@@ -160,7 +160,7 @@ passes. It runs in CI nightly against all four targets using ephemeral environme
 | Orchestrator | Work-item state machine, scheduling, maintenance windows, webhooks | Go service, Postgres for state |
 | Agent runtime | LLM loop with typed tools, per-role tool sets, cost budget | Go, OpenRouter chat completions with tool calling |
 | Policy engine | Turns a plan into a risk tier and approval requirement | OPA/Rego over `tofu show -json` output |
-| Runner | Runs plan, policy check and apply in a throwaway container | One container per job, no network egress beyond what the job needs |
+| Runner | Runs plan, policy check and apply in a throwaway container | One container per job, built with Nix, no network egress beyond what the job needs |
 | Access broker | Verifies grants, mints short-lived credentials, revokes on completion | Go service, the only component holding cloud trust |
 | Git forge | Hosts repos, PRs, code browsing | Forgejo, bundled |
 | Audit log | Append-only, hash-chained event record; evidence export | Postgres table plus periodic export to object storage |
@@ -278,6 +278,25 @@ Constraints:
   held in the secret store.
 - **Delivery is audited.** Each send, failure and retry is an audit event, so "who was told,
   and when" is answerable.
+
+### 5.5 Reproducible toolchain with Nix
+
+Nix is used in two places and deliberately nowhere else.
+
+- **Runner image.** The image that executes `tofu`, the policy checker, Helm and `kubectl`
+  against real environments is built from a Nix flake, so every tool is pinned to an exact
+  version and the image is reproducible. Its digest is recorded on each job's audit event next
+  to the plan hash. An approval therefore covers the tooling as well as the plan, and upgrading
+  OpenTofu or a provider toolchain is itself a reviewed change to `flake.lock`.
+- **Developer and CI shell.** The same flake provides a dev shell with `tofu`, `kubectl`,
+  `helm`, `kind`, Go, Node and the policy tools, so contributors and CI use identical versions
+  and "works on my machine" differences disappear from the conformance suite.
+
+What Nix is not used for:
+
+- **Hosts.** Cluster nodes are managed by each cloud; there is no NixOS in the design.
+- **Running the demo.** `docker compose up` with published images remains the only requirement
+  to try the prototype. Nix is needed to build and contribute, not to evaluate.
 
 ## 6. Permissions and just-in-time access
 
@@ -506,7 +525,7 @@ cloud and ported later.
 
 | # | Milestone | Delivers | Done when |
 |---|---|---|---|
-| M0 | Foundations | Repo layout, module contract, Paperboat 1.0.0 and chart, CI | Paperboat runs on the local target from one command |
+| M0 | Foundations | Repo layout, Nix flake (dev shell and runner image), module contract, Paperboat 1.0.0 and chart, CI running inside the flake | Paperboat runs on the local target from one command; the runner image builds to the same digest on two machines |
 | M1 | Blank slate everywhere | Per-cloud modules for all layers, bootstrap command, conformance suite | `tofu apply` from empty reaches a passing conformance run on AWS, GCP, Azure and local; teardown leaves nothing behind |
 | M2 | Change pipeline | Forge, orchestrator, runner, policy tiers, audit log, history store. Carbon UI shell, approval page, first version of the timeline. Notifier with all four channel adapters. No LLM yet | A hand-written PR goes plan → tier → approve → apply → verify through the dashboard, with logs and diff visible; the approver is notified on email, Slack, Teams and Discord; the change appears on the timeline |
 | M3 | Just-in-time access | Broker, grants, per-layer appliers, standing approvals, access view | Appliers have zero standing permissions; an apply without a valid grant, or with a stale plan, is refused on every cloud |
@@ -548,6 +567,7 @@ Ordering notes:
 /runbooks               parameterised jobs
 /conformance            cross-cloud test suite
 /deploy                 compose file and control-plane chart
+/flake.nix, /flake.lock pinned toolchain: dev shell and runner image
 /docs                   this plan, ADRs, demo script
 ```
 
@@ -559,6 +579,7 @@ on the forge copies are the source of truth for the running system.
 | Risk | Mitigation |
 |---|---|
 | Three clouds triples the infrastructure work | Strict contract, conformance suite, local target for most development |
+| Nix is unfamiliar to many contributors | Confined to one flake; day-to-day use is a single `nix develop`; not required to run the demo |
 | Cloud spend during development | TTL on every environment, smallest viable sizes, nightly rather than per-commit cloud CI |
 | Azure role assignments take time to propagate | Broker waits for the assignment to become effective before releasing the job; budget this into grant windows |
 | OpenTofu state contains secrets | OpenTofu client-side state and plan encryption on top of encrypted backends, state readable only by planner and applier identities, never sent to the model |
