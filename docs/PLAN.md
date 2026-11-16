@@ -13,14 +13,14 @@ This document covers the architecture, the use cases, the permissions model and 
 These five rules shape most of the design decisions below.
 
 1. **The model proposes and explains; deterministic code decides and executes.** The LLM drafts
-   Terraform changes, summaries and answers. It never classifies its own risk, never holds a
+   OpenTofu changes, summaries and answers. It never classifies its own risk, never holds a
    cloud credential, and has no tool that applies a change. Risk tier, approval requirement and
    execution come from policy code and a runner.
 2. **Every change is a pull request.** No console clicks, no ad-hoc `kubectl apply`. If the agent
    wants something changed, it changes a repository and a pipeline does the rest. Even "restart
    that deployment" is a recorded, parameterised runbook job.
 3. **What was approved is exactly what runs.** An approval is bound to a commit and to the hash
-   of a saved Terraform plan. If the world moved and the plan is stale, the apply fails and the
+   of a saved OpenTofu plan. If the world moved and the plan is stale, the apply fails and the
    work goes back for re-approval.
 4. **No standing write access.** Read-only by default. Write permissions exist only for the
    duration of one approved job, scoped to the layer that job touches.
@@ -35,7 +35,7 @@ Three things, kept deliberately separate:
 | Piece | What it is | Why it exists |
 |---|---|---|
 | **Paperboat** (the workload) | A small multi-service document-sharing app | Something realistic to operate: needs a database, a shared file system, a load balancer, and has versioned releases |
-| **Platform** (the IaC) | Terraform modules and per-environment stacks for each cloud | The thing the agent actually edits |
+| **Platform** (the IaC) | OpenTofu modules and per-environment stacks for each cloud | The thing the agent actually edits |
 | **Clanker** (the control plane) | Dashboard, agent, runner, access broker, git forge, audit log | The product concept being prototyped |
 
 A fourth piece, the **simulator**, makes the lifecycle demonstrable in minutes instead of months:
@@ -70,7 +70,7 @@ flowchart LR
   API -- approved job --> RUN
   RUN -- asks for grant --> BR
   BR -- short-lived credentials --> RUN
-  RUN -- terraform plan and apply --> ENV
+  RUN -- tofu plan and apply --> ENV
   AG -- read-only tools --> OBS
   API --> AUD
   RUN --> AUD
@@ -99,7 +99,7 @@ Releases are pre-built so upgrade scenarios are repeatable:
 - `1.1.1` — security patch (base image CVE)
 - `1.2.0-bad` — deliberately faulty release, for the failed-canary and rollback scenario
 
-Packaged as a Helm chart, deployed through Terraform so the app follows the same
+Packaged as a Helm chart, deployed through OpenTofu so the app follows the same
 plan-approve-apply path as the infrastructure.
 
 ## 4. Multi-cloud platform
@@ -117,7 +117,7 @@ Each cloud implements the same module interface. Stacks above the contract are c
 | Object storage | bucket for backups and evidence | S3 | Cloud Storage | Blob Storage | MinIO |
 | Secrets | secret store reference | Secrets Manager | Secret Manager | Key Vault | Kubernetes secrets |
 | Workload identity | pod-to-cloud identity binding | EKS Pod Identity | Workload Identity Federation | Entra Workload ID | none |
-| Terraform state | remote backend with locking | S3 | Cloud Storage | Blob Storage | MinIO |
+| OpenTofu state | remote backend with locking | S3 | Cloud Storage | Blob Storage | MinIO |
 | Cloud audit trail | source for cross-checking | CloudTrail | Cloud Audit Logs | Activity Log | Kubernetes audit log |
 
 Ingress uses the Kubernetes Gateway API with one portable implementation (Envoy Gateway) on
@@ -131,7 +131,7 @@ keeps the development loop short.
 
 ### 4.2 Stack layering
 
-Each environment is split into small Terraform states. This limits blast radius, keeps plans
+Each environment is split into small OpenTofu states. This limits blast radius, keeps plans
 readable, and lets credentials be scoped per layer.
 
 | Layer | Contents | Change frequency | Typical risk |
@@ -154,10 +154,12 @@ passes. It runs in CI nightly against all four targets using ephemeral environme
 
 | Component | Responsibility | Prototype choice |
 |---|---|---|
-| Dashboard | Work queue, plan review, fleet health, chat, audit, access views | React single-page app served by the orchestrator |
+| Dashboard | Work queue, plan review, fleet health, timeline, chat, audit, access views | React single-page app built on the Carbon Design System, served by the orchestrator |
+| Notifier | Routes events to email, Slack, Microsoft Teams and Discord | Go service with one adapter per channel |
+| History store | Point-in-time snapshots of inventory, versions and health for the timeline | Postgres, written after every apply and on a schedule |
 | Orchestrator | Work-item state machine, scheduling, maintenance windows, webhooks | Go service, Postgres for state |
 | Agent runtime | LLM loop with typed tools, per-role tool sets, cost budget | Go, OpenRouter chat completions with tool calling |
-| Policy engine | Turns a plan into a risk tier and approval requirement | OPA/Rego over `terraform show -json` output |
+| Policy engine | Turns a plan into a risk tier and approval requirement | OPA/Rego over `tofu show -json` output |
 | Runner | Runs plan, policy check and apply in a throwaway container | One container per job, no network egress beyond what the job needs |
 | Access broker | Verifies grants, mints short-lived credentials, revokes on completion | Go service, the only component holding cloud trust |
 | Git forge | Hosts repos, PRs, code browsing | Forgejo, bundled |
@@ -206,7 +208,7 @@ and that tool set is the security boundary.
 | Role | Does | Tools | Cannot |
 |---|---|---|---|
 | Triage | Reads detector findings, groups and prioritises, opens work items | Read metrics, logs, cloud inventory, advisories | Touch repos or credentials |
-| Author | Writes the Terraform or runbook change and opens a PR | Read repos, write to a branch, request a plan | Merge, approve, apply |
+| Author | Writes the OpenTofu or runbook change and opens a PR | Read repos, write to a branch, request a plan | Merge, approve, apply |
 | Explainer | Writes the approval summary and answers questions | Read plan JSON, PR diff, history, audit log | Change anything |
 | Investigator | Diagnoses incidents under a debug grant | Scoped read tools, recorded session commands | Make persistent changes |
 
@@ -218,7 +220,7 @@ Safeguards:
 - **Faithful summaries.** Counts, resource names, replace/destroy flags and cost deltas on the
   approval page come from the plan JSON directly. The LLM writes prose around those facts and
   cannot alter them.
-- **Redaction.** Tool outputs pass through a secret scrubber before reaching the model. Terraform
+- **Redaction.** Tool outputs pass through a secret scrubber before reaching the model. OpenTofu
   state is never sent.
 - **Replay mode.** Recorded model responses let the full demo run without a key or network.
 
@@ -234,6 +236,49 @@ Safeguards:
 - Telemetry leaves your boundary when it is sent to a model. An allowlist controls which data
   classes may be included, with the default excluding application data and secrets.
 
+### 5.4 Notifications
+
+One notifier service consumes the same event stream as the audit log and fans out through
+channel adapters. Adding a channel means adding an adapter, nothing else.
+
+| Channel | Transport | Message format | Local demo |
+|---|---|---|---|
+| Email | SMTP | HTML built from the same facts as the approval page, plain-text alternative | Mailpit captures mail in a local inbox |
+| Slack | Incoming webhook, or a Slack app when threading is wanted | Block Kit | Real workspace or recorded payloads |
+| Microsoft Teams | Workflows webhook | Adaptive Card | Real tenant or recorded payloads |
+| Discord | Channel webhook | Embed | Real server or recorded payloads |
+
+What gets sent:
+
+| Event | Default urgency | Typical audience |
+|---|---|---|
+| Approval needed | Immediate | Approvers for that environment and tier |
+| Approval still waiting | Reminder, then escalation | Approvers, then their backup |
+| Change started, succeeded, failed, rolled back | Immediate for failures, digest otherwise | Operators |
+| Incident opened, updated, resolved | Immediate | On-call |
+| Debug or break-glass grant issued | Immediate | Security, admins |
+| Drift or overdue patch detected | Digest | Operators |
+| Upcoming maintenance | Daily or weekly digest | Everyone subscribed |
+| Inference spend cap reached | Immediate | Admins |
+
+Routing rules match on event type, environment, layer and risk tier, and resolve to channels
+and recipients. They live in the `runbooks` repo, so changing who gets told about what is itself
+a reviewed pull request. Rules support immediate versus digest delivery, quiet hours (which T3
+and incidents override), de-duplication, and threading follow-ups under the original message
+where the channel allows it.
+
+Constraints:
+
+- **Notifications link, they do not approve.** Every message deep-links to the work item, and
+  the decision is made in the dashboard after sign-in. A chat identity is not a verified
+  approver identity, so there are no approve buttons in chat in the prototype.
+- **Messages carry no secrets.** They pass through the same scrubber as model input and are
+  built from plan facts, not free-form model output.
+- **Webhook URLs and SMTP credentials are secrets**, entered at bootstrap or in settings and
+  held in the secret store.
+- **Delivery is audited.** Each send, failure and retry is an audit event, so "who was told,
+  and when" is answerable.
+
 ## 6. Permissions and just-in-time access
 
 ### 6.1 Identities
@@ -241,7 +286,7 @@ Safeguards:
 | Identity | Standing access | Elevation |
 |---|---|---|
 | `observer` | Read-only on cloud inventory, metrics, logs, Kubernetes `view`. No secret values | None |
-| `planner` | Read-only plus state read, enough to run `terraform plan` | None |
+| `planner` | Read-only plus state read, enough to run `tofu plan` | None |
 | `applier-<layer>` | **None** | Assumable only with a valid grant for that layer |
 | `debugger` | **None** | Time-boxed, namespace-scoped, session recorded |
 | `broker` | May mint credentials for the identities above. No resource permissions itself | None |
@@ -308,13 +353,16 @@ long-lived key exists anywhere.
 
 | Area | Answers |
 |---|---|
-| **Overview** | Is each environment healthy? What needs me right now? |
+| **Overview** | Is each environment healthy? What needs me right now? What happened since I last looked? |
+| **Timeline** | What happened, when, across every environment, and what is coming next? |
+| **Topology** | What exists in this environment, how is it connected, and what state is each part in? |
 | **Upcoming** | What work is scheduled or forecast, when, and why? |
 | **Approvals** | What is waiting on a decision? |
 | **Activity** | What ran, who approved it, what happened? Logs, plan and diff for each |
 | **Code** | Repos, PRs and history (the forge, linked from every work item) |
 | **Access** | Who and what holds which permission right now; grant history |
 | **Audit** | Searchable event log; evidence export |
+| **Notifications** | Who gets told about what, on which channel; delivery history |
 | **Ask** | Chat grounded in all of the above |
 
 ### 7.2 Approval page
@@ -345,6 +393,76 @@ hands-on can drill all the way to the raw plan.
 - What does the agent have access to right now?
 
 Answers cite work items, PRs and audit events, so every claim is one click from its source.
+
+### 7.4 Orientation and history
+
+The goal is that someone opening the control plane cold, or after two weeks away, understands
+the state of the world in about thirty seconds. Four views do that work, and they share one
+time control.
+
+**Catch-up panel.** The top of Overview is a short summary of what changed since this person's
+last visit: changes applied, anything that failed or rolled back, incidents, and decisions now
+waiting on them. Counts come from the audit log; the agent writes the two-line narrative.
+
+**Timeline.** The centrepiece. A horizontal time axis with one swimlane per environment, each
+expandable into its layers.
+
+- Past: changes (coloured by outcome), approvals, incidents, alerts, backups and restore
+  drills, detector findings, grants issued.
+- Future, on the same axis past a "now" marker: approved and scheduled work, maintenance
+  windows, and forecasts such as version end-of-support dates, certificate expiry and storage
+  running out.
+- A health strip under each lane shows SLO attainment over time, so cause and effect line up
+  visually: a deploy marker directly above the dip it caused.
+- Zoom from a year down to minutes; brush to select a range; filter by environment, layer,
+  event type or risk tier. Selecting a range filters every other view to that window.
+- Any marker opens the work item with its plan, diff, logs and approval record.
+
+**Point-in-time view.** A scrubber on the timeline sets "as of" for the whole dashboard.
+Topology, versions, open work and access grants all render as they were at that moment, with a
+persistent banner saying so. This is cheap because the audit log is an ordered event stream,
+the forge holds the code at every commit, and the history store snapshots inventory after each
+apply. "Compare with now" shows what differs between then and the present.
+
+**Topology.** One diagram per environment, laid out by layer: network, cluster and node pools,
+database, file system, load balancer, and the application services on top. Each node shows
+health, current version, and badges for pending change, drift or an open incident. Works with
+the scrubber. A side-by-side mode lines up the same diagram for all four targets, which is the
+fastest way to see that one cloud is behind the others.
+
+Supporting visualisations:
+
+- **Version posture matrix**: environments down, components across (Kubernetes, node image,
+  Postgres, add-ons, Paperboat), each cell coloured by how far behind current it is.
+- **Change markers on every metric chart**: any time series can overlay deploys and incidents.
+- **Approval flow**: per work item, a progress indicator of the state machine with time spent
+  in each state.
+- **Access over time**: a lane chart of grants, making it obvious that write access exists
+  only in short bursts aligned with approved work.
+
+### 7.5 Design system
+
+All UI is built from the IBM Carbon Design System, with no bespoke component styling.
+
+| Need | Carbon piece |
+|---|---|
+| Application frame and navigation | UI Shell (header, side navigation, switcher) |
+| Work queue, activity, audit | Data table with sorting, filtering, batch actions and expansion |
+| Status and risk tier | Tags, inline and toast notifications, status icons |
+| Approval page | Tiles, structured list, progress indicator, modal for confirmation |
+| Plans, diffs and logs | Code snippet, tabs, accordion |
+| Marking AI-written content | Carbon's AI label, with the explanation popover linking to sources |
+| Charts | Carbon Charts (line, area, bar, heatmap, gauge, meter) |
+| Icons and empty states | Carbon icons and pictograms |
+| Typography and theme | IBM Plex; light and dark Carbon themes, following the system setting |
+
+Carbon Charts covers the standard charts. It does not provide a swimlane timeline or a
+topology diagram, so those two are custom components drawn with D3 and styled exclusively with
+Carbon tokens (colour, spacing, type, motion) so they are indistinguishable from the rest of
+the UI in both themes. Status is never conveyed by colour alone; every state has an icon and a
+label, in line with Carbon's accessibility guidance.
+
+Notification emails use the same visual language where email clients allow it.
 
 ## 8. Use cases
 
@@ -389,11 +507,11 @@ cloud and ported later.
 | # | Milestone | Delivers | Done when |
 |---|---|---|---|
 | M0 | Foundations | Repo layout, module contract, Paperboat 1.0.0 and chart, CI | Paperboat runs on the local target from one command |
-| M1 | Blank slate everywhere | Per-cloud modules for all layers, bootstrap command, conformance suite | `terraform apply` from empty reaches a passing conformance run on AWS, GCP, Azure and local; teardown leaves nothing behind |
-| M2 | Change pipeline | Forge, orchestrator, runner, policy tiers, approval page, audit log. No LLM yet | A hand-written PR goes plan → tier → approve → apply → verify through the dashboard, with logs and diff visible |
+| M1 | Blank slate everywhere | Per-cloud modules for all layers, bootstrap command, conformance suite | `tofu apply` from empty reaches a passing conformance run on AWS, GCP, Azure and local; teardown leaves nothing behind |
+| M2 | Change pipeline | Forge, orchestrator, runner, policy tiers, audit log, history store. Carbon UI shell, approval page, first version of the timeline. Notifier with all four channel adapters. No LLM yet | A hand-written PR goes plan → tier → approve → apply → verify through the dashboard, with logs and diff visible; the approver is notified on email, Slack, Teams and Discord; the change appears on the timeline |
 | M3 | Just-in-time access | Broker, grants, per-layer appliers, standing approvals, access view | Appliers have zero standing permissions; an apply without a valid grant, or with a stale plan, is refused on every cloud |
 | M4 | The agent | OpenRouter client, roles and tools, detectors, plan explanations, Ask, replay mode | The agent notices a new release unprompted, opens the PR, and the approval page explains it accurately |
-| M5 | Lifecycle | Simulator and use cases 4–16 | The scripted month runs end to end on each cloud |
+| M5 | Lifecycle | Simulator and use cases 4–16. Full timeline with forecasts, point-in-time view, topology, version posture matrix, digests and escalation | The scripted month runs end to end on each cloud, and scrubbing back through it shows the correct state at each step |
 | M6 | Incidents and audit | Investigator role, debug grants, incident write-ups, evidence export | Use cases 17, 18, 21 pass; the evidence pack reconciles against the cloud's own audit trail |
 | M7 | Demo polish | Guided demo mode, seeded history, documentation | A newcomer can go from clone to full local demo in under 15 minutes |
 
@@ -401,6 +519,9 @@ Ordering notes:
 
 - M2 comes before the agent on purpose. The pipeline, policy and audit trail must be trustworthy
   with a human author first; the agent then becomes just another PR author.
+- The timeline and notifier start in M2 because both are just consumers of the audit event
+  stream. Building them early forces that stream to be complete, and gives every later
+  milestone a visible result for free.
 - M1 is the most expensive milestone and the most parallelisable: the three cloud modules can be
   built independently against the contract and the conformance suite.
 - Cloud environments are ephemeral with a TTL from M1. Cost estimates are attached to every plan
@@ -416,9 +537,11 @@ Ordering notes:
 /internal/runner        plan, policy check, apply, log capture
 /internal/policy        Rego rules and tier mapping
 /internal/audit         hash-chained event log, evidence export
+/internal/notify        routing rules, email, Slack, Teams, Discord adapters
+/internal/history       point-in-time snapshots for the timeline
 /internal/detect        detectors
 /internal/sim           clock, advisories, releases, faults
-/web                    dashboard
+/web                    dashboard (Carbon React, Carbon Charts, timeline and topology)
 /platform/modules       contract plus aws, gcp, azure, local
 /platform/stacks        00-bootstrap … 50-app
 /apps/paperboat         services, chart, releases
@@ -438,10 +561,13 @@ on the forge copies are the source of truth for the running system.
 | Three clouds triples the infrastructure work | Strict contract, conformance suite, local target for most development |
 | Cloud spend during development | TTL on every environment, smallest viable sizes, nightly rather than per-commit cloud CI |
 | Azure role assignments take time to propagate | Broker waits for the assignment to become effective before releasing the job; budget this into grant windows |
-| Terraform state contains secrets | Encrypted backends, state readable only by planner and applier identities, never sent to the model |
+| OpenTofu state contains secrets | OpenTofu client-side state and plan encryption on top of encrypted backends, state readable only by planner and applier identities, never sent to the model |
 | Model writes a plausible but wrong change | It still has to survive `validate`, plan, policy and a human; summaries are built from plan facts |
 | Managed-service upgrades are slow and not always reversible | Simulator compresses time for demos; irreversible steps are always T3 with a verified backup first |
 | The demo depends on a live model | Replay mode |
+| Carbon has no timeline or topology component | Two custom D3 components restricted to Carbon tokens; everything else stays stock Carbon |
+| Notification fatigue makes approvers ignore messages | Digest by default, immediate only for decisions and failures, de-duplication, per-person subscriptions |
+| Chat webhooks leak operational detail to broad channels | Scrubbed, fact-only messages; routing rules reviewed as code; sensitive detail stays behind the dashboard link |
 
 ## 12. Decisions to confirm
 
@@ -449,8 +575,9 @@ Defaults are chosen so work can start; each is cheap to change before the milest
 
 | Decision | Default | Alternative | Settle by |
 |---|---|---|---|
-| IaC binary | Terraform, written to stay OpenTofu-compatible | OpenTofu as the default | M0 |
-| Control-plane language | Go backend, React front end | TypeScript throughout | M0 |
+| Control-plane language | Go backend; front end is React because Carbon's primary library is React | TypeScript backend as well | M0 |
+| Approving from chat | Not offered; messages link to the dashboard | Signed, single-use approve links or a Slack/Teams app with verified identity mapping | M6 |
+| Slack integration depth | Incoming webhook | Slack app, for threading and richer interaction | M2 |
 | Forge | Forgejo, bundled | Gitea, or an external GitHub/GitLab | M2 |
 | Where the control plane runs | Docker Compose on one machine | Small dedicated management cluster | M3 |
 | Broker trust for the prototype | One scoped credential per cloud | Workload identity federation from day one | M3 |
