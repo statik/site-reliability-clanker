@@ -393,7 +393,7 @@ struct DetailModelTests {
     let name = "buffer-test-\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: name))
     defer { defaults.removePersistentDomain(forName: name) }
-    let app = AppModel(defaults: defaults)
+    let app = AppModel(defaults: defaults, tokens: MemoryTokenStore())
     for seq in 1...(AppModel.eventBufferSize + 5) {
       app.receive(try event(seq, "x"))
     }
@@ -421,14 +421,14 @@ struct DetailModelTests {
     options.initialScreen = "activity"
     options.workItem = "WI-0005"
     options.user = "alice"
-    let app = AppModel(defaults: defaults, options: options)
+    let app = AppModel(defaults: defaults, options: options, tokens: MemoryTokenStore())
     #expect(app.selectedTab == .activity)
     #expect(app.path(for: .activity) == [.activity("WI-0005")])
     #expect(app.settings.user == "alice")
     #expect(AppSettings.load(from: defaults).user == "dave")
     var approval = LaunchOptions()
     approval.workItem = "WI-0020"
-    let second = AppModel(defaults: defaults, options: approval)
+    let second = AppModel(defaults: defaults, options: approval, tokens: MemoryTokenStore())
     #expect(second.selectedTab == .approvals)
     #expect(second.path(for: .approvals) == [.approval("WI-0020")])
   }
@@ -437,7 +437,7 @@ struct DetailModelTests {
     let name = "citation-test-\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: name))
     defer { defaults.removePersistentDomain(forName: name) }
-    let app = AppModel(defaults: defaults)
+    let app = AppModel(defaults: defaults, tokens: MemoryTokenStore())
     app.selectedTab = .ask
     app.open(Citation(type: "work_item", id: "WI-0007", label: "WI-0007"))
     #expect(app.path(for: .ask) == [.activity("WI-0007")])

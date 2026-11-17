@@ -95,8 +95,9 @@ struct EventStreamReader: Sendable {
   let api: ControlPlaneAPI
   var retryDelay: Duration = .seconds(3)
 
-  static func streamSession() -> URLSession {
-    let configuration = URLSessionConfiguration.default
+  /// A session for the stream, configured like the session of the other requests.
+  static func streamSession(like session: URLSession) -> URLSession {
+    let configuration = session.configuration
     // The server sends nothing while no event happens. Do not time the request out.
     configuration.timeoutIntervalForRequest = 60 * 60 * 24
     configuration.timeoutIntervalForResource = 60 * 60 * 24 * 7
@@ -106,7 +107,7 @@ struct EventStreamReader: Sendable {
   func updates() -> AsyncStream<StreamUpdate> {
     AsyncStream { continuation in
       let task = Task {
-        let session = Self.streamSession()
+        let session = Self.streamSession(like: api.client.session)
         var lastSeq = 0
         while !Task.isCancelled {
           do {
@@ -140,7 +141,7 @@ struct EventStreamReader: Sendable {
       throw APIError.transport(
         url: request.url?.absoluteString ?? "", detail: error.localizedDescription)
     }
-    try APIClient.check(response: response, data: Data())
+    try await api.client.validate(response: response, data: Data())
     continuation.yield(.connected)
     if lastSeq > 0 {
       for event in try await api.events(after: lastSeq) {

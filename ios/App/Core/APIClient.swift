@@ -28,17 +28,31 @@ enum APIError: Error, Equatable, LocalizedError {
   }
 }
 
-/// A small JSON-over-HTTP client. It names the demo user on every request.
+/// How a request says who asks.
+enum Credential: Sendable, Equatable {
+  /// The demo: the name of a demo user in the `X-Clanker-User` header. Only a control plane
+  /// without a sign-in reads it.
+  case demoUser(String)
+  /// A control plane with a sign-in: the token that the device flow gave.
+  case bearer(String)
+  /// Nobody yet: the requests of the device flow itself.
+  case anonymous
+}
+
+/// A small JSON-over-HTTP client. Every request carries the credential of the client.
 struct APIClient: Sendable {
   static let userHeader = "X-Clanker-User"
 
   let baseURL: URL
-  let user: String
+  let credential: Credential
   let session: URLSession
+  /// Runs before a call throws for an answer with status 401: the server does not know who
+  /// asks. The app uses it to go back to the sign-in.
+  var onUnauthorized: (@Sendable () async -> Void)?
 
-  init(baseURL: URL, user: String, session: URLSession = .shared) {
+  init(baseURL: URL, credential: Credential, session: URLSession = .shared) {
     self.baseURL = baseURL
-    self.user = user
+    self.credential = credential
     self.session = session
   }
 
@@ -53,6 +67,25 @@ struct APIClient: Sendable {
     return try await send(request)
   }
 
+  /// Posts form fields, which is what the endpoints of the device flow read.
+  func postForm<T: Decodable>(_ path: String, fields: [String: String]) async throws -> T {
+    var request = try request(path, method: "POST", query: [])
+    request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+    request.httpBody = Data(Self.formEncoded(fields).utf8)
+    return try await send(request)
+  }
+
+  static func formEncoded(_ fields: [String: String]) -> String {
+    var unreserved = CharacterSet.alphanumerics
+    unreserved.insert(charactersIn: "-._~")
+    func escape(_ text: String) -> String {
+      text.addingPercentEncoding(withAllowedCharacters: unreserved) ?? ""
+    }
+    return fields.sorted { $0.key < $1.key }
+      .map { "\(escape($0.key))=\(escape($0.value))" }
+      .joined(separator: "&")
+  }
+
   func request(_ path: String, method: String, query: [URLQueryItem]) throws -> URLRequest {
     guard
       var components = URLComponents(
@@ -64,9 +97,20 @@ struct APIClient: Sendable {
     }
     var request = URLRequest(url: url)
     request.httpMethod = method
-    request.setValue(user, forHTTPHeaderField: Self.userHeader)
+    switch credential {
+    case .demoUser(let name): request.setValue(name, forHTTPHeaderField: Self.userHeader)
+    case .bearer(let token):
+      request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    case .anonymous: break
+    }
     request.setValue("application/json", forHTTPHeaderField: "Accept")
     return request
+  }
+
+  /// Checks the status of an answer. A 401 first runs `onUnauthorized`.
+  func validate(response: URLResponse, data: Data) async throws {
+    if (response as? HTTPURLResponse)?.statusCode == 401 { await onUnauthorized?() }
+    try Self.check(response: response, data: data)
   }
 
   private func send<T: Decodable>(_ request: URLRequest) async throws -> T {
@@ -79,7 +123,7 @@ struct APIClient: Sendable {
       throw APIError.transport(
         url: request.url?.absoluteString ?? path, detail: error.localizedDescription)
     }
-    try Self.check(response: response, data: data)
+    try await validate(response: response, data: data)
     do {
       return try JSONDecoder().decode(T.self, from: data)
     } catch let error as DecodingError {

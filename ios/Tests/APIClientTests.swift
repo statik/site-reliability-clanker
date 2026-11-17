@@ -6,7 +6,7 @@ import Testing
 @Suite("API client")
 struct APIClientTests {
   @Test func everyGetNamesTheUserInTheHeader() async throws {
-    let (client, host) = try StubProtocol.client(user: "bob", body: "[]")
+    let (client, host) = try StubProtocol.client(credential: .demoUser("bob"), body: "[]")
     let api = ControlPlaneAPI(client: client)
     _ = try await api.workItems()
     _ = try await api.chat(workItem: "WI-0020")
@@ -19,7 +19,7 @@ struct APIClientTests {
 
   @Test func decisionIsPostedWithUserHeaderPathAndBody() async throws {
     let item = #"{"id": "WI-0020", "state": "Approved"}"#
-    let (client, host) = try StubProtocol.client(user: "alice", body: item)
+    let (client, host) = try StubProtocol.client(credential: .demoUser("alice"), body: item)
     let request = DecisionRequest(decision: .approve, comment: "  looks right \n")
     let answer = try await ControlPlaneAPI(client: client).decide("WI-0020", request)
     #expect(answer.state == .approved)
@@ -47,7 +47,7 @@ struct APIClientTests {
     let message =
       "dave has role viewer and cannot decide on WI-0020: an approver or admin must decide"
     let (client, _) = try StubProtocol.client(
-      user: "dave", status: 403, body: #"{"error": "\#(message)"}"#)
+      credential: .demoUser("dave"), status: 403, body: #"{"error": "\#(message)"}"#)
     let request = DecisionRequest(decision: .requestChanges, comment: "")
     do {
       _ = try await ControlPlaneAPI(client: client).decide("WI-0020", request)
@@ -112,7 +112,8 @@ struct APIClientTests {
     // Port 1 on the loopback interface has no listener.
     let url = try AppSettings.baseURL("http://127.0.0.1:1")
     let client = APIClient(
-      baseURL: url, user: "alice", session: URLSession(configuration: .ephemeral))
+      baseURL: url, credential: .demoUser("alice"),
+      session: URLSession(configuration: .ephemeral))
     do {
       _ = try await ControlPlaneAPI(client: client).overview()
       Issue.record("The call must throw")
