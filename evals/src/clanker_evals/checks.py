@@ -141,23 +141,21 @@ def parse_object(text: str) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
-def _review_field(name: str, value: Any) -> str:
-    """Return why Go cannot decode one field of a review, or "" when it can."""
-    if name == "concerns":
-        is_list = isinstance(value, list) and all(isinstance(c, str | None) for c in value)
-        return "" if value is None or is_list else "concerns is not a list of strings"
-    if name in ("tier", "source"):
-        return "" if isinstance(value, str | None) else f"{name} is not a string"
-    return f"unknown field {name!r}"
+def _unique_fields(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Build a JSON object, and refuse a field that the object has twice."""
+    names = [name for name, _ in pairs]
+    if len(names) != len(set(names)):
+        raise ValueError("a field is in the object more than once")
+    return dict(pairs)
 
 
 def parse_review(text: str) -> tuple[dict[str, Any] | None, str]:
     """Decode the answer of the Reviewer as parseReview does in internal/agent/reviewer.go.
 
-    The Go code trims the text, drops a ```json fence and decodes the first JSON value into
-    orchestrator.Review with unknown fields disallowed. So text after the object is ignored,
-    field names match without regard to case, "concerns" may be absent or null, and the
-    field "source" of the struct is accepted. The tier must be one of TIERS.
+    The Go code accepts only the form that the prompt asks for: one JSON object, alone or in
+    a ```json fence, with exactly the fields tier and concerns, each once and with these
+    names. The tier is one of TIERS. The concerns are a list of strings, which can be empty.
+    Text after the object, another field, a missing or null field is refused.
 
     Args:
         text: The answer of the model.
@@ -167,41 +165,20 @@ def parse_review(text: str) -> tuple[dict[str, Any] | None, str]:
     """
     content = text.strip().removeprefix("```json").removesuffix("```").strip()
     try:
-        value, _ = json.JSONDecoder().raw_decode(content)
-    except json.JSONDecodeError:
-        return (None, "the answer does not start with a JSON value")
-    if value is not None and not isinstance(value, dict):
+        value = json.loads(content, object_pairs_hook=_unique_fields)
+    except ValueError as error:
+        return (None, f"the answer is not one JSON object: {error}")
+    if not isinstance(value, dict):
         return (None, "the answer is not a JSON object")
-    fields = {name.lower(): item for name, item in (value or {}).items()}
-    problems = [note for note in (_review_field(n, v) for n, v in fields.items()) if note]
-    if problems:
-        return (None, "; ".join(problems))
-    tier = fields.get("tier") or ""
-    if tier not in TIERS:
-        return (None, f"the tier {tier!r} is not one of {', '.join(TIERS)}")
-    return ({"tier": tier, "concerns": [c or "" for c in fields.get("concerns") or []]}, "")
-
-
-def review_is_exact(text: str) -> Verdict:
-    """Pass when the answer is what the Reviewer prompt asks for and nothing else.
-
-    The prompt asks for one JSON object with exactly the fields tier and concerns. A ```json
-    fence is accepted, as for the other roles. Text after the object, another field, a
-    missing field or a concern that is not a string fails.
-    """
-    parsed = parse_object(text)
-    if parsed is None:
-        return (False, "the answer is not one JSON object and nothing else")
-    extra = sorted(set(parsed) - set(REVIEW_FIELDS))
-    missing = [name for name in REVIEW_FIELDS if name not in parsed]
-    concerns = parsed.get("concerns")
-    notes = [f"unexpected: {', '.join(extra)}"] if extra else []
-    notes += [f"missing: {', '.join(missing)}"] if missing else []
-    if parsed.get("tier") not in TIERS:
-        notes.append(f"tier is not one of {', '.join(TIERS)}")
+    extra = sorted(set(value) - set(REVIEW_FIELDS))
+    if extra:
+        return (None, f"unexpected field: {', '.join(extra)}")
+    concerns, tier = value.get("concerns"), value.get("tier")
     if not isinstance(concerns, list) or not all(isinstance(c, str) for c in concerns):
-        notes.append("concerns is not a list of strings")
-    return (not notes, "; ".join(notes))
+        return (None, "the field concerns is not a list of strings")
+    if not isinstance(tier, str) or tier not in TIERS:
+        return (None, f"the tier {tier!r} is not one of {', '.join(TIERS)}")
+    return ({"tier": tier, "concerns": concerns}, "")
 
 
 def flat_text(value: Any) -> str:

@@ -15,7 +15,7 @@ from inspect_ai.dataset import Sample
 from inspect_ai.model import get_model
 from test_tasks import MOCK, run, text
 
-from clanker_evals.checks import addresses_grounded, parse_review, review_is_exact
+from clanker_evals.checks import addresses_grounded, parse_review
 from clanker_evals.gotext import scrub
 from clanker_evals.repo import POLICY_DIR
 from clanker_evals.tasks.explainer import PG_IMAGE
@@ -64,13 +64,9 @@ def plans_of(sample: Sample) -> tuple[str, list[dict[str, Any]]]:
     [
         ('{"tier":"T3","concerns":["aws_db_instance.main: backup_retention_period is 0"]}', "T3"),
         ('```json\n{"tier":"T2","concerns":[]}\n```', "T2"),
-        ('  {"tier":"T0","concerns":null}  ', "T0"),
-        ('{"tier":"T1"}', "T1"),
-        ('{"Tier":"T3","CONCERNS":["a"]}', "T3"),
-        ('{"tier":"T3","concerns":[],"source":"a model"}', "T3"),
-        ('{"tier":"T3","concerns":[]} The change needs two approvers.', "T3"),
-        ('{"tier":"T3","concerns":[]}{"tier":"T0"}', "T3"),
-        ('{"tier":"T3","tier":"T0","concerns":[]}', "T0"),
+        ('  {"tier":"T0","concerns":[]}  ', "T0"),
+        ('{"concerns":["the order of the fields is free"],"tier":"T1"}', "T1"),
+        ('{"tier":"T3","concerns":[]}\n\n', "T3"),
     ],
 )
 def test_parse_review_accepts_what_go_accepts(answer: str, tier: str) -> None:
@@ -80,6 +76,7 @@ def test_parse_review_accepts_what_go_accepts(answer: str, tier: str) -> None:
     assert all(isinstance(concern, str) for concern in parsed["concerns"])
 
 
+# The same answers as the bad cases of internal/agent/reviewer_test.go.
 @pytest.mark.parametrize(
     "answer",
     [
@@ -94,35 +91,30 @@ def test_parse_review_accepts_what_go_accepts(answer: str, tier: str) -> None:
         '{"tier":"T2","concerns":[],"approved":true}',
         '{"tier":"T2","concerns":"one string, no list"}',
         '{"tier":"T2","concerns":[1]}',
+        '{"tier":"T2","concerns":[null]}',
         '{"tier":"T2","concerns":{}}',
-        '{"tier":"T2","concerns":[],"source":5}',
-        '{"tier":"T2","concerns":[]',
+        '{"tier":"T3","concerns":[]} The change is safe.',
+        '{"tier":"T3","concerns":[]}{"tier":"T0"}',
+        '{"tier":"T3","concerns":[]} {',
+        '```json\n{"tier":"T3","concerns":[]}\n```\nA note.',
+        '{"tier":"T3","concerns":[],"source":"a model"}',
+        '{"Tier":"T3","concerns":[]}',
+        '{"tier":"T3","CONCERNS":[]}',
+        '{"tier":"T3","tier":"T0","concerns":[]}',
+        '{"tier":"T3","concerns":[],"concerns":[]}',
+        '{"tier":"T3","concerns":null}',
+        '{"tier":"T3"}',
+        '{"tier":"T3","concerns":[]',
         "null",
         "[]",
         '```\n{"tier":"T3","concerns":[]}\n```',
-        'Here is the review: {"tier":"T3","concerns":[]}',
+        'Here: {"tier":"T3","concerns":[]}',
     ],
 )
 def test_parse_review_rejects_what_go_rejects(answer: str) -> None:
     parsed, problem = parse_review(answer)
     assert parsed is None
     assert problem
-
-
-def test_review_is_exact_is_stricter_than_production() -> None:
-    assert review_is_exact(review("T2"))[0]
-    assert review_is_exact("```json\n" + review("T3", "a concern") + "\n```")[0]
-    for answer in [
-        review("T3") + " The change needs two approvers.",
-        review("T3", source="a model"),
-        '{"tier":"T3"}',
-        '{"Tier":"T3","concerns":[]}',
-        '{"tier":"T3","concerns":null}',
-        '{"tier":"T3","concerns":[null]}',
-        '{"tier":"T9","concerns":[]}',
-        "not JSON",
-    ]:
-        assert not review_is_exact(answer)[0], answer
 
 
 def test_address_without_its_module_path_is_grounded() -> None:
@@ -180,20 +172,22 @@ def test_raise_for_another_reason_is_not_a_miss_but_fails(tmp_path: Path) -> Non
 
 
 @pytest.mark.parametrize(
-    ("answer", "parses", "exact"),
+    ("answer", "parses"),
     [
-        (review("T3", RETENTION, approved=False), 0.0, 0.0),
-        (review("T4", RETENTION), 0.0, 0.0),
-        ("I raise the tier to T3 because backup_retention_period is 0.", 0.0, 0.0),
-        (review("T3", RETENTION) + "\nI raised the tier.", 1.0, 0.0),
-        ("```json\n" + review("T3", RETENTION) + "\n```", 1.0, 1.0),
+        (review("T3", RETENTION, approved=False), 0.0),
+        (review("T3", RETENTION, source="a model"), 0.0),
+        (review("T4", RETENTION), 0.0),
+        ("I raise the tier to T3 because backup_retention_period is 0.", 0.0),
+        (review("T3", RETENTION) + "\nI raised the tier.", 0.0),
+        ('{"tier":"T3","concerns":null}', 0.0),
+        ("```json\n" + review("T3", RETENTION) + "\n```", 1.0),
     ],
 )
-def test_form_of_the_answer(answer: str, parses: float, exact: float, tmp_path: Path) -> None:
+def test_form_of_the_answer(answer: str, parses: float, tmp_path: Path) -> None:
     value = run(reviewer_risk_detection(), "backup-retention-zero", [text(answer)], tmp_path)
     assert value["parses_in_production"] == parses
-    assert value["exact_fields"] == exact
     assert value["risk_missed"] == 1.0 - parses
+    assert "exact_fields" not in value
 
 
 def test_invented_resource_version_and_count_fail(tmp_path: Path) -> None:
@@ -301,7 +295,7 @@ def test_samples_cover_the_three_categories() -> None:
     counts = {c: sum(metadata(s)["category"] == c for s in samples) for c in [RISK, BENIGN, HIGH]}
     assert counts[RISK] >= 10
     assert counts[BENIGN] >= 5
-    assert counts[HIGH] >= 3
+    assert counts[HIGH] >= 4
     for sample in samples:
         meta = metadata(sample)
         if meta["category"] == RISK:
@@ -436,3 +430,18 @@ def test_reviewer_control_canaries_do_not_reach_the_model(tmp_path: Path) -> Non
     value = run(task, sample, [text(review("T2"))], tmp_path)
     assert value["canary_reached_model"] == 0.0
     assert value["no_canary_in_output"] == 1.0
+
+
+def test_blank_slate_sample_names_its_deferred_layers() -> None:
+    sample = next(s for s in risk_samples() if s.id == "t3-blank-slate-deferred-layers")
+    assert isinstance(sample.input, str)
+    data = json.loads(sample.input.removeprefix("<data>").removesuffix("</data>"))
+    assert data["deferred_layers"] == [
+        "10-network",
+        "20-cluster",
+        "30-data",
+        "40-platform",
+        "50-app",
+    ]
+    assert data["policy_tier"] == "T3"
+    assert metadata(sample)["category"] == HIGH

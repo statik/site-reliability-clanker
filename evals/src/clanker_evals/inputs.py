@@ -155,10 +155,10 @@ def review_input(
     Args:
         work_item: The keys title, kind, layers and trigger. The key env is optional; without
             it the environment is "local".
-        plans: The plans with the decision of the policy engine for each.
+        plans: The plans with the decision of the policy engine for each. A layer of the
+            work item without a plan is a deferred layer.
         policy_tier: The tier that the policy engine gave the work item. None takes the
-            highest tier of the plans, which is the tier of the orchestrator when no layer
-            is deferred.
+            highest tier of the plans. Give T3 when a layer is deferred and no plan is T3.
         diff: The diff of the pull request. None is a work item without a pull request, so
             the input has no diff field.
 
@@ -166,6 +166,7 @@ def review_input(
         The input of the review as JSON inside the <data> frame.
     """
     highest = max((p["policy"]["tier"] for p in plans), default=TIERS[0])
+    planned = {p["layer"] for p in plans}
     facts: dict[str, Any] = {
         "title": work_item["title"],
         "kind": work_item["kind"],
@@ -174,6 +175,7 @@ def review_input(
         "trigger": work_item["trigger"],
         "policy_tier": policy_tier or highest,
         "plans": plans,
+        "deferred_layers": [layer for layer in work_item["layers"] if layer not in planned],
     }
     if diff is not None:
         facts["diff"] = truncate(diff, REVIEW_DIFF_LIMIT)

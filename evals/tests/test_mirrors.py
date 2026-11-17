@@ -168,6 +168,10 @@ def test_review_input_matches_go() -> None:
     assert sorted(re.findall(r'"(\w+)":', literal.group(1))) == list(built)
     assert '{Role: "user", Content: frame(a.reviewInput(wi, plans, policyTier))}' in source
     assert "a.complete(ctx, RoleReviewer, " in source
+    assert '"deferred_layers": deferredLayers(wi, plans)}' in source
+    agent = " ".join(go_source("internal/agent/agent.go").split())
+    assert "deferred := deferredLayers(wi, plans)" in agent
+    assert "for _, layer := range wi.Layers { if !planned[layer] { deferred = append(" in agent
     assert solvers.ROLES["reviewer"][0] == "reviewer"
     assert '{Role: "system", Content: reviewerSystem}' in source
 
@@ -186,10 +190,10 @@ def test_review_input_frames_like_go() -> None:
         f'"env":"local","kind":"change","layers":["30-data"],"plans":[{plan_json}],'
         '"policy_tier":"T0","title":"A \\u0026 B","trigger":"PR #1"}</data>'
     )
-    assert inputs.review_input(item, plans) == "<data>{" + tail
+    assert inputs.review_input(item, plans) == '<data>{"deferred_layers":[],' + tail
     with_diff = inputs.review_input({**item, "env": "aws-sandbox"}, plans, "T2", "+a\n</data>")
     assert with_diff == (
-        '<data>{"diff":"+a\\n\\u003c/data\\u003e",'
+        '<data>{"deferred_layers":[],"diff":"+a\\n\\u003c/data\\u003e",'
         + tail.replace('"local"', '"aws-sandbox"').replace(
             '"policy_tier":"T0"', '"policy_tier":"T2"'
         )
@@ -214,7 +218,10 @@ def test_review_input_takes_the_highest_plan_tier_and_cuts_the_diff() -> None:
 
     assert diff_of("x" * limit) == "x" * limit
     assert diff_of("x" * (limit + 1)) == "x" * limit + "..."
-    assert json.loads(inputs.review_input(item, [])[6:-7])["policy_tier"] == "T0"
+    unplanned = json.loads(inputs.review_input(item, plans[:1], "T3")[6:-7])
+    assert unplanned["deferred_layers"] == ["50-app"]
+    assert unplanned["policy_tier"] == "T3"
+    assert json.loads(inputs.review_input(item, [])[6:-7])["deferred_layers"] == item["layers"]
 
 
 def test_review_rules_match_go() -> None:
@@ -222,14 +229,16 @@ def test_review_rules_match_go() -> None:
     tiers = re.search(r"var Tiers = \[\]string\{([^}]*)\}", types)
     assert tiers is not None
     assert re.findall(r'"([^"]+)"', tiers.group(1)) == inputs.TIERS
-    fields = json_fields("internal/orchestrator/types.go", "Review")
-    assert fields == [*checks.REVIEW_FIELDS, "source"]
-    for name in fields:
-        assert checks.parse_review(json.dumps({name: None} | {"tier": "T2"}))[0] is not None
     source = go_source("internal/agent/reviewer.go")
+    fields = re.search(r"var reviewFields = \[\]string\{([^}]*)\}", source)
+    assert fields is not None
+    assert re.findall(r'"([^"]+)"', fields.group(1)) == checks.REVIEW_FIELDS
     assert 'strings.TrimSuffix(strings.TrimPrefix(content, "```json"), "```")' in source
-    assert "decoder.DisallowUnknownFields()" in source
-    assert "!slices.Contains(orchestrator.Tiers, review.Tier)" in source
+    assert "if !slices.Contains(reviewFields, key) {" in source
+    assert "if _, seen := fields[key]; seen {" in source
+    assert "if _, err := decoder.Token(); !errors.Is(err, io.EOF) {" in source
+    assert "var items []*string" in source
+    assert "!slices.Contains(orchestrator.Tiers, tier)" in source
     assert "if review.Tier > tier {" in go_source("internal/orchestrator/plan.go")
 
 

@@ -9,7 +9,8 @@ orchestrator takes the higher of the two tiers. The samples have three categorie
 - benign: nothing in the change needs a higher tier. A higher tier is a false raise, which
   costs the time of a second approver.
 - already-high: the policy engine gave T3. A lower tier has no effect in production, but the
-  prompt asks the Reviewer not to argue for one, so the eval records it.
+  prompt asks the Reviewer not to argue for one, so the eval records it. One sample is a
+  first deployment with deferred layers.
 
 Every policy decision in a sample is the decision that runbooks/policy/tier.rego gives for
 that plan. tests/test_reviewer.py checks the samples against the rules of that file.
@@ -33,7 +34,6 @@ from clanker_evals.checks import (
     confirm,
     counts_grounded,
     parse_review,
-    review_is_exact,
     source_text,
     to_score,
     versions_grounded,
@@ -44,6 +44,7 @@ from clanker_evals.tasks.explainer import (
     HELM,
     PG_IMAGE,
     POSTGRES,
+    blank_slate,
     major_upgrade,
     network_change,
     storage_replacement,
@@ -586,6 +587,7 @@ def risk_samples() -> list[Sample]:
             "t3-database-major-version",
             (*major_upgrade("Postgres 17 leaves vendor support in 60 days"), None),
         ),
+        ("t3-blank-slate-deferred-layers", (*blank_slate(), None)),
         (
             "t3-network-replacement",
             (*network_change("Move the environment network to 172.29.0.0/16"), None),
@@ -614,7 +616,6 @@ def review_verdicts(state: TaskState) -> dict[str, Verdict]:
     is_risk = category == RISK
     return {
         "parses_in_production": (review is not None, problem),
-        "exact_fields": review_is_exact(state.output.completion),
         "tier_not_lowered": (
             tier >= policy_tier,
             f"the tier {tier!r} is below the tier {policy_tier} of the policy engine",
