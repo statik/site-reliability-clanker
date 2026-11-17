@@ -271,8 +271,9 @@ func build(ctx context.Context, o options) (*components, error) {
 	if c.dispatcher, err = newDispatcher(o); err != nil {
 		return nil, err
 	}
-	if c.broker, err = broker.New(c.db, c.clock, secret.signingKey, on.issuer,
-		func() (policy.Approvals, error) { return orchestrator.ApprovalSettings(c.forge) }); err != nil {
+	c.broker, err = broker.New(c.db, c.clock, secret.signingKey, on.issuer,
+		func() (policy.Approvals, error) { return orchestrator.ApprovalSettings(c.forge) })
+	if err != nil {
 		return nil, err
 	}
 	c.orch = &orchestrator.Orchestrator{DB: c.db, Audit: c.log, Forge: c.forge,
