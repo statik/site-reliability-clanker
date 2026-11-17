@@ -30,7 +30,10 @@ def call(method, path, body=None, user="carol"):
 
 
 def git(*args, cwd):
-    subprocess.run(["git", "-c", "user.name=carol", "-c", "user.email=carol@example.com", *args],
+    # After a fetch, git can repack the objects in the background. The fsck at the end then
+    # fails now and then, because it reads the objects while they move.
+    subprocess.run(["git", "-c", "user.name=carol", "-c", "user.email=carol@example.com",
+                    "-c", "gc.auto=0", "-c", "maintenance.auto=false", *args],
                    cwd=cwd, check=True, capture_output=True)
 
 

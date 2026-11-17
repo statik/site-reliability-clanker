@@ -45,10 +45,23 @@ What ran on the build of commit `376617b`, the last change to the Go code:
    ran on the build of commit `e5d1997` with the same results as before: thirteen work
    items, the chain at 310 events, no error line. The path without an issuer has unit
    tests only.
-2. **A core entry point with no file.** Today the core still writes: the unpacked bundle,
-   the data directory, `broker.key`, `database.password`. On a cloud the signing key and the
-   database address must come from a secret store at start. `ops` writes `Env` into the
-   image, so a secret must never be in `Env`.
+2. **A core entry point with no file.** Done for the start of the core; the secret store is
+   open (issue #40). `clanker up --cloud <not local>` makes no directory and refuses
+   `--data`. A released binary reads its source files from memory (`bundle.FS`). The forge,
+   the simulator and the dashboard take a file system, and the broker takes its key. The
+   core reads `CLANKER_DATABASE_URL` and `CLANKER_SIGNING_KEY` (base64, 64 bytes) from the
+   environment and stops when one is absent. **These two variables are for a laptop only.**
+   `ops` writes `Env` into the image, so the image for a cloud account must not carry them;
+   there they must come from a secret store at start.
+   - Ran as a host process: a binary with the tag `bundle`, started outside a checkout with
+     a home directory that does not exist, against a throwaway PostgreSQL. The dashboard
+     answered 200. The three repositories of the forge had the same trees as the ones
+     that the local demo seeded from the checkout, with the same executable files. The
+     working directory stayed empty.
+   - The local target keeps its data directory (`broker.key`, `database.password`, the
+     unpacked bundle, the files of the runner).
+   - Not done: the template `internal/setup/controlplane.yaml` (the ECS design) still
+     passes `--data /data`, which the core now refuses. Step 7 replaces that template.
 3. **Boot the real core under Nanos** with `ops/run-local.sh`, in the standby mode
    (`clanker up --cloud aws --demo=false`), against PostgreSQL. Only a throwaway probe ran
    under Nanos so far.
@@ -66,6 +79,8 @@ What ran on the build of commit `376617b`, the last change to the Go code:
 
 ### What the owner must give
 
+- A decision on issue #40: where the core gets its secrets on AWS, and whether the core
+  uses the AWS SDK for Go. Steps 6 and 7 need it.
 - For step 8: the AWS profile, the region and a spending limit; a domain name for the
   certificate; an OIDC identity provider. The owner chose "apply with a budget cap" but
   named no profile, region or amount. Do not pick one of the local profiles.
@@ -173,13 +188,11 @@ group. Section 12 of the plan records the five decisions that follow from the la
   - A plan file can hold secret values in clear text. It is now a row in the database, where
     before it was a file in the data directory. No route serves it.
 - **Still not ready for the unikernel:**
-  - The broker keeps its signing key in a file. A cloud needs a key from a secret store,
-    and a `broker.Issuer` that uses the API of the cloud. The simulator reads release
-    notes from the checkout.
+  - A cloud needs the signing key and the database address from a secret store (issue
+    #40), and a `broker.Issuer` that uses the API of the cloud.
   - There is no launcher for a cloud (a Fargate task), and the runner has no remote state
     backend. The job specification has a field for the backend settings.
   - A job in flight is lost when the core stops. The work item must be reconciled at start.
-  - The local database password and the unpacked bundle are files.
 - **Nanos boot test (2026-11-17, a throwaway probe, on a laptop):** a Go program as a Nanos
   image read its environment from the image configuration, made an outbound HTTPS request,
   connected to PostgreSQL 18 and inserted a row, and answered HTTP from the host. A

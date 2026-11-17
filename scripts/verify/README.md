@@ -21,6 +21,10 @@ target and Python 3.
 
 ## Limits
 
+- These scripts check the local target. They do not start the core as it runs on a cloud
+  (`clanker up --cloud aws --demo=false`), which uses other code to find its files, its
+  key and its database.
+
 - The approvals go through the API with the user header. This is the demo identity, not a
   sign-in. A person must test an approval from the dashboard or the iOS application.
 - `fresh-run.sh` deletes the demo. It stops when the destroy fails, so it does not throw away
