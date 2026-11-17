@@ -18,8 +18,13 @@ a load balancer with OIDC sign-in; the wizard builds the machine image with `ops
 Next steps 1 to 4 are merged (#39, #42, #43 and #44).
 Nothing waits on a branch. The next work is step 5, OIDC sign-in.
 
-Two questions wait for the owner: issue #40 (the secrets of the core on AWS) and issue #41
-(what a restart does with work that was not yet in the apply).
+The owner decided three things in that session:
+
+- Issue #40: on AWS the core reads its secrets from Parameter Store with the AWS SDK for
+  Go v2. This is work for steps 6 and 7.
+- Issue #41: after a restart, plan again and ask for approval again. Built.
+- Issue #45, for step 5: a role comes from the users table by email; clients that are not
+  a browser use a device grant flow that the core runs itself.
 
 Not done in that session: the iOS app was not built after the change that shows a lost job
 as an error (`ios/App/Views/ActivityView.swift`).
@@ -98,9 +103,14 @@ What ran on the build of commit `376617b`, the last change to the Go code:
      the work item, ended its job as `lost`, revoked its grant, and the audit chain
      verified. `fresh-run.sh`, `sweep.py` and `stale_plan.py` gave the usual results on
      the same commit.
-   - Open (issue #41): a work item that was in the plan or between the approval and the
-     apply when the control plane stopped stays in its state (`Detected`, `Drafting`,
-     `Planned` or `Approved`) and nothing continues it.
+   - A work item that was in the plan, or approved and not yet in the apply (`Detected`,
+     `Drafting`, `Planned` or `Approved`), is planned again at start and ends in a new
+     request for approval. The owner decided this in issue #41. One with no layer to plan
+     (a runbook, an incident, a debug session, a change with no pull request yet) fails.
+     A work item in `Scheduled` keeps its window and its approval.
+     Ran on commit `9209191` (`restart_check.py`): after `kill -9` in the middle of a
+     plan, the work item was planned again and waited for approval. A stop of an
+     `Approved` work item has a unit test only, because that state lasts a moment.
    - Limit: the kill in the test closed the connection at once. An instance that
      disappears and does not close its connection keeps the lock until PostgreSQL notices,
      which the keepalive settings decide. Until then the next control plane waits and
@@ -109,7 +119,8 @@ What ran on the build of commit `376617b`, the last change to the Go code:
      but nothing shows whether it finished its `tofu apply` first. A break of the lock
      connection was tested only by the unit tests of the wait, not by a cut connection.
 5. **OIDC sign-in**, and no trust in the `X-Clanker-User` header. This blocks every public
-   deployment.
+   deployment. Issue #45 has the decisions of the owner and the build order: first the
+   signed identity from the load balancer, then the device flow.
 6. **Cloud runner and broker:** a launcher that starts a Fargate task, an S3 state backend
    in the runner (the job specification has the field `backend`), a broker that uses STS.
    The ECS task definition in `internal/setup/controlplane.yaml` is the starting point.
@@ -119,8 +130,6 @@ What ran on the build of commit `376617b`, the last change to the Go code:
 
 ### What the owner must give
 
-- A decision on issue #40: where the core gets its secrets on AWS, and whether the core
-  uses the AWS SDK for Go. Steps 6 and 7 need it.
 - For step 8: the AWS profile, the region and a spending limit; a domain name for the
   certificate; an OIDC identity provider. The owner chose "apply with a budget cap" but
   named no profile, region or amount. Do not pick one of the local profiles.
