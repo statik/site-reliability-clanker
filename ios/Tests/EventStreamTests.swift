@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import PaperboatManager
+@testable import SRC
 
 @Suite("Server-sent events")
 struct EventStreamTests {

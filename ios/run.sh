@@ -6,10 +6,10 @@ set -euo pipefail
 
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 SIMULATOR="${SIMULATOR:-iPhone 17 Pro}"
-BUNDLE_ID="dev.clanker.paperboat-manager"
+BUNDLE_ID="dev.clanker.src"
 
 cd "$(dirname "$0")"
-APP=".build/Build/Products/Debug-iphonesimulator/PaperboatManager.app"
+APP=".build/Build/Products/Debug-iphonesimulator/SRC.app"
 
 if [[ ! -d "$APP" ]]; then
   echo "The app is not built. Run ./build.sh first." >&2

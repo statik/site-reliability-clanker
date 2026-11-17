@@ -1,6 +1,6 @@
 import Foundation
 
-@testable import PaperboatManager
+@testable import SRC
 
 /// Answers requests of a URLSession from memory. Each test uses its own host name, so tests
 /// can run in parallel.

@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import PaperboatManager
+@testable import SRC
 
 /// The contrast ratio of WCAG 2 between two colours, from 1 to 21.
 private func contrast(_ first: PaletteColor, _ second: PaletteColor) -> Double {

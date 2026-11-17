@@ -24,7 +24,7 @@ struct KeychainError: Error, Equatable, LocalizedError {
 /// The token store of the app: generic passwords in the Keychain, which only this app on
 /// this phone can read, and only while the phone is unlocked.
 struct KeychainTokenStore: TokenStore {
-  static let service = "dev.clanker.paperboat-manager.sign-in-token"
+  static let service = "dev.clanker.src.sign-in-token"
 
   private func query(_ server: String) -> [CFString: Any] {
     [

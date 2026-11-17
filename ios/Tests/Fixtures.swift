@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import PaperboatManager
+@testable import SRC
 
 /// Loads the JSON captured from the live control plane and from Paperboat.
 enum Fixture {

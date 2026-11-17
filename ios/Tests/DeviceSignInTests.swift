@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import PaperboatManager
+@testable import SRC
 
 @Suite("Device flow")
 struct DeviceSignInTests {

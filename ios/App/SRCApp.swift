@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct PaperboatManagerApp: App {
+struct SRCApp: App {
   @State private var app = AppModel(options: LaunchOptions.read())
 
   init() {

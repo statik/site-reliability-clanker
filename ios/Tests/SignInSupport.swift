@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import PaperboatManager
+@testable import SRC
 
 /// A token store in memory. `failure` makes every operation fail, like a locked Keychain.
 final class MemoryTokenStore: TokenStore, @unchecked Sendable {

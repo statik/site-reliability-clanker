@@ -16,11 +16,11 @@ xcodegen generate --quiet
 
 DERIVED="$PWD/.build"
 PRODUCTS="$DERIVED/Build/Products/Debug-iphonesimulator"
-APP="$PRODUCTS/PaperboatManager.app"
+APP="$PRODUCTS/SRC.app"
 
 xcodebuild \
-  -project PaperboatManager.xcodeproj \
-  -scheme PaperboatManager \
+  -project SRC.xcodeproj \
+  -scheme SRC \
   -configuration Debug \
   -destination "platform=iOS Simulator,name=${SIMULATOR}" \
   -derivedDataPath "$DERIVED" \
@@ -34,6 +34,6 @@ xcodebuild \
 xcrun simctl bootstatus "$SIMULATOR" -b >/dev/null
 SIMCTL_CHILD_DYLD_LIBRARY_PATH="$APP" xcrun simctl spawn "$SIMULATOR" \
   "$DEVELOPER_DIR/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Agents/xctest" \
-  "$APP/PlugIns/PaperboatManagerTests.xctest"
+  "$APP/PlugIns/SRCTests.xctest"
 
 echo "Build and tests passed. App: ${APP#"$PWD"/}"
