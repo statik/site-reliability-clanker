@@ -30,7 +30,11 @@ def call(method, path, body=None, user="carol"):
 
 
 def git(*args, cwd):
-    subprocess.run(["git", "-c", "user.name=carol", "-c", "user.email=carol@example.com", *args],
+    # After a fetch, git can repack the objects in the background. That is the likely cause
+    # of one failure of the fsck at the end, which passed when it ran again on the same
+    # objects. The cause was not proved, because the output of that fsck was not kept.
+    subprocess.run(["git", "-c", "user.name=carol", "-c", "user.email=carol@example.com",
+                    "-c", "gc.auto=0", "-c", "maintenance.auto=false", *args],
                    cwd=cwd, check=True, capture_output=True)
 
 
@@ -90,7 +94,10 @@ for event in events:
 git("fetch", "-q", "origin", cwd=work)
 content = subprocess.run(["git", "show", f"origin/main:{VARS}"], cwd=work, capture_output=True, text=True).stdout
 print(content)
-subprocess.run(["git", "fsck", "--strict", "--no-dangling"], cwd=work, check=True, capture_output=True)
-ok = "api_replicas      = 2" in content and "loadgen_enabled   = false" in content and after == "Done"
+fsck = subprocess.run(["git", "fsck", "--strict", "--no-dangling"], cwd=work, capture_output=True, text=True)
+if fsck.returncode != 0:
+    print(f"git fsck failed with status {fsck.returncode}:\n{fsck.stdout}{fsck.stderr}")
+ok = ("api_replicas      = 2" in content and "loadgen_enabled   = false" in content
+      and after == "Done" and fsck.returncode == 0)
 print("RESULT:", "both changes are on main and the objects pass git fsck" if ok else "FAILED")
 sys.exit(0 if ok else 1)

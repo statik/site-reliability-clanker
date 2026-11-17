@@ -15,9 +15,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
+	// MapFS is a complete file system in memory. The standard library has no other one.
+	"testing/fstest"
 )
 
 // archive is the gzip-compressed tar file. embed.go sets it in a build with the tag.
@@ -35,6 +39,53 @@ func Extract(dir string) (string, error) {
 			"`make release`, or set --source to a checkout of the repository")
 	}
 	return extract(archive, dir)
+}
+
+// FS returns the files as a read-only file system in memory. It writes nothing, so it also
+// works where the program has no disk.
+func FS() (fs.FS, error) {
+	if !Present() {
+		return nil, errors.New("this binary carries no bundled files: build it with " +
+			"`make release`, or set --source to a checkout of the repository")
+	}
+	return memory(archive)
+}
+
+func memory(data []byte) (fs.FS, error) {
+	zipped, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("open the bundled files: %w", err)
+	}
+	files := fstest.MapFS{}
+	reader := tar.NewReader(zipped)
+	for {
+		header, err := reader.Next()
+		if errors.Is(err, io.EOF) {
+			return files, nil
+		}
+		if err != nil {
+			return nil, fmt.Errorf("read the bundled files: %w", err)
+		}
+		// Other entry types (directories, links, the pax header of git archive) are not
+		// needed: a directory exists when a file is below it.
+		if header.Typeflag != tar.TypeReg {
+			continue
+		}
+		name := path.Clean(header.Name)
+		if !fs.ValidPath(name) {
+			return nil, fmt.Errorf("the bundle has an entry outside its directory: %q",
+				header.Name)
+		}
+		content, err := io.ReadAll(reader)
+		if err != nil {
+			return nil, fmt.Errorf("read %s from the bundled files: %w", name, err)
+		}
+		mode := fs.FileMode(0o644)
+		if header.Mode&0o111 != 0 {
+			mode = 0o755
+		}
+		files[name] = &fstest.MapFile{Data: content, Mode: mode}
+	}
 }
 
 func extract(data []byte, dir string) (string, error) {

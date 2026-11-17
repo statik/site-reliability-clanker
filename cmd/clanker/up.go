@@ -13,6 +13,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	// MapFS is a complete file system in memory. The standard library has no other one.
+	"testing/fstest"
 	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/agent"
@@ -101,35 +103,44 @@ func seedUsers(db *sql.DB) error {
 	return nil
 }
 
-func seedForge(f *forge.Forge, source string) error {
-	chart := filepath.Join(source, "apps", "paperboat", "chart")
-	if err := f.Seed(orchestrator.PlatformRepo, map[string]string{
-		"platform":             filepath.Join(source, "platform"),
-		"apps/paperboat/chart": chart,
+// subtrees returns the directories of source with the given paths.
+func subtrees(source fs.FS, paths ...string) ([]fs.FS, error) {
+	trees := []fs.FS{}
+	for _, path := range paths {
+		tree, err := fs.Sub(source, path)
+		if err != nil {
+			return nil, fmt.Errorf("open %s of the source files: %w", path, err)
+		}
+		trees = append(trees, tree)
+	}
+	return trees, nil
+}
+
+// seedForge makes the three repositories of the forge from the source files, when they do
+// not exist yet.
+func seedForge(f *forge.Forge, source fs.FS) error {
+	trees, err := subtrees(source, "platform", "apps/paperboat/chart", "runbooks")
+	if err != nil {
+		return err
+	}
+	platform, chart, runbooks := trees[0], trees[1], trees[2]
+	if err := f.Seed(orchestrator.PlatformRepo, map[string]fs.FS{
+		"platform": platform, "apps/paperboat/chart": chart,
 	}, "Seed platform code and the Paperboat chart"); err != nil {
 		return err
 	}
-	if err := f.Seed(orchestrator.RunbooksRepo, map[string]string{
-		".": filepath.Join(source, "runbooks"),
-	}, "Seed runbooks, policies and notification routes"); err != nil {
+	if err := f.Seed(orchestrator.RunbooksRepo, map[string]fs.FS{".": runbooks},
+		"Seed runbooks, policies and notification routes"); err != nil {
 		return err
 	}
-	if f.Exists(detect.PaperboatRepo) {
-		return nil
-	}
-	firstRelease, err := os.MkdirTemp("", "clanker-release-")
-	if err != nil {
-		return fmt.Errorf("create temporary directory for the first release: %w", err)
-	}
-	defer os.RemoveAll(firstRelease)
-	note, err := os.ReadFile(filepath.Join(source, "apps", "paperboat", "releases", "1.0.0.md"))
+	note, err := fs.ReadFile(source, "apps/paperboat/releases/1.0.0.md")
 	if err != nil {
 		return fmt.Errorf("read the 1.0.0 release note: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(firstRelease, "1.0.0.md"), note, 0o644); err != nil {
-		return fmt.Errorf("stage the 1.0.0 release note: %w", err)
-	}
-	return f.Seed(detect.PaperboatRepo, map[string]string{"releases": firstRelease,
+	// The repository of the application starts with the first release only. The simulator
+	// publishes the later ones.
+	firstRelease := fstest.MapFS{"1.0.0.md": {Data: note, Mode: 0o644}}
+	return f.Seed(detect.PaperboatRepo, map[string]fs.FS{"releases": firstRelease,
 		"chart": chart}, "Release 1.0.0")
 }
 
@@ -189,29 +200,19 @@ type components struct {
 	sim        *sim.Simulator
 }
 
-func build(o options) (*components, error) {
-	if err := os.MkdirAll(o.dataDir, 0o755); err != nil {
-		return nil, fmt.Errorf("create data directory %s: %w", o.dataDir, err)
-	}
-	c := &components{}
+// target holds the parts that only one kind of target has. On a cloud both are nil now:
+// the broker exchanges no grant and the drift scene reports that it cannot run.
+type target struct {
+	issuer       broker.Issuer
+	manualChange func(context.Context, string) error
+}
+
+// localTarget makes the data directory and the parts of the local target, which all use
+// files of that directory and start programs.
+func localTarget(c *components, o options) (target, error) {
 	var err error
-	databaseURL, err := database(o)
-	if err != nil {
-		return nil, err
-	}
-	if c.db, err = store.Open(databaseURL); err != nil {
-		return nil, err
-	}
-	if c.clock, err = sim.NewClock(c.db); err != nil {
-		return nil, err
-	}
-	c.log = audit.New(c.db, c.clock)
-	c.forge = forge.New(c.db)
 	if c.runner, err = runner.New(o.dataDir); err != nil {
-		return nil, err
-	}
-	if c.dispatcher, err = newDispatcher(o); err != nil {
-		return nil, err
+		return target{}, err
 	}
 	adminKubeconfig := func(env string) (string, error) {
 		path := filepath.Join(c.runner.StateDir(env), "kubeconfig")
@@ -221,15 +222,38 @@ func build(o options) (*components, error) {
 		}
 		return path, nil
 	}
-	// Only the local target has a credential issuer and a manual change now. On a cloud
-	// the broker exchanges no grant and the drift scene reports that it cannot run.
-	var issuer broker.Issuer
-	var manualChange func(context.Context, string) error
+	return target{issuer: localtarget.Credentials{AdminKubeconfig: adminKubeconfig},
+		manualChange: localtarget.ManualChange(adminKubeconfig)}, nil
+}
+
+func build(o options) (*components, error) {
+	c := &components{}
+	var on target
 	if o.cloud == "local" {
-		issuer = localtarget.Credentials{AdminKubeconfig: adminKubeconfig}
-		manualChange = localtarget.ManualChange(adminKubeconfig)
+		if err := os.MkdirAll(o.dataDir, 0o755); err != nil {
+			return nil, fmt.Errorf("create data directory %s: %w", o.dataDir, err)
+		}
+		var err error
+		if on, err = localTarget(c, o); err != nil {
+			return nil, err
+		}
 	}
-	if c.broker, err = broker.New(c.db, c.clock, o.dataDir, issuer); err != nil {
+	secret, err := loadSecrets(o)
+	if err != nil {
+		return nil, err
+	}
+	if c.db, err = store.Open(secret.databaseURL); err != nil {
+		return nil, err
+	}
+	if c.clock, err = sim.NewClock(c.db); err != nil {
+		return nil, err
+	}
+	c.log = audit.New(c.db, c.clock)
+	c.forge = forge.New(c.db)
+	if c.dispatcher, err = newDispatcher(o); err != nil {
+		return nil, err
+	}
+	if c.broker, err = broker.New(c.db, c.clock, secret.signingKey, on.issuer); err != nil {
 		return nil, err
 	}
 	c.orch = &orchestrator.Orchestrator{DB: c.db, Audit: c.log, Forge: c.forge,
@@ -242,7 +266,7 @@ func build(o options) (*components, error) {
 	if err := seedUsers(c.db); err != nil {
 		return nil, err
 	}
-	if err := seedForge(c.forge, o.sourceDir); err != nil {
+	if err := seedForge(c.forge, o.source); err != nil {
 		return nil, err
 	}
 	channelAdapters, err := adapters(c.db, o)
@@ -271,7 +295,7 @@ func build(o options) (*components, error) {
 		Monitor: c.monitor, Clock: c.clock, OnFinding: c.agent.HandleFinding}
 	c.sim = &sim.Simulator{DB: c.db, Clock: c.clock, Audit: c.log, Forge: c.forge,
 		Detector: c.detector, Orch: c.orch, Monitor: c.monitor, Notifier: c.notifier,
-		SourceDir: o.sourceDir, AdminToken: demoAdminToken, ManualChange: manualChange,
+		Source: o.source, AdminToken: demoAdminToken, ManualChange: on.manualChange,
 		Env: o.env}
 	c.orch.Hooks = orchestrator.Hooks{Explain: c.agent.Explain, Verify: c.monitor.Verify,
 		LayerApplied: func(ctx context.Context, wi orchestrator.WorkItem, layer string) error {
@@ -387,9 +411,10 @@ func up(ctx context.Context, o options) error {
 	server := &api.Server{Orch: c.orch, Audit: c.log, Forge: c.forge, Broker: c.broker,
 		Monitor: c.monitor, Notifier: c.notifier, Agent: c.agent, Detector: c.detector,
 		Sim: c.sim, Clock: c.clock, Runners: c.dispatcher.Handler()}
-	webDir := filepath.Join(o.sourceDir, "web", "dist")
-	if _, err := os.Stat(filepath.Join(webDir, "index.html")); err == nil {
-		server.Web = os.DirFS(webDir).(fs.FS)
+	if _, err := fs.Stat(o.source, "web/dist/index.html"); err == nil {
+		if server.Web, err = fs.Sub(o.source, "web/dist"); err != nil {
+			return fmt.Errorf("open the built dashboard: %w", err)
+		}
 	} else {
 		slog.Warn("the dashboard is not built; only the API is served. Run `make web`")
 	}

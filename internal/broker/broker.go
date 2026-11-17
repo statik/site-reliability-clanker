@@ -9,10 +9,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -61,27 +58,23 @@ type Broker struct {
 	issuer Issuer
 }
 
-// New loads or creates the signing key in dataDir. issuer can be nil.
-func New(db *sql.DB, clock Clock, dataDir string, issuer Issuer) (*Broker, error) {
-	keyPath := filepath.Join(dataDir, "broker.key")
-	raw, err := os.ReadFile(keyPath)
-	if errors.Is(err, os.ErrNotExist) {
-		_, key, genErr := ed25519.GenerateKey(rand.Reader)
-		if genErr != nil {
-			return nil, fmt.Errorf("generate broker signing key: %w", genErr)
-		}
-		raw = key
-		if err := os.WriteFile(keyPath, raw, 0o600); err != nil {
-			return nil, fmt.Errorf("write broker signing key %s: %w", keyPath, err)
-		}
-	} else if err != nil {
-		return nil, fmt.Errorf("read broker signing key %s: %w", keyPath, err)
+// NewKey makes a signing key for New.
+func NewKey() ([]byte, error) {
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("generate broker signing key: %w", err)
 	}
-	if len(raw) != ed25519.PrivateKeySize {
-		return nil, fmt.Errorf("broker signing key %s has %d bytes, want %d: delete it to "+
-			"create a new key", keyPath, len(raw), ed25519.PrivateKeySize)
+	return key, nil
+}
+
+// New returns a broker that signs with key, which NewKey made. The caller keeps the key:
+// the broker reads and writes no file. issuer can be nil.
+func New(db *sql.DB, clock Clock, key []byte, issuer Issuer) (*Broker, error) {
+	if len(key) != ed25519.PrivateKeySize {
+		return nil, fmt.Errorf("the broker signing key has %d bytes, want %d", len(key),
+			ed25519.PrivateKeySize)
 	}
-	return &Broker{db: db, clock: clock, key: raw, issuer: issuer}, nil
+	return &Broker{db: db, clock: clock, key: key, issuer: issuer}, nil
 }
 
 func (g Grant) signedText() string {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Destroy the local environment, start from an empty data directory, and run the first
-# deployment and the ten scenes of the scripted month. It takes about 40 minutes and uses
+# deployment and the ten scenes of the scripted month. It takes about 10 minutes and uses
 # the live model when OPENROUTER_API_KEY is in .env.
 #
 # Usage: scripts/verify/fresh-run.sh

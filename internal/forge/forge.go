@@ -12,7 +12,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
+	"io/fs"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -182,23 +183,19 @@ func moveBranch(s *sqlStorage, branch string, updated, old plumbing.Hash) error 
 
 var skipNames = map[string]bool{".terraform": true, ".git": true, "node_modules": true}
 
-// readTree stores the files below dir as blobs and adds them to files below prefix.
-func readTree(s *sqlStorage, dir, prefix string, files map[string]file) error {
-	return filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+// readTree stores the files of source as blobs and adds them to files below prefix.
+func readTree(s *sqlStorage, source fs.FS, prefix string, files map[string]file) error {
+	return fs.WalkDir(source, ".", func(relative string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if skipNames[d.Name()] {
-			return filepath.SkipDir
+			return fs.SkipDir
 		}
 		if d.IsDir() || strings.Contains(d.Name(), ".tfstate") || strings.HasSuffix(d.Name(), ".tfplan") {
 			return nil
 		}
-		relative, err := filepath.Rel(dir, path)
-		if err != nil {
-			return err
-		}
-		content, err := os.ReadFile(path)
+		content, err := fs.ReadFile(source, relative)
 		if err != nil {
 			return err
 		}
@@ -214,15 +211,15 @@ func readTree(s *sqlStorage, dir, prefix string, files map[string]file) error {
 		if info.Mode().Perm()&0o111 != 0 {
 			mode = filemode.Executable
 		}
-		files[filepath.ToSlash(filepath.Join(prefix, relative))] = file{Mode: mode, Hash: hash}
+		files[path.Join(prefix, relative)] = file{Mode: mode, Hash: hash}
 		return nil
 	})
 }
 
-// Seed creates the repository and commits the given source directories into it. Each key of
-// sources is a path inside the repository. Each value is a directory on disk to copy.
+// Seed creates the repository and commits the given source trees into it. Each key of
+// sources is a path inside the repository. Each value is the tree of files to copy there.
 // Seed does nothing when the repository exists.
-func (f *Forge) Seed(repo string, sources map[string]string, message string) error {
+func (f *Forge) Seed(repo string, sources map[string]fs.FS, message string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.Exists(repo) {
@@ -234,7 +231,7 @@ func (f *Forge) Seed(repo string, sources map[string]string, message string) err
 	files := map[string]file{}
 	for dest, src := range sources {
 		if err := readTree(s, src, dest, files); err != nil {
-			return fmt.Errorf("copy %s into repository %s: %w", src, repo, err)
+			return fmt.Errorf("copy the files for %q into repository %s: %w", dest, repo, err)
 		}
 	}
 	commit, err := f.writeCommit(s, files, "clanker-bootstrap", message)
@@ -483,52 +480,6 @@ func (f *Forge) UpdateBranch(repo, branch, author string) (string, error) {
 		return "", err
 	}
 	return commit.String(), nil
-}
-
-// Export writes the tree of commit into dest.
-func (f *Forge) Export(repo, commit, dest string) error {
-	s, err := f.storage(repo)
-	if err != nil {
-		return err
-	}
-	repository, err := open(s)
-	if err != nil {
-		return err
-	}
-	at, err := commitAt(repository, repo, commit)
-	if err != nil {
-		return err
-	}
-	files, err := filesAt(at)
-	if err != nil {
-		return err
-	}
-	for path, entry := range files {
-		if entry.Mode == filemode.Submodule {
-			continue
-		}
-		content, err := s.readBlob(entry.Hash)
-		if err != nil {
-			return fmt.Errorf("read %s of %s: %w", path, repo, err)
-		}
-		target := filepath.Join(dest, filepath.FromSlash(path))
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return fmt.Errorf("create directory for %s: %w", target, err)
-		}
-		switch entry.Mode {
-		case filemode.Symlink:
-			err = os.Symlink(string(content), target)
-		case filemode.Executable:
-			err = os.WriteFile(target, content, 0o755)
-		default:
-			err = os.WriteFile(target, content, 0o644)
-		}
-		if err != nil {
-			return fmt.Errorf("write %s: %w", target, err)
-		}
-	}
-	// An empty tree still gives the directory.
-	return os.MkdirAll(dest, 0o755)
 }
 
 // Archive returns the tree of commit as a gzip-compressed tar file. A runner unpacks it
