@@ -21,7 +21,24 @@ for git and scripts (#39, #42, #43, #44, #46, #47 and #48).
 The next work is the last part of step 5, the device flow in the iOS app. Step 6 comes
 after that.
 
-The owner decided three things in that session:
+Also built in that session, on the request of the owner: the adversarial review. After
+the policy engine sets the tier of a planned change, the Reviewer role (a second model call
+with its own prompt, `internal/agent/reviewer.go`) reads the plans, the policy decision and
+the diff and looks for reasons for a higher tier. The orchestrator takes the higher tier
+and never a lower one. A failed review leaves the tier of the policy engine and an audit
+event. The approval page shows the review and its concerns.
+
+- Ran on commit `955ffca`: `fresh-run.sh` with the live model. The review agreed with the
+  policy engine on five changes and raised the faulty release `WI-0005` from T2 to T3,
+  because of the tag `1.2.0-bad`. The chain verified at 317 events with no error line.
+  `sweep.py` and `stale_plan.py` gave the usual results.
+- Not run: the approval page with the review in a browser (only the lint, the type check
+  and the tests of the dashboard ran). A work item that goes back to approval after a stale
+  plan keeps its tier and is not reviewed again. Evals for the Reviewer are written on the
+  branch `reviewer-evals` and no live round ran.
+- The full run no longer ends at exactly 310 events: see `scripts/verify/README.md`.
+
+The owner decided these things in that session:
 
 - Issue #40: on AWS the core reads its secrets from Parameter Store with the AWS SDK for
   Go v2. This is work for steps 6 and 7.

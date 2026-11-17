@@ -25,7 +25,11 @@ target and Python 3.
   `RESULT: the core signed in a person and a program, seeded the forge from memory and left no file`.
 - `fresh-run.sh`: thirteen work items. Twelve end in `Done`. `WI-0005` (the faulty release)
   ends in `RolledBack`. The last line before the error count is
-  `chain: {'ok': True, 'count': 310, ...}`. The error count is 0.
+  `chain: {'ok': True, 'count': 317, ...}`. The error count is 0.
+  The count depends on the adversarial review, which is a live model: 316 events when it
+  raises no tier, and one more for each second approval of a change that it raises to tier
+  T3. In the first run with the review it raised the faulty release `WI-0005` to T3, which
+  gave 317. Without a model key there is no review and the count is 310.
 - `stale_plan.py`: the last line is
   `RESULT: both changes are on main and the objects pass git fsck`.
 
