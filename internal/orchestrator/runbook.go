@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -14,6 +11,7 @@ import (
 
 	"github.com/statik/site-reliability-clanker/internal/audit"
 	"github.com/statik/site-reliability-clanker/internal/broker"
+	"github.com/statik/site-reliability-clanker/internal/runner"
 	"github.com/statik/site-reliability-clanker/internal/scrub"
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
@@ -45,18 +43,17 @@ func (o *Orchestrator) StandingApprover(runbook string) (string, error) {
 	return store.GetKV(o.DB, standingKey(runbook))
 }
 
-func (o *Orchestrator) runbooksCheckout() (string, string, error) {
+// runbooksCheckout returns the runbooks repository at the head of main, for a runner job.
+func (o *Orchestrator) runbooksCheckout() (runner.Checkout, string, error) {
 	head, err := o.Forge.Head(RunbooksRepo, "main")
 	if err != nil {
-		return "", "", fmt.Errorf("find runbooks: %w", err)
+		return runner.Checkout{}, "", fmt.Errorf("find runbooks: %w", err)
 	}
-	dir := filepath.Join(o.DataDir, "work", "runbooks", head)
-	if _, err := os.Stat(filepath.Join(dir, "jobs")); err != nil {
-		if err := o.Forge.Export(RunbooksRepo, head, dir); err != nil {
-			return "", "", err
-		}
+	archive, err := o.Forge.Archive(RunbooksRepo, head)
+	if err != nil {
+		return runner.Checkout{}, "", err
 	}
-	return dir, head, nil
+	return runner.Checkout{ID: "runbooks/" + head, Archive: archive}, head, nil
 }
 
 // RunbookRequest names a runbook job to run.
@@ -83,12 +80,11 @@ func (o *Orchestrator) RunRunbook(ctx context.Context, req RunbookRequest) (Work
 		return WorkItem{}, fmt.Errorf("runbook %s has no standing approval: an approver must "+
 			"sign one first", req.Name)
 	}
-	dir, commit, err := o.runbooksCheckout()
+	scripts, commit, err := o.runbooksCheckout()
 	if err != nil {
 		return WorkItem{}, err
 	}
-	script := filepath.Join(dir, "jobs", req.Name+".sh")
-	if _, err := os.Stat(script); err != nil {
+	if _, err := o.Forge.ReadFile(RunbooksRepo, commit, "jobs/"+req.Name+".sh"); err != nil {
 		return WorkItem{}, fmt.Errorf("runbook %s is not in the runbooks repository at %s",
 			req.Name, commit[:8])
 	}
@@ -113,7 +109,7 @@ func (o *Orchestrator) RunRunbook(ctx context.Context, req RunbookRequest) (Work
 	if err := o.setState(&wi, StateApplying, "orchestrator", "runbook started"); err != nil {
 		return WorkItem{}, err
 	}
-	runErr := o.execRunbook(ctx, wi, req, script, "standing:"+approver)
+	runErr := o.execRunbook(ctx, wi, req, scripts, "standing:"+approver)
 	if runErr != nil {
 		return wi, o.setState(&wi, StateFailed, "runner", runErr.Error())
 	}
@@ -127,7 +123,7 @@ func (o *Orchestrator) RunRunbook(ctx context.Context, req RunbookRequest) (Work
 }
 
 func (o *Orchestrator) execRunbook(ctx context.Context, wi WorkItem, req RunbookRequest,
-	script, approver string) error {
+	scripts runner.Checkout, approver string) error {
 	grant, err := o.Broker.Issue(broker.Request{WorkItem: wi.ID, Env: wi.Env, Layer: "runbook",
 		Kind: broker.KindRunbook, Commit: wi.Commit, Tier: "T1", Approvers: []string{approver},
 		Duration: 15 * time.Minute})
@@ -148,25 +144,18 @@ func (o *Orchestrator) execRunbook(ctx context.Context, wi WorkItem, req Runbook
 		if err != nil {
 			return fmt.Errorf("the broker refused the grant: %w", err)
 		}
-		fmt.Fprintf(logFile, "grant %s accepted: %s\n$ %s\n", grant.ID, cred.Mechanism,
-			filepath.Base(script))
-		cmd := exec.CommandContext(ctx, "bash", script)
-		cmd.Env = append(os.Environ(), "KUBECONFIG="+cred.KubeConfig,
-			"STATE_DIR="+o.Runner.StateDir(wi.Env))
+		fmt.Fprintf(logFile, "grant %s accepted: %s\n$ %s.sh\n", grant.ID, cred.Mechanism,
+			req.Name)
 		keys := make([]string, 0, len(req.Params))
 		for k := range req.Params {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
 		for _, k := range keys {
-			cmd.Env = append(cmd.Env, "PARAM_"+strings.ToUpper(k)+"="+req.Params[k])
 			fmt.Fprintf(logFile, "param %s=%s\n", k, req.Params[k])
 		}
-		cmd.Stdout, cmd.Stderr = logFile, logFile
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("runbook %s: %w", req.Name, err)
-		}
-		return nil
+		return o.Runner.Runbook(ctx, runner.RunbookJob{Env: wi.Env, Checkout: scripts,
+			Name: req.Name, Params: req.Params, KubeConfig: cred.KubeConfig, Log: logFile})
 	}()
 	o.endJob(job, logFile, runErr)
 	outcome := "used"
@@ -247,9 +236,7 @@ func (o *Orchestrator) DebugSession(ctx context.Context, wi WorkItem, actor, rea
 		out := io.MultiWriter(logFile, &transcript)
 		for _, args := range diagnosticCommands {
 			fmt.Fprintf(out, "$ kubectl %s\n", strings.Join(args, " "))
-			cmd := exec.CommandContext(ctx, "kubectl", append([]string{"--kubeconfig",
-				cred.KubeConfig}, args...)...)
-			raw, err := cmd.CombinedOutput()
+			raw, err := o.Runner.Kubectl(ctx, cred.KubeConfig, args...)
 			fmt.Fprintln(out, lastPart(scrub.Text(strings.TrimSpace(string(raw)))))
 			if err != nil {
 				fmt.Fprintf(out, "(command failed: %v)\n", err)

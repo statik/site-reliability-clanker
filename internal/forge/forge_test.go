@@ -1,8 +1,12 @@
 package forge
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"database/sql"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -407,5 +411,44 @@ func TestABranchMovesOnlyFromTheCommitThatTheWriterRead(t *testing.T) {
 	}
 	if err := moveBranch(s, "feature", main, first); err != nil {
 		t.Fatalf("the writer with the right old commit was refused: %v", err)
+	}
+}
+
+func TestArchiveHoldsTheTreeOfACommit(t *testing.T) {
+	f, _ := seeded(t)
+	head, _ := f.Head(repo, "main")
+	raw, err := f.Archive(repo, head)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unzipped, err := gzip.NewReader(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := tar.NewReader(unzipped)
+	modes := map[string]int64{}
+	bodies := map[string]string{}
+	for {
+		header, err := reader.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(reader)
+		modes[header.Name], bodies[header.Name] = header.Mode, string(body)
+	}
+	if len(modes) != 3 {
+		t.Fatalf("the archive has %d files, want 3: %v", len(modes), modes)
+	}
+	if modes["platform/run.sh"] != 0o755 || modes["platform/app/main.tf"] != 0o644 {
+		t.Fatalf("modes = %v", modes)
+	}
+	if !strings.Contains(bodies[tfvars], "replicas = 1") {
+		t.Fatalf("tfvars = %q", bodies[tfvars])
+	}
+	if _, err := f.Archive(repo, "0000000000000000000000000000000000000000"); err == nil {
+		t.Fatal("no error for a commit that does not exist")
 	}
 }

@@ -174,7 +174,7 @@ func bootstrap(ctx context.Context, o options) error {
 		return err
 	}
 	fmt.Printf("Applying layer 00-bootstrap of %s with your own credentials.\n", o.env)
-	job := runner.Job{Env: o.env, Cloud: o.cloud, Layer: "00-bootstrap", Checkout: o.sourceDir,
+	job := runner.Job{Env: o.env, Cloud: o.cloud, Layer: "00-bootstrap", Checkout: runner.Checkout{Dir: o.sourceDir},
 		Log: os.Stdout}
 	if err := r.ApplyDirect(ctx, job); err != nil {
 		return err
@@ -208,7 +208,7 @@ func destroy(ctx context.Context, o options) error {
 			continue
 		}
 		fmt.Printf("Destroying %s/%s\n", o.env, layer)
-		job := runner.Job{Env: o.env, Cloud: o.cloud, Layer: layer, Checkout: o.sourceDir,
+		job := runner.Job{Env: o.env, Cloud: o.cloud, Layer: layer, Checkout: runner.Checkout{Dir: o.sourceDir},
 			KubeConfig: admin, Log: os.Stdout}
 		if err := r.Destroy(ctx, job); err != nil {
 			return err

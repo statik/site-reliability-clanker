@@ -54,10 +54,9 @@ type Clock interface{ Now() time.Time }
 
 // Broker issues and checks grants.
 type Broker struct {
-	db       *sql.DB
-	clock    Clock
-	key      ed25519.PrivateKey
-	credsDir string
+	db    *sql.DB
+	clock Clock
+	key   ed25519.PrivateKey
 	// adminKubeconfig returns the administrator kubeconfig of an environment. Only the
 	// broker reads that file.
 	adminKubeconfig func(env string) (string, error)
@@ -66,10 +65,6 @@ type Broker struct {
 // New loads or creates the signing key in dataDir.
 func New(db *sql.DB, clock Clock, dataDir string,
 	adminKubeconfig func(env string) (string, error)) (*Broker, error) {
-	credsDir := filepath.Join(dataDir, "creds")
-	if err := os.MkdirAll(credsDir, 0o700); err != nil {
-		return nil, fmt.Errorf("create credential directory %s: %w", credsDir, err)
-	}
 	keyPath := filepath.Join(dataDir, "broker.key")
 	raw, err := os.ReadFile(keyPath)
 	if errors.Is(err, os.ErrNotExist) {
@@ -88,8 +83,7 @@ func New(db *sql.DB, clock Clock, dataDir string,
 		return nil, fmt.Errorf("broker signing key %s has %d bytes, want %d: delete it to "+
 			"create a new key", keyPath, len(raw), ed25519.PrivateKeySize)
 	}
-	return &Broker{db: db, clock: clock, key: raw, credsDir: credsDir,
-		adminKubeconfig: adminKubeconfig}, nil
+	return &Broker{db: db, clock: clock, key: raw, adminKubeconfig: adminKubeconfig}, nil
 }
 
 func (g Grant) signedText() string {

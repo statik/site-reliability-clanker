@@ -1,23 +1,12 @@
-package runner_test
+package planfacts_test
 
 import (
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
-	"github.com/statik/site-reliability-clanker/internal/runner"
+	"github.com/statik/site-reliability-clanker/internal/planfacts"
 )
-
-func writePlan(t *testing.T, content string) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "plan.json")
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
 
 const upgradePlan = `{"resource_changes":[
  {"address":"module.app.helm_release.paperboat","type":"helm_release","name":"paperboat",
@@ -29,8 +18,8 @@ const upgradePlan = `{"resource_changes":[
  {"address":"a.unchanged","type":"a","name":"unchanged","change":{"actions":["no-op"]}}
 ],"output_changes":{"paperboat_version":{"actions":["update"]},"app_url":{"actions":["no-op"]}}}`
 
-func TestReadFactsHumanisesHelmValues(t *testing.T) {
-	facts, err := runner.ReadFacts(writePlan(t, upgradePlan))
+func TestParseHumanisesHelmValues(t *testing.T) {
+	facts, err := planfacts.Parse([]byte(upgradePlan))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,8 +38,8 @@ func TestReadFactsHumanisesHelmValues(t *testing.T) {
 	}
 }
 
-func TestReadFactsHidesSensitiveValues(t *testing.T) {
-	facts, err := runner.ReadFacts(writePlan(t, upgradePlan))
+func TestParseHidesSensitiveValues(t *testing.T) {
+	facts, err := planfacts.Parse([]byte(upgradePlan))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,14 +52,14 @@ func TestReadFactsHidesSensitiveValues(t *testing.T) {
 	}
 }
 
-func TestReadFactsCountsEachAction(t *testing.T) {
+func TestParseCountsEachAction(t *testing.T) {
 	plan := `{"resource_changes":[
 	 {"address":"a.create","type":"a","name":"create","change":{"actions":["create"]}},
 	 {"address":"a.destroy","type":"a","name":"destroy","change":{"actions":["delete"]}},
 	 {"address":"a.replace","type":"a","name":"replace","change":{"actions":["delete","create"]}},
 	 {"address":"a.replace2","type":"a","name":"replace2","change":{"actions":["create","delete"]}}
 	]}`
-	facts, err := runner.ReadFacts(writePlan(t, plan))
+	facts, err := planfacts.Parse([]byte(plan))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,8 +71,8 @@ func TestReadFactsCountsEachAction(t *testing.T) {
 	}
 }
 
-func TestReadFactsEmptyPlanHasNoChanges(t *testing.T) {
-	facts, err := runner.ReadFacts(writePlan(t, `{"resource_changes":[]}`))
+func TestParseEmptyPlanHasNoChanges(t *testing.T) {
+	facts, err := planfacts.Parse([]byte(`{"resource_changes":[]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,23 +81,11 @@ func TestReadFactsEmptyPlanHasNoChanges(t *testing.T) {
 	}
 }
 
-func TestReadFactsRejectsBadInput(t *testing.T) {
-	if _, err := runner.ReadFacts(writePlan(t, `not json`)); err == nil {
+func TestParseRejectsBadInput(t *testing.T) {
+	if _, err := planfacts.Parse([]byte(`not json`)); err == nil {
 		t.Error("want an error for a plan file that is not JSON")
 	}
-	if _, err := runner.ReadFacts(filepath.Join(t.TempDir(), "missing.json")); err == nil {
-		t.Error("want an error for a missing plan file")
-	}
-}
-
-func TestFileSHA256(t *testing.T) {
-	path := writePlan(t, "abc")
-	sum, err := runner.FileSHA256(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	const want = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-	if sum != want {
-		t.Fatalf("want %s, got %s", want, sum)
+	if _, err := planfacts.Parse(nil); err == nil {
+		t.Error("want an error for an empty plan")
 	}
 }

@@ -7,8 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -25,51 +23,32 @@ type Decision struct {
 
 // Input identifies the plan to evaluate.
 type Input struct {
-	Kind         string
-	Layer        string
-	PlanJSONPath string
-	// PolicyDir is the directory with the Rego files, from the runbooks repository.
-	PolicyDir string
+	Kind  string
+	Layer string
+	// PlanJSON is the JSON form of the plan.
+	PlanJSON []byte
+	// Modules are the Rego files of the runbooks repository: name to source.
+	Modules map[string]string
 }
 
 const query = `{"decision": data.clanker.tier.decision, "create_only": data.clanker.tier.create_only}`
 
-// modules reads the Rego files of the policy directory. Test files are not rules.
-func modules(dir string) ([]func(*rego.Rego), error) {
-	paths, err := filepath.Glob(filepath.Join(dir, "*.rego"))
-	if err != nil {
-		return nil, fmt.Errorf("list policies in %s: %w", dir, err)
-	}
-	options := []func(*rego.Rego){}
-	for _, path := range paths {
-		if strings.HasSuffix(path, "_test.rego") {
-			continue
-		}
-		source, err := os.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("read policy %s: %w", path, err)
-		}
-		options = append(options, rego.Module(path, string(source)))
-	}
-	if len(options) == 0 {
-		return nil, fmt.Errorf("the policy directory %s has no Rego file", dir)
-	}
-	return options, nil
-}
-
 // Evaluate runs the tier policy over the plan JSON.
 func Evaluate(ctx context.Context, in Input) (Decision, error) {
-	planRaw, err := os.ReadFile(in.PlanJSONPath)
-	if err != nil {
-		return Decision{}, fmt.Errorf("read plan JSON %s for policy: %w", in.PlanJSONPath, err)
-	}
 	var plan any
-	if err := json.Unmarshal(planRaw, &plan); err != nil {
-		return Decision{}, fmt.Errorf("decode plan JSON %s for policy: %w", in.PlanJSONPath, err)
+	if err := json.Unmarshal(in.PlanJSON, &plan); err != nil {
+		return Decision{}, fmt.Errorf("decode plan JSON of layer %s for policy: %w", in.Layer, err)
 	}
-	options, err := modules(in.PolicyDir)
-	if err != nil {
-		return Decision{}, err
+	options := []func(*rego.Rego){}
+	for name, source := range in.Modules {
+		// Test files are not rules.
+		if strings.HasSuffix(name, "_test.rego") || !strings.HasSuffix(name, ".rego") {
+			continue
+		}
+		options = append(options, rego.Module(name, source))
+	}
+	if len(options) == 0 {
+		return Decision{}, fmt.Errorf("the policy for layer %s has no Rego file", in.Layer)
 	}
 	options = append(options, rego.Query(query),
 		rego.Input(map[string]any{"kind": in.Kind, "layer": in.Layer, "plan": plan}))
@@ -78,11 +57,10 @@ func Evaluate(ctx context.Context, in Input) (Decision, error) {
 	defer cancel()
 	results, err := rego.New(options...).Eval(ctx)
 	if err != nil {
-		return Decision{}, fmt.Errorf("evaluate the policies in %s: %w", in.PolicyDir, err)
+		return Decision{}, fmt.Errorf("evaluate the policies for layer %s: %w", in.Layer, err)
 	}
 	if len(results) == 0 || len(results[0].Expressions) == 0 {
-		return Decision{}, fmt.Errorf("the policy gave no decision for layer %s: check %s",
-			in.Layer, in.PolicyDir)
+		return Decision{}, fmt.Errorf("the policy gave no decision for layer %s", in.Layer)
 	}
 	// The value is generic JSON. A round trip through JSON gives the typed decision.
 	raw, err := json.Marshal(results[0].Expressions[0].Value)

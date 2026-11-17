@@ -222,7 +222,7 @@ func build(o options) (*components, error) {
 	c.orch = &orchestrator.Orchestrator{DB: c.db, Audit: c.log, Forge: c.forge,
 		Runner: c.runner, Broker: c.broker, Clock: c.clock, DataDir: o.dataDir,
 		Envs: map[string]orchestrator.EnvConfig{o.env: {Name: o.env, Cloud: o.cloud}}}
-	c.monitor = monitor.New(c.db, c.runner, c.clock)
+	c.monitor = monitor.New(c.db, c.clock)
 	if err := seedUsers(c.db); err != nil {
 		return nil, err
 	}

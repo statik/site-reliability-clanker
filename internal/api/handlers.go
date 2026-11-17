@@ -188,9 +188,9 @@ func (s *Server) getPlanJSON(r *http.Request) (any, error) {
 		if p.Layer != r.PathValue("layer") {
 			continue
 		}
-		raw, err := os.ReadFile(p.JSONPath)
+		raw, err := s.Orch.PlanJSON(p.ID)
 		if err != nil {
-			return nil, fmt.Errorf("read plan JSON of %s %s: %w", p.WorkItem, p.Layer, err)
+			return nil, err
 		}
 		var plan map[string]any
 		if err := json.Unmarshal(raw, &plan); err != nil {
@@ -215,11 +215,11 @@ func (s *Server) getJobLog(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, notFound(err)
 	}
-	raw, err := os.ReadFile(job.LogPath)
+	log, err := s.Orch.JobLog(id)
 	if err != nil {
-		return nil, fmt.Errorf("read log of job %d: %w", id, err)
+		return nil, err
 	}
-	return map[string]any{"job": job, "log": s.hidePaths(string(raw))}, nil
+	return map[string]any{"job": job, "log": s.hidePaths(log)}, nil
 }
 
 // hidePaths replaces the data directory and the home directory in a log with placeholders,

@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
-	"github.com/statik/site-reliability-clanker/internal/runner"
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
 
@@ -23,20 +22,18 @@ type Clock interface{ Now() time.Time }
 // Monitor probes environments.
 type Monitor struct {
 	DB     *sql.DB
-	Runner *runner.Runner
 	Clock  Clock
 	client *http.Client
 }
 
 // New returns a monitor.
-func New(db *sql.DB, r *runner.Runner, clock Clock) *Monitor {
-	return &Monitor{DB: db, Runner: r, Clock: clock,
-		client: &http.Client{Timeout: 4 * time.Second}}
+func New(db *sql.DB, clock Clock) *Monitor {
+	return &Monitor{DB: db, Clock: clock, client: &http.Client{Timeout: 4 * time.Second}}
 }
 
 // AppURL returns the URL of the application in env, or "" when it is not deployed.
 func (m *Monitor) AppURL(env string) string {
-	outputs, err := m.Runner.Outputs(env, "50-app")
+	outputs, err := store.LayerOutputs(m.DB, env, "50-app")
 	if err != nil {
 		return ""
 	}
@@ -164,7 +161,7 @@ func (m *Monitor) History(env, from, to string, limit int) ([]Sample, error) {
 // health check, report the version that the 50-app layer declares, and serve the inventory
 // with an error rate under ten percent.
 func (m *Monitor) Verify(ctx context.Context, wi orchestrator.WorkItem) (orchestrator.VerifyResult, error) {
-	outputs, err := m.Runner.Outputs(wi.Env, "50-app")
+	outputs, err := store.LayerOutputs(m.DB, wi.Env, "50-app")
 	if err != nil {
 		return orchestrator.VerifyResult{}, err
 	}
@@ -229,7 +226,7 @@ func (m *Monitor) TakeSnapshot(ctx context.Context, env, reason string) (Snapsho
 	snap := Snapshot{TS: store.FormatTime(m.Clock.Now()), Env: env, Reason: reason,
 		Layers: map[string]map[string]any{}}
 	for _, layer := range orchestrator.Layers {
-		outputs, err := m.Runner.Outputs(env, layer)
+		outputs, err := store.LayerOutputs(m.DB, env, layer)
 		if err != nil {
 			return Snapshot{}, err
 		}

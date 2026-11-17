@@ -147,7 +147,7 @@ func Newer(a, b string) bool {
 }
 
 func (d *Detector) runningVersion(env, layer, output string) string {
-	outputs, err := d.Orch.Runner.Outputs(env, layer)
+	outputs, err := store.LayerOutputs(d.DB, env, layer)
 	if err != nil {
 		return ""
 	}
@@ -293,7 +293,7 @@ func (d *Detector) CheckDrift(ctx context.Context, env string) (orchestrator.Wor
 }
 
 func (d *Detector) runningLayer(env, layer string) bool {
-	outputs, err := d.Orch.Runner.Outputs(env, layer)
+	outputs, err := store.LayerOutputs(d.DB, env, layer)
 	return err == nil && len(outputs) > 0
 }
 
