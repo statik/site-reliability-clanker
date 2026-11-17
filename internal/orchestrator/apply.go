@@ -2,12 +2,15 @@ package orchestrator
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/audit"
@@ -58,6 +61,26 @@ func planHashes(plans []Plan) map[string]string {
 	return hashes
 }
 
+// Binding is one value for what an approval covers: the commit and the hash of each plan.
+// A message in a chat carries it, so that a click on a message of an older plan is refused.
+func Binding(commit string, hashes map[string]string) string {
+	sum := sha256.New()
+	sum.Write([]byte(commit))
+	for _, layer := range slices.Sorted(maps.Keys(hashes)) {
+		sum.Write([]byte("\x1f" + layer + "\x1f" + hashes[layer]))
+	}
+	return hex.EncodeToString(sum.Sum(nil))
+}
+
+// Binding returns the binding of the current commit and the current plans of a work item.
+func (o *Orchestrator) Binding(wi WorkItem) (string, error) {
+	plans, err := o.Plans(wi.ID, false)
+	if err != nil {
+		return "", err
+	}
+	return Binding(wi.Commit, planHashes(plans)), nil
+}
+
 // ValidApprovers returns the people whose approval covers the current commit and plans.
 func (o *Orchestrator) ValidApprovers(wi WorkItem) ([]string, error) { return o.validApprovers(wi) }
 
@@ -92,18 +115,37 @@ type Decision struct {
 	Decision     string
 	Comment      string
 	ScheduledFor string
+	// Binding is set when the person saw the change outside the dashboard. The decision is
+	// refused when it is not the binding of the current commit and plans.
+	Binding string
+	// Origin says where the decision came from when it is not the dashboard, for example the
+	// chat platform and the chat account. The audit event of the decision records it.
+	Origin map[string]string
+}
+
+// record adds the origin of a decision to the data of its audit event.
+func (d Decision) record(data map[string]any) map[string]any {
+	if d.Origin != nil {
+		data["origin"] = d.Origin
+	}
+	return data
 }
 
 // Decide records a decision of a human on a work item that waits for approval. The decision
 // is bound to the commit and to the hash of each saved plan. A refused decision is recorded
-// in the audit log.
+// in the audit log. Two decisions on one work item run one after the other, so that two
+// clicks at the same moment do not both find the work item waiting.
 func (o *Orchestrator) Decide(ctx context.Context, id string, d Decision) (WorkItem, error) {
+	value, _ := o.decideLocks.LoadOrStore(id, &sync.Mutex{})
+	mu, _ := value.(*sync.Mutex)
+	mu.Lock()
+	defer mu.Unlock()
 	wi, err := o.decide(ctx, id, d)
 	if err != nil && (errors.Is(err, ErrForbidden) || errors.Is(err, ErrConflict) ||
 		errors.Is(err, ErrInvalid)) {
 		o.emit(audit.Event{Type: "approval.refused", Actor: d.User, WorkItem: id,
 			Summary: "Decision refused: " + err.Error(),
-			Data:    map[string]any{"decision": d.Decision, "reason": err.Error()}})
+			Data:    d.record(map[string]any{"decision": d.Decision, "reason": err.Error()})})
 	}
 	return wi, err
 }
@@ -148,6 +190,10 @@ func (o *Orchestrator) decide(ctx context.Context, id string, d Decision) (WorkI
 	if err != nil {
 		return WorkItem{}, err
 	}
+	if d.Binding != "" && d.Binding != Binding(wi.Commit, planHashes(plans)) {
+		return WorkItem{}, fmt.Errorf("%w: the plan of %s changed after this request for "+
+			"approval: decide on the current plan", ErrConflict, id)
+	}
 	hashes, _ := json.Marshal(planHashes(plans))
 	at := o.now()
 	if _, err := o.DB.Exec(`INSERT INTO approvals (work_item, approver, decision, comment,
@@ -157,8 +203,8 @@ func (o *Orchestrator) decide(ctx context.Context, id string, d Decision) (WorkI
 	}
 	o.emit(audit.Event{Type: "approval.recorded", Actor: user.Name, Env: wi.Env,
 		WorkItem: wi.ID, Summary: fmt.Sprintf("%s: %s by %s", wi.Title, d.Decision, user.Display),
-		Data: map[string]any{"decision": d.Decision, "comment": d.Comment, "commit": wi.Commit,
-			"plan_hashes": planHashes(plans), "tier": wi.Tier}})
+		Data: d.record(map[string]any{"decision": d.Decision, "comment": d.Comment,
+			"commit": wi.Commit, "plan_hashes": planHashes(plans), "tier": wi.Tier})})
 	switch d.Decision {
 	case "reject":
 		if wi.PRID != 0 {

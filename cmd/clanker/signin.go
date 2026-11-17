@@ -102,5 +102,8 @@ func withSignIn(ctx context.Context, server *api.Server, c *components, o option
 		return err
 	}
 	server.Identify, server.SignIn = identify(sessions, c.orch), sessions.Handler()
+	if c.chat != nil {
+		c.chat.serve(server, sessions)
+	}
 	return nil
 }

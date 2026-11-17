@@ -142,7 +142,14 @@ func seedForge(f *forge.Forge, source fs.FS) error {
 		"chart": chart}, "Release 1.0.0")
 }
 
-func adapters(db *sql.DB, o options) ([]notify.Adapter, error) {
+// adapters returns the channels of the notifier. It also builds the chat apps, which are
+// the adapters of their platforms.
+func adapters(c *components, o options) ([]notify.Adapter, error) {
+	db := c.db
+	var err error
+	if c.chat, err = buildChat(c, o); err != nil {
+		return nil, err
+	}
 	smtpAddr := envOr("CLANKER_SMTP_ADDR", "127.0.0.1:1025")
 	sinkURL := "http://" + o.sinkAddr
 	recipients := func(audience string) []string {
@@ -171,10 +178,12 @@ func adapters(db *sql.DB, o options) ([]notify.Adapter, error) {
 			return nil, err
 		}
 	}
+	slack, teams := c.chat.adapters(
+		notify.Slack{WebhookURL: envOr("CLANKER_SLACK_WEBHOOK", sinkURL+"/slack")},
+		notify.Teams{WebhookURL: envOr("CLANKER_TEAMS_WEBHOOK", sinkURL+"/teams")})
 	return []notify.Adapter{
 		notify.Email{Addr: smtpAddr, From: "clanker@example.com", Recipients: recipients},
-		notify.Slack{WebhookURL: envOr("CLANKER_SLACK_WEBHOOK", sinkURL+"/slack")},
-		notify.Teams{WebhookURL: envOr("CLANKER_TEAMS_WEBHOOK", sinkURL+"/teams")},
+		slack, teams,
 		notify.Discord{WebhookURL: envOr("CLANKER_DISCORD_WEBHOOK", sinkURL+"/discord")},
 	}, nil
 }
@@ -198,6 +207,8 @@ type components struct {
 	agent      *agent.Agent
 	detector   *detect.Detector
 	sim        *sim.Simulator
+	// chat is the apps for approval in Slack and Teams. Nil when none is configured.
+	chat *chatApps
 }
 
 // target holds the parts that only one kind of target has. On a cloud both are nil now:
@@ -278,7 +289,7 @@ func build(ctx context.Context, o options) (*components, error) {
 	if err := seedForge(c.forge, o.source); err != nil {
 		return nil, err
 	}
-	channelAdapters, err := adapters(c.db, o)
+	channelAdapters, err := adapters(c, o)
 	if err != nil {
 		return nil, err
 	}
@@ -496,6 +507,7 @@ func up(ctx context.Context, o options) error {
 		}()
 	}
 	go c.notifier.Run(ctx)
+	go c.chat.run(ctx)
 	go schedulerLoop(ctx, c)
 	if o.cloud == "local" {
 		go c.monitor.Run(ctx, []string{o.env}, 10*time.Second)

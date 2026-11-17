@@ -35,7 +35,7 @@ test:
 	opa test runbooks/policy
 
 # The core of the control plane must run as a unikernel, which cannot start a program.
-CORE_PACKAGES := agent api audit detect dispatch forge jobspec monitor notify orchestrator planfacts policy runbook scrub signin store
+CORE_PACKAGES := agent api audit chatops detect dispatch forge jobspec monitor notify orchestrator planfacts policy runbook scrub signin store
 
 lint-core:
 	scripts/lint-core.sh $(CORE_PACKAGES)

@@ -98,6 +98,20 @@ CREATE TABLE IF NOT EXISTS device_codes (
 CREATE TABLE IF NOT EXISTS tokens (
   id TEXT PRIMARY KEY, email TEXT NOT NULL, expires TEXT NOT NULL, created_at TEXT NOT NULL);
 
+CREATE TABLE IF NOT EXISTS chat_links (
+  platform TEXT NOT NULL, workspace TEXT NOT NULL, account TEXT NOT NULL,
+  account_name TEXT NOT NULL DEFAULT '', email TEXT NOT NULL, created_at TEXT NOT NULL,
+  PRIMARY KEY (platform, workspace, account));
+
+CREATE TABLE IF NOT EXISTS chat_link_codes (
+  id TEXT PRIMARY KEY, platform TEXT NOT NULL, workspace TEXT NOT NULL, account TEXT NOT NULL,
+  account_name TEXT NOT NULL DEFAULT '', expires TEXT NOT NULL, created_at TEXT NOT NULL);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, platform TEXT NOT NULL,
+  work_item TEXT NOT NULL, binding TEXT NOT NULL, place TEXT NOT NULL, message TEXT NOT NULL,
+  content TEXT NOT NULL, open BIGINT NOT NULL DEFAULT 1, created_at TEXT NOT NULL);
+
 CREATE TABLE IF NOT EXISTS chat (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, work_item TEXT NOT NULL DEFAULT '',
   username TEXT NOT NULL, role TEXT NOT NULL, body TEXT NOT NULL,

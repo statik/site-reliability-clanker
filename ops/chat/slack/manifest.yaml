@@ -1,0 +1,27 @@
+# Slack app for approval in chat. Paste this file into "Create an app from a manifest" at
+# https://api.slack.com/apps. Replace clanker.example with the host of CLANKER_PUBLIC_URL.
+# The keys follow https://docs.slack.dev/reference/app-manifest.
+# This manifest was not installed in a real workspace yet.
+_metadata:
+  major_version: 2
+  minor_version: 1
+display_information:
+  name: Clanker approvals
+  description: Requests for approval of infrastructure changes
+features:
+  bot_user:
+    display_name: Clanker
+    always_online: false
+oauth_config:
+  scopes:
+    bot:
+      # The only scope: post and change the messages of the app. Invite the app to the
+      # channel, because the app has no scope to post where it is not a member.
+      - chat:write
+settings:
+  interactivity:
+    is_enabled: true
+    request_url: https://clanker.example/chat/slack/interactions
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
