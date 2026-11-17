@@ -35,8 +35,8 @@ The wizard never approves a change. To build the binaries yourself, run `make re
 
 ## Run the local demo
 
-You need Docker (running), `git`, `tofu`, `kubectl`, `helm`, `kind`, `opa`, Go, Node 22 and
-`pnpm`. `nix develop` provides all of them except Docker.
+You need Docker (running), `git`, `tofu`, `kubectl`, `helm`, `kind`, Go, Node 22 and
+`pnpm`. The tests also need `opa`. `nix develop` provides all of them except Docker.
 
 ```
 make demo

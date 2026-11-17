@@ -1,16 +1,18 @@
 // Package policy turns a saved plan into a risk tier. The rules are Rego files in the
-// runbooks repository. This package only runs them with the opa CLI.
+// runbooks repository. This package evaluates them with the OPA library, in this process,
+// so the control plane starts no program for a policy decision.
 package policy
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
+
+	"github.com/open-policy-agent/opa/v1/rego"
 )
 
 // Decision is the result of the tier policy for one plan.
@@ -30,61 +32,74 @@ type Input struct {
 	PolicyDir string
 }
 
+const query = `{"decision": data.clanker.tier.decision, "create_only": data.clanker.tier.create_only}`
+
+// modules reads the Rego files of the policy directory. Test files are not rules.
+func modules(dir string) ([]func(*rego.Rego), error) {
+	paths, err := filepath.Glob(filepath.Join(dir, "*.rego"))
+	if err != nil {
+		return nil, fmt.Errorf("list policies in %s: %w", dir, err)
+	}
+	options := []func(*rego.Rego){}
+	for _, path := range paths {
+		if strings.HasSuffix(path, "_test.rego") {
+			continue
+		}
+		source, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("read policy %s: %w", path, err)
+		}
+		options = append(options, rego.Module(path, string(source)))
+	}
+	if len(options) == 0 {
+		return nil, fmt.Errorf("the policy directory %s has no Rego file", dir)
+	}
+	return options, nil
+}
+
 // Evaluate runs the tier policy over the plan JSON.
 func Evaluate(ctx context.Context, in Input) (Decision, error) {
 	planRaw, err := os.ReadFile(in.PlanJSONPath)
 	if err != nil {
 		return Decision{}, fmt.Errorf("read plan JSON %s for policy: %w", in.PlanJSONPath, err)
 	}
-	payload, err := json.Marshal(map[string]any{
-		"kind": in.Kind, "layer": in.Layer, "plan": json.RawMessage(planRaw),
-	})
+	var plan any
+	if err := json.Unmarshal(planRaw, &plan); err != nil {
+		return Decision{}, fmt.Errorf("decode plan JSON %s for policy: %w", in.PlanJSONPath, err)
+	}
+	options, err := modules(in.PolicyDir)
 	if err != nil {
-		return Decision{}, fmt.Errorf("encode policy input: %w", err)
+		return Decision{}, err
 	}
-	inputFile, err := os.CreateTemp("", "clanker-policy-*.json")
-	if err != nil {
-		return Decision{}, fmt.Errorf("create policy input file: %w", err)
-	}
-	defer os.Remove(inputFile.Name())
-	if _, err := inputFile.Write(payload); err != nil {
-		return Decision{}, fmt.Errorf("write policy input file: %w", err)
-	}
-	inputFile.Close()
+	options = append(options, rego.Query(query),
+		rego.Input(map[string]any{"kind": in.Kind, "layer": in.Layer, "plan": plan}))
 
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "opa", "eval", "--format", "json",
-		"--data", filepath.Clean(in.PolicyDir), "--input", inputFile.Name(),
-		"{\"decision\": data.clanker.tier.decision, \"create_only\": data.clanker.tier.create_only}")
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	if err := cmd.Run(); err != nil {
-		return Decision{}, fmt.Errorf("opa eval with policies in %s: %w: %s", in.PolicyDir, err,
-			stderr.String())
+	results, err := rego.New(options...).Eval(ctx)
+	if err != nil {
+		return Decision{}, fmt.Errorf("evaluate the policies in %s: %w", in.PolicyDir, err)
 	}
-	var result struct {
-		Result []struct {
-			Expressions []struct {
-				Value struct {
-					Decision   Decision `json:"decision"`
-					CreateOnly bool     `json:"create_only"`
-				} `json:"value"`
-			} `json:"expressions"`
-		} `json:"result"`
+	if len(results) == 0 || len(results[0].Expressions) == 0 {
+		return Decision{}, fmt.Errorf("the policy gave no decision for layer %s: check %s",
+			in.Layer, in.PolicyDir)
 	}
-	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
-		return Decision{}, fmt.Errorf("decode opa result: %w", err)
+	// The value is generic JSON. A round trip through JSON gives the typed decision.
+	raw, err := json.Marshal(results[0].Expressions[0].Value)
+	if err != nil {
+		return Decision{}, fmt.Errorf("encode the policy result: %w", err)
 	}
-	if len(result.Result) == 0 || len(result.Result[0].Expressions) == 0 {
-		return Decision{}, fmt.Errorf("opa gave no decision for layer %s: check %s", in.Layer,
-			in.PolicyDir)
+	var value struct {
+		Decision   Decision `json:"decision"`
+		CreateOnly bool     `json:"create_only"`
 	}
-	value := result.Result[0].Expressions[0].Value
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return Decision{}, fmt.Errorf("decode the policy result: %w", err)
+	}
 	decision := value.Decision
 	decision.CreateOnly = value.CreateOnly
 	if decision.Tier == "" {
-		return Decision{}, fmt.Errorf("opa decision for layer %s has no tier", in.Layer)
+		return Decision{}, fmt.Errorf("the policy decision for layer %s has no tier", in.Layer)
 	}
 	return decision, nil
 }
