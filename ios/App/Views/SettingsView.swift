@@ -108,6 +108,51 @@ private struct SignedInSection: View {
   @Environment(AppModel.self) private var app
 
   var body: some View {
+    if case .required = app.signIn {
+      Section("Signed in as") {
+        Text("Nobody. The control plane asks for a sign-in: close Settings to sign in.")
+          .font(.callout)
+        keychainProblem
+      }
+    } else if app.usesToken {
+      person
+    } else {
+      DemoUserSection()
+    }
+  }
+
+  private var person: some View {
+    Section {
+      if let me = app.me {
+        FieldRow(label: "Name", value: me.display)
+        FieldRow(label: "Email", value: me.email)
+        FieldRow(label: "Role", value: me.role)
+      } else {
+        Text("The control plane did not say yet who you are.").font(.callout)
+      }
+      keychainProblem
+      Button("Sign out", role: .destructive) { app.signOut() }
+        .accessibilityIdentifier("sign-out")
+    } header: {
+      Text("Signed in as")
+    } footer: {
+      Text(
+        "Sign out removes the token from this phone. The control plane has no way to end "
+          + "one token early: the token stays valid until twelve hours after the sign-in.")
+    }
+  }
+
+  @ViewBuilder private var keychainProblem: some View {
+    if let problem = app.keychainProblem {
+      ErrorNotice(message: problem)
+    }
+  }
+}
+
+private struct DemoUserSection: View {
+  @Environment(AppModel.self) private var app
+
+  var body: some View {
     Section {
       if let error = app.usersError {
         ErrorNotice(message: error) { Task { await app.loadUsers() } }
@@ -127,7 +172,7 @@ private struct SignedInSection: View {
       Text("Signed in as")
     } footer: {
       Text(
-        "This prototype has no real sign-in: the app sends the name you pick here in the "
+        "This control plane has no sign-in: the app sends the name you pick here in the "
           + "X-Clanker-User header, and anyone who can reach the server can do the same.")
     }
   }

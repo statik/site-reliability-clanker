@@ -35,9 +35,22 @@ struct ChatRequest: Encodable, Sendable {
   }
 }
 
+struct AuthMode: Decodable, Sendable, Equatable {
+  let signIn: Bool
+
+  enum CodingKeys: String, CodingKey { case signIn = "sign_in" }
+}
+
 /// The endpoints of the Clanker control plane that this app uses.
 struct ControlPlaneAPI: Sendable {
   let client: APIClient
+
+  /// Whether people sign in to this control plane. One that signs people in answers only
+  /// a signed-in caller; it refuses everybody else with status 401.
+  func auth() async throws -> AuthMode { try await client.get("/api/v1/auth") }
+
+  /// The user behind the credential of this client.
+  func me() async throws -> User { try await client.get("/api/v1/me") }
 
   func users() async throws -> [User] { try await client.get("/api/v1/users") }
 

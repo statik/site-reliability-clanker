@@ -8,6 +8,14 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
   struct Response: Sendable {
     var status = 200
     var body = Data()
+    /// When set, the request fails with this error and gets no answer.
+    var failure: URLError.Code?
+
+    static func json(_ text: String, status: Int = 200) -> Response {
+      Response(status: status, body: Data(text.utf8))
+    }
+
+    static func failure(_ code: URLError.Code) -> Response { Response(failure: code) }
   }
 
   struct Recorded: Sendable {
@@ -20,24 +28,38 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
 
   private static let lock = NSLock()
   nonisolated(unsafe) private static var responses: [String: Response] = [:]
+  nonisolated(unsafe) private static var queues: [String: [Response]] = [:]
   nonisolated(unsafe) private static var recorded: [String: [Recorded]] = [:]
 
-  /// Returns a client whose requests are answered with `response`, and the host to query.
-  static func client(
-    user: String = "alice", status: Int = 200, body: String
-  ) throws -> (client: APIClient, host: String) {
+  /// Returns a host name that no other test uses, and its address.
+  static func newHost() throws -> (host: String, url: URL) {
     let host = "stub-\(UUID().uuidString.lowercased()).test"
+    guard let url = URL(string: "http://\(host)") else { throw APIError.invalidURL(host) }
+    return (host, url)
+  }
+
+  /// A session whose requests to stub hosts are answered from memory.
+  static func session() -> URLSession {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [StubProtocol.self]
+    return URLSession(configuration: configuration)
+  }
+
+  /// Sets the answers of one path of a host, in order. The last answer repeats.
+  static func answer(host: String, path: String, _ answers: Response...) {
+    lock.withLock { queues[host + path] = answers }
+  }
+
+  /// Returns a client whose requests are answered with `response`, and the host to query.
+  /// A path with answers from `answer(host:path:_:)` gets those instead.
+  static func client(
+    credential: Credential = .demoUser("alice"), status: Int = 200, body: String
+  ) throws -> (client: APIClient, host: String) {
+    let (host, url) = try newHost()
     lock.withLock {
       responses[host] = Response(status: status, body: Data(body.utf8))
     }
-    let configuration = URLSessionConfiguration.ephemeral
-    configuration.protocolClasses = [StubProtocol.self]
-    guard let url = URL(string: "http://\(host)") else {
-      throw APIError.invalidURL(host)
-    }
-    let client = APIClient(
-      baseURL: url, user: user, session: URLSession(configuration: configuration))
-    return (client, host)
+    return (APIClient(baseURL: url, credential: credential, session: session()), host)
   }
 
   static func requests(to host: String) -> [Recorded] {
@@ -60,7 +82,16 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
       headers: request.allHTTPHeaderFields ?? [:], body: Self.readBody(of: request))
     let response = Self.lock.withLock {
       Self.recorded[host, default: []].append(entry)
+      let key = host + url.path()
+      if let queue = Self.queues[key], let next = queue.first {
+        if queue.count > 1 { Self.queues[key] = Array(queue.dropFirst()) }
+        return next
+      }
       return Self.responses[host] ?? Response(status: 500)
+    }
+    if let failure = response.failure {
+      client?.urlProtocol(self, didFailWithError: URLError(failure))
+      return
     }
     guard
       let http = HTTPURLResponse(

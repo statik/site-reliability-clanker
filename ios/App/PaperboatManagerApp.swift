@@ -18,12 +18,18 @@ struct RootView: View {
 
   var body: some View {
     @Bindable var app = app
-    TabView(selection: $app.selectedTab) {
-      tab(.home, "Home", "sailboat") { HomeView() }
-      tab(.approvals, "Approvals", "hand.raised") { ApprovalsView() }
-      tab(.activity, "Activity", "list.bullet.rectangle") { ActivityView() }
-      tab(.ask, "Ask", "bubble.left.and.text.bubble.right") { AskView() }
-      tab(.access, "Access", "key") { AccessView() }
+    Group {
+      if case .required(let notice) = app.signIn {
+        SignInView(notice: notice)
+      } else {
+        TabView(selection: $app.selectedTab) {
+          tab(.home, "Home", "sailboat") { HomeView() }
+          tab(.approvals, "Approvals", "hand.raised") { ApprovalsView() }
+          tab(.activity, "Activity", "list.bullet.rectangle") { ActivityView() }
+          tab(.ask, "Ask", "bubble.left.and.text.bubble.right") { AskView() }
+          tab(.access, "Access", "key") { AccessView() }
+        }
+      }
     }
     .sheet(isPresented: $app.showSettings) {
       SettingsView()

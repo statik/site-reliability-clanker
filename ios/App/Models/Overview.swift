@@ -1,19 +1,21 @@
 import Foundation
 
-/// A demo user of the control plane. The prototype has no real sign-in.
+/// A user of the control plane: a demo user, or a person who signs in.
 struct User: Decodable, Sendable, Equatable, Identifiable, Hashable {
   var name = ""
   var display = ""
   var role = ""
+  var email = ""
 
   var id: String { name }
 
-  enum CodingKeys: String, CodingKey { case name, display, role }
+  enum CodingKeys: String, CodingKey { case name, display, role, email }
 
-  init(name: String, display: String, role: String) {
+  init(name: String, display: String, role: String, email: String = "") {
     self.name = name
     self.display = display
     self.role = role
+    self.email = email
   }
 
   init(from decoder: Decoder) throws {
@@ -21,6 +23,7 @@ struct User: Decodable, Sendable, Equatable, Identifiable, Hashable {
     name = try c.decode(String.self, forKey: .name)
     display = try c.text(.display)
     role = try c.text(.role)
+    email = try c.text(.email)
   }
 
   /// The server accepts decisions only from these roles.

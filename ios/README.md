@@ -62,11 +62,12 @@ you can open a screen without taps:
 |---|---|
 | `-initialScreen home\|approvals\|activity\|ask\|access\|settings` | Opens that screen |
 | `-workItem WI-0020` | Opens the approval page of that work item. With `-initialScreen activity` it opens the timeline. With `-initialScreen ask` it opens the scoped chat |
-| `-debugUser alice` | Signs in as that user for this start only |
+| `-debugUser alice` | Uses that demo user for this start only |
 | `-debugScroll impact\|tier\|changes\|safety\|permission\|evidence\|approvers\|progress` | Scrolls the approval page to that section. Home accepts `environment`, `catchup`, `chain`. The Activity detail accepts `progress`, `jobs`, `timeline` |
 | `-debugDecision choose\|approve\|schedule\|request_changes\|reject` | Opens that step of the decision |
 | `-debugSubmit YES` | Sends the decision. It works only with `request_changes` and only if the user is a viewer. It shows how the server refuses |
 | `-debugJob 42` | Opens the log of that job |
+| `-debugSignIn YES` | Asks for a sign-in code when the sign-in screen opens |
 
 Example:
 
@@ -89,11 +90,60 @@ refuses that decision with status 403, and the screenshot shows the refusal.
 
 Open Settings with the name button at the top right of each tab.
 
-- **Signed in as**: the demo users from `GET /api/v1/users`. The default is `dave`, a viewer.
+- **Signed in as**: with a control plane that has a sign-in, the person who signed in
+  (from `GET /api/v1/me`) and the **Sign out** button. With the demo, the demo users from
+  `GET /api/v1/users`. The default demo user is `dave`, a viewer.
 - **Servers**: the addresses of the control plane and of Paperboat. The app keeps them in
   UserDefaults.
 
 The app permits plain HTTP only for local-network addresses (`NSAllowsLocalNetworking`).
+
+## Sign-in
+
+The app asks the control plane if people sign in (`GET /api/v1/auth`). There are two
+answers:
+
+- **The demo** answers `{"sign_in": false}`. The app sends the name of the demo user in
+  the `X-Clanker-User` header, as before.
+- **A control plane with a sign-in** answers with status 401 until the app has a token.
+  The app then shows the sign-in screen.
+
+The sign-in is the OAuth 2.0 device flow of the control plane (`internal/signin/device.go`):
+
+1. Tap **Sign in**. The app asks for a code (`POST /auth/device/code`) and shows it,
+   together with the address of the page.
+2. Open the page in a browser where you are signed in to the dashboard. The button
+   **Open the page in the browser** opens it on the phone. Approve only if the page shows
+   the same code.
+3. The app asks for its token (`POST /auth/device/token`) at the interval that the server
+   gives. If a request does not reach the server, the app tries again, because the phone
+   can lose the connection while the browser is in front.
+4. After the approval, the app shows who is signed in and loads the data.
+
+If you refuse the code, or if nobody approves it in ten minutes, the app says so and you
+can ask for a new code.
+
+The token is a secret. The app keeps it in the Keychain, one token for each server address.
+The token is not in UserDefaults and the app writes no log. The app sends the token as
+`Authorization: Bearer` on each request to the control plane, also on the event stream. The
+app does not send the token to Paperboat.
+
+A token is valid for twelve hours. When the control plane answers with status 401, the app
+removes the token and shows the sign-in screen with a message.
+
+**Sign out** in Settings removes the token from the phone. The control plane has no
+endpoint that ends one token. Thus a token stays valid on the server until its twelve
+hours are over.
+
+The Keychain accepts only a signed app. `project.yml` signs the app "to run locally", which
+needs no development team. Without this signature the Keychain gives status -34018.
+
+To try the sign-in in the simulator without taps, start the app with the address of a
+control plane that has a sign-in:
+
+```sh
+ios/run.sh -controlPlaneURL http://127.0.0.1:7270 -debugSignIn YES
+```
 
 ## Screens
 
@@ -122,8 +172,12 @@ of the grant and the verification. These rows come from the event stream.
 
 ## Limits
 
-- **No real sign-in.** The app sends the name that you select in the `X-Clanker-User`
-  header. Anyone who can reach the server can do the same.
+- **No sign-in in the demo.** With a control plane that has no sign-in, the app sends the
+  name that you select in the `X-Clanker-User` header. Anyone who can reach the server can
+  do the same.
+- **Sign out is local.** The control plane cannot end one token. See "Sign-in".
+- **The sign-in was not tested on a real phone.** It ran in the simulator against a control
+  plane with a fake identity provider. The button that opens the browser was not tapped.
 - **Simulated clock.** The control plane of the prototype runs on a virtual clock. The app
   shows control-plane times in UTC. The schedule picker starts from the clock of the control
   plane, not from the clock of the phone.
@@ -135,7 +189,8 @@ of the grant and the verification. These rows come from the event stream.
 - **No notifications.** The app does not send push notifications when a decision is needed.
 - **No "defer" action.** The API has no such decision. The page shows the consequence of
   waiting next to the choices.
-- **Not signed.** The project has no development team. It runs in the simulator only.
+- **No development team.** The app has only a signature "to run locally". It runs in the
+  simulator only.
 
 ## Layout
 
@@ -143,7 +198,7 @@ of the grant and the verification. These rows come from the event stream.
 ios/
   project.yml       project description for xcodegen
   build.sh run.sh   scripts
-  App/Core          API client, event stream, settings, timestamps
+  App/Core          API client, device flow, token store, event stream, settings, timestamps
   App/Models        Codable types of the API
   App/Logic         pure functions: approver progress, change summary, apply progress
   App/ViewModels    @Observable types, one for each screen

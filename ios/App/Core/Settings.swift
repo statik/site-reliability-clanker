@@ -1,6 +1,7 @@
 import Foundation
 
-/// The addresses of the two servers and the chosen demo user, kept in UserDefaults.
+/// The addresses of the two servers and the chosen demo user, kept in UserDefaults. The
+/// token of a sign-in is a secret and is not here: see `TokenStore`.
 struct AppSettings: Equatable, Sendable {
   static let defaultControlPlane = "http://127.0.0.1:7070"
   static let defaultPaperboat = "http://localhost:8088"
@@ -45,6 +46,15 @@ struct AppSettings: Equatable, Sendable {
     else { throw APIError.invalidURL(trimmed) }
     return url
   }
+
+  /// The form scheme://host:port of an address. It names the sign-in token of that server,
+  /// so that two spellings of one address share a token and two servers never do.
+  static func serverKey(_ url: URL) -> String {
+    let scheme = (url.scheme ?? "").lowercased()
+    let host = (url.host() ?? "").lowercased()
+    let port = url.port ?? (scheme == "https" ? 443 : 80)
+    return "\(scheme)://\(host):\(port)"
+  }
 }
 
 /// Launch arguments for development: they open a screen without taps, for screenshots.
@@ -59,6 +69,8 @@ struct LaunchOptions: Equatable, Sendable {
   /// Submits the opened decision. Refused unless the chosen user is a viewer.
   var submitDecision = false
   var job = 0
+  /// Asks for a sign-in code at once, without a tap on the sign-in screen.
+  var signIn = false
   var isUnderTest = false
 
   static func read(_ defaults: UserDefaults = .standard) -> LaunchOptions {
@@ -72,6 +84,7 @@ struct LaunchOptions: Equatable, Sendable {
       options.decision = defaults.string(forKey: "debugDecision") ?? ""
       options.submitDecision = defaults.bool(forKey: "debugSubmit")
       options.job = defaults.integer(forKey: "debugJob")
+      options.signIn = defaults.bool(forKey: "debugSignIn")
     #endif
     return options
   }
