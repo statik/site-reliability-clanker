@@ -41,7 +41,10 @@ What ran on the build of commit `376617b`, the last change to the Go code:
    target. The broker takes a `broker.Issuer` and the simulator takes a `ManualChange`
    function. On a cloud both are absent: the broker exchanges no grant and the drift scene
    reports an error. `scripts/lint-core.sh` follows the imports of the core packages inside
-   this module.
+   this module. The committed `scripts/verify/fresh-run.sh`, `sweep.py` and `stale_plan.py`
+   ran on the build of commit `e5d1997` with the same results as before: thirteen work
+   items, the chain at 310 events, no error line. The path without an issuer has unit
+   tests only.
 2. **A core entry point with no file.** Today the core still writes: the unpacked bundle,
    the data directory, `broker.key`, `database.password`. On a cloud the signing key and the
    database address must come from a secret store at start. `ops` writes `Env` into the
