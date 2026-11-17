@@ -274,7 +274,7 @@ func (r *Runner) ToolDigest() string {
 		h := sha256.New()
 		for _, args := range [][]string{
 			{"tofu", "version"}, {"helm", "version", "--short"},
-			{"kubectl", "version", "--client"}, {"opa", "version"}, {"git", "--version"},
+			{"kubectl", "version", "--client"},
 		} {
 			out, err := exec.Command(args[0], args[1:]...).Output()
 			if err != nil {

@@ -31,7 +31,6 @@ type tool struct {
 
 var localTools = []tool{
 	{"docker", "runs the local cluster", "Install Docker Desktop, then start it."},
-	{"git", "holds the repositories of the control plane", "brew install git"},
 	{"tofu", "plans and applies the infrastructure", "brew install opentofu"},
 	{"kubectl", "talks to the cluster", "brew install kubectl"},
 	{"helm", "installs the application chart", "brew install helm"},
