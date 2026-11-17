@@ -8,20 +8,25 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"slices"
 	"strings"
 	"syscall"
 
+	"github.com/statik/site-reliability-clanker/internal/bundle"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
 	"github.com/statik/site-reliability-clanker/internal/runner"
+	"github.com/statik/site-reliability-clanker/internal/setup"
 )
+
+// version is the release of this binary. `make release` sets it.
+var version = "dev"
 
 const usage = `clanker runs the Site Reliability Clanker control plane.
 
 Usage:
+  clanker setup                     open the first-run wizard in the browser
   clanker preflight                 check that the required tools are installed
   clanker bootstrap --cloud local   apply layer 00-bootstrap with your own credentials
   clanker up                        start the control plane and the dashboard
@@ -29,8 +34,10 @@ Usage:
   clanker sink                      run the local webhook sink alone
 
 Common flags:
-  --data DIR     data directory of the control plane (default .clanker)
-  --source DIR   checkout of this repository (default .)
+  --data DIR     data directory of the control plane (default .clanker in a checkout,
+                 ~/.clanker for a released binary)
+  --source DIR   checkout of this repository (default . in a checkout; a released binary
+                 carries the files and needs no checkout)
 `
 
 // options are the settings shared by the commands.
@@ -42,13 +49,17 @@ type options struct {
 	env       string
 	cloud     string
 	demo      bool
+	setupAddr string
+	noBrowser bool
 }
 
 func parse(args []string) (options, error) {
 	var o options
 	fs := flag.NewFlagSet("clanker", flag.ContinueOnError)
-	fs.StringVar(&o.dataDir, "data", ".clanker", "data directory")
-	fs.StringVar(&o.sourceDir, "source", ".", "checkout of this repository")
+	fs.StringVar(&o.dataDir, "data", "", "data directory")
+	fs.StringVar(&o.sourceDir, "source", "", "checkout of this repository")
+	fs.StringVar(&o.setupAddr, "setup-addr", "127.0.0.1:7069", "listen address of the wizard")
+	fs.BoolVar(&o.noBrowser, "no-browser", false, "do not open the wizard in the browser")
 	fs.StringVar(&o.addr, "addr", "127.0.0.1:7070", "listen address of the control plane")
 	fs.StringVar(&o.sinkAddr, "sink-addr", "127.0.0.1:7071", "listen address of the sink")
 	fs.StringVar(&o.env, "env", "local", "environment name")
@@ -57,12 +68,8 @@ func parse(args []string) (options, error) {
 	if err := fs.Parse(args); err != nil {
 		return options{}, err
 	}
-	var err error
-	if o.dataDir, err = filepath.Abs(o.dataDir); err != nil {
-		return options{}, fmt.Errorf("resolve data directory: %w", err)
-	}
-	if o.sourceDir, err = filepath.Abs(o.sourceDir); err != nil {
-		return options{}, fmt.Errorf("resolve source directory: %w", err)
+	if err := locate(&o); err != nil {
+		return options{}, err
 	}
 	if _, err := os.Stat(filepath.Join(o.sourceDir, "platform", "CONTRACT.md")); err != nil {
 		return options{}, fmt.Errorf("%s is not a checkout of this repository: run clanker "+
@@ -71,15 +78,52 @@ func parse(args []string) (options, error) {
 	return o, nil
 }
 
+// locate fills in the data directory and the source directory. A released binary carries
+// the source files: it unpacks them into the data directory and needs no checkout.
+func locate(o *options) error {
+	bundled := o.sourceDir == "" && bundle.Present()
+	if o.dataDir == "" {
+		o.dataDir = ".clanker"
+		if bundled {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("find the home directory for the data directory: %w; "+
+					"set --data", err)
+			}
+			o.dataDir = filepath.Join(home, ".clanker")
+		}
+	}
+	var err error
+	if o.dataDir, err = filepath.Abs(o.dataDir); err != nil {
+		return fmt.Errorf("resolve data directory: %w", err)
+	}
+	if bundled {
+		if err := os.MkdirAll(o.dataDir, 0o755); err != nil {
+			return fmt.Errorf("create data directory %s: %w", o.dataDir, err)
+		}
+		o.sourceDir, err = bundle.Extract(o.dataDir)
+		return err
+	}
+	if o.sourceDir == "" {
+		o.sourceDir = "."
+	}
+	if o.sourceDir, err = filepath.Abs(o.sourceDir); err != nil {
+		return fmt.Errorf("resolve source directory: %w", err)
+	}
+	return nil
+}
+
 // loadDotEnv reads KEY=VALUE lines from .env in the source directory. A variable that is
 // already set in the environment wins.
-func loadDotEnv(dir string) error {
-	f, err := os.Open(filepath.Join(dir, ".env"))
+func loadDotEnv(dir string) error { return loadEnvFile(filepath.Join(dir, ".env")) }
+
+func loadEnvFile(path string) error {
+	f, err := os.Open(path)
 	if os.IsNotExist(err) {
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("open .env: %w", err)
+		return fmt.Errorf("open %s: %w", path, err)
 	}
 	defer f.Close()
 	scanner := bufio.NewScanner(f)
@@ -92,30 +136,29 @@ func loadDotEnv(dir string) error {
 		key, value = strings.TrimSpace(key), strings.Trim(strings.TrimSpace(value), `"'`)
 		if os.Getenv(key) == "" && value != "" {
 			if err := os.Setenv(key, value); err != nil {
-				return fmt.Errorf("set %s from .env: %w", key, err)
+				return fmt.Errorf("set %s from %s: %w", key, path, err)
 			}
 		}
 	}
 	return scanner.Err()
 }
 
-var requiredTools = []string{"git", "tofu", "kubectl", "helm", "opa", "docker", "kind"}
-
-// preflight checks the tools before anything starts, so that a first run fails with one
-// clear list and not in the middle of a job.
-func preflight() error {
-	missing := []string{}
-	for _, tool := range requiredTools {
-		if _, err := exec.LookPath(tool); err != nil {
-			missing = append(missing, tool)
+// preflight checks the tools of a target before anything starts, so that a first run
+// fails with one clear list and not in the middle of a job.
+func preflight(target string) error {
+	checks, err := setup.Checks(target)
+	if err != nil {
+		return err
+	}
+	lines := []string{}
+	for _, c := range checks {
+		if !c.OK {
+			lines = append(lines, fmt.Sprintf("  %s (%s): %s. %s", c.Name, c.Why, c.Detail, c.Fix))
 		}
 	}
-	if len(missing) > 0 {
-		return fmt.Errorf("these tools are not installed: %s. Run `nix develop` in the "+
-			"repository, or install them with your package manager", strings.Join(missing, ", "))
-	}
-	if err := exec.Command("docker", "info").Run(); err != nil {
-		return fmt.Errorf("the Docker daemon does not answer: start Docker, then try again")
+	if len(lines) > 0 {
+		return fmt.Errorf("this machine is not ready for the %s target:\n%s", target,
+			strings.Join(lines, "\n"))
 	}
 	return nil
 }
@@ -180,39 +223,55 @@ func destroy(ctx context.Context, o options) error {
 }
 
 func run() error {
-	if len(os.Args) < 2 {
-		fmt.Print(usage)
-		return nil
+	args := os.Args[1:]
+	if len(args) == 0 {
+		if !bundle.Present() {
+			fmt.Print(usage)
+			return nil
+		}
+		// A released binary that is started with no command opens the wizard.
+		args = []string{"setup"}
 	}
-	command := os.Args[1]
+	command := args[0]
 	if command == "help" || command == "--help" || command == "-h" {
 		fmt.Print(usage)
 		return nil
 	}
-	o, err := parse(os.Args[2:])
+	if command == "version" || command == "--version" {
+		fmt.Println(version)
+		return nil
+	}
+	o, err := parse(args[1:])
 	if err != nil {
 		return err
 	}
 	if err := loadDotEnv(o.sourceDir); err != nil {
 		return err
 	}
+	if err := loadEnvFile(filepath.Join(o.dataDir, "secrets.env")); err != nil {
+		return err
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	switch command {
+	case "setup":
+		return runSetup(ctx, o)
 	case "preflight":
-		if err := preflight(); err != nil {
+		if err := preflight(setup.TargetLocal); err != nil {
 			return err
 		}
 		fmt.Println("All required tools are present and Docker answers.")
 		return nil
 	case "bootstrap":
-		if err := preflight(); err != nil {
+		if err := preflight(setup.TargetLocal); err != nil {
 			return err
 		}
 		return bootstrap(ctx, o)
 	case "up":
-		if err := preflight(); err != nil {
-			return err
+		if o.cloud == "local" {
+			if err := preflight(setup.TargetLocal); err != nil {
+				return err
+			}
 		}
 		return up(ctx, o)
 	case "destroy":

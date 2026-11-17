@@ -56,6 +56,12 @@ The backend block in `versions.tf` is empty (`backend "s3" {}`). The runner supp
 values with `tofu init -backend-config=...`. Layer `00-bootstrap` creates the backend, so its
 own state starts local and `clanker bootstrap` migrates it.
 
+### The home of the control plane is not a layer
+
+The setup wizard creates the home of the control plane before any layer exists. That home
+is outside this contract. The role that the control plane runs as is the value for
+`broker_principal` of `00-bootstrap` on AWS.
+
 ## 3. Inputs and outputs for each layer
 
 Types use OpenTofu syntax. "Local" shows how the local target satisfies the row.

@@ -12,6 +12,27 @@ deliveries and customer support.
 - [Handoff](docs/HANDOFF.md): what works now, what is validated only, and what is open.
 - [Platform contract](platform/CONTRACT.md): the OpenTofu interface for each cloud.
 
+## Install with the setup wizard
+
+A released `clanker` binary carries the dashboard and the platform code, so it needs no
+checkout. Start it with no command, or with `clanker setup`. It opens a wizard in your
+browser, on the loopback address only.
+
+```
+curl -fsSL -o clanker https://github.com/statik/site-reliability-clanker/releases/latest/download/clanker-darwin-arm64
+chmod +x clanker
+./clanker
+```
+
+The wizard has two targets:
+
+| Target | What the wizard does | Status |
+|---|---|---|
+| This machine | Checks the tools, takes the model key, starts the control plane. The control plane then plans the first deployment and waits for approval | Runs end to end |
+| Your AWS account | Not available yet. See "Direction for the cloud control plane" in `docs/HANDOFF.md` | Not built |
+
+The wizard never approves a change. To build the binaries yourself, run `make release`.
+
 ## Run the local demo
 
 You need Docker (running), `git`, `tofu`, `kubectl`, `helm`, `kind`, `opa`, Go, Node 22 and

@@ -1,0 +1,240 @@
+package setup
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/subtle"
+	"embed"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+)
+
+//go:embed ui
+var uiFiles embed.FS
+
+// Config is what the wizard needs from the program that starts it.
+type Config struct {
+	// DataDir is the data directory of the control plane on this machine.
+	DataDir string
+	// Version is the release of this binary, or "dev".
+	Version string
+	// ReleaseBase is the download address of the releases, without the version.
+	ReleaseBase string
+	// DashboardURL is where the dashboard answers on this machine.
+	DashboardURL string
+	// StartLocal starts the control plane for the local target in this process. It
+	// returns at once; the wizard waits for the dashboard.
+	StartLocal func(ctx context.Context, env string) error
+	// CLI runs the aws program. Nil means the real program.
+	CLI CLI
+	// EnableAWS offers the AWS target. It is off in a release: the home of the control
+	// plane on AWS is being rebuilt as a unikernel, and the code here still creates the
+	// earlier design, a container on ECS. Tests switch it on.
+	EnableAWS bool
+}
+
+// State is what the wizard remembers between starts. It holds no secret.
+type State struct {
+	Target    string `json:"target"`
+	Env       string `json:"env"`
+	Profile   string `json:"profile"`
+	Region    string `json:"region"`
+	Account   string `json:"account"`
+	Principal string `json:"principal"`
+	Size      string `json:"size"`
+	KeyChoice string `json:"key_choice"`
+	Deployed  bool   `json:"deployed"`
+}
+
+// Server is the wizard. One person uses it, on the loopback address.
+type Server struct {
+	cfg   Config
+	token string
+
+	mu      sync.Mutex
+	state   State
+	key     string
+	review  []Change
+	job     *job
+	tunnel  context.CancelFunc
+	baseCtx context.Context
+}
+
+// New loads the saved state and makes the token of this start.
+func New(ctx context.Context, cfg Config) (*Server, error) {
+	if cfg.CLI == nil {
+		cfg.CLI = realCLI
+	}
+	raw := make([]byte, 16)
+	if _, err := rand.Read(raw); err != nil {
+		return nil, fmt.Errorf("make the access token: %w", err)
+	}
+	s := &Server{cfg: cfg, token: hex.EncodeToString(raw), baseCtx: ctx}
+	data, err := os.ReadFile(s.statePath())
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+	case err != nil:
+		return nil, fmt.Errorf("read the saved setup state: %w", err)
+	default:
+		if err := json.Unmarshal(data, &s.state); err != nil {
+			return nil, fmt.Errorf("decode %s: %w; remove the file to start again",
+				s.statePath(), err)
+		}
+	}
+	return s, nil
+}
+
+// Token is the secret that the browser must send with each request.
+func (s *Server) Token() string { return s.token }
+
+func (s *Server) statePath() string { return filepath.Join(s.cfg.DataDir, "setup.json") }
+
+// save writes the state. The caller holds the lock.
+func (s *Server) save() error {
+	if err := os.MkdirAll(s.cfg.DataDir, 0o755); err != nil {
+		return fmt.Errorf("create the data directory %s: %w", s.cfg.DataDir, err)
+	}
+	data, err := json.MarshalIndent(s.state, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode the setup state: %w", err)
+	}
+	if err := os.WriteFile(s.statePath(), data, 0o600); err != nil {
+		return fmt.Errorf("save the setup state: %w", err)
+	}
+	return nil
+}
+
+func (s *Server) aws() AWS {
+	return AWS{Profile: s.state.Profile, Region: s.state.Region, Env: s.state.Env,
+		Run: s.cfg.CLI, WorkDir: s.cfg.DataDir}
+}
+
+// Handler serves the pages and the API. listenHost is the host and port that the browser
+// uses; a request for another host is refused, so that another site cannot reach the
+// wizard through a DNS name that points at this machine.
+func (s *Server) Handler(listenHost string) (http.Handler, error) {
+	pages, err := fs.Sub(uiFiles, "ui")
+	if err != nil {
+		return nil, fmt.Errorf("open the wizard pages: %w", err)
+	}
+	mux := http.NewServeMux()
+	mux.Handle("GET /", http.FileServerFS(pages))
+	api := func(pattern string, handler func(*http.Request) (any, error)) {
+		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+			if subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Setup-Token")),
+				[]byte(s.token)) != 1 {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "the access " +
+					"token is missing or wrong: open the address that `clanker setup` printed"})
+				return
+			}
+			result, err := handler(r)
+			if err != nil {
+				writeJSON(w, statusOf(err), map[string]string{"error": err.Error()})
+				return
+			}
+			writeJSON(w, http.StatusOK, result)
+		})
+	}
+	api("GET /api/state", s.getState)
+	api("GET /api/checks", s.getChecks)
+	api("POST /api/target", s.postTarget)
+	api("POST /api/key", s.postKey)
+	api("GET /api/aws/profiles", s.getProfiles)
+	api("POST /api/aws/signin", s.postSignIn)
+	api("POST /api/aws/login", s.postLogin)
+	api("POST /api/review", s.postReview)
+	api("POST /api/deploy", s.postDeploy)
+	api("POST /api/connect", s.postConnect)
+	api("POST /api/destroy", s.postDestroy)
+	_, port, err := net.SplitHostPort(listenHost)
+	if err != nil {
+		return nil, fmt.Errorf("read the listen address %q: %w", listenHost, err)
+	}
+	allowed := map[string]bool{"127.0.0.1:" + port: true, "localhost:" + port: true}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !allowed[r.Host] {
+			http.Error(w, "this address does not serve the wizard", http.StatusForbidden)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; frame-ancestors 'none'")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		mux.ServeHTTP(w, r)
+	}), nil
+}
+
+// userError is a mistake of the person, not of the program.
+type userError struct{ message string }
+
+func (e userError) Error() string { return e.message }
+
+func invalid(format string, args ...any) error {
+	return userError{fmt.Sprintf(format, args...)}
+}
+
+func statusOf(err error) int {
+	var mistake userError
+	switch {
+	case errors.As(err, &mistake):
+		return http.StatusBadRequest
+	case errors.Is(err, ErrNeedsLogin), errors.Is(err, errBusy):
+		return http.StatusConflict
+	default:
+		return http.StatusInternalServerError
+	}
+}
+
+func writeJSON(w http.ResponseWriter, status int, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(value)
+}
+
+func decode(r *http.Request, into any) error {
+	r.Body = http.MaxBytesReader(nil, r.Body, 1<<16)
+	if err := json.NewDecoder(r.Body).Decode(into); err != nil {
+		return invalid("the request body is not valid JSON: %v", err)
+	}
+	return nil
+}
+
+// dashboardUp reports whether the control plane answers on this machine.
+func (s *Server) dashboardUp(ctx context.Context) bool {
+	ctx, cancel := context.WithTimeout(ctx, 800*time.Millisecond)
+	defer cancel()
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		s.cfg.DashboardURL+"/api/v1/work-items", nil)
+	if err != nil {
+		return false
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return false
+	}
+	response.Body.Close()
+	return response.StatusCode == http.StatusOK
+}
+
+func (s *Server) waitDashboard(ctx context.Context, limit time.Duration) error {
+	deadline := time.Now().Add(limit)
+	for time.Now().Before(deadline) {
+		if s.dashboardUp(ctx) {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
+	}
+	return fmt.Errorf("the dashboard did not answer at %s in %s", s.cfg.DashboardURL, limit)
+}

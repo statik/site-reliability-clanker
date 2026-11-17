@@ -29,6 +29,38 @@ Everything in this section was run on the local target (kind on Docker, macOS ar
 | iOS app | `ios/`. Builds, 71 tests pass, runs in the simulator against the control plane |
 | Fresh clone | A fresh clone built and ran the blank-slate deployment and the scripted month |
 
+## The setup wizard (added 2026-11-17)
+
+- `clanker setup` serves a wizard on `127.0.0.1:7069`. `make release` builds self-contained
+  binaries (tag `bundle`) for macOS and Linux in `dist/`.
+- **Ran:** the macOS binary, started outside a checkout, walked through the local target in
+  a real browser and started the control plane (`web/scripts/setup-wizard-check.mjs`), on
+  the first-run path and on the restart path. It used the data directory of the running
+  demo, so a first deployment from an empty machine through the wizard was not run.
+- The wizard offers only the local target. The AWS target is switched off
+  (`setup.Config.EnableAWS`).
+- A binary that a browser downloads is unsigned, so macOS can refuse to start it. The
+  `curl` command in the README avoids this.
+
+## Direction for the cloud control plane (decided 2026-11-17)
+
+The owner changed the home of the control plane on AWS twice on this day: first a Linux
+virtual machine, then a container on Amazon ECS, then a Nanos unikernel in an auto scaling
+group. Section 12 of the plan records the five decisions that follow from the last one.
+
+- **What exists:** the code in `internal/setup` for the AWS CLI sign-in, the CloudFormation
+  change-set review, the key in Parameter Store, and a template and tunnel for the ECS
+  design. It passes its tests against a stand-in for the AWS CLI. It never ran in an AWS
+  account. The ECS template is the starting point for the runner jobs.
+- **What the unikernel needs, in build order:** policy on the OPA library; the forge on a
+  git library; the split of core and runners; the state in S3 with a lease, so that two
+  instances never write; OIDC sign-in; the image build and the stack in the wizard; a run
+  in a real account.
+- **Open risks, to test first:** the embedded database on the Nanos file system, and three-way
+  merges and `git push` with a git library.
+- On a cloud, `clanker up` starts in a standby mode: it serves the dashboard and proposes
+  no deployment.
+
 ## What is validated only
 
 | Item | State |
