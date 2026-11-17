@@ -15,6 +15,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/agent"
 	"github.com/statik/site-reliability-clanker/internal/audit"
 	"github.com/statik/site-reliability-clanker/internal/broker"
+	"github.com/statik/site-reliability-clanker/internal/chatops"
 	"github.com/statik/site-reliability-clanker/internal/detect"
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/monitor"
@@ -46,6 +47,11 @@ type Server struct {
 	Identify func(r *http.Request) (orchestrator.User, error)
 	// SignIn serves the sign-in below /auth/. It is set together with Identify.
 	SignIn http.Handler
+	// Slack and Teams are the endpoints where a chat platform sends the clicks of people.
+	// No user is signed in there: each handler accepts only a request that its platform
+	// signed. Nil leaves the endpoint out.
+	Slack http.Handler
+	Teams http.Handler
 }
 
 // ErrNotSignedIn means that a request carries no valid sign-in.
@@ -199,6 +205,7 @@ func (s *Server) Handler() (http.Handler, error) {
 	if s.Runners != nil {
 		mux.Handle("/runner/v1/", s.Runners)
 	}
+	s.chatRoutes(mux)
 	if s.Web != nil {
 		mux.Handle("/", spaHandler(s.Web))
 	}
@@ -216,16 +223,28 @@ func (s *Server) Handler() (http.Handler, error) {
 	return s.gate(mux), nil
 }
 
+// chatRoutes adds the endpoints of the chat platforms that are configured.
+func (s *Server) chatRoutes(mux *http.ServeMux) {
+	if s.Slack != nil {
+		mux.Handle(chatops.SlackPath, s.Slack)
+	}
+	if s.Teams != nil {
+		mux.Handle(chatops.TeamsPath, s.Teams)
+	}
+}
+
 // getAuth tells the dashboard whether people sign in or the demo names the user.
 func (s *Server) getAuth(*http.Request) (any, error) {
 	return map[string]bool{"sign_in": s.Identify != nil}, nil
 }
 
-// open reports whether a path needs no signed-in user: the health path, the sign-in, and
-// the runner path, where each request carries the token of one job.
+// open reports whether a path needs no signed-in user: the health path, the sign-in, the
+// runner path, where each request carries the token of one job, and the two endpoints of
+// the chat platforms, where each request carries the signature of the platform.
 func open(path string) bool {
 	return path == "/healthz" || strings.HasPrefix(path, "/auth/") ||
-		strings.HasPrefix(path, "/runner/v1/")
+		strings.HasPrefix(path, "/runner/v1/") || path == chatops.SlackPath ||
+		path == chatops.TeamsPath
 }
 
 // gitPush reports whether a request is a part of a push with the git client: the list of

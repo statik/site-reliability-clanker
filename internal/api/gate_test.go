@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/statik/site-reliability-clanker/internal/audit"
+	"github.com/statik/site-reliability-clanker/internal/chatops"
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
 	"github.com/statik/site-reliability-clanker/internal/store/storetest"
@@ -29,6 +31,59 @@ func gated(t *testing.T, who func() (orchestrator.User, error)) http.Handler {
 		t.Fatal(err)
 	}
 	return handler
+}
+
+// withChat returns the handler of a server where people sign in and both chat apps are
+// configured, with the real handlers of the chat endpoints.
+func withChat(t *testing.T) http.Handler {
+	t.Helper()
+	db := storetest.Open(t)
+	service := chatops.New(db, &orchestrator.Orchestrator{DB: db}, audit.New(db, nil),
+		"https://clanker.example")
+	slack, err := chatops.NewSlack(service, chatops.SlackConfig{SigningSecret: "test-secret",
+		BotToken: "xoxb-test", Channel: "#changes"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	teams, err := chatops.NewTeams(service, chatops.TeamsConfig{AppID: "app", AppSecret: "secret",
+		TenantID: "tenant"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Forge: forge.New(db), Slack: slack, Teams: teams,
+		Identify: func(*http.Request) (orchestrator.User, error) {
+			return orchestrator.User{}, ErrNotSignedIn
+		},
+		SignIn: http.NotFoundHandler()}
+	handler, err := server.Handler()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return handler
+}
+
+func TestTheChatEndpointsNeedNoSessionAndRefuseARequestThatIsNotSigned(t *testing.T) {
+	handler := withChat(t)
+	for path, want := range map[string]string{
+		chatops.SlackPath: "no valid signature of Slack",
+		chatops.TeamsPath: "no valid token of the Bot Connector"} {
+		request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"type":"invoke"}`))
+		answer := httptest.NewRecorder()
+		handler.ServeHTTP(answer, request)
+		// The handler of the platform answers, not the gate: the gate says "not signed in".
+		if answer.Code != http.StatusUnauthorized || !strings.Contains(answer.Body.String(), want) {
+			t.Errorf("POST %s with no signature: %d %s", path, answer.Code, answer.Body)
+		}
+	}
+	// The gate opens these two paths only.
+	for _, path := range []string{"/chat/slack/other", "/chat/teams/messages/more", "/chat/"} {
+		if got := ask(handler, "POST", path).Code; got != http.StatusUnauthorized {
+			t.Errorf("POST %s answered %d, want 401", path, got)
+		}
+		if body := ask(handler, "POST", path).Body.String(); !strings.Contains(body, "not signed in") {
+			t.Errorf("POST %s was not refused by the gate: %s", path, body)
+		}
+	}
 }
 
 func ask(handler http.Handler, method, path string) *httptest.ResponseRecorder {
