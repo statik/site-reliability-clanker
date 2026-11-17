@@ -241,6 +241,20 @@ func (o *Orchestrator) backToApproval(ctx context.Context, wi WorkItem, cause er
 	if err := o.setState(&wi, StatePlanned, "orchestrator", cause.Error()); err != nil {
 		return WorkItem{}, err
 	}
+	if wi.PRID != 0 {
+		// Main moved under this change. Plan the branch together with what merged since, so
+		// that the new plan does not undo another approved change.
+		pr, err := o.Forge.SyncPull(wi.PRID)
+		if err != nil {
+			return wi, o.setState(&wi, StateChangesRequested, "forge", err.Error())
+		}
+		if pr.HeadCommit != wi.Commit {
+			o.emit(audit.Event{Type: "pr.updated", Actor: "orchestrator", Env: wi.Env,
+				WorkItem: wi.ID, Summary: fmt.Sprintf("Pull request #%d updated with main", pr.ID),
+				Data: map[string]any{"pr": pr.ID, "commit": pr.HeadCommit}})
+		}
+		wi.Commit, wi.BaseCommit = pr.HeadCommit, pr.BaseCommit
+	}
 	for _, layer := range wi.Layers {
 		if !o.canPlan(wi.Env, layer) {
 			continue

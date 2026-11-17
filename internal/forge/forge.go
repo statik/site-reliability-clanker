@@ -253,6 +253,34 @@ func (f *Forge) Merge(repo, branch, author, message string) (string, error) {
 	return strings.TrimSpace(out), err
 }
 
+// UpdateBranch merges main into branch, so that a plan of the branch includes every change
+// that merged after the branch started. It returns the new head of the branch. It fails on
+// a conflict.
+func (f *Forge) UpdateBranch(repo, branch, author string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	work, err := os.MkdirTemp("", "clanker-update-")
+	if err != nil {
+		return "", fmt.Errorf("create temporary directory for branch update: %w", err)
+	}
+	defer os.RemoveAll(work)
+	if _, err := runGit(work, nil, "clone", "--quiet", f.repoPath(repo), "."); err != nil {
+		return "", err
+	}
+	if _, err := runGit(work, nil, "checkout", "--quiet", branch); err != nil {
+		return "", err
+	}
+	env := authorEnv(author)
+	if _, err := runGit(work, env, "merge", "--quiet", "--no-edit", "origin/main"); err != nil {
+		return "", fmt.Errorf("branch %s conflicts with main: %w", branch, err)
+	}
+	if _, err := runGit(work, env, "push", "--quiet", "origin", branch); err != nil {
+		return "", err
+	}
+	out, err := runGit(work, nil, "rev-parse", "HEAD")
+	return strings.TrimSpace(out), err
+}
+
 // Export writes the tree of commit into dest.
 func (f *Forge) Export(repo, commit, dest string) error {
 	if err := os.MkdirAll(dest, 0o755); err != nil {

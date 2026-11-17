@@ -110,6 +110,32 @@ func (f *Forge) RefreshPull(id int64) (PullRequest, error) {
 	return p, nil
 }
 
+// SyncPull brings the branch of a pull request up to date with main when main moved. It
+// returns the pull request with its new head and base commits.
+func (f *Forge) SyncPull(id int64) (PullRequest, error) {
+	p, err := f.Pull(id)
+	if err != nil {
+		return PullRequest{}, err
+	}
+	main, err := f.Head(p.Repo, "main")
+	if err != nil {
+		return PullRequest{}, err
+	}
+	if main == p.BaseCommit {
+		return p, nil
+	}
+	head, err := f.UpdateBranch(p.Repo, p.Branch, "clanker-orchestrator")
+	if err != nil {
+		return PullRequest{}, err
+	}
+	if _, err := f.db.Exec(`UPDATE prs SET head_commit = ?, base_commit = ? WHERE id = ?`, head,
+		main, id); err != nil {
+		return PullRequest{}, fmt.Errorf("record update of pull request %d: %w", id, err)
+	}
+	p.HeadCommit, p.BaseCommit = head, main
+	return p, nil
+}
+
 // MergePull merges the pull request into main. It refuses when the head commit is not
 // wantCommit, so that only the reviewed commit can merge.
 func (f *Forge) MergePull(id int64, wantCommit, author, now string) (string, error) {
