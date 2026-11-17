@@ -78,10 +78,26 @@ func (a *Agent) recentChanges(env string) (string, error) {
 	return strings.Join(lines, "\n"), nil
 }
 
-// allowedMitigations are the deployments that the restart runbook may target after an
-// incident. The model proposes; this list decides.
-var allowedMitigations = map[string]bool{"paperboat-api": true, "paperboat-web": true,
-	"paperboat-worker": true}
+// mitigationParams are the parameters of the runbook that the Investigator proposes.
+func mitigationParams(d diagnosis) map[string]string {
+	return map[string]string{"deployment": d.Deployment}
+}
+
+// checkMitigation checks the proposal of the Investigator against the definition of the
+// runbook in the runbooks repository. The model proposes; the definition decides: the
+// runbook must exist, it must be marked as a mitigation for an incident, and the
+// deployment must be one of the values of its input.
+func (a *Agent) checkMitigation(d diagnosis) error {
+	definition, err := a.Orch.CheckRunbook(d.ProposedRunbook, mitigationParams(d))
+	if err != nil {
+		return err
+	}
+	if !definition.IncidentMitigation {
+		return fmt.Errorf("%w: runbook %s is not a mitigation for an incident",
+			orchestrator.ErrInvalid, definition.Name)
+	}
+	return nil
+}
 
 func (a *Agent) recovered(ctx context.Context, env string) (bool, string) {
 	deadline := time.Now().Add(90 * time.Second)
@@ -101,23 +117,45 @@ func (a *Agent) recovered(ctx context.Context, env string) (bool, string) {
 	}
 }
 
-// HandleIncident runs use case 17: alert, diagnosis under a debug grant, mitigation with a
-// tier T1 runbook, and the write-up.
-func (a *Agent) HandleIncident(ctx context.Context, f detect.Finding) error {
+// openIncident creates the work item of an incident and links the finding to it.
+func (a *Agent) openIncident(f detect.Finding) (orchestrator.WorkItem, error) {
 	wi, err := a.Orch.Create(orchestrator.NewWorkItem{Title: "Incident: " + f.Title,
 		Kind: "incident", Env: f.Env, Trigger: f.Title, Actor: "detector:health"})
 	if err != nil {
-		return err
+		return orchestrator.WorkItem{}, err
 	}
-	opened := a.Clock.Now()
 	a.emit(audit.Event{Type: "incident.opened", Actor: "detector:health", Env: f.Env,
 		WorkItem: wi.ID, Summary: "Incident opened: " + f.Title, Data: f.Detail})
 	if _, err := a.DB.Exec(`UPDATE findings SET work_item = $1, state = 'drafted'
 		WHERE key = $2`, wi.ID, f.Key); err != nil {
-		return fmt.Errorf("link incident finding to %s: %w", wi.ID, err)
+		return orchestrator.WorkItem{}, fmt.Errorf("link incident finding to %s: %w", wi.ID, err)
 	}
-	if wi, err = a.Orch.Transition(wi.ID, orchestrator.StateDrafting, RoleInvestigator,
-		"investigating under a debug grant"); err != nil {
+	return a.Orch.Transition(wi.ID, orchestrator.StateDrafting, RoleInvestigator,
+		"investigating under a debug grant")
+}
+
+// escalate ends an incident that no routine runbook can mitigate. A human must decide.
+func (a *Agent) escalate(wi orchestrator.WorkItem, f detect.Finding, d diagnosis,
+	model string) error {
+	a.emit(audit.Event{Type: "incident.escalated", Actor: RoleInvestigator, Env: f.Env,
+		WorkItem: wi.ID, Summary: "Incident needs a human: " + d.Diagnosis,
+		Data: map[string]any{"proposed_runbook": d.ProposedRunbook, "evidence": d.Evidence}})
+	explanation := orchestrator.Explanation{Sentence: d.Diagnosis, Why: d.WriteUp,
+		UserEffect: f.Title, IfDeferred: "Evidence: " + d.Evidence, Source: model,
+		Rollback: "No routine mitigation applies. A human must decide the next step."}
+	if err := a.Orch.SetExplanation(wi.ID, explanation); err != nil {
+		return err
+	}
+	return a.failIncident(wi, fmt.Errorf("the proposed mitigation %q on %q is not a "+
+		"routine runbook; a human must decide", d.ProposedRunbook, d.Deployment))
+}
+
+// HandleIncident runs use case 17: alert, diagnosis under a debug grant, mitigation with a
+// tier T1 runbook, and the write-up.
+func (a *Agent) HandleIncident(ctx context.Context, f detect.Finding) error {
+	opened := a.Clock.Now()
+	wi, err := a.openIncident(f)
+	if err != nil {
 		return err
 	}
 	transcript, err := a.Orch.DebugSession(ctx, wi, RoleInvestigator, f.Title)
@@ -132,35 +170,42 @@ func (a *Agent) HandleIncident(ctx context.Context, f detect.Finding) error {
 		WorkItem: wi.ID, Summary: "Diagnosis: " + d.Diagnosis,
 		Data: map[string]any{"evidence": d.Evidence, "proposed_runbook": d.ProposedRunbook,
 			"deployment": d.Deployment, "model": model}})
-	if d.ProposedRunbook != "restart-deployment" || !allowedMitigations[d.Deployment] {
-		a.emit(audit.Event{Type: "incident.escalated", Actor: RoleInvestigator, Env: f.Env,
-			WorkItem: wi.ID, Summary: "Incident needs a human: " + d.Diagnosis,
-			Data: map[string]any{"proposed_runbook": d.ProposedRunbook, "evidence": d.Evidence}})
-		explanation := orchestrator.Explanation{Sentence: d.Diagnosis, Why: d.WriteUp,
-			UserEffect: f.Title, IfDeferred: "Evidence: " + d.Evidence, Source: model,
-			Rollback: "No routine mitigation applies. A human must decide the next step."}
-		if err := a.Orch.SetExplanation(wi.ID, explanation); err != nil {
-			return err
-		}
-		return a.failIncident(wi, fmt.Errorf("the proposed mitigation %q on %q is not a "+
-			"routine runbook; a human must decide", d.ProposedRunbook, d.Deployment))
+	if err := a.checkMitigation(d); errors.Is(err, orchestrator.ErrInvalid) {
+		return a.escalate(wi, f, d, model)
+	} else if err != nil {
+		return a.failIncident(wi, err)
 	}
 	mitigation, err := a.Orch.RunRunbook(ctx, orchestrator.RunbookRequest{Env: f.Env,
-		Name: "restart-deployment", Params: map[string]string{"deployment": d.Deployment},
+		Name: d.ProposedRunbook, Params: mitigationParams(d),
 		Actor: RoleInvestigator, Trigger: "Mitigation for " + wi.ID,
 		Title: fmt.Sprintf("Restart %s to mitigate %s", d.Deployment, wi.ID)})
 	if err != nil {
 		return a.failIncident(wi, err)
 	}
+	return a.resolve(ctx, wi, f, incidentEnd{diagnosis: d, model: model,
+		mitigation: mitigation.ID, opened: opened})
+}
+
+// incidentEnd is what the write-up of a mitigated incident needs.
+type incidentEnd struct {
+	diagnosis  diagnosis
+	model      string
+	mitigation string
+	opened     time.Time
+}
+
+// resolve waits for the recovery after a mitigation and writes the incident up.
+func (a *Agent) resolve(ctx context.Context, wi orchestrator.WorkItem, f detect.Finding,
+	end incidentEnd) error {
 	ok, check := a.recovered(ctx, f.Env)
 	if !ok {
-		return a.failIncident(wi, fmt.Errorf("mitigation %s did not help: %s", mitigation.ID,
+		return a.failIncident(wi, fmt.Errorf("mitigation %s did not help: %s", end.mitigation,
 			check))
 	}
-	minutes := int(a.Clock.Now().Sub(opened).Minutes()) + 1
+	minutes := int(a.Clock.Now().Sub(end.opened).Minutes()) + 1
 	explanation := orchestrator.Explanation{
-		Sentence:     d.Diagnosis,
-		Why:          d.WriteUp,
+		Sentence:     end.diagnosis.Diagnosis,
+		Why:          end.diagnosis.WriteUp,
 		Downtime:     fmt.Sprintf("About %d minutes of failed inventory requests", minutes),
 		UserEffect:   f.Title,
 		PreChecks:    []string{"Debug session recorded: read-only, namespace paperboat"},
@@ -169,16 +214,16 @@ func (a *Agent) HandleIncident(ctx context.Context, f detect.Finding) error {
 		Backup:       "Not needed; no data changed",
 		Duration:     fmt.Sprintf("%d minutes from alert to recovery", minutes),
 		CostChange:   "None",
-		IfDeferred:   "Mitigation: " + mitigation.ID + ". Evidence: " + d.Evidence,
-		Source:       model,
+		IfDeferred:   "Mitigation: " + end.mitigation + ". Evidence: " + end.diagnosis.Evidence,
+		Source:       end.model,
 	}
 	if err := a.Orch.SetExplanation(wi.ID, explanation); err != nil {
 		return err
 	}
 	a.emit(audit.Event{Type: "incident.resolved", Actor: RoleInvestigator, Env: f.Env,
 		WorkItem: wi.ID, Summary: "Incident resolved: " + check,
-		Data: map[string]any{"mitigation": mitigation.ID, "minutes": minutes}})
-	_, err = a.Orch.Transition(wi.ID, orchestrator.StateDone, RoleInvestigator,
+		Data: map[string]any{"mitigation": end.mitigation, "minutes": minutes}})
+	_, err := a.Orch.Transition(wi.ID, orchestrator.StateDone, RoleInvestigator,
 		"mitigated and verified")
 	return err
 }

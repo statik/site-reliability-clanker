@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Restore the newest backup into a scratch database, compare row counts with production,
 # then drop the scratch database.
+# The definition restore-drill.json declares the output that this script writes to OUTPUT_FILE.
 set -euo pipefail
 
 psql_prod() {
@@ -34,3 +35,4 @@ done
 
 kubectl -n paperboat-data exec postgres-0 -- dropdb -U postgres restore_drill
 echo "restore drill passed; scratch database dropped"
+echo "backup_file=${latest}" >>"${OUTPUT_FILE}"

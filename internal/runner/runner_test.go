@@ -148,14 +148,18 @@ func TestRunbookNeedsTheScriptInTheCheckout(t *testing.T) {
 	checkout := Checkout{ID: "runbooks/abc", Archive: archive(t,
 		entry{"jobs/hello.sh", "#!/bin/bash\necho \"hello $PARAM_NAME from $STATE_DIR\"\n", 0o755})}
 	var log bytes.Buffer
-	if err := r.Runbook(context.Background(), RunbookJob{Env: "local", Checkout: checkout,
-		Name: "hello", Params: map[string]string{"name": "carol"}, Log: &log}); err != nil {
+	outputs, err := r.Runbook(context.Background(), RunbookJob{Env: "local", Checkout: checkout,
+		Name: "hello", Params: map[string]string{"name": "carol"}, Log: &log})
+	if err != nil {
 		t.Fatal(err)
+	}
+	if len(outputs) != 0 {
+		t.Errorf("outputs = %v, want none from a script that writes none", outputs)
 	}
 	if !strings.Contains(log.String(), "hello carol from "+r.StateDir("local")) {
 		t.Fatalf("log = %q", log.String())
 	}
-	err := r.Runbook(context.Background(), RunbookJob{Env: "local", Checkout: checkout,
+	_, err = r.Runbook(context.Background(), RunbookJob{Env: "local", Checkout: checkout,
 		Name: "missing", Log: &log})
 	if err == nil || !strings.Contains(err.Error(), "is not in the checkout") {
 		t.Fatalf("error = %v", err)

@@ -430,36 +430,93 @@ type RunbookJob struct {
 	Log        io.Writer
 }
 
-// Runbook runs the script with the credential and the parameters in its environment.
-func (r *Runner) Runbook(ctx context.Context, j RunbookJob) error {
+// Runbook runs the script with the credential and the parameters in its environment. It
+// returns the outputs that the script wrote to the file that OUTPUT_FILE names, one
+// "name=value" on each line. The core checks them against the definition of the runbook.
+func (r *Runner) Runbook(ctx context.Context, j RunbookJob) (map[string]any, error) {
 	checkout, err := r.checkoutDir(j.Checkout)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	script := filepath.Join(checkout, "jobs", j.Name+".sh")
 	if _, err := os.Stat(script); err != nil {
-		return fmt.Errorf("runbook %s is not in the checkout %s", j.Name, j.Checkout.ID)
+		return nil, fmt.Errorf("runbook %s is not in the checkout %s", j.Name, j.Checkout.ID)
 	}
 	kubeconfig, remove, err := r.credentialFile(j.KubeConfig)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer remove()
+	outputFile, removeOutputs, err := r.outputFile()
+	if err != nil {
+		return nil, fmt.Errorf("runbook %s: %w", j.Name, err)
+	}
+	defer removeOutputs()
 	cmd := exec.CommandContext(ctx, "bash", script)
-	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig, "STATE_DIR="+r.StateDir(j.Env))
-	names := make([]string, 0, len(j.Params))
-	for name := range j.Params {
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig, "STATE_DIR="+r.StateDir(j.Env),
+		"OUTPUT_FILE="+outputFile)
+	cmd.Env = append(cmd.Env, paramEnv(j.Params)...)
+	cmd.Stdout, cmd.Stderr = j.Log, j.Log
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("runbook %s: %w", j.Name, err)
+	}
+	raw, err := os.ReadFile(outputFile)
+	if err != nil {
+		return nil, fmt.Errorf("read the outputs of runbook %s: %w", j.Name, err)
+	}
+	outputs, err := parseOutputs(string(raw))
+	if err != nil {
+		return nil, fmt.Errorf("runbook %s: %w", j.Name, err)
+	}
+	return outputs, nil
+}
+
+// outputFile makes the empty file that a script writes its outputs to. The returned
+// function removes it.
+func (r *Runner) outputFile() (string, func(), error) {
+	file, err := os.CreateTemp(r.WorkRoot, "outputs-*")
+	if err != nil {
+		return "", nil, fmt.Errorf("create the output file: %w", err)
+	}
+	remove := func() { os.Remove(file.Name()) }
+	if err := file.Close(); err != nil {
+		remove()
+		return "", nil, fmt.Errorf("close the output file: %w", err)
+	}
+	return file.Name(), remove, nil
+}
+
+// paramEnv gives each parameter as PARAM_<NAME> in upper case, in the order of the names.
+func paramEnv(params map[string]string) []string {
+	names := make([]string, 0, len(params))
+	for name := range params {
 		names = append(names, name)
 	}
 	sort.Strings(names)
+	env := make([]string, 0, len(names))
 	for _, name := range names {
-		cmd.Env = append(cmd.Env, "PARAM_"+strings.ToUpper(name)+"="+j.Params[name])
+		env = append(env, "PARAM_"+strings.ToUpper(name)+"="+params[name])
 	}
-	cmd.Stdout, cmd.Stderr = j.Log, j.Log
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("runbook %s: %w", j.Name, err)
+	return env
+}
+
+// parseOutputs reads the lines "name=value" of an output file. An empty line is skipped.
+func parseOutputs(text string) (map[string]any, error) {
+	outputs := map[string]any{}
+	for _, line := range strings.Split(text, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		name, value, found := strings.Cut(line, "=")
+		if !found || name == "" {
+			return nil, fmt.Errorf("the output line %q is not name=value", line)
+		}
+		if _, twice := outputs[name]; twice {
+			return nil, fmt.Errorf("the output %q is written twice", name)
+		}
+		outputs[name] = value
 	}
-	return nil
+	return outputs, nil
 }
 
 // Kubectl runs one kubectl command with the credential and returns what it printed. The

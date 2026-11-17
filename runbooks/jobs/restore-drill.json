@@ -1,0 +1,10 @@
+{
+  "description": "Restore the newest backup into a scratch database and compare the row counts.",
+  "tier": "T1",
+  "outputs": {
+    "backup_file": {
+      "type": "string",
+      "description": "The path of the backup that the drill restored."
+    }
+  }
+}

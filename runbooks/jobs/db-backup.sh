@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Take a logical backup of the Paperboat database, check it, and apply the retention policy.
+# The definition db-backup.json declares the outputs that this script writes to OUTPUT_FILE.
 set -euo pipefail
 
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -9,10 +10,20 @@ kubectl -n paperboat-data exec postgres-0 -- \
   pg_dump -U postgres -d paperboat --format=custom --file="${file}"
 echo "backup written: ${file}"
 
-kubectl -n paperboat-data exec postgres-0 -- sh -c "pg_restore --list '${file}' | wc -l" |
-  awk '{ print "objects in backup: " $1; if ($1 < 5) exit 1 }'
+objects="$(kubectl -n paperboat-data exec postgres-0 -- \
+  sh -c "pg_restore --list '${file}' | wc -l" | tr -d '[:space:]')"
+echo "objects in backup: ${objects}"
+if [[ "${objects}" -lt 5 ]]; then
+  echo "the backup lists fewer than 5 objects" >&2
+  exit 1
+fi
 
 retention_days="$(kubectl -n paperboat-data get configmap backup-policy -o 'jsonpath={.data.retention_days}')"
 kubectl -n paperboat-data exec postgres-0 -- \
   find /backups -name 'paperboat-*.dump' -mtime "+${retention_days}" -delete
 kubectl -n paperboat-data exec postgres-0 -- sh -c 'ls -1 /backups | tail -5'
+
+{
+  echo "backup_file=${file}"
+  echo "objects=${objects}"
+} >>"${OUTPUT_FILE}"

@@ -1,0 +1,14 @@
+{
+  "description": "Back up the Paperboat database, check the backup, apply the retention policy.",
+  "tier": "T1",
+  "outputs": {
+    "backup_file": {
+      "type": "string",
+      "description": "The path of the new backup on the database volume."
+    },
+    "objects": {
+      "type": "integer",
+      "description": "The number of lines in the object list of the backup. A run fails below 5."
+    }
+  }
+}

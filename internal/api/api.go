@@ -181,6 +181,7 @@ func (s *Server) Handler() (http.Handler, error) {
 		"POST /api/v1/sim/advance":                    s.postSimAdvance,
 		"POST /api/v1/sim/scenes/{name}":              s.postSimScene,
 		"POST /api/v1/debug-sessions":                 s.postDebugSession,
+		"GET /api/v1/runbooks":                        s.getRunbooks,
 		"POST /api/v1/runbooks/{name}":                s.postRunbook,
 		"POST /api/v1/notifications/digest":           s.postDigest,
 		"POST /api/v1/environments/{env}/blank-slate": s.postBlankSlate,

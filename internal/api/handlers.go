@@ -16,6 +16,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
 	"github.com/statik/site-reliability-clanker/internal/policy"
+	"github.com/statik/site-reliability-clanker/internal/runbook"
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
 
@@ -525,6 +526,30 @@ func (s *Server) roleWhenSignedIn(r *http.Request, roles ...string) error {
 	return err
 }
 
+// getRunbooks lists the runbooks with their definitions and who signed the standing
+// approval of each one.
+func (s *Server) getRunbooks(*http.Request) (any, error) {
+	definitions, err := s.Orch.Runbooks()
+	if err != nil {
+		return nil, err
+	}
+	type row struct {
+		runbook.Definition
+		StandingApprover string `json:"standing_approver"`
+	}
+	rows := make([]row, 0, len(definitions))
+	for _, definition := range definitions {
+		approver, err := s.Orch.StandingApprover(definition.Name)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, row{Definition: definition, StandingApprover: approver})
+	}
+	return rows, nil
+}
+
+// postRunbook starts a runbook. It answers with the reason when the request does not fit
+// the definition of the runbook.
 func (s *Server) postRunbook(r *http.Request) (any, error) {
 	user, err := s.requireRole(r, "approver", "admin")
 	if err != nil {
@@ -538,6 +563,9 @@ func (s *Server) postRunbook(r *http.Request) (any, error) {
 		return nil, err
 	}
 	name := r.PathValue("name")
+	if _, err := s.Orch.CheckRunbook(name, body.Params); err != nil {
+		return nil, err
+	}
 	go s.background("runbook "+name, func(ctx context.Context) error {
 		_, err := s.Orch.RunRunbook(ctx, orchestrator.RunbookRequest{Env: body.Env, Name: name,
 			Params: body.Params, Actor: user.Name, Trigger: "Started by " + user.Display})
