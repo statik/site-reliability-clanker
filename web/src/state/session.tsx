@@ -12,6 +12,8 @@ interface Session {
   userName: string;
   usersError: string | null;
   setUser: (name: string) => void;
+  /** True when people sign in. False in the demo, where the user switcher names the user. */
+  signIn: boolean;
   theme: ThemeName;
   toggleTheme: () => void;
   asOf: Date | null;
@@ -58,6 +60,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [userName, setUserName] = useState(storedUser);
   const [theme, toggleTheme] = useTheme();
   const [asOf, setAsOf] = useState<Date | null>(null);
+  const [signIn, setSignIn] = useState(false);
+
+  useEffect(() => {
+    // With a sign-in the server knows who this is. The stored choice of the demo is not used.
+    apiGet<{ sign_in: boolean }>("/auth")
+      .then((auth) => {
+        setSignIn(auth.sign_in);
+        return auth.sign_in ? apiGet<User>("/me") : null;
+      })
+      .then(
+        (me) => {
+          if (me !== null) {
+            setUserName(me.name);
+          }
+        },
+        (error: unknown) => setUsersError(errorMessage(error)),
+      );
+  }, []);
 
   useEffect(() => {
     apiGet<User[]>("/users").then(
@@ -81,12 +101,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       userName,
       usersError,
       setUser,
+      signIn,
       theme,
       toggleTheme,
       asOf,
       setAsOf,
     }),
-    [users, userName, usersError, setUser, theme, toggleTheme, asOf],
+    [users, userName, usersError, setUser, signIn, theme, toggleTheme, asOf],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

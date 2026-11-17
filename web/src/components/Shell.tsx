@@ -33,6 +33,7 @@ import {
   TaskApproved,
   UserAvatar,
 } from "@carbon/icons-react";
+import { signOut } from "@/api/client";
 import { AsOfBanner, AsOfControl } from "@/components/AsOf";
 import { ErrorNote } from "@/components/common";
 import { IconTag, StatusTag } from "@/components/status";
@@ -72,7 +73,21 @@ function isActive(pathname: string, to: string): boolean {
 }
 
 function UserPanel({ expanded, onPick }: { expanded: boolean; onPick: () => void }) {
-  const { users, userName, setUser } = useSession();
+  const { users, user: signedIn, userName, setUser, signIn } = useSession();
+  if (signIn) {
+    return (
+      <HeaderPanel expanded={expanded} aria-label="Account">
+        <p className="app-panel-note">
+          Signed in as {signedIn?.email ?? userName} ({signedIn?.role ?? "no role"}).
+        </p>
+        <Switcher aria-label="Account" expanded={expanded}>
+          <SwitcherItem aria-label="Sign out" onClick={() => void signOut()}>
+            Sign out
+          </SwitcherItem>
+        </Switcher>
+      </HeaderPanel>
+    );
+  }
   return (
     <HeaderPanel expanded={expanded} aria-label="Switch user">
       <Switcher aria-label="Users" expanded={expanded}>
@@ -97,7 +112,7 @@ function UserPanel({ expanded, onPick }: { expanded: boolean; onPick: () => void
 }
 
 function GlobalBar() {
-  const { user, userName, theme, toggleTheme } = useSession();
+  const { user, userName, signIn, theme, toggleTheme } = useSession();
   const { connected } = useLive();
   const [panel, setPanel] = useState(false);
   const dark = theme === "g100";
@@ -116,7 +131,7 @@ function GlobalBar() {
           onClick={toggleTheme}>
           {dark ? <Light size={20} /> : <Asleep size={20} />}
         </HeaderGlobalAction>
-        <HeaderGlobalAction aria-label="Switch user" isActive={panel} tooltipAlignment="end"
+        <HeaderGlobalAction aria-label={signIn ? "Account" : "Switch user"} isActive={panel} tooltipAlignment="end"
           aria-expanded={panel} onClick={() => setPanel((open) => !open)}>
           <UserAvatar size={20} />
         </HeaderGlobalAction>
