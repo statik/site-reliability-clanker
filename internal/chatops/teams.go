@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 
 	"github.com/statik/site-reliability-clanker/internal/notify"
@@ -81,10 +82,14 @@ func NewTeams(service *Service, config TeamsConfig) (*Teams, error) {
 		config.MetadataURL = connectorMetadata
 	}
 	plain := &http.Client{Timeout: 10 * time.Second}
+	// The documentation shows the credentials in the form of the token request.
 	credentials := clientcredentials.Config{ClientID: config.AppID,
 		ClientSecret: config.AppSecret, TokenURL: config.TokenURL,
-		Scopes: []string{"https://api.botframework.com/.default"}}
-	connector := credentials.Client(context.Background())
+		Scopes:    []string{"https://api.botframework.com/.default"},
+		AuthStyle: oauth2.AuthStyleInParams}
+	// The request for the token uses the client of this context, which has a time limit.
+	connector := credentials.Client(context.WithValue(context.Background(), oauth2.HTTPClient,
+		plain))
 	connector.Timeout = plain.Timeout
 	t := &Teams{service: service, config: config, connector: connector,
 		keys: &connectorKeys{metadataURL: config.MetadataURL, client: plain, now: time.Now}}
@@ -279,7 +284,6 @@ type teamsActivity struct {
 	Conversation struct {
 		ID       string `json:"id"`
 		TenantID string `json:"tenantId"`
-		Kind     string `json:"conversationType"`
 	} `json:"conversation"`
 	MembersAdded []struct {
 		ID string `json:"id"`
@@ -312,9 +316,10 @@ func (a teamsActivity) tenant() string {
 	return a.ChannelData.Tenant.ID
 }
 
-// botAdded reports whether the activity says that the bot was added to a channel.
+// botAdded reports whether the activity says that the bot was added to a conversation. The
+// app manifest allows the bot in a team only, so the conversation is a channel.
 func (a teamsActivity) botAdded() bool {
-	if a.Conversation.Kind != "channel" || a.Conversation.ID == "" {
+	if a.Conversation.ID == "" {
 		return false
 	}
 	if a.Type == "installationUpdate" {

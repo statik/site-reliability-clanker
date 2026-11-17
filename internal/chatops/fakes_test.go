@@ -239,7 +239,10 @@ func newFakeTeams(t *testing.T, w *world, site *http.ServeMux) *fakeTeams {
 	mux.HandleFunc("POST /token", func(rw http.ResponseWriter, r *http.Request) {
 		want := url.Values{"grant_type": {"client_credentials"}, "client_id": {teamsApp},
 			"client_secret": {teamsSecret}, "scope": {"https://api.botframework.com/.default"}}
-		if err := r.ParseForm(); err != nil || r.PostForm.Encode() != want.Encode() {
+		// The credentials are in the form and not in a header, as the documentation shows.
+		_, _, basic := r.BasicAuth()
+		if err := r.ParseForm(); err != nil || basic || r.PostForm.Encode() != want.Encode() {
+			t.Errorf("the request for the token of the bot is not the documented form")
 			http.Error(rw, `{"error":"invalid_client"}`, http.StatusUnauthorized)
 			return
 		}
@@ -316,10 +319,9 @@ func (f *fakeTeams) activity(person, kind string) map[string]any {
 	return map[string]any{"type": kind, "channelId": "msteams", "serviceUrl": f.url,
 		"from": map[string]any{"id": "29:" + person, "name": person,
 			"aadObjectId": "aad-" + person},
-		"recipient": map[string]any{"id": "28:" + teamsApp},
-		"conversation": map[string]any{"id": "19:changes@thread.tacv2", "tenantId": teamsTenant,
-			"conversationType": "channel"},
-		"channelData": map[string]any{"tenant": map[string]any{"id": teamsTenant}}}
+		"recipient":    map[string]any{"id": "28:" + teamsApp},
+		"conversation": map[string]any{"id": "19:changes@thread.tacv2", "tenantId": teamsTenant},
+		"channelData":  map[string]any{"tenant": map[string]any{"id": teamsTenant}}}
 }
 
 // deliver posts an activity to the messaging endpoint with a bearer token. An empty token

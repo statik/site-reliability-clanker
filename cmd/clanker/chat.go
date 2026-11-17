@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -121,6 +122,14 @@ func (a *chatApps) adapters(slack, teams notify.Adapter) (notify.Adapter, notify
 		teams = a.teams
 	}
 	return slack, teams
+}
+
+// run keeps the posted requests up to date until ctx ends. It does nothing when no chat
+// app is configured.
+func (a *chatApps) run(ctx context.Context) {
+	if a != nil {
+		a.service.Run(ctx)
+	}
 }
 
 // serve adds the endpoints of the chat platforms and the link page to the API. The link
