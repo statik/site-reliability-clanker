@@ -31,11 +31,12 @@
         <!-- build:period -->
 17 Nov 2026 to 16 Dec 2026
 <!-- /build:period --></p>
-      <h1 class="reveal">One month with S.R.C., one change at a time.</h1>
-      <p class="section-lead reveal">Here is what the workflow looks like for an example application
-        (Paperboat), from the initial deploy through the first month of operation. Each step below is drawn from the audit log
-        of the real run. The headlines are ours. The names, times, tiers and numbers are the
-        log's.</p>
+      <h1 class="reveal">The first month of an application, step by step.</h1>
+      <p class="section-lead reveal">This is a walkthrough of a typical set of interactions during
+        the first month after an application is deployed. The example application is Paperboat:
+        the page follows it from the initial deploy through releases, patches, a rollback,
+        drift and an incident. Each step below is drawn from the audit log of the real run. The
+        headlines are ours. The names, times, tiers and numbers are the log's.</p>
       <p class="key-hint js-only reveal">Scroll, or use the keys: <kbd>&rarr;</kbd> or <kbd>Space</kbd> for the
         next step, <kbd>&larr;</kbd> for the previous step, <kbd>Home</kbd> and <kbd>End</kbd>.</p>
       <ul class="legend reveal" aria-label="Who wrote each record">
@@ -147,9 +148,10 @@ data-at="3.00" aria-labelledby="blank-slate-title">
 <p class="kicker reveal">Step 1 of 14 ·
 17 Nov 2026</p>
 <h2 class="reveal" id="blank-slate-title">A blank slate, and the first question</h2>
-<p class="lead reveal">Paperboat rents out live fish. Before one fish is listed,
-Carol Reyes signs
-four standing approvals for routine runbooks. The
+<p class="lead reveal">The example application is Paperboat. Before Paperboat can be deployed
+and put into production, the administrator
+(Carol Reyes) reviews the routine runbooks
+and authorizes four standing approvals. The
 orchestrator then opens WI-0001: blank-slate deployment of local. Policy code reads
 the plan and rates it <strong>T3</strong> under the rule
 <code>high-risk-layer</code>, so it needs

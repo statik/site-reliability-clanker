@@ -92,9 +92,10 @@ const STORY = {
       const item = step.work_items[0];
       const signed = step.all("standing_approval.signed");
       const grant = writeGrant(step, item);
-      return html`Paperboat rents out live fish. Before one fish is listed,
-        ${names(signed.map((event) => event.actor), users)} signs
-        ${numberWord(signed.length)} standing approvals for routine runbooks. The
+      return html`The example application is Paperboat. Before Paperboat can be deployed
+        and put into production, the administrator
+        (${names(signed.map((event) => event.actor), users)}) reviews the routine runbooks
+        and authorizes ${numberWord(signed.length)} standing approvals. The
         orchestrator then opens ${item.id}: ${item.title.toLowerCase()}. Policy code reads
         the plan and rates it <strong>${item.tier}</strong> under the rule
         <code>${item.tier_rule}</code>, so it needs
