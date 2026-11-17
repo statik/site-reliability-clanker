@@ -38,6 +38,23 @@ event. The approval page shows the review and its concerns.
   branch `reviewer-evals` and no live round ran.
 - The full run no longer ends at exactly 310 events: see `scripts/verify/README.md`.
 
+Also built in that session: typed runbooks (section 5.6 of the plan). The owner decided not
+to use Swamp, because of its licence and its account dependency, and to build the same
+ideas in this repository. Each runbook has a definition file beside its script
+(`runbooks/jobs/<name>.json`) with its tier, its inputs with the values that each one
+permits, and its typed outputs. The control plane refuses a request that does not fit the
+definition before a work item or a grant exists, and records the outputs of each run.
+
+- Ran on commit `c953da1`: `fresh-run.sh` (thirteen work items, 317 events, no error line;
+  the backup runbook reported its backup file and 92 objects), `sweep.py`, `stale_plan.py`,
+  `core-check.sh` and `nanos-check.sh`.
+- A database from before this change refuses every runbook, because its `runbooks`
+  repository has no definition files and the forge does not seed a repository twice. Start
+  from an empty database (`fresh-run.sh`).
+- Not built: a pull request for a change to a runbook, and a standing approval that names
+  the commit of the runbook. The prompt of the Investigator and the evals still hold their
+  own list of runbooks; a Go test fails when the prompt and the definitions differ.
+
 The owner decided these things in that session:
 
 - Issue #40: on AWS the core reads its secrets from Parameter Store with the AWS SDK for
@@ -366,7 +383,8 @@ Limits:
 ## What is not built
 
 - The access broker paths for the three clouds (STS, service account impersonation, Entra).
-- Swamp integration and the Nanos unikernel track. Both spikes need input from the owner.
+- A pull request for a change to a runbook: the main branch of the `runbooks` repository
+  cannot change after it is seeded. Section 5.6 of the plan has the open decision.
 - Use cases 7, 8, 12 and 23 on a real target. Use case 7 is a forecast on the timeline.
 - The device flow in the iOS app, a page to manage users, and a way to end one token.
 - A "defer" decision, and enforcement of a maintenance window for tier T3.

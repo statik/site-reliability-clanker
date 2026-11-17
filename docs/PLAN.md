@@ -343,58 +343,35 @@ What Nix is not used for:
 - **Running the demo.** `docker compose up` with published images remains the only requirement
   to try the prototype. Nix is needed to build and contribute, not to evaluate.
 
-### 5.6 Swamp as the automation substrate
+### 5.6 Typed runbooks
 
-[Swamp](https://swamp-club.com) is a CLI and registry for building automation out of typed,
-reusable **behaviors** connected into **workflows**, designed to be authored by a coding agent
-and then run without one. Its stated position is the same as principle 1 of this plan: use the
-model at build time to encode intent, not at run time to decide what to do. That makes it a
-natural fit for the layer between "the agent wrote something" and "the runner executed it".
+**Decided 2026-11-17 by the owner:** the project does not use Swamp. The first plan made
+Swamp (a CLI and registry for automation that a coding agent writes and that then runs
+without one) the automation substrate. The spike of issue #12 found terms that do not fit:
+the source is AGPLv3 with an exception, the official binary comes under a separate licence
+agreement that forbids copies and changes, almost every command needs an account at the
+service of the vendor, and telemetry is on by default. Issue #12 has the record with its
+sources.
 
-How Swamp's concepts map onto Clanker:
+The project keeps the ideas, which are ordinary engineering practice, and builds them in its
+own format:
 
-| Swamp concept | What it is | Role in Clanker |
-|---|---|---|
-| Behavior | Typed unit with validated inputs and outputs that produces versioned data | Each operational action: `tofu plan`, `tofu apply`, backup, restore drill, conformance check, database maintenance, detector |
-| Workflow | DAG of behavior steps with dependencies, `forEach`, triggers and guards | Each runbook and each use case in section 8 |
-| Definitions in Git | Behaviors, workflows and vault definitions are YAML files in a repository | The `runbooks` repo in the forge; changing a runbook is a pull request like any other change |
-| `manual_approval` step | Pauses a workflow until a human approves or rejects with a reason | Mid-run gates such as "canary healthy, continue?". The approval of the change itself stays in Clanker |
-| Vault | Credential source that injects secrets only when needed and redacts them from output | Fronts each cloud's secret store; also where the access broker's short-lived credentials are delivered to a step |
-| Datastore | Immutable, versioned, tagged data from every run, on a filesystem or object storage | Source for the history store and point-in-time view; lives in each environment's bucket |
-| Audit trail | Every command and session recorded, exportable over OpenTelemetry | One of the inputs to Clanker's hash-chained audit log |
-| `swamp serve` and workers | Long-running orchestrator with cron and webhook triggers; workers execute steps | Scheduling for detectors and maintenance; one worker per environment, running inside that cloud |
-| Extensions and registry | Published packs of behaviors, vaults, datastores and skills | Reuse existing AWS, Azure, Google Cloud and Kubernetes extensions; publish Clanker's own pack |
-| Agent skills | Instructions Swamp installs for a coding agent | What teaches the Author role to write behaviors and workflows correctly |
+1. **The model works when a runbook is written and reviewed, not each time it runs.** At run
+   time the control plane selects a reviewed runbook by name and fills in checked values. No
+   model writes a command.
+2. **Each runbook has a typed definition.** `runbooks/jobs/<name>.json` is beside the script
+   `<name>.sh`. It holds a description, the tier that the runbook needs, the inputs with the
+   list of values that each one permits, and the typed outputs. `runbooks/README.md` has the
+   format.
+3. **The control plane checks a request before anything exists.** A request for a runbook
+   that has no definition, with an input that the definition does not name, or with a value
+   that is not in the list, is refused before there is a work item or a grant.
+4. **Each run records its inputs, its outputs and its result** in the audit log.
 
-What changes in the architecture:
-
-- **The runner executes Swamp workflows.** A job is "run workflow X at commit Y with grant Z".
-  The plan-then-apply pipeline is itself a workflow whose steps are behaviors.
-- **An OpenTofu behavior is ours to write.** The registry lists a Terraform extension; nothing
-  on the site mentions OpenTofu. Clanker ships a small extension with `plan`, `show` and
-  `apply` methods that emits the saved plan, its hash and the plan JSON as versioned data.
-- **The Author role writes Swamp definitions as well as OpenTofu.** Operational knowledge
-  accumulates as reviewed, versioned behaviors instead of living in prompts.
-- **Detectors become scheduled workflows** that write findings as data; triage reads the data.
-- **Clanker stays the system of record** for work items, risk tiers, approvals bound to a plan
-  hash, grants and the audit chain. Swamp does not replace the policy engine or the broker.
-
-What stays independent of Swamp: the runner has an executor interface with two
-implementations, Swamp and plain subprocess. The demo and replay mode must run with the
-subprocess executor alone.
-
-Things to verify hands-on before committing (none of this has been tested yet; it comes from
-reading the site):
-
-| Question | Why it matters |
-|---|---|
-| Almost every command needs a swamp-club.com account; CI and containers use collective tokens | Adds an external dependency to bootstrap and to every runner; check behaviour offline |
-| The software is described as AGPLv3 and also as distributed under a separate licence agreement | Needs a licence review before the control plane depends on it or ships it in the runner image |
-| The licence agreement makes the customer solely responsible for agent operations | Consistent with this design, where a human approves every change, but worth stating to adopters |
-| Telemetry is on by default | Disable it in the runner image |
-| Third-party extensions require explicit trust | Pin versions, allow only named collectives, and vendor what the runner uses |
-| How a short-lived credential reaches a step | Decide between a broker-backed vault extension and environment injection per worker |
-| Whether the Author role should run inside a Swamp-supported harness | Several supported harnesses can use OpenRouter; the alternative is Clanker's own loop following Swamp's skills |
+Not built: a change to a runbook cannot go through a pull request. Pull requests work only on
+the platform repository, so the main branch of the `runbooks` repository does not change
+after it is seeded. That needs a decision of the owner on how such a change is tiered and
+approved, and a standing approval must then name the commit of the runbook that it covers.
 
 ## 6. Permissions and just-in-time access
 
@@ -641,10 +618,10 @@ cloud and ported later.
 |---|---|---|---|
 | M0 | Foundations | Repo layout, Nix flake (dev shell and runner image), module contract, Paperboat 1.0.0 and chart, CI running inside the flake. Spikes: Swamp (account, offline behaviour, OpenTofu behavior) and one Nanos image booted under QEMU | Paperboat runs on the local target from one command; the runner image builds to the same digest on two machines |
 | M1 | Blank slate everywhere | Per-cloud modules for all layers, bootstrap command, conformance suite | `tofu apply` from empty reaches a passing conformance run on AWS, GCP, Azure and local; teardown leaves nothing behind |
-| M2 | Change pipeline | Forge, orchestrator, runner, policy tiers, audit log, history store. Carbon UI shell, approval page, first version of the timeline. Notifier with all four channel adapters. Runner with subprocess and Swamp executors; plan-and-apply expressed as a Swamp workflow. No LLM yet | A hand-written PR goes plan → tier → approve → apply → verify through the dashboard, with logs and diff visible; the approver is notified on email, Slack, Teams and Discord; the change appears on the timeline |
+| M2 | Change pipeline | Forge, orchestrator, runner, policy tiers, audit log, history store. Carbon UI shell, approval page, first version of the timeline. Notifier with all four channel adapters. Runner that runs each job as a subprocess. No LLM yet | A hand-written PR goes plan → tier → approve → apply → verify through the dashboard, with logs and diff visible; the approver is notified on email, Slack, Teams and Discord; the change appears on the timeline |
 | M3 | Just-in-time access | Broker, grants, per-layer appliers, standing approvals, access view | Appliers have zero standing permissions; an apply without a valid grant, or with a stale plan, is refused on every cloud |
-| M4 | The agent | OpenRouter client, roles and tools, Author role writing Swamp behaviors and workflows, detectors as scheduled workflows, plan explanations, Ask, replay mode | The agent notices a new release unprompted, opens the PR, and the approval page explains it accurately |
-| M5 | Lifecycle | Simulator and use cases 4–16 as Swamp workflows. Unikernel variant of the app layer on each cloud. Full timeline with forecasts, point-in-time view, topology, version posture matrix, digests and escalation | The scripted month runs end to end on each cloud, and scrubbing back through it shows the correct state at each step |
+| M4 | The agent | OpenRouter client, roles and tools, Author role, detectors, plan explanations, Ask, replay mode | The agent notices a new release unprompted, opens the PR, and the approval page explains it accurately |
+| M5 | Lifecycle | Simulator and use cases 4–16. Unikernel variant of the app layer on each cloud. Full timeline with forecasts, point-in-time view, topology, version posture matrix, digests and escalation | The scripted month runs end to end on each cloud, and scrubbing back through it shows the correct state at each step |
 | M6 | Incidents and audit | Investigator role, debug grants, incident write-ups, evidence export | Use cases 17, 18, 21 pass; the evidence pack reconciles against the cloud's own audit trail |
 | M7 | Demo polish | Guided demo mode, seeded history, documentation, concept website with animated walkthrough, explainer video | A newcomer can go from clone to full local demo in under 15 minutes |
 
@@ -678,8 +655,7 @@ Ordering notes:
 /platform/modules       contract plus aws, gcp, azure, local
 /platform/stacks        00-bootstrap … 50-app
 /apps/paperboat         services, chart, releases
-/runbooks               Swamp behaviors, workflows and vault definitions
-/extensions             Clanker's Swamp extension pack (OpenTofu behavior, broker vault)
+/runbooks               runbook scripts with their typed definitions, policy rules, notification routes
 /conformance            cross-cloud test suite
 /deploy                 compose file and control-plane chart
 /flake.nix, /flake.lock pinned toolchain: dev shell and runner image
@@ -704,7 +680,7 @@ on the forge copies are the source of truth for the running system.
 | The demo depends on a live model | Replay mode |
 | Carbon has no timeline or topology component | Two custom D3 components restricted to Carbon tokens; everything else stays stock Carbon |
 | Notification fatigue makes approvers ignore messages | Digest by default, immediate only for decisions and failures, de-duplication, per-person subscriptions |
-| Swamp adds an account dependency and has unsettled licence terms | Executor interface keeps a subprocess path; M0 spike and licence review before M2 depends on it |
+| A third-party automation substrate adds an account dependency and licence terms that do not fit | Decided 2026-11-17: no such dependency. Runbooks are scripts with typed definitions in this repository (section 5.6) |
 | Unikernels cannot mount the shared file system or be debugged the usual way | Start with one service; keep Kubernetes as the baseline; decide after measured comparison |
 | Chat webhooks leak operational detail to broad channels | Scrubbed, fact-only messages; routing rules reviewed as code; sensitive detail stays behind the dashboard link |
 
@@ -729,7 +705,7 @@ Defaults are chosen so work can start; each is cheap to change before the milest
 | First run | **Chosen 2026-11-17 by the owner:** a wizard in the browser, served on the loopback address by the downloaded `clanker` binary. AWS is the first cloud | A native macOS application, or a wizard in the terminal | M3 |
 | Broker trust for the prototype | One scoped credential per cloud | Workload identity federation from day one | M3 |
 | Models per role | Configurable, set at bootstrap | Single model for everything | M4 |
-| Automation substrate | Swamp for runbooks and detectors, behind an executor interface | Plain subprocess jobs only | M0 spike, settle by M2 |
-| Author role harness | Clanker's own loop following Swamp's skills | A Swamp-supported coding agent pointed at OpenRouter | M4 |
+| Automation substrate | **Chosen 2026-11-17 by the owner:** no third-party substrate. Runbooks are scripts with typed definitions that the control plane checks (section 5.6) | Swamp, behind an executor interface (the first plan; dropped for its licence and its account dependency) | Settled |
+| Author role harness | Clanker's own loop | A third-party coding agent pointed at OpenRouter | M4 |
 | Unikernel runtime | Experimental track alongside Kubernetes for the workload. For the control plane it is the chosen runtime: see "Where the control plane runs" | Promote to a first-class runtime for the workload, or drop | After M5 comparison |
 | Website hosting | Static site published from this repository | Separate hosting | M7 |
