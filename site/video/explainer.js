@@ -3,13 +3,17 @@
 // seconds. This module shows the picture of that cue and fills the pictures with the names
 // and numbers of data/month.json.
 
-import { clock, duration, plural } from "../lib/html.mjs";
-import { grantViews, totals } from "../lib/month.mjs";
+import { clock, duration } from "../lib/html.mjs";
+import { displayName, grantViews, totals } from "../lib/month.mjs";
 
 const COUNT_SECONDS = 1.2;
 // A picture leaves in this time (scene.css). The number of the step changes after it.
 const LEAVE_MS = 250;
 const TIERS = ["T0", "T1", "T2", "T3"];
+// The three steps follow one change of the month: one that the model wrote and that is
+// done. The video does not name the demo application, and the summaries of its upgrades
+// do, so the change is the patch of the database.
+const CHANGE_KIND = "postgres-patch";
 
 const root = document.documentElement;
 const shots = [...document.querySelectorAll(".pic")];
@@ -70,9 +74,9 @@ function fill(month) {
   listItems("layers", layers, "deploy");
   listItems("demo-layers", layers, "");
 
-  // The change that the model wrote, and that went through every step.
   const written = need(details.find((one) => one.pull?.author === "clanker-author"
-    && one.work_item.state === "Done"), "finished change that the model wrote");
+    && one.work_item.state === "Done" && one.work_item.kind === CHANGE_KIND),
+  `finished change of the kind ${CHANGE_KIND} that the model wrote`);
   const own = month.events.filter((event) => event.work_item === written.work_item.id);
   const event = (type) => need(own.find((one) => one.type === type), `${type} event`);
   put("pull-path", need(event("pr.opened").data.paths?.[0], "path in the pull request"));
@@ -91,12 +95,9 @@ function fill(month) {
   put("access-issued", `${clock(grant.issued_at)} UTC`);
   put("access-revoked", `${clock(grant.ended_at)} UTC`);
   put("access-held", duration(grant.held_seconds));
-
-  // The change that waits for a person: its summary is what the approver reads.
-  const waiting = need(details.find((one) => one.work_item.state === "AwaitingApproval"
-    && one.work_item.explanation?.sentence), "change that waits for approval");
-  put("summary", waiting.work_item.explanation.sentence);
-  put("approver", `Needs ${plural(waiting.approvers_required, "approver")}`);
+  put("summary", need(written.work_item.explanation?.sentence, "summary for the approver"));
+  const approval = need(written.approvals.find((one) => one.decision === "approve"), "approval");
+  put("approver", displayName(approval.approver, month.users));
 
   put("demo-items", String(sums.work_items));
   counter("figure-days", "held", sums.days, (value) => String(Math.round(value)));

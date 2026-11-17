@@ -9,7 +9,8 @@
 <body>
   <!-- One picture (class "pic") for each sentence or group of sentences of narration.md.
        data-cues lists the cues that show the picture. A part with data-at appears when
-       its cue starts; --at is the share of the sentence that passes first. -->
+       its cue starts; --at is the share of the sentence that passes first. A part with
+       the class "part-dim" is there from the start, dimmed, and lights up at that time. -->
   <main class="scene">
     <!-- The number of the step, for the pictures that have data-step. -->
     <p class="step-number" id="step-number"></p>
@@ -93,9 +94,9 @@
     <!-- how -->
     <section class="pic pic-step" data-cues="find" data-step="1">
       <ul class="rows">
-        <li class="row part" data-at="find" style="--at: 0.64">A new release</li>
-        <li class="row part" data-at="find" style="--at: 0.78">A security fix</li>
-        <li class="row part" data-at="find" style="--at: 0.9">Drift</li>
+        <li class="row part part-dim" data-at="find" style="--at: 0.64">A new release</li>
+        <li class="row part part-dim" data-at="find" style="--at: 0.78">A security fix</li>
+        <li class="row part part-dim" data-at="find" style="--at: 0.9">Drift</li>
       </ul>
     </section>
 
@@ -127,7 +128,7 @@
         <p class="summary" id="summary"></p>
         <p class="approver part" data-at="approve" style="--at: 0.75">
           <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 12c5.5 0 10 3.4 10 8v4H6v-4c0-4.6 4.5-8 10-8z"/></svg>
-          <span id="approver"></span>
+          <span>Approved by <strong id="approver"></strong></span>
         </p>
       </div>
     </section>

@@ -24,6 +24,9 @@ import {
 import { readWav, writeWav } from "./wav.mjs";
 
 const ELEVENLABS_MODEL = "eleven_multilingual_v2";
+// The loudest sample of the narration track, as a share of full scale: -3 dB. One gain for
+// the whole track, so the voice needs no limiter and no clip changes against another.
+const VOICE_PEAK = 0.708;
 const SPEECH_CACHE = join(OUT, "cache", "speech");
 const ENV_FILE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".env");
 
@@ -133,6 +136,10 @@ async function main() {
     track.set(clip.samples.subarray(0, track.length - Math.floor(clip.at * SAMPLE_RATE)),
       Math.floor(clip.at * SAMPLE_RATE));
   }
+  let peak = 0;
+  for (const sample of track) peak = Math.max(peak, Math.abs(sample));
+  if (peak === 0) throw new Error("the narration track is silent");
+  for (let index = 0; index < track.length; index += 1) track[index] *= VOICE_PEAK / peak;
   writeWav(join(WORK, "narration.wav"), [track], SAMPLE_RATE);
 
   const srt = captions.map((caption) =>

@@ -15,19 +15,20 @@ Format:
   says the sentence.
 - `pause:` is the number of seconds of quiet after each sentence of the part. `hold:` is
   the number of seconds that the last picture of the part stays after its last sentence.
-  The pauses set the pace of the video. The voice is not made slower.
+  The pauses set the pace of the video. The voice is not made slower. Each of the three
+  steps is its own part, so that its `hold:` gives time after the step.
 - `{days}` and `{held}` are filled in from `data/month.json`, so the narration cannot
   disagree with the data.
 - A caption has at most two lines of 42 characters and stays for at least one second. The
   build stops if a caption does not fit. In a sentence that is too long for one caption, a
-  `|` shows where the second caption starts. The voice still says it as one sentence, and
+  `|` shows where the next caption starts. The voice still says it as one sentence, and
   the `|` is not sent to the voice, so you can move it at no cost.
 - Each sentence is sent to ElevenLabs one time and then kept in `out/cache/speech/`. A
   sentence with a changed word is sent again.
 
 ## problem
 
-pause: 0.7
+pause: 0.8
 
 - [sell] You sell software that your customers run themselves.
 - [build] So you build an installer. Then upgrades. Then patches.
@@ -46,28 +47,38 @@ hold: 1.5
 ## setup
 
 pause: 0.9
-hold: 1.0
+hold: 1.4
 
 - [download] Setup is one download. A wizard starts the control plane.
 - [deploy] The control plane then deploys your product, layer by layer.
 
-## how
+## step-one
 
 pause: 1.6
-hold: 1.2
+hold: 2.2
 
-- [find] One. It finds the needed maintenance without someone having to manually | ask for it: a new release, a security fix, drift.
+- [find] One. It finds the needed maintenance | without someone having to manually ask for it: | a new release, a security fix, drift.
 - [write] It writes each change as infrastructure code, in a pull request.
+## step-two
+
+pause: 1.6
+hold: 2.2
+
 - [rate] Two. Code rates the risk of the change. The model has no say in that.
 - [approve] A person reads a plain summary of what will change, and approves.
+## step-three
+
+pause: 1.6
+hold: 2.6
+
 - [grant] Three. Permissions are narrowly scoped, and issued only for that approved change.
 - [revoke] They are revoked as soon as the job ends.
 - [verify] Then it checks the result, and rolls back if the check fails.
 
 ## payoff
 
-pause: 1.3
-hold: 1.2
+pause: 1.6
+hold: 1.4
 
 - [demo] We ran it on a demo app with a realistic architecture, to model the workflows.
 - [held] In {days} days, it held access for {held} in total.

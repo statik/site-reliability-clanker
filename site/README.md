@@ -126,11 +126,11 @@ by itself with reduced motion.
 
 The result is `out/explainer.mp4` (1920 x 1080, H.264, AAC, captions burned in) and
 `out/explainer.srt` (the same captions as a sidecar file). The script fails if the video
-is not 60 to 100 seconds long.
+is not 60 to 110 seconds long.
 
 The video has one idea: ship an AI site reliability engineer with your product instead of
-an installer. It has six parts: the problem, the solution, the first setup, how a change
-goes through in three steps, the numbers of the scripted month, and the command to try it.
+an installer. It tells of the problem, the solution, the first setup, how a change goes
+through in three steps, the numbers of the scripted month, and the command to try it.
 The build needs no running demo. Every picture is drawn from `data/month.json`.
 
 | Step | Script | What it does |
@@ -138,7 +138,7 @@ The build needs no running demo. Every picture is drawn from `data/month.json`.
 | 1 | `video/narrate.mjs` | Checks the captions, gets each sentence of `narration.md` from the ElevenLabs voice, measures it, and writes the timeline, the narration track and the `.srt` file |
 | 1 | `video/music.mjs` | Synthesizes the music bed from the notes in `js/score.mjs` |
 | 2 | `video/record.mjs` | Playwright records `video/explainer.html` for each part, for as long as its narration, and draws the caption pictures |
-| 3 | `video/assemble.mjs` | ffmpeg cuts and joins the parts, lays the captions over them, and mixes the voice over the music |
+| 3 | `video/assemble.mjs` | ffmpeg cuts and joins the parts, lays the captions over them, and mixes the voice over a quiet, steady music bed |
 
 Things to know:
 
@@ -151,7 +151,8 @@ Things to know:
   time. A sentence with a changed word is sent again, and that costs credits.
 - A caption has at most two lines of 42 characters and stays for at least one second.
   `node video/narrate.mjs --check` tests the text without the voice, and the build stops
-  on a caption that does not fit. A `|` in a longer sentence starts a second caption.
+  on a caption that does not fit. A `|` in a longer sentence starts another caption. The
+  duration in the sentence about the held access stays on one caption line.
 - The pace comes from the pauses. `pause:` and `hold:` in `narration.md` set the quiet
   after the sentences of a part. `narrate.mjs` prints the words a second of the whole
   video and of the voice alone. The voice itself is not made slower.
@@ -160,9 +161,15 @@ Things to know:
   every picture the same way in and out. A part of a picture with `data-at` appears when
   its cue starts; `--at` is the share of the sentence that passes first, so a change of
   the words does not need a change of the picture.
-- The pictures of the three steps use two changes of the month. The pull request, the
-  tier and the grant are those of the first finished change that the model wrote. The
-  summary for the approver is that of the change that waits for approval.
+- The pictures of the three steps follow one change of the month: the patch of the
+  database, which the model wrote and which is done. Its pull request, tier, summary for
+  the approver, approver and grant are on the screen. The summaries of the application
+  upgrades name the demo application, which the video leaves out.
+- The sound: `narrate.mjs` brings the voice track to a peak of -3 dB with one gain.
+  `assemble.mjs` lays the music under it at one steady level, about 15 dB under the voice,
+  with no compressor. A limiter is there only as a safety net and adds no gain. The music
+  has no noise in it. The build keeps `out/build/narration.wav` (the voice alone) and
+  `out/build/music.wav` (the bed alone).
 - The end card shows `make demo`, the command of "Run the local demo" in the README of
   the repository, and the address of the site.
 - Playwright records a 1440 x 810 window, so that the text is large enough to read, and

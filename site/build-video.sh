@@ -16,7 +16,7 @@ cd "$(dirname "$0")"
 
 WORK="out/build"
 MIN_SECONDS=60
-MAX_SECONDS=100
+MAX_SECONDS=110
 
 for tool in node pnpm ffmpeg ffprobe; do
   if ! command -v "$tool" >/dev/null 2>&1; then
@@ -70,8 +70,9 @@ if [ "$whole" -lt "$MIN_SECONDS" ] || [ "$whole" -gt "$MAX_SECONDS" ]; then
   echo "build-video: the video is ${duration} s; it must be $MIN_SECONDS to $MAX_SECONDS s. Edit narration.md." >&2
   exit 1
 fi
-# The intermediate files are large. The final files stay.
+# The intermediate pictures are large. The final files stay, and so do the two sound
+# tracks: out/build/narration.wav (the voice alone) and out/build/music.wav (the bed).
 find "$WORK" -maxdepth 1 -type f \( -name '*.webm' -o -name 'segment-*.mp4' -o -name 'pictures.mp4' \
-  -o -name '*.wav' -o -name '*.png' \) -delete
+  -o -name '*.png' \) -delete
 find "$WORK/speech" -type f -delete
 echo "build-video: done. Captions: out/explainer.srt"

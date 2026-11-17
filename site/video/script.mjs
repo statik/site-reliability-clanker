@@ -24,12 +24,15 @@ export const CAPTION_LINE = 42;
 export const CAPTION_LINES = 2;
 export const CAPTION_MIN_SECONDS = 1;
 
+// A space that a caption does not break at. The duration stays on one caption line.
+const TIE = "\u00A0";
+
 function heldInWords(totalSeconds) {
   const minutes = Math.floor(totalSeconds / 60);
   const rest = Math.round(totalSeconds - minutes * 60);
   const secondsPart = `${rest} ${rest === 1 ? "second" : "seconds"}`;
-  if (minutes === 0) return secondsPart;
-  return `${minutes} ${minutes === 1 ? "minute" : "minutes"} and ${secondsPart}`;
+  if (minutes === 0) return secondsPart.replaceAll(" ", TIE);
+  return `${minutes} ${minutes === 1 ? "minute" : "minutes"} and ${secondsPart}`.replaceAll(" ", TIE);
 }
 
 function placeholders() {
@@ -62,8 +65,8 @@ function balanced(words) {
 function captionsOf(marked) {
   return marked.split("|").map((piece) => {
     const text = piece.trim();
-    if (text.length <= CAPTION_LINE) return [text];
-    const lines = balanced(text.split(/\s+/));
+    if (text.length <= CAPTION_LINE) return [text.replaceAll(TIE, " ")];
+    const lines = balanced(text.split(/ +/))?.map((line) => line.replaceAll(TIE, " "));
     if (!lines) {
       throw new Error(`narration.md: "${text}" does not fit ${CAPTION_LINES} caption lines of ` +
         `${CAPTION_LINE} characters. Put a | in the sentence where a second caption must start`);
@@ -101,7 +104,7 @@ export function readScript() {
     const sentence = line.match(/^- \[([\w-]+)\]\s+(.+)$/);
     if (!sentence) throw new Error(`narration.md: this sentence has no [cue] for its picture: ${line}`);
     const marked = fill(sentence[2].trim(), values);
-    const text = marked.replace(/\s*\|\s*/g, " ");
+    const text = marked.replace(/\s*\|\s*/g, " ").replaceAll(TIE, " ");
     part.sentences.push({ cue: sentence[1], text, captions: captionsOf(marked) });
   }
   if (parts.length === 0) throw new Error("narration.md has no parts");

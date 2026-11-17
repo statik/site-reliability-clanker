@@ -5,8 +5,8 @@
 //    pictures enter and leave by themselves on the background colour, so the parts join
 //    with no fade. Only the start and the end of the video fade.
 // 2. Join the parts.
-// 3. Lay each caption picture over its time, mix the narration over the music (the music
-//    gets quieter while the voice speaks), and write out/explainer.mp4.
+// 3. Lay each caption picture over its time, mix the narration over a quiet, steady music
+//    bed, and write out/explainer.mp4.
 //
 // This ffmpeg has no subtitle or text filter, so the captions are pictures, drawn by
 // video/record.mjs in the site's typeface. out/explainer.srt has the same captions as text.
@@ -19,7 +19,10 @@ import { FPS, OUT, TIMELINE, WORK } from "./script.mjs";
 
 const FADE_IN = 0.4;
 const FADE_OUT = 0.8;
-const MUSIC_LEVEL = 0.4;
+// The bed stays at one level under the whole video, far under the voice: music.wav peaks
+// at 0.6, so the bed peaks near -29 dB. The voice peaks at -3 dB (video/narrate.mjs).
+// Nothing moves the level of the bed with the voice, so the bed does not swell in a pause.
+const MUSIC_LEVEL = 0.06;
 
 function ffmpeg(args) {
   execFileSync("ffmpeg", ["-v", "error", "-y", ...args], { stdio: ["ignore", "inherit", "inherit"] });
@@ -77,10 +80,11 @@ function finish(timeline, pictures) {
     previous = `v${index + 1}`;
   });
   graph.push(
-    `[${narration}:a]aformat=channel_layouts=stereo,volume=1.5,asplit=2[voice][key]`,
+    // The same voice in both channels, at the level of the track.
+    `[${narration}:a]pan=stereo|c0=c0|c1=c0[voice]`,
     `[${music}:a]volume=${MUSIC_LEVEL}[bed]`,
-    "[bed][key]sidechaincompress=threshold=0.02:ratio=9:attack=30:release=700[ducked]",
-    "[voice][ducked]amix=inputs=2:normalize=0,alimiter=limit=0.95[a]",
+    // The sum peaks under the limit, so the limiter is only a safety net. It adds no gain.
+    "[voice][bed]amix=inputs=2:normalize=0,alimiter=limit=0.95:level=disabled[a]",
   );
   const output = join(OUT, "explainer.mp4");
   ffmpeg([

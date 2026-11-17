@@ -15,13 +15,17 @@ body { background: var(--background); color: var(--text-primary); font-family: v
 .scene :where(ol, ul) { list-style: none; }
 .scene :where(i, b, strong) { font-style: normal; font-weight: inherit; }
 
-.pic { position: absolute; left: 96px; right: 96px; top: 40px; height: 580px;
-  display: flex; flex-direction: column; justify-content: center; gap: 36px;
+/* One grid for every picture: a block 1248px wide in the middle of the frame, centred in
+   the 600px above the captions. A picture that is narrower than the block sits in its
+   middle. */
+.pic { position: absolute; left: 96px; right: 96px; top: 24px; height: 600px;
+  display: flex; flex-direction: column; justify-content: center; gap: 40px;
   opacity: 0; transform: translateY(8px);
   transition: opacity 0.25s var(--ease), transform 0s linear 0.25s; }
 .pic.is-active { opacity: 1; transform: none;
   transition: opacity 0.5s var(--ease) var(--wait, 0s), transform 0.5s var(--ease) var(--wait, 0s); }
 .part { opacity: 0; transform: translateY(8px); }
+.part-dim { opacity: 0.3; transform: none; }
 .part.is-shown { opacity: 1; transform: none;
   transition: opacity 0.5s var(--ease) calc(var(--say, 0s) * var(--at, 0)),
     transform 0.5s var(--ease) calc(var(--say, 0s) * var(--at, 0)); }
@@ -32,7 +36,7 @@ body { background: var(--background); color: var(--text-primary); font-family: v
   background: var(--layer-01); border: 2px solid var(--border-strong); font-size: 40px; white-space: nowrap; }
 .box-own { border-color: var(--honey); }
 .box-off { color: var(--text-helper); border-style: dashed; }
-.word { font-size: 84px; font-weight: 300; line-height: 1.1; white-space: nowrap; }
+.word { font-size: 96px; font-weight: 300; line-height: 1.1; white-space: nowrap; }
 .word-bad { color: var(--terracotta); }
 .panel { padding: 32px 40px; background: var(--layer-01); border-top: 2px solid var(--honey); }
 .panel-label { font-size: 24px; color: var(--text-helper); }
@@ -46,7 +50,7 @@ body { background: var(--background); color: var(--text-primary); font-family: v
 .sell-customers li::before { content: ""; position: absolute; right: 100%; top: 50%; width: 488px;
   margin-right: 2px; border-top: 2px solid var(--border-strong); }
 
-.words { display: grid; gap: 20px; justify-items: start; padding-left: 160px; }
+.words { display: grid; gap: 20px; justify-items: center; }
 
 .tracks { display: grid; gap: 40px; }
 .release-row-head { display: flex; justify-content: space-between; margin-left: 260px; font-size: 24px;
@@ -62,7 +66,7 @@ body { background: var(--background); color: var(--text-primary); font-family: v
 .release-row-line b { position: absolute; left: calc(var(--runs) * 20%); bottom: -13px; width: 28px; height: 28px;
   margin-left: -14px; background: var(--cream); }
 
-.turns { display: grid; grid-template-columns: auto 200px 1fr; align-items: center; }
+.turns { display: grid; grid-template-columns: auto 160px auto; align-items: center; justify-content: center; }
 .turns-arrow { margin: 0 40px; border-top: 2px solid var(--border-strong); }
 .turns-into { display: grid; gap: 28px; }
 
@@ -72,17 +76,17 @@ body { background: var(--background); color: var(--text-primary); font-family: v
 .struck .word { font-size: 132px; color: var(--text-secondary); }
 .struck i { position: absolute; left: -24px; right: -24px; top: 54%; height: 8px; background: var(--terracotta); }
 
-.lockup { display: flex; align-items: center; gap: 32px; }
+.lockup { display: flex; align-items: center; gap: 32px; align-self: center; }
 .lockup-mark { display: block; flex: none; width: 132px; height: 132px; max-width: none; }
 .lockup-name { font-size: 96px; font-weight: 300; line-height: 1; letter-spacing: 0.02em; }
 .lockup-full { margin-top: 8px; font-size: 29px; color: var(--text-secondary); white-space: nowrap; }
-.lockup-line { font-size: 44px; font-weight: 300; line-height: 1.2; }
+.lockup-line { font-size: 52px; font-weight: 300; line-height: 1.2; text-align: center; }
 .does { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
 
-.terminal { align-self: flex-start; padding: 24px 40px; background: var(--layer-01);
-  border: 2px solid var(--honey); font-family: var(--font-mono); font-size: 54px; }
+.terminal { align-self: center; padding: 28px 56px; background: var(--layer-01);
+  border: 2px solid var(--honey); font-family: var(--font-mono); font-size: 72px; }
 .terminal span { color: var(--text-helper); }
-.address { font-family: var(--font-mono); font-size: 36px; color: var(--honey); }
+.address { font-family: var(--font-mono); font-size: 40px; color: var(--honey); text-align: center; }
 
 /* ------------------------------------------------------------------ setup */
 
@@ -100,7 +104,7 @@ body { background: var(--background); color: var(--text-primary); font-family: v
 
 /* ------------------------------------------------------------------ how */
 
-.step-number { position: absolute; left: 96px; top: 210px; width: 180px; font-size: 240px; font-weight: 300;
+.step-number { position: absolute; left: 96px; top: 204px; width: 180px; font-size: 240px; font-weight: 300;
   line-height: 1; color: var(--honey); opacity: 0; transition: opacity 0.25s var(--ease); }
 .step-number.is-active { opacity: 1; transition: opacity 0.5s var(--ease); }
 .pic-step { left: 320px; }
@@ -127,8 +131,9 @@ body { background: var(--background); color: var(--text-primary); font-family: v
   background: var(--layer-02); color: var(--text-helper); }
 .tiers .is-set { background: var(--honey); color: var(--dark); }
 
-.summary { margin-top: 20px; font-size: 44px; font-weight: 300; line-height: 1.25; }
-.approver { display: flex; align-items: center; gap: 16px; margin-top: 28px; font-size: 29px; }
+.summary { margin-top: 20px; font-size: 52px; font-weight: 300; line-height: 1.25; }
+.approver { display: flex; align-items: center; gap: 16px; margin-top: 28px; font-size: 36px; }
+.approver strong { font-weight: 600; }
 .approver svg { width: 48px; height: 48px; fill: var(--person); }
 
 .access { display: grid; grid-template-columns: 220px 1fr; row-gap: 16px; margin-top: 20px; font-size: 40px;
@@ -140,11 +145,11 @@ body { background: var(--background); color: var(--text-primary); font-family: v
 
 /* ------------------------------------------------------------------ payoff */
 
-.demo-title { font-size: 72px; font-weight: 300; line-height: 1; }
-.demo-count { font-size: 44px; font-weight: 300; }
+.demo-title { font-size: 84px; font-weight: 300; line-height: 1; text-align: center; }
+.demo-count { font-size: 52px; font-weight: 300; text-align: center; }
 .demo-count strong { color: var(--honey); }
 
-.big-numbers { display: flex; gap: 96px; align-items: flex-end; }
+.big-numbers { display: flex; gap: 96px; align-items: flex-end; justify-content: center; }
 .big-number { font-size: 160px; font-weight: 300; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .big-number-accent { color: var(--honey); }
 .big-number-name { margin-top: 12px; font-size: 40px; color: var(--text-secondary); }
