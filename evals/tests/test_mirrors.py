@@ -95,7 +95,7 @@ def test_input_frames_match_go() -> None:
     assert 'return "<data>" + string(raw) + "</data>"' in agent
     assert "raw, err := json.Marshal(value)" in agent
     assert "Content: frame(input)" in agent
-    assert "truncate(note, 4000)" in agent
+    assert f"truncate(note, {inputs.RELEASE_NOTE_LIMIT})" in agent
     for key in ["title", "kind", "env", "layers", "tier", "tier_rule", "trigger", "plans"]:
         assert f'"{key}": ' in agent
     assert '"deferred_layers": deferred' in agent
@@ -108,7 +108,8 @@ def test_input_frames_match_go() -> None:
     assert 'frame(map[string]any{"alert": f, "change_history": strings.Split(history, "\\n"), ' in (
         incident
     )
-    assert '"debug_session": truncate(transcript, 8000)})' in incident
+    limit = inputs.TRANSCRIPT_LIMIT
+    assert f'"debug_session": truncate(transcript, {limit})}})' in incident
     assert 'fmt.Sprintf("%s %s: %s, %s ago", wi.ID, wi.Title, wi.State, age)' in incident
 
 

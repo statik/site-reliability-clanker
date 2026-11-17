@@ -10,7 +10,7 @@ from typing import Any
 from clanker_evals.gotext import go_json, sorted_map, truncate
 
 RELEASE_NOTE_LIMIT = 4000
-TRANSCRIPT_LIMIT = 8000
+TRANSCRIPT_LIMIT = 14000
 TIERS = ["T0", "T1", "T2", "T3"]
 # The history that recentChanges gives for an environment that has run 1.0.0 for nine days.
 QUIET_HISTORY = ["WI-0001 Create environment local: Done, 216h0m0s ago"]
