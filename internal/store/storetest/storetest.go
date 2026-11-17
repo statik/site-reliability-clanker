@@ -33,14 +33,21 @@ var (
 	baseErr error
 )
 
-// Open returns a database with the schema of the control plane and no rows. The schema is
-// removed when the test ends.
-func Open(t testing.TB) *sql.DB {
+// URL returns the address of the PostgreSQL server of the tests.
+func URL(t testing.TB) string {
 	t.Helper()
 	once.Do(func() { baseURL, baseErr = server() })
 	if baseErr != nil {
 		t.Fatalf("no PostgreSQL for the test: %v", baseErr)
 	}
+	return baseURL
+}
+
+// Open returns a database with the schema of the control plane and no rows. The schema is
+// removed when the test ends.
+func Open(t testing.TB) *sql.DB {
+	t.Helper()
+	baseURL := URL(t)
 	raw := make([]byte, 8)
 	if _, err := rand.Read(raw); err != nil {
 		t.Fatal(err)
