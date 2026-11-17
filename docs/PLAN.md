@@ -289,8 +289,8 @@ channel adapters. Adding a channel means adding an adapter, nothing else.
 | Channel | Transport | Message format | Local demo |
 |---|---|---|---|
 | Email | SMTP | HTML built from the same facts as the approval page, plain-text alternative | Mailpit captures mail in a local inbox |
-| Slack | Incoming webhook, or a Slack app when threading is wanted | Block Kit | Real workspace or recorded payloads |
-| Microsoft Teams | Workflows webhook | Adaptive Card | Real tenant or recorded payloads |
+| Slack | Incoming webhook. With the settings of a Slack app, the app posts in its place and takes approvals | Block Kit | Webhook sink. The app has tests with a fake Slack only |
+| Microsoft Teams | Workflows webhook. With the settings of a Teams bot, the bot posts in its place and takes approvals | Adaptive Card | Webhook sink. The bot has tests with a fake Bot Connector only |
 | Discord | Channel webhook | Embed | Real server or recorded payloads |
 
 What gets sent:
@@ -314,9 +314,17 @@ where the channel allows it.
 
 Constraints:
 
-- **Notifications link, they do not approve.** Every message deep-links to the work item, and
-  the decision is made in the dashboard after sign-in. A chat identity is not a verified
-  approver identity, so there are no approve buttons in chat in the prototype.
+- **A webhook message links, it does not approve.** Every message deep-links to the work
+  item. Email, Discord and the webhooks of Slack and Teams carry no approve action.
+- **An approval in chat needs a linked identity** (decided by the owner on 2026-11-17,
+  issue #49). With a Slack app or a Teams bot, a person approves or rejects a tier T2
+  change inside the chat. The person links the chat account once through the sign-in of
+  the control plane. After that, each click is verified with the signature of the platform
+  and mapped to the user with the email address of that person. The decision goes through
+  the same code as the dashboard, and the audit log records the user and the chat account.
+  A tier T3 change shows its summary and a link in chat, and is decided on the approval
+  page. `ops/chat/README.md` has the setup. This was not tested against the real Slack or
+  the real Teams.
 - **Messages carry no secrets.** They pass through the same scrubber as model input and are
   built from plan facts, not free-form model output.
 - **Webhook URLs and SMTP credentials are secrets**, entered at bootstrap or in settings and
@@ -691,8 +699,8 @@ Defaults are chosen so work can start; each is cheap to change before the milest
 | Decision | Default | Alternative | Settle by |
 |---|---|---|---|
 | Control-plane language | Go backend; front end is React because Carbon's primary library is React | TypeScript backend as well | M0 |
-| Approving from chat | Not offered; messages link to the dashboard | Signed, single-use approve links or a Slack/Teams app with verified identity mapping | M6 |
-| Slack integration depth | Incoming webhook | Slack app, for threading and richer interaction | M2 |
+| Approving from chat | **Chosen 2026-11-17 by the owner (issue #49):** a person approves or rejects a tier T2 change inside Slack or Microsoft Teams, on one shared core. The chat account is linked once to a user through the OIDC sign-in. Each click is verified with the signature of the platform and mapped to that user, and the audit log records both identities. A tier T3 change shows its summary and a link in chat and is decided on the approval page. Built and tested with fakes and test keys only; not tested against the real platforms | Not offered, with messages that link to the dashboard (the first default), or signed, single-use approve links | M6 |
+| Slack integration depth | **Chosen 2026-11-17 by the owner (issue #49):** a Slack app (Web API and interactive messages) when its three settings are present. It takes the place of the incoming webhook. Without the settings, the incoming webhook stays. Threading is not built | Incoming webhook only | M2 |
 | Forge | **Chosen 2026-11-16, storage changed 2026-11-17:** a small forge built into the control plane. A git library does the history work in the process. The objects, the references and the pull requests are rows in the database of the control plane. The forge has its own three-way merge, because the library merges only by fast-forward. It serves clone and push over the smart HTTP protocol | Forgejo, Gitea, or an external GitHub/GitLab | M2 |
 | Control-plane database | **Chosen 2026-11-17 by the owner:** PostgreSQL on every target, outside the process of the control plane. On AWS it is a managed database. On the local target `clanker up` runs it in a Docker container. The repositories of the forge go into the same database | Embedded SQLite (the choice of 2026-11-16, removed), or DynamoDB | M2 |
 | First deployment | **Chosen 2026-11-16:** one approval for the blank-slate work item. A layer that cannot be planned before the layer below it exists is planned at apply time and runs only if its plan creates resources and changes or destroys nothing | One approval for each layer | M3 |

@@ -319,6 +319,49 @@ What ran on the build of commit `376617b`, the last change to the Go code:
      user other than the first admin needs a row in the users table. There is no list of
      tokens and no way to end one token before its twelve hours. The core does not slow
      down a program that asks for its token too often.
+   - **Done, with fakes only: approval inside Slack and Microsoft Teams** (issue #49,
+     `internal/chatops`, setup in `ops/chat/README.md`). **Nothing ran against the real
+     Slack or the real Teams, and the change was not run end to end in a control plane.**
+     The owner deferred the real test until a Slack app and a Teams bot registration exist.
+     - A person links a chat account once at `/auth/chat-link`, with a browser session of
+       the sign-in. A program token cannot link. A link code works once and for ten
+       minutes. The same page lists the links of the person and removes one.
+     - A click goes to `POST /chat/slack/interactions` or `POST /chat/teams/messages`. Both
+       are open in the gate and accept only a request that the platform signed: Slack with
+       HMAC-SHA256 over the raw body and a timestamp of at most five minutes, Teams with a
+       token of the Bot Connector (signature, issuer, audience, validity, endorsement of
+       the key for the channel, `serviceUrl`, and the tenant of the bot).
+     - The decision goes through `Orchestrator.Decide` as the user with the email of the
+       link. The message carries a binding of the commit and the plan hashes, and
+       `Decide` refuses a click on a message of an older plan. `Decide` now runs one
+       decision on a work item at a time, also for the dashboard.
+     - Chat decides tier T2 and lower. A tier T3 request has only a link.
+     - After a decision, and when the work item leaves `AwaitingApproval` for another
+       reason or its plan changes, the posted message shows the outcome and has no action.
+     - Audit: `chat.linked`, `chat.unlinked` and `chat.refused` are new. `approval.recorded`
+       and `approval.refused` carry `origin` (platform, workspace or tenant, account) for a
+       decision from chat.
+     - Settings: `CLANKER_SLACK_SIGNING_SECRET`, `CLANKER_SLACK_BOT_TOKEN`,
+       `CLANKER_SLACK_CHANNEL`; `CLANKER_TEAMS_APP_ID`, `CLANKER_TEAMS_APP_SECRET`,
+       `CLANKER_TEAMS_TENANT_ID`. The secrets come from the environment, which is for a
+       laptop only (issue #40). With the settings of a platform, the app takes the place of
+       the webhook of that platform. Without them nothing changes, and no new audit event
+       is emitted. A chat app with no sign-in stops the start.
+     - Ran: `go test ./...` with a fake Slack Web API, a fake token endpoint and Bot
+       Connector, a test key set and the fake identity provider.
+     - Not run: `fresh-run.sh`, `core-check.sh`, `nanos-check.sh` and `restart_check.py` on
+       this change. The schema has three new tables (`chat_links`, `chat_link_codes`,
+       `chat_messages`), so `fresh-run.sh` must run before a merge. The expected result is
+       the same thirteen work items and 310 events.
+     - To check first against a real tenant: the request that starts a thread in a Teams
+       channel (its form comes from an archived page of the Microsoft documentation), and
+       that an invoke activity carries `from.aadObjectId` and the tenant ID.
+     - Not built: a comment for a rejection in chat (the comment is fixed), threading,
+       more than one Slack workspace or Teams channel, an installation for a whole Slack
+       Enterprise Grid organization, a page in the dashboard for the links (the page at
+       `/auth/chat-link` does this).
+     - To know: the links in the other notifications still use the listen address and not
+       `CLANKER_PUBLIC_URL` (`cmd/clanker/up.go`). The chat requests use `CLANKER_PUBLIC_URL`.
 6. **Cloud runner and broker:** a launcher that starts a Fargate task, an S3 state backend
    in the runner (the job specification has the field `backend`), a broker that uses STS.
    The ECS task definition in `internal/setup/controlplane.yaml` is the starting point.
@@ -506,6 +549,7 @@ Limits:
 - The device flow in the iOS app, a page to manage users, and a way to end one token.
 - A "defer" decision, and enforcement of a maintenance window for tier T3.
 - Quiet hours, escalation and threading for notifications.
+- A test of the approval in chat against the real Slack and the real Teams (issue #49).
 - The move of the control plane into a cloud (bootstrap and pivot).
 
 ## Decisions made in this build
@@ -517,6 +561,7 @@ Limits:
 | Control-plane database | PostgreSQL, outside the process (changed 2026-11-17) | #7 |
 | First deployment | One approval. Later layers must stay inside a create-only envelope | #8 |
 | Inference | OpenRouter, confirmed by the owner on 2026-11-16 | #15 |
+| Approval in chat | In Slack and Teams, with a chat account that is linked once through the sign-in. Tier T2 in chat, tier T3 on the dashboard | #49 |
 | Merges | Merge a pull request when its checks pass and the change was run. See `CLAUDE.md` | — |
 | Dashboard, evals, site and video, iOS app | Review issues | #22, #23, #24, #25, #26 |
 
