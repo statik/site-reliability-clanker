@@ -53,11 +53,17 @@ What ran on the build of commit `376617b`, the last change to the Go code:
    environment and stops when one is absent. **These two variables are for a laptop only.**
    `ops` writes `Env` into the image, so the image for a cloud account must not carry them;
    there they must come from a secret store at start.
-   - Ran as a host process: a binary with the tag `bundle`, started outside a checkout with
-     a home directory that does not exist, against a throwaway PostgreSQL. The dashboard
-     answered 200. The three repositories of the forge had the same trees as the ones
-     that the local demo seeded from the checkout, with the same executable files. The
-     working directory stayed empty.
+   - Ran as a host process (`scripts/verify/core-check.sh`, on commit `4c26150`): a binary
+     with the tag `bundle`, started outside a checkout with a home directory that does not
+     exist, against its own PostgreSQL. The dashboard answered. The repositories of the
+     forge had the same trees as the checkout, with the same executable files. The working
+     directory and the temporary directory stayed empty and the home directory was not
+     made. The check does not watch the rest of the disk.
+   - Ran on the local target, on the same commit: `fresh-run.sh` (thirteen work items, the
+     chain at 310 events, no error line), `sweep.py` and `stale_plan.py`.
+   - Did not run: the core under Nanos (step 3), and the walk through the wizard with a
+     released binary. From a released binary on the local path, only `clanker preflight`
+     ran, which unpacks the files.
    - The local target keeps its data directory (`broker.key`, `database.password`, the
      unpacked bundle, the files of the runner).
    - Not done: the template `internal/setup/controlplane.yaml` (the ECS design) still
@@ -289,4 +295,5 @@ Limits:
 | The Investigator saw no errors in a failing system | The debug transcript was cut from the front, and the application log is the last command. Each command now keeps its newest output |
 | A log line closed the `<data>` frame of the Investigator | The evals found it. Untrusted input is now JSON-encoded |
 | `git push` over SSH fails with "agent refused operation" | The SSH key is in Secretive and needs the owner present. Do not work around it |
+| `stale_plan.py` failed once at `git fsck`, and the same command passed on the same clone a minute later | Not proved. The clone had one pack and no loose object afterward, so git probably repacked in the background after the fetch. The script now switches that off and prints the output of a failed fsck |
 | `xcodebuild test` hangs | The first-launch packages of Xcode are probably not installed. `ios/build.sh` runs the test bundle with `xcrun simctl spawn` |
