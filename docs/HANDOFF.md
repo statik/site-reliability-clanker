@@ -13,30 +13,16 @@ the wizard (`clanker setup`). The decisions of the owner are in section 12 of
 run in short-lived runners; all state is in an external PostgreSQL; the dashboard is behind
 a load balancer with OIDC sign-in; the wizard builds the machine image with `ops`.
 
-### Work that is not pushed (end of the second session of 2026-11-17)
+### State at the end of the second session of 2026-11-17
 
-The push over SSH was refused, because the owner was not at the keyboard. Three branches
-are on this machine only. Each one is built on the one before it.
+Next steps 1 to 4 are merged (#39, #42, #43 and the pull request of the writer guard).
+Nothing waits on a branch. The next work is step 5, OIDC sign-in.
 
-| Order | Branch | Tip | Next step that it holds | Checks that ran on it |
-|---|---|---|---|---|
-| 1 | `core-without-paths` | `fc96c26` | 2 | `fresh-run.sh`, `sweep.py`, `stale_plan.py`, `core-check.sh` on `4c26150`; the later commit changes documents only |
-| 2 | `core-under-nanos` | `66bf569` | 3 | `nanos-check.sh` |
-| 3 | `one-writer` | the commit that holds this text | 4 | `fresh-run.sh`, `sweep.py`, `stale_plan.py`, `restart_check.py` on `0e6572d`; `core-check.sh` and `nanos-check.sh` on `e60e598`. The last code commit, `4741ba5`, changes only the label of a lost job in the dashboard and the iOS app. The dashboard checks passed. The iOS app was not built |
+Two questions wait for the owner: issue #40 (the secrets of the core on AWS) and issue #41
+(what a restart does with work that was not yet in the apply).
 
-To finish:
-
-1. Push `core-without-paths`, open a pull request and merge it when the checks pass. The
-   body must say what the section "Next steps" says for step 2: what the change does, what
-   ran, the one `git fsck` failure, and what did not run.
-2. A squash merge removes the parent of the next branch. Move the next branch with
-   `git rebase --onto main fc96c26 core-under-nanos`, and later
-   `git rebase --onto main 66bf569 one-writer`. After each rebase, `git diff` between the
-   old tip and the new tip must show nothing. Then the recorded runs still describe the
-   same files, and the pull request can say so.
-3. The local demo is not clean: `restart_check.py` left a failed work item (`WI-0016`).
-   Run `scripts/verify/fresh-run.sh` before any other check.
-4. Do not start step 5 on top of these branches before they are merged.
+Not done in that session: the iOS app was not built after the change that shows a lost job
+as an error (`ios/App/Views/ActivityView.swift`).
 
 ### The core and runner split (verified 2026-11-17)
 
