@@ -136,7 +136,7 @@ enum RiskTier: Sendable, Equatable, Hashable {
     case .t0: "Needs no approval."
     case .t1: "Covered by a standing approval that a human signed once. Each use is logged."
     case .t2: "Needs one approver."
-    case .t3: "Needs two approvers and a maintenance window."
+    case .t3: "Needs one or two approvers, as the control plane sets, and a maintenance window."
     case .none: "Policy has not classified this work item."
     case .unknown: "This app does not know the approval rule of this tier."
     }

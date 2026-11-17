@@ -99,6 +99,10 @@ To finish the site and the video:
   and new footage.
 - How is a pull request on the `runbooks` repository tiered and approved? Until that
   exists, a runbook and the policy rules cannot change after the first seed.
+- A change to `policy/approvals.json` must not be approvable under the rule that it
+  lowers: a change of `t3_approvers` from 2 to 1 must itself need two approvers. The pull
+  request path for `runbooks` must enforce this. Until that path exists, the file can be
+  set only before the first start, because the forge copies `runbooks/` only once.
 - Does the owner want a pass over the 101 functions that are over a cyclomatic complexity
   of 8, and a check in CI? Only the functions of this session were brought under it.
 
@@ -311,9 +315,10 @@ What ran on the build of commit `376617b`, the last change to the Go code:
      branch, and is refused a push to the main branch. `web/scripts/signin-check.mjs`
      approves a code in a real browser.
    - Limits to know before a run in a real account: a sign-in, a code and a token leave no
-     audit event. A tier T3 change needs two approvers, and a control plane on a cloud
-     has only the first admin until somebody adds a row to the users table. The request
-     for a code is open to everybody and is not slowed down.
+     audit event. A tier T3 change needs two approvers unless `policy/approvals.json`
+     says one, and a control plane on a cloud has only the first admin until somebody
+     adds a row to the users table. The request for a code is open to everybody and is
+     not slowed down.
    - Not built: the iOS app does not use the device flow yet, and still sends the user
      header, which only the demo reads. There is no page to add a user or change a role: a
      user other than the first admin needs a row in the users table. There is no list of
