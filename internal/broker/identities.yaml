@@ -1,0 +1,70 @@
+# Identities that the access broker manages on a Kubernetes target.
+# No identity has a long-lived token. The broker issues a token for each grant.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: clanker-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: clanker-observer, namespace: clanker-system}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: clanker-planner, namespace: clanker-system}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: clanker-debugger, namespace: clanker-system}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: clanker-applier-30-data, namespace: clanker-system}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: clanker-applier-40-platform, namespace: clanker-system}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: clanker-applier-50-app, namespace: clanker-system}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: clanker-runbook, namespace: clanker-system}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: {name: clanker-read-all}
+rules:
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: clanker-observer}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: view}
+subjects:
+  - {kind: ServiceAccount, name: clanker-observer, namespace: clanker-system}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: clanker-planner}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: clanker-read-all}
+subjects:
+  - {kind: ServiceAccount, name: clanker-planner, namespace: clanker-system}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: clanker-applier-30-data}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: cluster-admin}
+subjects:
+  - {kind: ServiceAccount, name: clanker-applier-30-data, namespace: clanker-system}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: clanker-applier-40-platform}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: cluster-admin}
+subjects:
+  - {kind: ServiceAccount, name: clanker-applier-40-platform, namespace: clanker-system}

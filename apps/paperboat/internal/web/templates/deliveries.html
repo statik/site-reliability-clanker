@@ -1,0 +1,60 @@
+{{define "content"}}
+<div id="live" data-refresh="5">
+{{if .LoadError}}
+<section class="load-error" data-load-error>
+  <h1>The deliveries did not load</h1>
+  <p>{{.LoadError}}</p>
+  <p class="hint">This page tries again every few seconds.</p>
+</section>
+{{else}}
+<h1>Deliveries and collections</h1>
+<table class="ledger">
+  <thead>
+    <tr>
+      <th>No.</th><th>Job</th><th>Customer</th><th>Fish</th><th>Driver</th><th>Window</th>
+      <th>Status</th><th>Manifest</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {{range .Data}}
+  {{$statusPath := printf "/api/deliveries/%d/status" .ID}}
+  <tr>
+    <td class="num">{{.ID}}</td>
+    <td><span class="kind" data-kind="{{.Kind}}">{{statusLabel .Kind}}</span></td>
+    <td>{{.Customer}}<br><span class="quiet">{{.Address}}</span></td>
+    <td><strong>{{.Fish}}</strong> <span class="quiet">{{.Species}}</span></td>
+    <td>{{.Driver}}</td>
+    <td class="keep">{{clock .WindowStart}} to {{clock .WindowEnd}} UTC</td>
+    <td><span class="chip" data-delivery="{{.Status}}">{{statusLabel .Status}}</span></td>
+    <td class="keep">
+      {{if .ManifestPath}}
+      <a href="/api/deliveries/{{.ID}}/manifest" target="_blank" rel="noopener">Open manifest</a>
+      {{else}}
+      <span class="quiet">Not written yet</span>
+      {{end}}
+    </td>
+    <td class="actions">
+      {{if eq .Status "scheduled"}}
+      <button type="button" class="small" data-post="{{$statusPath}}"
+              data-body='{"status":"out"}'>Send out</button>
+      {{end}}
+      {{if eq .Status "out"}}
+      <button type="button" class="small" data-post="{{$statusPath}}"
+              data-body='{"status":"done"}'>Mark done</button>
+      {{end}}
+      {{if or (eq .Status "scheduled") (eq .Status "out")}}
+      <button type="button" class="small plain" data-post="{{$statusPath}}"
+              data-body='{"status":"failed"}'>Mark failed</button>
+      {{end}}
+    </td>
+  </tr>
+  {{else}}
+  <tr>
+    <td colspan="9" class="empty">No jobs yet. A new rental schedules the first delivery.</td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}
+</div>
+{{end}}

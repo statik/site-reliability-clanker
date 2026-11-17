@@ -1,0 +1,57 @@
+[
+  {
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "call_1",
+        "type": "function",
+        "function": {
+          "name": "read_file",
+          "arguments": "{\"repo\": \"paperboat\", \"path\": \"releases/1.1.1.md\"}"
+        }
+      }
+    ]
+  },
+  {
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "call_2",
+        "type": "function",
+        "function": {
+          "name": "read_file",
+          "arguments": "{\"repo\": \"platform-live\", \"path\": \"platform/stacks/local/50-app/terraform.tfvars\"}"
+        }
+      }
+    ]
+  },
+  {
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "call_3",
+        "type": "function",
+        "function": {
+          "name": "set_tfvar",
+          "arguments": "{\"layer\": \"50-app\", \"name\": \"paperboat_version\", \"value\": \"1.1.1\"}"
+        }
+      }
+    ]
+  },
+  {
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "call_4",
+        "type": "function",
+        "function": {
+          "name": "open_pull_request",
+          "arguments": "{\"title\": \"Patch Paperboat to 1.1.1 (base image security fix)\", \"body\": \"What changes: paperboat_version in layer 50-app goes from 1.1.0 to 1.1.1. Only the base image of the container changes. No schema migration.\\n\\nWhy now: advisory PB-2026-014 reports a vulnerability in the base image of 1.1.0. Release 1.1.1 is built on the patched base image.\\n\\nRollback: revert this pull request. Both releases use schema version 2.\"}"
+        }
+      }
+    ]
+  },
+  {
+    "content": "The pull request is open. The change sets paperboat_version to 1.1.1 in layer 50-app."
+  }
+]

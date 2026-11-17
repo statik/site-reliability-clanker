@@ -1,0 +1,5 @@
+[
+  {
+    "content": "{\"diagnosis\": \"The api pods of Paperboat are in an in-memory fault state: about half of the inventory requests fail while health checks pass.\", \"evidence\": \"The debug session shows all pods Running and Ready with no restarts and no new deployment. The api log has repeated 500 responses on GET /api/inventory, and none on /api/healthz. No change was applied in the last hour, so a bad release is not the cause.\", \"proposed_runbook\": \"restart-deployment\", \"deployment\": \"paperboat-api\", \"write_up\": \"At the alert time the error rate of inventory requests rose above 20 percent for three samples in a row. No change was in progress. A read-only debug session showed healthy pods and failing inventory requests from a fault that exists only in process memory. Restarting the api deployment clears that state. The restart ran as a tier T1 runbook under the standing approval. Follow-up for a human: find what switched the fault on, and make the readiness check cover the inventory path so that a pod in this state leaves the load balancer.\"}"
+  }
+]

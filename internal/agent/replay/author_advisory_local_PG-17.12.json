@@ -1,0 +1,44 @@
+[
+  {
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "call_2",
+        "type": "function",
+        "function": {
+          "name": "read_file",
+          "arguments": "{\"repo\": \"platform-live\", \"path\": \"platform/stacks/local/30-data/terraform.tfvars\"}"
+        }
+      }
+    ]
+  },
+  {
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "call_3",
+        "type": "function",
+        "function": {
+          "name": "set_tfvar",
+          "arguments": "{\"layer\": \"30-data\", \"name\": \"postgres_version\", \"value\": \"17.12\"}"
+        }
+      }
+    ]
+  },
+  {
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "call_4",
+        "type": "function",
+        "function": {
+          "name": "open_pull_request",
+          "arguments": "{\"title\": \"Patch Postgres from 17.11 to 17.12\", \"body\": \"What changes: postgres_version in layer 30-data goes from 17.11 to 17.12. The Postgres pod restarts once on the new image.\\n\\nWhy now: advisory PG-17.12 says that minor release 17.12 is pending. Minor releases contain bug and security fixes only.\\n\\nRollback: revert this pull request. A minor release does not change the data format, so the old image starts on the same volume.\"}"
+        }
+      }
+    ]
+  },
+  {
+    "content": "The pull request is open. The change sets postgres_version to 17.12 in layer 30-data."
+  }
+]

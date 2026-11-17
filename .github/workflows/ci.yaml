@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go build, vet and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+      - name: Check formatting
+        run: test -z "$(gofmt -l cmd internal apps/paperboat)"
+      - name: Vet and test the control plane
+        run: |
+          go vet ./...
+          go test ./...
+      - name: Vet and test Paperboat
+        working-directory: apps/paperboat
+        run: |
+          go vet ./...
+          go test ./...
+
+  policy:
+    name: Rego policy tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: open-policy-agent/setup-opa@b2b258e089860efaadaaf71bf6e3aecb4a3eeff1 # v2.4.0
+        with:
+          version: 1.22.4
+      - run: opa check runbooks/policy
+      - run: opa test runbooks/policy
+
+  platform:
+    name: OpenTofu format and validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cloud: [local, aws, gcp, azure]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: 1.12.3
+      - run: tofu fmt -check -recursive platform
+      - name: Validate each layer
+        env:
+          CLOUD: ${{ matrix.cloud }}
+        run: |
+          set -euo pipefail
+          if [ ! -d "platform/stacks/${CLOUD}" ]; then
+            echo "platform/stacks/${CLOUD} does not exist yet; nothing to validate"
+            exit 0
+          fi
+          for layer in platform/stacks/"${CLOUD}"/*/; do
+            echo "::group::${layer}"
+            tofu -chdir="${layer}" init -backend=false -input=false
+            tofu -chdir="${layer}" validate
+            echo "::endgroup::"
+          done
+
+  web:
+    name: Dashboard lint, types, tests and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        if: hashFiles('web/package.json') != ''
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Build and check the dashboard
+        if: hashFiles('web/package.json') != ''
+        working-directory: web
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm lint
+          pnpm exec tsc --noEmit
+          pnpm test
+          pnpm build

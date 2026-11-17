@@ -1,0 +1,5 @@
+[
+  {
+    "content": "{\"sentence\": \"Patch the Postgres database from 17.11 to 17.12. The database restarts once.\", \"why\": \"Advisory PG-17.12 says that minor release 17.12 is pending. Minor releases contain bug and security fixes.\", \"downtime\": \"About 20 to 40 seconds while the single Postgres pod restarts on the new image.\", \"user_effect\": \"Paperboat requests fail or wait during the restart. The health check reports unhealthy until Postgres answers.\", \"cost_change\": \"None.\", \"duration\": \"About 2 minutes.\", \"pre_checks\": [\"The plan updates the Postgres StatefulSet in place. It does not replace the volume\", \"A minor release keeps the data format\"], \"backup\": \"Run the db-backup runbook before you approve. The last backup is listed in the timeline.\", \"rollback\": \"Revert the pull request. The 17.11 image starts on the same data volume.\", \"verification\": \"Health check and 40 canary requests after the database answers again.\", \"if_deferred\": \"The database stays on 17.11 and misses the fixes in 17.12.\"}"
+  }
+]

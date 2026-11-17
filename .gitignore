@@ -10,3 +10,4 @@ bin/
 .DS_Store
 site/out/
 web/test-results/
+.claude/worktrees/

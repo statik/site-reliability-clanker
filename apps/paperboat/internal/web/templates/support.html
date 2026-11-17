@@ -1,0 +1,65 @@
+{{define "content"}}
+<div class="split">
+<aside class="panel">
+  <h2>Open a ticket</h2>
+  <form data-api-form="/api/tickets">
+    <label>Customer
+      <select name="customer_id" data-number required>
+        {{range .Data.Customers}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+      </select>
+    </label>
+    <label>Subject
+      <input type="text" name="subject" maxlength="120" required>
+    </label>
+    <label>What the customer said
+      <textarea name="body" rows="3"></textarea>
+    </label>
+    <div class="pair">
+      <label>Channel
+        <select name="channel">
+          <option>phone</option><option selected>email</option><option>chat</option>
+        </select>
+      </label>
+      <label>Priority
+        <select name="priority">
+          <option>low</option><option selected>normal</option><option>high</option>
+          <option>urgent</option>
+        </select>
+      </label>
+    </div>
+    <button type="submit">Open ticket</button>
+  </form>
+</aside>
+<section>
+  <div id="live" data-refresh="5">
+  {{if .LoadError}}
+  <section class="load-error" data-load-error>
+    <h1>The tickets did not load</h1>
+    <p>{{.LoadError}}</p>
+    <p class="hint">This page tries again every few seconds.</p>
+  </section>
+  {{else}}
+  <h1>Support desk</h1>
+  <p class="lede">
+    {{.Data.Open}} open. A ticket that stays open moves up one priority every two minutes.
+  </p>
+  <ul class="tickets">
+    {{range .Data.Tickets}}
+    <li data-ticket="{{.Status}}">
+      <span class="priority" data-priority="{{.Priority}}">{{.Priority}}</span>
+      <a href="/support/{{.ID}}">{{.Subject}}</a>
+      <span class="quiet">
+        {{.Customer}}, {{ago .CreatedAt}},
+        {{.Interactions}} {{if eq .Interactions 1}}message{{else}}messages{{end}}
+      </span>
+      <span class="chip" data-ticket-status="{{.Status}}">{{statusLabel .Status}}</span>
+    </li>
+    {{else}}
+    <li class="empty">No tickets. Customers are happy.</li>
+    {{end}}
+  </ul>
+  {{end}}
+  </div>
+</section>
+</div>
+{{end}}

@@ -1,0 +1,50 @@
+# Namespace-scoped rights. The broker applies this file when the application namespace exists.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: clanker-applier-50-app, namespace: paperboat}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: admin}
+subjects:
+  - {kind: ServiceAccount, name: clanker-applier-50-app, namespace: clanker-system}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: clanker-runbook, namespace: paperboat}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "patch"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: clanker-runbook, namespace: paperboat}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: clanker-runbook}
+subjects:
+  - {kind: ServiceAccount, name: clanker-runbook, namespace: clanker-system}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: clanker-runbook, namespace: paperboat-data}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "configmaps"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create", "get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: clanker-runbook, namespace: paperboat-data}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: clanker-runbook}
+subjects:
+  - {kind: ServiceAccount, name: clanker-runbook, namespace: clanker-system}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: clanker-debugger, namespace: paperboat}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: view}
+subjects:
+  - {kind: ServiceAccount, name: clanker-debugger, namespace: clanker-system}

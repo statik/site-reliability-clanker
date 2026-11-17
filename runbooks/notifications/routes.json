@@ -1,0 +1,53 @@
+{
+  "routes": [
+    {
+      "name": "Approval needed",
+      "types": ["approval.requested"],
+      "channels": ["email", "slack", "teams", "discord"],
+      "audience": "approvers",
+      "urgency": "immediate"
+    },
+    {
+      "name": "Change failed or rolled back",
+      "types": ["apply.failed", "apply.refused", "verify.failed", "rollback.failed"],
+      "channels": ["email", "slack", "teams", "discord"],
+      "audience": "operators",
+      "urgency": "immediate"
+    },
+    {
+      "name": "Incident",
+      "types": ["incident.opened", "incident.escalated", "incident.resolved"],
+      "channels": ["email", "slack", "teams", "discord"],
+      "audience": "operators",
+      "urgency": "immediate"
+    },
+    {
+      "name": "Debug or break-glass access",
+      "types": ["grant.debug_issued"],
+      "channels": ["email", "slack"],
+      "audience": "admins",
+      "urgency": "immediate"
+    },
+    {
+      "name": "Inference spend cap reached",
+      "types": ["agent.budget_reached"],
+      "channels": ["email", "slack"],
+      "audience": "admins",
+      "urgency": "immediate"
+    },
+    {
+      "name": "Changes applied",
+      "types": ["verify.passed"],
+      "channels": ["slack", "email"],
+      "audience": "operators",
+      "urgency": "digest"
+    },
+    {
+      "name": "Drift and overdue patches",
+      "types": ["finding.opened"],
+      "channels": ["slack", "email"],
+      "audience": "operators",
+      "urgency": "digest"
+    }
+  ]
+}

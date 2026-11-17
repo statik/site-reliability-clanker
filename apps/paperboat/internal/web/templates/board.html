@@ -1,0 +1,61 @@
+{{define "content"}}
+<div id="live" data-refresh="20">
+{{if .LoadError}}
+<section class="load-error" data-load-error>
+  <h1>The inventory did not load</h1>
+  <p>{{.LoadError}}</p>
+  <p class="hint">This page tries again every few seconds.</p>
+</section>
+{{else}}
+{{with .Data}}
+<section class="fleet">
+  <div class="fleet-head">
+    <h1>Inventory</h1>
+    <p>{{.Total}} fish in {{len .Tanks}} tanks, updated as it happens</p>
+  </div>
+  <div class="stockbar" id="stockbar" aria-hidden="true">
+    {{range .Statuses}}<span data-status="{{.Key}}" style="flex-grow: {{.Count}}"></span>{{end}}
+  </div>
+  <ul class="legend">
+    {{range .Statuses}}
+    <li data-status="{{.Key}}">
+      <i></i><b data-count="{{.Key}}">{{.Count}}</b> {{statusLabel .Key}}
+    </li>
+    {{end}}
+  </ul>
+</section>
+<section class="tanks">
+  {{range .Tanks}}
+  <article class="tank" data-tank="{{.ID}}">
+    <header>
+      <h2>{{.Name}}</h2>
+      <p>{{.Location}}, {{printf "%.1f" .WaterTempC}} °C</p>
+      <p class="occupancy"><b data-occupancy>{{.Occupancy}}</b> of {{.Capacity}} in the tank</p>
+    </header>
+    <ul class="water">
+      {{range .Fish}}
+      <li class="fish-row" data-fish-id="{{.ID}}" data-status="{{.Status}}">
+        <svg class="fish-glyph" aria-hidden="true"><use href="#fish"/></svg>
+        <span class="fish-name">{{.Name}}</span>
+        <span class="fish-meta">{{.Species}}, {{ageText .AgeDays}}</span>
+        {{if and $.ShowAging .Condition}}
+        {{$limit := deref .RetireAfterDays}}
+        <span class="condition" data-band="{{band (deref .Condition)}}"
+              title="Condition {{deref .Condition}} of 100. Retires after {{$limit}} days">
+          <span class="meter"><span style="width: {{deref .Condition}}%"></span></span>
+          <span class="score">{{deref .Condition}}</span>
+        </span>
+        {{end}}
+        <span class="status" data-status-label>{{statusLabel .Status}}</span>
+      </li>
+      {{else}}
+      <li class="empty">No fish live in this tank.</li>
+      {{end}}
+    </ul>
+  </article>
+  {{end}}
+</section>
+{{end}}
+{{end}}
+</div>
+{{end}}

@@ -1,0 +1,57 @@
+[
+  {
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "call_1",
+        "type": "function",
+        "function": {
+          "name": "read_file",
+          "arguments": "{\"repo\": \"paperboat\", \"path\": \"releases/1.2.0-bad.md\"}"
+        }
+      }
+    ]
+  },
+  {
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "call_2",
+        "type": "function",
+        "function": {
+          "name": "read_file",
+          "arguments": "{\"repo\": \"platform-live\", \"path\": \"platform/stacks/local/50-app/terraform.tfvars\"}"
+        }
+      }
+    ]
+  },
+  {
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "call_3",
+        "type": "function",
+        "function": {
+          "name": "set_tfvar",
+          "arguments": "{\"layer\": \"50-app\", \"name\": \"paperboat_version\", \"value\": \"1.2.0-bad\"}"
+        }
+      }
+    ]
+  },
+  {
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "call_4",
+        "type": "function",
+        "function": {
+          "name": "open_pull_request",
+          "arguments": "{\"title\": \"Upgrade Paperboat to 1.2.0 (inventory snapshot)\", \"body\": \"What changes: paperboat_version in layer 50-app goes from 1.1.1 to 1.2.0-bad, the image tag that the release note names for 1.2.0. No schema migration.\\n\\nWhy now: release 1.2.0 is published. The release note says that the inventory is built from a snapshot for each tank.\\n\\nRollback: revert this pull request. The canary check after the apply does this automatically if the error rate is over the limit.\"}"
+        }
+      }
+    ]
+  },
+  {
+    "content": "The pull request is open. The change sets paperboat_version to 1.2.0-bad in layer 50-app."
+  }
+]

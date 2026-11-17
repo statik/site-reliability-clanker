@@ -1,0 +1,5 @@
+[
+  {
+    "content": "{\"sentence\": \"Upgrade Paperboat from 1.1.1 to 1.2.0, which changes how the inventory list is built.\", \"why\": \"Release 1.2.0 is published and this environment runs 1.1.1.\", \"downtime\": \"None expected. Pods are replaced one at a time.\", \"user_effect\": \"The release note promises a faster inventory board. This release changes the most used endpoint, so the canary check matters more than usual.\", \"cost_change\": \"None.\", \"duration\": \"About 2 minutes, plus about 3 minutes if the canary fails and the rollback runs.\", \"pre_checks\": [\"The plan changes one resource: the Helm release of Paperboat\", \"No schema migration\"], \"backup\": \"Not needed. No data changes.\", \"rollback\": \"Automatic. If more than 10 percent of canary requests fail, the pull request is reverted and 1.1.1 is applied again under this approval.\", \"verification\": \"Health check, the running version must be 1.2.0-bad, and 40 canary requests against the inventory endpoint.\", \"if_deferred\": \"Nothing breaks. Customers keep the current inventory board.\"}"
+  }
+]
