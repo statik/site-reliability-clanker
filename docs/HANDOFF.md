@@ -62,17 +62,40 @@ group. Section 12 of the plan records the five decisions that follow from the la
   signing key as files in the data directory; these must move before the unikernel can
   hold no state.
 - **Nanos boot test (2026-11-17, a throwaway probe, on a laptop):** a Go program as a Nanos
-  0.1.56 image read its environment from the image configuration, made an outbound HTTPS
-  request, connected to PostgreSQL 18 and inserted a row, and answered HTTP from the host.
-  A subprocess was refused (`function not implemented`). It ran under QEMU with software
-  emulation; `ops run` with hardware acceleration failed on this machine (`HVF does not
-  support GICv2 emulation`, QEMU 11.1). A file write failed with `no space left on device`,
-  because the image has no free space unless the configuration asks for it.
+  image read its environment from the image configuration, made an outbound HTTPS request,
+  connected to PostgreSQL 18 and inserted a row, and answered HTTP from the host. A
+  subprocess was refused (`function not implemented`). With hardware acceleration the
+  report came about one second after QEMU started. A file write failed with `no space left
+  on device`, because the image has no free space unless the configuration asks for it.
 - **PostgreSQL (2026-11-17):** from an empty data directory, the first deployment and the ten
   scenes of the scripted month ran on PostgreSQL with the live model. The thirteen work
   items ended in the expected states and the audit chain verified at 310 events.
 - On a cloud, `clanker up` starts in a standby mode: it serves the dashboard and proposes
   no deployment.
+
+## Nanos on a laptop
+
+`ops/run-local.sh <binary> [port]` runs a static `linux/arm64` binary as a Nanos unikernel
+under QEMU on an Apple Silicon Mac. Set `NANOS_CONFIG` to an `ops` configuration file to give
+the program its environment.
+
+The script starts QEMU directly, because `ops run` fails on this machine (macOS on Apple
+Silicon, QEMU 11.1.3). Three separate defects are the cause. The notes come from the owner's
+earlier unikernel work in another repository.
+
+| # | Defect | Workaround |
+|---|---|---|
+| 1 | `ops` passes `gic-version=2`. From QEMU 11.1, HVF on arm64 uses the vGIC of the kernel, which is GICv3 only. QEMU stops with "HVF does not support GICv2 emulation" | `-accel hvf,kernel-irqchip=off` |
+| 2 | `ops run --accel=false` passes `-cpu host`, which is valid only with acceleration. QEMU stops with "Invalid CPU model: host" | `-accel tcg -cpu max` |
+| 3 | Nanos 0.1.56 for arm64 crashes in early boot on a real Apple CPU. Emulation does not show the fault | The nightly kernel (`ops build -n`), which has the fix |
+
+Limits:
+
+- The nightly kernel changes each day. Use it on a laptop only. An image for EC2 must use a
+  release.
+- The result is for arm64 on a laptop. It says nothing about x86 or EC2.
+- The arm64 kernel does not boot with GICv3 when QEMU starts it with `-kernel`.
+- With QEMU's user networking, the host is `10.0.2.2` from inside the unikernel.
 
 ## What is validated only
 
