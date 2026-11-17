@@ -219,7 +219,10 @@ func (s *Server) postDeploy(r *http.Request) (any, error) {
 	s.mu.Lock()
 	state, reviewed := s.state, len(s.review) > 0
 	s.mu.Unlock()
-	if !reviewed {
+	// A local control plane that was set up before is only started again: nothing new
+	// is created, so there is nothing to review.
+	restart := state.Target == TargetLocal && state.Deployed
+	if !reviewed && !restart {
 		return nil, invalid("review what will be created before you create it")
 	}
 	if state.KeyChoice == "" {

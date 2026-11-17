@@ -36,22 +36,30 @@ const press = (name) => page.getByRole("button", { name, exact: true }).click();
 
 await page.goto(address);
 if (new URL(page.url()).search !== "") problems.push("the token stayed in the address bar");
-await heading("Where do you want Clanker to run?");
-await shoot("target");
-await page.getByText("This machine", { exact: true }).click();
-await press("Continue");
+await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+const first = await page.getByRole("heading", { level: 1 }).first().textContent();
+if (first === "Where do you want Clanker to run?") {
+  await shoot("target");
+  await page.getByText("This machine", { exact: true }).click();
+  await press("Continue");
 
-await heading(/This machine is ready|needs a few things/);
-await shoot("checks");
-await press("Continue");
+  await heading(/This machine is ready|needs a few things/);
+  await shoot("checks");
+  await press("Continue");
 
-await heading("Give Clanker a language model.");
-await shoot("key");
-await press("Continue without a key");
+  await heading("Give Clanker a language model.");
+  await shoot("key");
+  await press("Continue without a key");
 
-await heading("This is what the wizard will create.");
-await shoot("review");
-await press("Start the control plane");
+  await heading("This is what the wizard will create.");
+  await shoot("review");
+  await press("Start the control plane");
+} else {
+  // This machine was set up before, so the wizard opens on its last page.
+  await heading("The control plane does not answer here.");
+  await shoot("set-up-before");
+  await press("Start the control plane");
+}
 
 await heading("The control plane runs. It is yours now.").catch(async (error) => {
   await shoot("create-failed");

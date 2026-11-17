@@ -436,6 +436,7 @@ function drawHandover() {
       up ? el("a", { href: aws ? view.dashboard_url : `${view.dashboard_url}/approvals`, target: "_blank", rel: "noopener" },
         button(aws ? "Open the dashboard" : "Open the first approval", "primary", () => {})) : null,
       aws && !up ? button("Open the tunnel again", "primary", reconnect, jobRunning()) : null,
+      !aws && !up ? button("Start the control plane", "primary", startDeploy, jobRunning()) : null,
       aws ? button("Remove everything", "danger", startDestroy, jobRunning()) : null),
     aws ? null : el("p", { class: "help" }, "To stop, press Ctrl+C in the terminal. To start again later, run ",
       el("code", {}, "clanker up"), ". To remove the local environment, run ", el("code", {}, "clanker destroy --env local"), "."),
