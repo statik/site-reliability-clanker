@@ -6,15 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"os"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/audit"
 	"github.com/statik/site-reliability-clanker/internal/broker"
+	"github.com/statik/site-reliability-clanker/internal/jobspec"
 	"github.com/statik/site-reliability-clanker/internal/policy"
-	"github.com/statik/site-reliability-clanker/internal/runner"
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
 
@@ -247,7 +246,7 @@ func (o *Orchestrator) Apply(ctx context.Context, id string) (WorkItem, error) {
 		switch {
 		case err == nil:
 			continue
-		case errors.Is(err, runner.ErrStalePlan), errors.Is(err, errOutsideEnvelope):
+		case errors.Is(err, jobspec.ErrStalePlan), errors.Is(err, errOutsideEnvelope):
 			return o.backToApproval(ctx, wi, err)
 		default:
 			if stateErr := o.setState(&wi, StateFailed, "runner", err.Error()); stateErr != nil {
@@ -374,7 +373,7 @@ func (o *Orchestrator) applyPlan(ctx context.Context, wi WorkItem, plan Plan,
 	if err != nil {
 		return err
 	}
-	applyErr := o.runApply(ctx, wi, plan, grant, logFile)
+	applyErr := o.runApply(ctx, wi, plan, grant, &job, logFile)
 	o.endJob(job, logFile, applyErr)
 	outcome := "used"
 	if applyErr != nil {
@@ -401,18 +400,19 @@ func (o *Orchestrator) applyPlan(ctx context.Context, wi WorkItem, plan Plan,
 }
 
 func (o *Orchestrator) runApply(ctx context.Context, wi WorkItem, plan Plan, grant broker.Grant,
-	logFile *os.File) error {
-	checkout, err := o.checkout(wi)
+	job *Job, logFile *jobLog) error {
+	spec, err := o.layerJob(wi, jobspec.KindApply, plan.Layer)
 	if err != nil {
 		return err
 	}
-	// The runner presents what it holds. The broker compares it with the grant.
-	held, err := runner.FileSHA256(plan.PlanPath)
+	planFile, err := o.planFile(plan.ID)
 	if err != nil {
 		return err
 	}
+	// The broker compares the hash of the stored plan with the grant. The runner gets
+	// these same bytes and compares them again before it applies.
 	cred, err := o.Broker.Exchange(ctx, grant, broker.Presentation{Commit: wi.Commit,
-		PlanSHA256: held})
+		PlanSHA256: jobspec.SHA256(planFile)})
 	if err != nil {
 		return fmt.Errorf("the broker refused the grant: %w", err)
 	}
@@ -421,7 +421,11 @@ func (o *Orchestrator) runApply(ctx context.Context, wi WorkItem, plan Plan, gra
 		WorkItem: wi.ID, Summary: fmt.Sprintf("Apply of %s started", plan.Layer),
 		Data: map[string]any{"grant": grant.ID, "credential": cred.Mechanism,
 			"plan_sha256": plan.SHA256}})
-	return o.Runner.Apply(ctx, runner.Job{Env: wi.Env, Cloud: o.Envs[wi.Env].Cloud,
-		Layer: plan.Layer, Checkout: checkout, KubeConfig: cred.KubeConfig, Log: logFile},
-		plan.PlanPath, grant.PlanSHA256)
+	spec.KubeConfig, spec.Log = cred.KubeConfig, logFile
+	spec.Plan, spec.PlanSHA256 = planFile, grant.PlanSHA256
+	result, err := o.run(ctx, job, spec)
+	if err != nil {
+		return err
+	}
+	return store.SetLayerOutputs(o.DB, wi.Env, plan.Layer, result.Outputs, o.now())
 }

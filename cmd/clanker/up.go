@@ -20,6 +20,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/audit"
 	"github.com/statik/site-reliability-clanker/internal/broker"
 	"github.com/statik/site-reliability-clanker/internal/detect"
+	"github.com/statik/site-reliability-clanker/internal/dispatch"
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/monitor"
 	"github.com/statik/site-reliability-clanker/internal/notify"
@@ -170,18 +171,21 @@ func adapters(db *sql.DB, o options) ([]notify.Adapter, error) {
 
 // components holds everything that `up` starts.
 type components struct {
-	db       *sql.DB
-	clock    *sim.Clock
-	log      *audit.Log
-	forge    *forge.Forge
-	runner   *runner.Runner
-	broker   *broker.Broker
-	orch     *orchestrator.Orchestrator
-	monitor  *monitor.Monitor
-	notifier *notify.Notifier
-	agent    *agent.Agent
-	detector *detect.Detector
-	sim      *sim.Simulator
+	db    *sql.DB
+	clock *sim.Clock
+	log   *audit.Log
+	forge *forge.Forge
+	// runner reads the files of the runner directory. Only the local target uses it, for
+	// the administrator kubeconfig and the image registry.
+	runner     *runner.Runner
+	dispatcher *dispatch.Dispatcher
+	broker     *broker.Broker
+	orch       *orchestrator.Orchestrator
+	monitor    *monitor.Monitor
+	notifier   *notify.Notifier
+	agent      *agent.Agent
+	detector   *detect.Detector
+	sim        *sim.Simulator
 }
 
 func build(o options) (*components, error) {
@@ -205,8 +209,8 @@ func build(o options) (*components, error) {
 	if c.runner, err = runner.New(o.dataDir); err != nil {
 		return nil, err
 	}
-	if o.demo {
-		c.runner.ExtraEnv = []string{"TF_VAR_admin_token=" + demoAdminToken}
+	if c.dispatcher, err = newDispatcher(o); err != nil {
+		return nil, err
 	}
 	adminKubeconfig := func(env string) (string, error) {
 		path := filepath.Join(c.runner.StateDir(env), "kubeconfig")
@@ -220,9 +224,12 @@ func build(o options) (*components, error) {
 		return nil, err
 	}
 	c.orch = &orchestrator.Orchestrator{DB: c.db, Audit: c.log, Forge: c.forge,
-		Runner: c.runner, Broker: c.broker, Clock: c.clock, DataDir: o.dataDir,
+		Runners: c.dispatcher, Broker: c.broker, Clock: c.clock, DataDir: o.dataDir,
 		Envs: map[string]orchestrator.EnvConfig{o.env: {Name: o.env, Cloud: o.cloud}}}
-	c.monitor = monitor.New(c.db, c.runner, c.clock)
+	if o.demo {
+		c.orch.JobVariables = map[string]string{"TF_VAR_admin_token": demoAdminToken}
+	}
+	c.monitor = monitor.New(c.db, c.clock)
 	if err := seedUsers(c.db); err != nil {
 		return nil, err
 	}
@@ -370,7 +377,7 @@ func up(ctx context.Context, o options) error {
 	defer c.db.Close()
 	server := &api.Server{Orch: c.orch, Audit: c.log, Forge: c.forge, Broker: c.broker,
 		Monitor: c.monitor, Notifier: c.notifier, Agent: c.agent, Detector: c.detector,
-		Sim: c.sim, Clock: c.clock}
+		Sim: c.sim, Clock: c.clock, Runners: c.dispatcher.Handler()}
 	webDir := filepath.Join(o.sourceDir, "web", "dist")
 	if _, err := os.Stat(filepath.Join(webDir, "index.html")); err == nil {
 		server.Web = os.DirFS(webDir).(fs.FS)

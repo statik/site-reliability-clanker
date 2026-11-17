@@ -1,9 +1,11 @@
-package runner
+// Package planfacts reads the facts of an OpenTofu plan from its JSON form: what changes,
+// and how. The control plane shows these facts and gives them to the policy. They come
+// from the plan, never from a language model.
+package planfacts
 
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 )
@@ -65,15 +67,11 @@ func actionName(actions []string) string {
 	}
 }
 
-// ReadFacts extracts the facts from a plan JSON file.
-func ReadFacts(jsonPath string) (Facts, error) {
-	raw, err := os.ReadFile(jsonPath)
-	if err != nil {
-		return Facts{}, fmt.Errorf("read plan JSON %s: %w", jsonPath, err)
-	}
+// Parse extracts the facts from the JSON form of a plan.
+func Parse(raw []byte) (Facts, error) {
 	var plan planJSON
 	if err := json.Unmarshal(raw, &plan); err != nil {
-		return Facts{}, fmt.Errorf("decode plan JSON %s: %w", jsonPath, err)
+		return Facts{}, fmt.Errorf("decode plan JSON: %w", err)
 	}
 	facts := Facts{Resources: []ResourceChange{}, Outputs: []string{}}
 	for _, rc := range plan.ResourceChanges {

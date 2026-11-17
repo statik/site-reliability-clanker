@@ -6,9 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -26,8 +24,8 @@ const identityNamespace = "clanker-system"
 // Credential is what the broker gives a runner for one grant.
 type Credential struct {
 	GrantID string
-	// KubeConfig is the path of a kubeconfig with a short-lived token. It is empty for a
-	// layer that needs no cluster credential.
+	// KubeConfig is the text of a kubeconfig with a short-lived token. It is empty for a
+	// layer that needs no cluster credential. The broker keeps no copy.
 	KubeConfig string
 	// Mechanism says in plain words what the credential is.
 	Mechanism string
@@ -97,17 +95,19 @@ func (b *Broker) Exchange(ctx context.Context, g Grant, p Presentation) (Credent
 	if err != nil {
 		return Credential{}, fmt.Errorf("issue token for %s under grant %s: %w", account, g.ID, err)
 	}
-	path, err := b.writeKubeconfig(ctx, admin, g.ID, account, strings.TrimSpace(token))
+	text, err := grantKubeconfig(ctx, admin, g.ID, account, strings.TrimSpace(token))
 	if err != nil {
 		return Credential{}, err
 	}
-	cred.KubeConfig = path
+	cred.KubeConfig = text
 	cred.Mechanism = fmt.Sprintf("Kubernetes TokenRequest for service account %s, lifetime %s",
 		account, lifetime.Round(time.Second))
 	return cred, b.setStatus(g.ID, "active", false)
 }
 
-func (b *Broker) writeKubeconfig(ctx context.Context, admin, grantID, user, token string) (string, error) {
+// grantKubeconfig returns a kubeconfig for the cluster of the administrator kubeconfig,
+// with the token of the grant as its only user.
+func grantKubeconfig(ctx context.Context, admin, grantID, user, token string) (string, error) {
 	raw, err := kubectl(ctx, admin, nil, "config", "view", "--raw", "--minify", "-o", "json")
 	if err != nil {
 		return "", fmt.Errorf("read cluster address for grant %s: %w", grantID, err)
@@ -130,21 +130,12 @@ func (b *Broker) writeKubeconfig(ctx context.Context, admin, grantID, user, toke
 	if err != nil {
 		return "", fmt.Errorf("encode kubeconfig for grant %s: %w", grantID, err)
 	}
-	path := filepath.Join(b.credsDir, grantID+".kubeconfig")
-	if err := os.WriteFile(path, out, 0o600); err != nil {
-		return "", fmt.Errorf("write kubeconfig for grant %s: %w", grantID, err)
-	}
-	return path, nil
+	return string(out), nil
 }
 
-// Revoke ends a grant and removes its credential. For an apply, runbook or debug grant on a
-// cluster it also deletes and recreates the service account, which makes every token of that
-// account invalid at once.
+// Revoke ends a grant. For an apply, runbook or debug grant on a cluster it also deletes and
+// recreates the service account, which makes every token of that account invalid at once.
 func (b *Broker) Revoke(ctx context.Context, g Grant, outcome string) error {
-	path := filepath.Join(b.credsDir, g.ID+".kubeconfig")
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("remove credential of grant %s: %w", g.ID, err)
-	}
 	if err := b.setStatus(g.ID, outcome, true); err != nil {
 		return err
 	}

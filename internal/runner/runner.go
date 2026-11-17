@@ -1,10 +1,17 @@
-// Package runner executes OpenTofu for one layer of one environment. It shells out to the
-// same tofu CLI that an operator uses. It never decides whether a change is permitted: the
+// Package runner executes the jobs of the control plane: OpenTofu for one layer of one
+// environment, a runbook script, or a read-only kubectl command. It starts the same
+// programs that an operator uses. It never decides whether a change is permitted: the
 // orchestrator gives it a credential from the access broker and a saved plan to apply.
+//
+// The runner owns every file of a job. A job comes in as values (the archive of a commit,
+// the bytes of a plan, the text of a credential) and its results go back as values, so the
+// runner can run in another process or on another machine than the orchestrator.
 package runner
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -15,37 +22,44 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/statik/site-reliability-clanker/internal/jobspec"
 )
 
 // ErrStalePlan means that the state changed after the plan was saved.
-var ErrStalePlan = errors.New("the saved plan is stale")
+var ErrStalePlan = jobspec.ErrStalePlan
 
-// Runner runs OpenTofu commands.
+// Runner runs the jobs.
 type Runner struct {
 	// StateRoot holds one directory of state for each environment.
 	StateRoot string
 	// PluginCache is shared by all jobs so that each provider downloads once.
 	PluginCache string
+	// WorkRoot holds the unpacked checkouts and the temporary files of the jobs.
+	WorkRoot string
 	// ExtraEnv is added to the environment of every job, for example TF_VAR_admin_token.
 	ExtraEnv []string
 
 	digestOnce sync.Once
 	digest     string
 	dockerHost string
+	unpack     sync.Mutex
 }
 
-// New returns a runner. dataDir is the data directory of the control plane.
-func New(dataDir string) (*Runner, error) {
+// New returns a runner that keeps its files below dir.
+func New(dir string) (*Runner, error) {
 	r := &Runner{
-		StateRoot:   filepath.Join(dataDir, "state"),
-		PluginCache: filepath.Join(dataDir, "plugin-cache"),
+		StateRoot:   filepath.Join(dir, "state"),
+		PluginCache: filepath.Join(dir, "plugin-cache"),
+		WorkRoot:    filepath.Join(dir, "work"),
 	}
-	for _, dir := range []string{r.StateRoot, r.PluginCache} {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return nil, fmt.Errorf("create runner directory %s: %w", dir, err)
+	for _, sub := range []string{r.StateRoot, r.PluginCache, r.WorkRoot} {
+		if err := os.MkdirAll(sub, 0o755); err != nil {
+			return nil, fmt.Errorf("create runner directory %s: %w", sub, err)
 		}
 	}
 	out, err := exec.Command("docker", "context", "inspect", "--format",
@@ -56,15 +70,26 @@ func New(dataDir string) (*Runner, error) {
 	return r, nil
 }
 
-// Job identifies the layer to run and where its code and credential are.
+// Checkout is the tree of one commit that a job works on.
+type Checkout struct {
+	// ID names the checkout. Two jobs with the same ID share one unpacked directory, so a
+	// plan and its apply run in the same place.
+	ID string
+	// Archive is the tree as a gzip-compressed tar file.
+	Archive []byte
+	// Dir is a directory that holds the tree already. The command line uses it for a
+	// checkout of the repository. When it is set, ID and Archive are not used.
+	Dir string
+}
+
+// Job is one OpenTofu run.
 type Job struct {
-	Env   string
-	Cloud string
-	Layer string
-	// Checkout is the root of the exported platform-live commit.
-	Checkout string
-	// KubeConfig is the credential file from the access broker. Empty when the layer
-	// needs no cluster credential.
+	Env      string
+	Cloud    string
+	Layer    string
+	Checkout Checkout
+	// KubeConfig is the text of the credential file from the access broker. It is empty
+	// when the layer needs no cluster credential.
 	KubeConfig string
 	Log        io.Writer
 }
@@ -72,11 +97,127 @@ type Job struct {
 // StateDir returns the state directory of an environment.
 func (r *Runner) StateDir(env string) string { return filepath.Join(r.StateRoot, env) }
 
-func (r *Runner) stackDir(j Job) string {
-	return filepath.Join(j.Checkout, "platform", "stacks", j.Cloud, j.Layer)
+// checkoutDir returns the directory with the tree of the checkout. It unpacks the archive
+// on the first use of an ID.
+func (r *Runner) checkoutDir(c Checkout) (string, error) {
+	if c.Dir != "" {
+		return c.Dir, nil
+	}
+	if c.ID == "" || strings.Contains(c.ID, "..") || filepath.IsAbs(c.ID) {
+		return "", fmt.Errorf("the checkout ID %q is not valid", c.ID)
+	}
+	r.unpack.Lock()
+	defer r.unpack.Unlock()
+	dir := filepath.Join(r.WorkRoot, "checkouts", filepath.FromSlash(c.ID))
+	marker := filepath.Join(dir, ".complete")
+	if _, err := os.Stat(marker); err == nil {
+		return dir, nil
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		return "", fmt.Errorf("remove incomplete checkout %s: %w", dir, err)
+	}
+	if err := untar(c.Archive, dir); err != nil {
+		return "", fmt.Errorf("unpack checkout %s: %w", c.ID, err)
+	}
+	if err := os.WriteFile(marker, nil, 0o644); err != nil {
+		return "", fmt.Errorf("mark checkout %s as complete: %w", c.ID, err)
+	}
+	return dir, nil
 }
 
-func (r *Runner) environ(j Job) []string {
+func untar(archive []byte, dir string) error {
+	unzipped, err := gzip.NewReader(bytes.NewReader(archive))
+	if err != nil {
+		return fmt.Errorf("open the archive: %w", err)
+	}
+	reader := tar.NewReader(unzipped)
+	for {
+		header, err := reader.Next()
+		if errors.Is(err, io.EOF) {
+			return os.MkdirAll(dir, 0o755)
+		}
+		if err != nil {
+			return fmt.Errorf("read the archive: %w", err)
+		}
+		name := filepath.Clean(header.Name)
+		if filepath.IsAbs(name) || name == ".." || strings.HasPrefix(name, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("the archive has an entry outside its directory: %q", header.Name)
+		}
+		path := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return fmt.Errorf("create %s: %w", filepath.Dir(path), err)
+		}
+		switch header.Typeflag {
+		case tar.TypeReg:
+			content, err := io.ReadAll(reader)
+			if err != nil {
+				return fmt.Errorf("read %s from the archive: %w", header.Name, err)
+			}
+			mode := os.FileMode(0o644)
+			if header.Mode&0o111 != 0 {
+				mode = 0o755
+			}
+			if err := os.WriteFile(path, content, mode); err != nil {
+				return fmt.Errorf("write %s: %w", path, err)
+			}
+		case tar.TypeSymlink:
+			if err := os.Symlink(header.Linkname, path); err != nil {
+				return fmt.Errorf("link %s: %w", path, err)
+			}
+		}
+	}
+}
+
+// credentialFile writes the text of a credential to a file that only this user can read.
+// The returned function removes it. An empty text gives an empty path.
+func (r *Runner) credentialFile(text string) (string, func(), error) {
+	if text == "" {
+		return "", func() {}, nil
+	}
+	dir := filepath.Join(r.WorkRoot, "credentials")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", nil, fmt.Errorf("create credential directory %s: %w", dir, err)
+	}
+	file, err := os.CreateTemp(dir, "*.kubeconfig")
+	if err != nil {
+		return "", nil, fmt.Errorf("create credential file: %w", err)
+	}
+	remove := func() { os.Remove(file.Name()) }
+	if _, err := file.WriteString(text); err != nil {
+		file.Close()
+		remove()
+		return "", nil, fmt.Errorf("write credential file: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		remove()
+		return "", nil, fmt.Errorf("close credential file: %w", err)
+	}
+	return file.Name(), remove, nil
+}
+
+// run is one prepared job: where its stack is, and its environment.
+type run struct {
+	job     Job
+	stack   string
+	environ []string
+}
+
+func (r *Runner) prepare(j Job) (run, func(), error) {
+	checkout, err := r.checkoutDir(j.Checkout)
+	if err != nil {
+		return run{}, nil, err
+	}
+	stack := filepath.Join(checkout, "platform", "stacks", j.Cloud, j.Layer)
+	if _, err := os.Stat(stack); err != nil {
+		return run{}, nil, fmt.Errorf("find stack for %s/%s in the checkout: %w", j.Env, j.Layer, err)
+	}
+	if err := os.MkdirAll(r.StateDir(j.Env), 0o755); err != nil {
+		return run{}, nil, fmt.Errorf("create state directory for %s: %w", j.Env, err)
+	}
+	kubeconfig, remove, err := r.credentialFile(j.KubeConfig)
+	if err != nil {
+		return run{}, nil, err
+	}
 	env := append(os.Environ(),
 		"TF_IN_AUTOMATION=1",
 		"TF_INPUT=0",
@@ -88,23 +229,23 @@ func (r *Runner) environ(j Job) []string {
 	if r.dockerHost != "" {
 		env = append(env, "DOCKER_HOST="+r.dockerHost)
 	}
-	if j.KubeConfig != "" {
-		env = append(env, "KUBE_CONFIG_PATH="+j.KubeConfig, "KUBECONFIG="+j.KubeConfig)
+	if kubeconfig != "" {
+		env = append(env, "KUBE_CONFIG_PATH="+kubeconfig, "KUBECONFIG="+kubeconfig)
 	} else {
 		env = append(env, "KUBE_CONFIG_PATH=", "KUBECONFIG=/dev/null")
 	}
-	return env
+	return run{job: j, stack: stack, environ: env}, remove, nil
 }
 
-func (r *Runner) tofu(ctx context.Context, j Job, capture io.Writer, args ...string) error {
+func (r *Runner) tofu(ctx context.Context, p run, log, capture io.Writer, args ...string) error {
 	cmd := exec.CommandContext(ctx, "tofu", args...)
-	cmd.Dir = r.stackDir(j)
-	cmd.Env = r.environ(j)
+	cmd.Dir = p.stack
+	cmd.Env = p.environ
 	var tail bytes.Buffer
 	writers := []io.Writer{&tail}
-	if j.Log != nil {
-		fmt.Fprintf(j.Log, "$ tofu %s\n", strings.Join(args, " "))
-		writers = append(writers, j.Log)
+	if log != nil {
+		fmt.Fprintf(log, "$ tofu %s\n", strings.Join(args, " "))
+		writers = append(writers, log)
 	}
 	cmd.Stderr = io.MultiWriter(writers...)
 	if capture != nil {
@@ -115,103 +256,127 @@ func (r *Runner) tofu(ctx context.Context, j Job, capture io.Writer, args ...str
 	if err := cmd.Run(); err != nil {
 		text := tail.String()
 		if strings.Contains(text, "Saved plan is stale") {
-			return fmt.Errorf("%w: tofu %s for %s/%s", ErrStalePlan, args[0], j.Env, j.Layer)
+			return fmt.Errorf("%w: tofu %s for %s/%s", ErrStalePlan, args[0], p.job.Env, p.job.Layer)
 		}
 		if len(text) > 1500 {
 			text = text[len(text)-1500:]
 		}
-		return fmt.Errorf("tofu %s for %s/%s: %w: %s", args[0], j.Env, j.Layer, err,
+		return fmt.Errorf("tofu %s for %s/%s: %w: %s", args[0], p.job.Env, p.job.Layer, err,
 			strings.TrimSpace(text))
 	}
 	return nil
 }
 
-func (r *Runner) init(ctx context.Context, j Job) error {
-	if err := os.MkdirAll(r.StateDir(j.Env), 0o755); err != nil {
-		return fmt.Errorf("create state directory for %s: %w", j.Env, err)
-	}
-	if _, err := os.Stat(r.stackDir(j)); err != nil {
-		return fmt.Errorf("find stack for %s/%s in the checkout: %w", j.Env, j.Layer, err)
-	}
-	statePath := filepath.Join(r.StateDir(j.Env), j.Layer+".tfstate")
-	return r.tofu(ctx, j, nil, "init", "-no-color", "-input=false",
+func (r *Runner) init(ctx context.Context, p run) error {
+	statePath := filepath.Join(r.StateDir(p.job.Env), p.job.Layer+".tfstate")
+	return r.tofu(ctx, p, p.job.Log, nil, "init", "-no-color", "-input=false",
 		"-backend-config=path="+statePath)
 }
 
-// PlanResult describes a saved plan.
+// PlanResult is a saved plan.
 type PlanResult struct {
-	PlanPath string
-	JSONPath string
-	SHA256   string
+	// Plan is the plan file of OpenTofu. Apply needs exactly these bytes.
+	Plan []byte
+	// JSON is the same plan in the JSON form.
+	JSON []byte
+	// SHA256 is the hash of Plan. It identifies exactly what an approver agrees to.
+	SHA256 string
 }
 
-// Plan runs init and plan for the layer. It saves the plan file and its JSON form in outDir.
-// The SHA-256 of the plan file identifies exactly what an approver agrees to.
-func (r *Runner) Plan(ctx context.Context, j Job, outDir string) (PlanResult, error) {
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
-		return PlanResult{}, fmt.Errorf("create plan directory %s: %w", outDir, err)
+// planFile makes an empty temporary directory for one plan file.
+func (r *Runner) planFile(layer string) (string, func(), error) {
+	dir, err := os.MkdirTemp(r.WorkRoot, "plan-")
+	if err != nil {
+		return "", nil, fmt.Errorf("create plan directory: %w", err)
 	}
-	if err := r.init(ctx, j); err != nil {
+	return filepath.Join(dir, layer+".tfplan"), func() { os.RemoveAll(dir) }, nil
+}
+
+// Plan runs init and plan for the layer and returns the saved plan.
+func (r *Runner) Plan(ctx context.Context, j Job) (PlanResult, error) {
+	p, done, err := r.prepare(j)
+	if err != nil {
 		return PlanResult{}, err
 	}
-	result := PlanResult{
-		PlanPath: filepath.Join(outDir, j.Layer+".tfplan"),
-		JSONPath: filepath.Join(outDir, j.Layer+".plan.json"),
-	}
-	err := r.tofu(ctx, j, nil, "plan", "-no-color", "-input=false", "-lock-timeout=60s",
-		"-out="+result.PlanPath)
+	defer done()
+	path, remove, err := r.planFile(j.Layer)
 	if err != nil {
+		return PlanResult{}, err
+	}
+	defer remove()
+	if err := r.init(ctx, p); err != nil {
+		return PlanResult{}, err
+	}
+	if err := r.tofu(ctx, p, j.Log, nil, "plan", "-no-color", "-input=false",
+		"-lock-timeout=60s", "-out="+path); err != nil {
 		return PlanResult{}, err
 	}
 	var planJSON bytes.Buffer
-	quiet := j
-	quiet.Log = nil
-	if err := r.tofu(ctx, quiet, &planJSON, "show", "-json", result.PlanPath); err != nil {
+	if err := r.tofu(ctx, p, nil, &planJSON, "show", "-json", path); err != nil {
 		return PlanResult{}, err
 	}
-	if err := os.WriteFile(result.JSONPath, planJSON.Bytes(), 0o600); err != nil {
-		return PlanResult{}, fmt.Errorf("write plan JSON %s: %w", result.JSONPath, err)
-	}
-	sum, err := FileSHA256(result.PlanPath)
+	plan, err := os.ReadFile(path)
 	if err != nil {
-		return PlanResult{}, err
+		return PlanResult{}, fmt.Errorf("read the saved plan of %s/%s: %w", j.Env, j.Layer, err)
 	}
-	result.SHA256 = sum
-	return result, nil
+	return PlanResult{Plan: plan, JSON: planJSON.Bytes(), SHA256: jobspec.SHA256(plan)}, nil
 }
 
-// Apply applies a saved plan. It checks first that the plan file still has the approved hash.
-func (r *Runner) Apply(ctx context.Context, j Job, planPath, wantSHA256 string) error {
-	sum, err := FileSHA256(planPath)
-	if err != nil {
-		return err
-	}
-	if sum != wantSHA256 {
-		return fmt.Errorf("apply %s/%s: plan file hash %s is not the approved hash %s",
+// Apply applies a saved plan and returns the outputs of the layer. It checks first that
+// the plan has the approved hash. It never makes a new plan.
+func (r *Runner) Apply(ctx context.Context, j Job, plan []byte, wantSHA256 string) (map[string]any, error) {
+	if sum := jobspec.SHA256(plan); sum != wantSHA256 {
+		return nil, fmt.Errorf("apply %s/%s: plan hash %s is not the approved hash %s",
 			j.Env, j.Layer, sum, wantSHA256)
 	}
-	if err := r.init(ctx, j); err != nil {
-		return err
+	p, done, err := r.prepare(j)
+	if err != nil {
+		return nil, err
 	}
-	return r.tofu(ctx, j, nil, "apply", "-no-color", "-input=false", "-lock-timeout=60s",
-		planPath)
+	defer done()
+	path, remove, err := r.planFile(j.Layer)
+	if err != nil {
+		return nil, err
+	}
+	defer remove()
+	if err := os.WriteFile(path, plan, 0o600); err != nil {
+		return nil, fmt.Errorf("write the plan of %s/%s: %w", j.Env, j.Layer, err)
+	}
+	if err := r.init(ctx, p); err != nil {
+		return nil, err
+	}
+	if err := r.tofu(ctx, p, j.Log, nil, "apply", "-no-color", "-input=false",
+		"-lock-timeout=60s", path); err != nil {
+		return nil, err
+	}
+	return r.Outputs(j.Env, j.Layer)
 }
 
 // Destroy removes every resource of a layer. Only the CLI teardown calls it.
 func (r *Runner) Destroy(ctx context.Context, j Job) error {
-	if err := r.init(ctx, j); err != nil {
+	p, done, err := r.prepare(j)
+	if err != nil {
 		return err
 	}
-	return r.tofu(ctx, j, nil, "destroy", "-no-color", "-input=false", "-auto-approve")
+	defer done()
+	if err := r.init(ctx, p); err != nil {
+		return err
+	}
+	return r.tofu(ctx, p, j.Log, nil, "destroy", "-no-color", "-input=false", "-auto-approve")
 }
 
 // ApplyDirect plans and applies a layer in one step with the credentials of the operator.
 // Only `clanker bootstrap` calls it, for layer 00-bootstrap.
 func (r *Runner) ApplyDirect(ctx context.Context, j Job) error {
-	if err := r.init(ctx, j); err != nil {
+	p, done, err := r.prepare(j)
+	if err != nil {
 		return err
 	}
-	return r.tofu(ctx, j, nil, "apply", "-no-color", "-input=false", "-auto-approve")
+	defer done()
+	if err := r.init(ctx, p); err != nil {
+		return err
+	}
+	return r.tofu(ctx, p, j.Log, nil, "apply", "-no-color", "-input=false", "-auto-approve")
 }
 
 // Outputs reads the outputs of a layer from its state file. A layer that was never applied
@@ -253,18 +418,60 @@ func (r *Runner) Outputs(env, layer string) (map[string]any, error) {
 	return outputs, nil
 }
 
-// FileSHA256 returns the hex SHA-256 of a file.
-func FileSHA256(path string) (string, error) {
-	f, err := os.Open(path)
+// RunbookJob is one run of a script from the runbooks repository.
+type RunbookJob struct {
+	Env string
+	// Checkout is the runbooks repository at the commit of the work item.
+	Checkout Checkout
+	// Name is the name of the script in the jobs directory, without ".sh".
+	Name       string
+	Params     map[string]string
+	KubeConfig string
+	Log        io.Writer
+}
+
+// Runbook runs the script with the credential and the parameters in its environment.
+func (r *Runner) Runbook(ctx context.Context, j RunbookJob) error {
+	checkout, err := r.checkoutDir(j.Checkout)
 	if err != nil {
-		return "", fmt.Errorf("open %s to hash it: %w", path, err)
+		return err
 	}
-	defer f.Close()
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", fmt.Errorf("hash %s: %w", path, err)
+	script := filepath.Join(checkout, "jobs", j.Name+".sh")
+	if _, err := os.Stat(script); err != nil {
+		return fmt.Errorf("runbook %s is not in the checkout %s", j.Name, j.Checkout.ID)
 	}
-	return hex.EncodeToString(h.Sum(nil)), nil
+	kubeconfig, remove, err := r.credentialFile(j.KubeConfig)
+	if err != nil {
+		return err
+	}
+	defer remove()
+	cmd := exec.CommandContext(ctx, "bash", script)
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig, "STATE_DIR="+r.StateDir(j.Env))
+	names := make([]string, 0, len(j.Params))
+	for name := range j.Params {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		cmd.Env = append(cmd.Env, "PARAM_"+strings.ToUpper(name)+"="+j.Params[name])
+	}
+	cmd.Stdout, cmd.Stderr = j.Log, j.Log
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("runbook %s: %w", j.Name, err)
+	}
+	return nil
+}
+
+// Kubectl runs one kubectl command with the credential and returns what it printed. The
+// output comes back also when the command fails.
+func (r *Runner) Kubectl(ctx context.Context, kubeConfig string, args ...string) ([]byte, error) {
+	path, remove, err := r.credentialFile(kubeConfig)
+	if err != nil {
+		return nil, err
+	}
+	defer remove()
+	cmd := exec.CommandContext(ctx, "kubectl", append([]string{"--kubeconfig", path}, args...)...)
+	return cmd.CombinedOutput()
 }
 
 // ToolDigest identifies the exact tool versions that run jobs. It stands in for the digest of

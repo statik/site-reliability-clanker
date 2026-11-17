@@ -34,7 +34,15 @@ test:
 	cd apps/paperboat && go test ./...
 	opa test runbooks/policy
 
+# The core of the control plane must run as a unikernel, which cannot start a program.
+CORE_PACKAGES := agent api audit detect dispatch forge jobspec monitor notify orchestrator planfacts policy scrub store
+
 lint:
+	@for p in $(CORE_PACKAGES); do \
+		if go list -f '{{join .Imports "\n"}}' ./internal/$$p | grep -qx os/exec; then \
+			echo "internal/$$p imports os/exec: the core must not start a program"; exit 1; \
+		fi; \
+	done
 	test -z "$$(gofmt -l cmd internal apps/paperboat)"
 	go vet ./...
 	cd apps/paperboat && go vet ./...

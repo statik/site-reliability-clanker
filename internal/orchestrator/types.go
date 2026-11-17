@@ -14,8 +14,9 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/audit"
 	"github.com/statik/site-reliability-clanker/internal/broker"
 	"github.com/statik/site-reliability-clanker/internal/forge"
+	"github.com/statik/site-reliability-clanker/internal/jobspec"
+	"github.com/statik/site-reliability-clanker/internal/planfacts"
 	"github.com/statik/site-reliability-clanker/internal/policy"
-	"github.com/statik/site-reliability-clanker/internal/runner"
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
 
@@ -102,9 +103,7 @@ type Plan struct {
 	Layer      string          `json:"layer"`
 	Commit     string          `json:"commit"`
 	SHA256     string          `json:"plan_sha256"`
-	PlanPath   string          `json:"-"`
-	JSONPath   string          `json:"-"`
-	Facts      runner.Facts    `json:"facts"`
+	Facts      planfacts.Facts `json:"facts"`
 	Policy     policy.Decision `json:"policy"`
 	Superseded bool            `json:"superseded"`
 	CreatedAt  string          `json:"created_at"`
@@ -129,7 +128,6 @@ type Job struct {
 	Layer      string `json:"layer"`
 	Kind       string `json:"kind"`
 	Status     string `json:"status"`
-	LogPath    string `json:"-"`
 	GrantID    string `json:"grant_id"`
 	ToolDigest string `json:"tool_digest"`
 	StartedAt  string `json:"started_at"`
@@ -164,17 +162,27 @@ type VerifyResult struct {
 	Reason string   `json:"reason"`
 }
 
+// Executor runs one job on a runner and returns its result. A failed job is an error, and
+// a stale plan is an error that wraps jobspec.ErrStalePlan.
+type Executor interface {
+	Run(ctx context.Context, job jobspec.Job) (jobspec.Result, error)
+}
+
 // Orchestrator runs work items.
 type Orchestrator struct {
-	DB      *sql.DB
-	Audit   *audit.Log
-	Forge   *forge.Forge
-	Runner  *runner.Runner
+	DB    *sql.DB
+	Audit *audit.Log
+	Forge *forge.Forge
+	// Runners runs the jobs. The orchestrator starts no program itself.
+	Runners Executor
 	Broker  *broker.Broker
 	Clock   Clock
+	// DataDir is the data directory of the control plane. The API hides it in job logs.
 	DataDir string
 	Envs    map[string]EnvConfig
 	Hooks   Hooks
+	// JobVariables are added to the environment of OpenTofu in every job.
+	JobVariables map[string]string
 
 	envLocks sync.Map
 	idMu     sync.Mutex
@@ -339,7 +347,7 @@ func (o *Orchestrator) closeFindings(wi WorkItem) error {
 
 // Plans returns the plans of a work item. Superseded plans are included when all is set.
 func (o *Orchestrator) Plans(workItem string, all bool) ([]Plan, error) {
-	query := `SELECT id, work_item, layer, commit_sha, plan_sha256, plan_path, json_path, facts,
+	query := `SELECT id, work_item, layer, commit_sha, plan_sha256, facts,
 		policy, superseded, created_at FROM plans WHERE work_item = $1`
 	if !all {
 		query += ` AND superseded = 0`
@@ -353,8 +361,8 @@ func (o *Orchestrator) Plans(workItem string, all bool) ([]Plan, error) {
 	for rows.Next() {
 		var p Plan
 		var facts, decision string
-		if err := rows.Scan(&p.ID, &p.WorkItem, &p.Layer, &p.Commit, &p.SHA256, &p.PlanPath,
-			&p.JSONPath, &facts, &decision, &p.Superseded, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.WorkItem, &p.Layer, &p.Commit, &p.SHA256, &facts,
+			&decision, &p.Superseded, &p.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan plan: %w", err)
 		}
 		if err := json.Unmarshal([]byte(facts), &p.Facts); err != nil {
@@ -394,7 +402,7 @@ func (o *Orchestrator) Approvals(workItem string) ([]Approval, error) {
 
 // Jobs returns the runner jobs of a work item, oldest first.
 func (o *Orchestrator) Jobs(workItem string) ([]Job, error) {
-	rows, err := o.DB.Query(`SELECT id, work_item, layer, kind, status, log_path, grant_id,
+	rows, err := o.DB.Query(`SELECT id, work_item, layer, kind, status, grant_id,
 		tool_digest, started_at, ended_at FROM jobs WHERE work_item = $1 ORDER BY id`, workItem)
 	if err != nil {
 		return nil, fmt.Errorf("list jobs of %s: %w", workItem, err)
@@ -403,7 +411,7 @@ func (o *Orchestrator) Jobs(workItem string) ([]Job, error) {
 	jobs := []Job{}
 	for rows.Next() {
 		var j Job
-		if err := rows.Scan(&j.ID, &j.WorkItem, &j.Layer, &j.Kind, &j.Status, &j.LogPath,
+		if err := rows.Scan(&j.ID, &j.WorkItem, &j.Layer, &j.Kind, &j.Status,
 			&j.GrantID, &j.ToolDigest, &j.StartedAt, &j.EndedAt); err != nil {
 			return nil, fmt.Errorf("scan job: %w", err)
 		}
@@ -415,14 +423,42 @@ func (o *Orchestrator) Jobs(workItem string) ([]Job, error) {
 // Job returns one job.
 func (o *Orchestrator) Job(id int64) (Job, error) {
 	var j Job
-	err := o.DB.QueryRow(`SELECT id, work_item, layer, kind, status, log_path, grant_id,
+	err := o.DB.QueryRow(`SELECT id, work_item, layer, kind, status, grant_id,
 		tool_digest, started_at, ended_at FROM jobs WHERE id = $1`, id).Scan(&j.ID, &j.WorkItem,
-		&j.Layer, &j.Kind, &j.Status, &j.LogPath, &j.GrantID, &j.ToolDigest, &j.StartedAt,
-		&j.EndedAt)
+		&j.Layer, &j.Kind, &j.Status, &j.GrantID, &j.ToolDigest, &j.StartedAt, &j.EndedAt)
 	if err != nil {
 		return Job{}, fmt.Errorf("read job %d: %w", id, err)
 	}
 	return j, nil
+}
+
+// JobLog returns what the job wrote so far. A job that still runs has a partial log.
+func (o *Orchestrator) JobLog(id int64) (string, error) {
+	var log string
+	if err := o.DB.QueryRow(`SELECT log FROM jobs WHERE id = $1`, id).Scan(&log); err != nil {
+		return "", fmt.Errorf("read log of job %d: %w", id, err)
+	}
+	return log, nil
+}
+
+// PlanJSON returns the JSON form of a saved plan.
+func (o *Orchestrator) PlanJSON(planID int64) ([]byte, error) {
+	var raw []byte
+	err := o.DB.QueryRow(`SELECT plan_json FROM plans WHERE id = $1`, planID).Scan(&raw)
+	if err != nil {
+		return nil, fmt.Errorf("read JSON of plan %d: %w", planID, err)
+	}
+	return raw, nil
+}
+
+// planFile returns the plan file of a saved plan: the exact bytes that an apply needs.
+// A plan file can hold secret values in clear text. Nothing serves it to a client.
+func (o *Orchestrator) planFile(planID int64) ([]byte, error) {
+	var raw []byte
+	if err := o.DB.QueryRow(`SELECT plan FROM plans WHERE id = $1`, planID).Scan(&raw); err != nil {
+		return nil, fmt.Errorf("read plan %d: %w", planID, err)
+	}
+	return raw, nil
 }
 
 // Transition moves a work item to a state outside the plan-and-apply pipeline, for example

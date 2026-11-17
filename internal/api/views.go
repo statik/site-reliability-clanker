@@ -44,7 +44,7 @@ func (s *Server) liveSnapshot(env string) (monitor.Snapshot, error) {
 	snap := monitor.Snapshot{TS: store.FormatTime(s.Clock.Now()), Env: env, Reason: "live",
 		Layers: map[string]map[string]any{}}
 	for _, layer := range orchestrator.Layers {
-		outputs, err := s.Orch.Runner.Outputs(env, layer)
+		outputs, err := store.LayerOutputs(s.Orch.DB, env, layer)
 		if err != nil {
 			return monitor.Snapshot{}, err
 		}

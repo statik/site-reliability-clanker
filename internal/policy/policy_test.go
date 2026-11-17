@@ -8,16 +8,22 @@ import (
 	"testing"
 )
 
-// The real rules of the repository.
-const rulesDir = "../../runbooks/policy"
-
-func planFile(t *testing.T, body string) string {
+// realRules reads the rules of the repository, test files too, as the forge gives them.
+func realRules(t *testing.T) map[string]string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "plan.json")
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-		t.Fatal(err)
+	paths, err := filepath.Glob("../../runbooks/policy/*.rego")
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("no rules found: %v", err)
 	}
-	return path
+	modules := map[string]string{}
+	for _, path := range paths {
+		source, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		modules["policy/"+filepath.Base(path)] = string(source)
+	}
+	return modules
 }
 
 func change(resourceType string, actions ...string) string {
@@ -41,10 +47,10 @@ func TestEvaluateGivesTheTierOfTheRealRules(t *testing.T) {
 		{"only new resources", "change", "50-app", change("helm_release", "create"),
 			"T2", "normal-change", true},
 	}
+	rules := realRules(t)
 	for _, c := range cases {
-		plan := planFile(t, `{"resource_changes":[`+c.changes+`]}`)
 		got, err := Evaluate(context.Background(), Input{Kind: c.kind, Layer: c.layer,
-			PlanJSONPath: plan, PolicyDir: rulesDir})
+			PlanJSON: []byte(`{"resource_changes":[` + c.changes + `]}`), Modules: rules})
 		if err != nil {
 			t.Errorf("%s: %v", c.name, err)
 			continue
@@ -60,30 +66,23 @@ func TestEvaluateGivesTheTierOfTheRealRules(t *testing.T) {
 }
 
 func TestEvaluateFailsClearlyOnBadInput(t *testing.T) {
-	good := planFile(t, `{"resource_changes":[]}`)
-	empty := t.TempDir()
-	broken := t.TempDir()
-	if err := os.WriteFile(filepath.Join(broken, "tier.rego"), []byte("package clanker.tier\nthis is not rego"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	testsOnly := t.TempDir()
-	if err := os.WriteFile(filepath.Join(testsOnly, "tier_test.rego"), []byte("package x\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	other := t.TempDir()
-	if err := os.WriteFile(filepath.Join(other, "other.rego"), []byte("package other\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	good := []byte(`{"resource_changes":[]}`)
+	rules := realRules(t)
 	cases := map[string]struct {
 		in   Input
 		want string
 	}{
-		"plan file missing":     {Input{PlanJSONPath: filepath.Join(empty, "none.json"), PolicyDir: rulesDir}, "read plan JSON"},
-		"plan is not JSON":      {Input{PlanJSONPath: planFile(t, "{"), PolicyDir: rulesDir}, "decode plan JSON"},
-		"no policy file":        {Input{PlanJSONPath: good, PolicyDir: empty}, "has no Rego file"},
-		"only a test file":      {Input{PlanJSONPath: good, PolicyDir: testsOnly}, "has no Rego file"},
-		"policy does not parse": {Input{PlanJSONPath: good, PolicyDir: broken}, "evaluate the policies"},
-		"policy has no tier":    {Input{PlanJSONPath: good, PolicyDir: other, Layer: "50-app"}, "gave no decision"},
+		"plan is not JSON": {Input{PlanJSON: []byte("{"), Modules: rules}, "decode plan JSON"},
+		"no policy file":   {Input{PlanJSON: good, Modules: map[string]string{}}, "has no Rego file"},
+		"only a test file": {Input{PlanJSON: good,
+			Modules: map[string]string{"policy/tier_test.rego": "package x\n"}}, "has no Rego file"},
+		"a file that is not Rego": {Input{PlanJSON: good,
+			Modules: map[string]string{"policy/README.md": "notes"}}, "has no Rego file"},
+		"policy does not parse": {Input{PlanJSON: good,
+			Modules: map[string]string{"policy/tier.rego": "package clanker.tier\nthis is not rego"}},
+			"evaluate the policies"},
+		"policy has no tier": {Input{PlanJSON: good, Layer: "50-app",
+			Modules: map[string]string{"policy/other.rego": "package other\n"}}, "gave no decision"},
 	}
 	for name, c := range cases {
 		_, err := Evaluate(context.Background(), c.in)

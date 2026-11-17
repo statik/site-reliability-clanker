@@ -4,6 +4,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -32,8 +33,8 @@ CREATE TABLE IF NOT EXISTS work_items (
 
 CREATE TABLE IF NOT EXISTS plans (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, work_item TEXT NOT NULL, layer TEXT NOT NULL,
-  commit_sha TEXT NOT NULL, plan_sha256 TEXT NOT NULL, plan_path TEXT NOT NULL,
-  json_path TEXT NOT NULL, facts TEXT NOT NULL DEFAULT '{}', policy TEXT NOT NULL DEFAULT '{}',
+  commit_sha TEXT NOT NULL, plan_sha256 TEXT NOT NULL, plan BYTEA NOT NULL,
+  plan_json BYTEA NOT NULL, facts TEXT NOT NULL DEFAULT '{}', policy TEXT NOT NULL DEFAULT '{}',
   superseded BIGINT NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
 
 CREATE TABLE IF NOT EXISTS approvals (
@@ -50,7 +51,7 @@ CREATE TABLE IF NOT EXISTS grants (
 
 CREATE TABLE IF NOT EXISTS jobs (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, work_item TEXT NOT NULL, layer TEXT NOT NULL DEFAULT '',
-  kind TEXT NOT NULL, status TEXT NOT NULL, log_path TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL, status TEXT NOT NULL, log TEXT NOT NULL DEFAULT '',
   grant_id TEXT NOT NULL DEFAULT '', tool_digest TEXT NOT NULL DEFAULT '',
   started_at TEXT NOT NULL, ended_at TEXT NOT NULL DEFAULT '');
 
@@ -97,6 +98,10 @@ CREATE TABLE IF NOT EXISTS agent_calls (
   transcript TEXT NOT NULL DEFAULT '', at TEXT NOT NULL);
 
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+CREATE TABLE IF NOT EXISTS layer_outputs (
+  env TEXT NOT NULL, layer TEXT NOT NULL, outputs TEXT NOT NULL, updated_at TEXT NOT NULL,
+  PRIMARY KEY (env, layer));
 
 CREATE TABLE IF NOT EXISTS git_repos (name TEXT PRIMARY KEY);
 
@@ -177,6 +182,41 @@ func Open(url string) (*sql.DB, error) {
 		return nil, fmt.Errorf("commit the schema: %w", err)
 	}
 	return db, nil
+}
+
+// LayerOutputs returns the outputs of a layer as the runner reported them after the last
+// apply. A layer that was never applied gives an empty map.
+func LayerOutputs(db *sql.DB, env, layer string) (map[string]any, error) {
+	var raw string
+	err := db.QueryRow(`SELECT outputs FROM layer_outputs WHERE env = $1 AND layer = $2`, env,
+		layer).Scan(&raw)
+	if err == sql.ErrNoRows {
+		return map[string]any{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read outputs of %s/%s: %w", env, layer, err)
+	}
+	outputs := map[string]any{}
+	if err := json.Unmarshal([]byte(raw), &outputs); err != nil {
+		return nil, fmt.Errorf("decode outputs of %s/%s: %w", env, layer, err)
+	}
+	return outputs, nil
+}
+
+// SetLayerOutputs records the outputs of a layer.
+func SetLayerOutputs(db *sql.DB, env, layer string, outputs map[string]any, now string) error {
+	raw, err := json.Marshal(outputs)
+	if err != nil {
+		return fmt.Errorf("encode outputs of %s/%s: %w", env, layer, err)
+	}
+	_, err = db.Exec(`INSERT INTO layer_outputs (env, layer, outputs, updated_at)
+		VALUES ($1,$2,$3,$4) ON CONFLICT (env, layer)
+		DO UPDATE SET outputs = excluded.outputs, updated_at = excluded.updated_at`, env, layer,
+		string(raw), now)
+	if err != nil {
+		return fmt.Errorf("record outputs of %s/%s: %w", env, layer, err)
+	}
+	return nil
 }
 
 // GetKV reads a value from the kv table. A missing key gives "".

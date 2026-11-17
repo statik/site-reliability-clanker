@@ -4,6 +4,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -174,7 +175,7 @@ func bootstrap(ctx context.Context, o options) error {
 		return err
 	}
 	fmt.Printf("Applying layer 00-bootstrap of %s with your own credentials.\n", o.env)
-	job := runner.Job{Env: o.env, Cloud: o.cloud, Layer: "00-bootstrap", Checkout: o.sourceDir,
+	job := runner.Job{Env: o.env, Cloud: o.cloud, Layer: "00-bootstrap", Checkout: runner.Checkout{Dir: o.sourceDir},
 		Log: os.Stdout}
 	if err := r.ApplyDirect(ctx, job); err != nil {
 		return err
@@ -198,7 +199,12 @@ func destroy(ctx context.Context, o options) error {
 	}
 	layers := slices.Clone(orchestrator.Layers)
 	slices.Reverse(layers)
-	admin := filepath.Join(r.StateDir(o.env), "kubeconfig")
+	// The teardown uses the administrator kubeconfig of the operator. Before the cluster
+	// exists there is none, and the layers below the cluster need none.
+	admin, err := os.ReadFile(filepath.Join(r.StateDir(o.env), "kubeconfig"))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("read the administrator kubeconfig of %s: %w", o.env, err)
+	}
 	for _, layer := range layers {
 		outputs, err := r.Outputs(o.env, layer)
 		if err != nil {
@@ -208,8 +214,8 @@ func destroy(ctx context.Context, o options) error {
 			continue
 		}
 		fmt.Printf("Destroying %s/%s\n", o.env, layer)
-		job := runner.Job{Env: o.env, Cloud: o.cloud, Layer: layer, Checkout: o.sourceDir,
-			KubeConfig: admin, Log: os.Stdout}
+		job := runner.Job{Env: o.env, Cloud: o.cloud, Layer: layer,
+			Checkout: runner.Checkout{Dir: o.sourceDir}, KubeConfig: string(admin), Log: os.Stdout}
 		if err := r.Destroy(ctx, job); err != nil {
 			return err
 		}
@@ -240,6 +246,12 @@ func run() error {
 	if command == "version" || command == "--version" {
 		fmt.Println(version)
 		return nil
+	}
+	if command == "runner" {
+		// A runner needs no checkout and no database: it gets its job from the core.
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		return runRunner(ctx, args[1:])
 	}
 	o, err := parse(args[1:])
 	if err != nil {

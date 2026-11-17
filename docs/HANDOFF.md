@@ -3,6 +3,93 @@
 State of the work on 2026-11-17. A new session can continue from this file and from the
 issues with the label `needs-owner-review`.
 
+## Start here (written at the end of the session of 2026-11-17)
+
+### The goal now
+
+The control plane must run on AWS as a Nanos unikernel in an auto scaling group, set up by
+the wizard (`clanker setup`). The decisions of the owner are in section 12 of
+`docs/PLAN.md` and in issue #11. In short: the core starts no program and keeps no file; jobs
+run in short-lived runners; all state is in an external PostgreSQL; the dashboard is behind
+a load balancer with OIDC sign-in; the wizard builds the machine image with `ops`.
+
+### The core and runner split (verified 2026-11-17)
+
+The split has two steps:
+
+1. The core holds no file path (plans, plan JSON, job logs and layer outputs are rows in
+   PostgreSQL; policy rules and runbook scripts come from the forge).
+2. Each job runs in a `clanker runner` process that gets its one job from the core over
+   HTTP with a token.
+
+What ran on the build of commit `376617b`, the last change to the Go code:
+
+- The full run from an empty data directory, with the live model: thirteen work items,
+  twelve in `Done` and `WI-0005` in `RolledBack`. The audit chain verified at 310 events.
+  The log of the control plane had no error line. The run used the script that became
+  `scripts/verify/fresh-run.sh`; the committed file itself was not run.
+- `scripts/verify/sweep.py`: only `GET /topology` without `env` answered other than 2xx,
+  which is correct.
+- `scripts/verify/stale_plan.py`: the stale plan was refused, planned again and approved
+  again. Both changes are on `main` of the forge and the objects pass `git fsck`.
+- The data directory had no `plans`, `creds` or `repos` directory after the run.
+
+### Next steps, in order
+
+1. **Local-only code behind interfaces.** The access broker (`internal/broker/credentials.go`)
+   and the simulator start `kubectl`. Move that code to packages that only the local target
+   wires in. Then make the lint check follow imports inside this module, from a core entry
+   point.
+2. **A core entry point with no file.** Today the core still writes: the unpacked bundle,
+   the data directory, `broker.key`, `database.password`. On a cloud the signing key and the
+   database address must come from a secret store at start. `ops` writes `Env` into the
+   image, so a secret must never be in `Env`.
+3. **Boot the real core under Nanos** with `ops/run-local.sh`, in the standby mode
+   (`clanker up --cloud aws --demo=false`), against PostgreSQL. Only a throwaway probe ran
+   under Nanos so far.
+4. **A guard for one writer.** The pool has one connection, but that does not stop two
+   instances. Put the guard in PostgreSQL. Reconcile jobs that were in flight when the core
+   stopped.
+5. **OIDC sign-in**, and no trust in the `X-Clanker-User` header. This blocks every public
+   deployment.
+6. **Cloud runner and broker:** a launcher that starts a Fargate task, an S3 state backend
+   in the runner (the job specification has the field `backend`), a broker that uses STS.
+   The ECS task definition in `internal/setup/controlplane.yaml` is the starting point.
+7. **The wizard for AWS:** build the image with `ops`, create the stack (auto scaling group,
+   load balancer, RDS), switch `setup.Config.EnableAWS` on.
+8. **A run in a real account.**
+
+### What the owner must give
+
+- For step 8: the AWS profile, the region and a spending limit; a domain name for the
+  certificate; an OIDC identity provider. The owner chose "apply with a budget cap" but
+  named no profile, region or amount. Do not pick one of the local profiles.
+- The estimate for the home of the control plane is 47 to 50 USD each month. It is from
+  list prices and is not checked against the pricing pages.
+
+### Rules that cost time when they are forgotten
+
+- `CLAUDE.md` has the standing rule: merge a pull request when its checks pass **and the
+  change was run**. A unit test is not a run for a change to the control plane; use
+  `scripts/verify/`.
+- A push over SSH needs the owner at the keyboard (Secretive). On 2026-11-17 the owner
+  allowed one push over HTTPS with the `gh` token; SSH worked later that day.
+- A hook blocks a command line that contains the push command together with the name of
+  the default branch, also inside quoted text. Run the push as its own command, and put
+  such text in a file.
+- The shell is bash 3.2. Put Python and long text in a file, not in a heredoc inside a
+  compound command. A safety check refuses compound commands that remove things; run a
+  removal as its own simple command.
+- Do not script an approval through the dashboard. Approvals in the checks go through the
+  API as the demo users.
+- The schema has no migration. A change to a table needs `scripts/verify/fresh-run.sh`,
+  which starts from an empty database.
+- `docs/PLAN.md` sections 5 and 5.4 still describe the first design in places. Section 12
+  is the record of the decisions.
+- The site and the video were made from an earlier run with 323 audit records. The demo
+  now has 310. To refresh them: `node export-data.mjs`, `node build.mjs`,
+  `./build-video.sh` in `site/`, then upload the video to the release `site-video`.
+
 ## What runs now
 
 Everything in this section was run on the local target (kind on Docker, macOS arm64).
@@ -63,9 +150,31 @@ group. Section 12 of the plan records the five decisions that follow from the la
   both. The git client cloned, pushed and fetched over HTTP, and `git fsck --strict` found
   no fault in the objects that the forge wrote. Two changes to lines next to each other
   are a conflict, as in git.
-- **Open risks:** the control plane still keeps plans, job logs, OpenTofu state and its
-  signing key as files in the data directory, and it still starts `tofu`, `kubectl`, `helm`
-  and the runbook scripts. These must move to the runners before the unikernel can run it.
+- **Core and runners (2026-11-17):** the control plane has two parts in one program.
+  - The core is the packages in `CORE_PACKAGES` of the Makefile. A lint check and CI refuse
+    a direct import of `os/exec` in them. The check does not follow imports: the
+    orchestrator still imports the access broker, and the API still imports the simulator,
+    and both of those start `kubectl`. The core holds no file path: plans, plan JSON, job logs and layer
+    outputs are rows in PostgreSQL, and policy rules and runbook scripts come from the forge.
+  - A job is a value (`internal/jobspec`). The dispatcher (`internal/dispatch`) gives it to a
+    runner and waits. A launcher starts the runner. On the local target the launcher starts
+    `clanker runner` as a process on the same machine (`internal/launch`).
+  - The runner asks the core for the one job of its token over HTTP (`/runner/v1/`), sends
+    the log while the job runs, sends a heartbeat, and reports the result. The token opens
+    only that job, and nothing after the result. The user header means nothing there.
+  - The core hashes the plan bytes that it stores, and an apply job gets exactly those
+    bytes. The runner compares the hash again and never makes a new plan in an apply job.
+  - A plan file can hold secret values in clear text. It is now a row in the database, where
+    before it was a file in the data directory. No route serves it.
+- **Still not ready for the unikernel:**
+  - The local access broker and the simulator start `kubectl`, and the broker keeps its
+    signing key in a file. They must move behind interfaces that only the local target
+    fills, and the lint check must then follow imports. A cloud needs a broker that uses the API of the cloud, and a key from a secret
+    store.
+  - There is no launcher for a cloud (a Fargate task), and the runner has no remote state
+    backend. The job specification has a field for the backend settings.
+  - A job in flight is lost when the core stops. The work item must be reconciled at start.
+  - The local database password and the unpacked bundle are files.
 - **Nanos boot test (2026-11-17, a throwaway probe, on a laptop):** a Go program as a Nanos
   image read its environment from the image configuration, made an outbound HTTPS request,
   connected to PostgreSQL 18 and inserted a row, and answered HTTP from the host. A

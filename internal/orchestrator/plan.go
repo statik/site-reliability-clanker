@@ -2,18 +2,20 @@ package orchestrator
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/audit"
 	"github.com/statik/site-reliability-clanker/internal/broker"
+	"github.com/statik/site-reliability-clanker/internal/jobspec"
+	"github.com/statik/site-reliability-clanker/internal/planfacts"
 	"github.com/statik/site-reliability-clanker/internal/policy"
-	"github.com/statik/site-reliability-clanker/internal/runner"
+	"github.com/statik/site-reliability-clanker/internal/store"
 )
 
 // LayersForPaths returns the layers of cloud that the changed paths touch, in apply order.
@@ -75,38 +77,58 @@ func (o *Orchestrator) AttachPull(id string, prID int64, actor string) (WorkItem
 	return wi, nil
 }
 
-func (o *Orchestrator) workDir(wi WorkItem) string {
-	return filepath.Join(o.DataDir, "work", wi.ID, wi.Commit)
-}
-
-func (o *Orchestrator) checkout(wi WorkItem) (string, error) {
-	dir := o.workDir(wi)
-	if _, err := os.Stat(filepath.Join(dir, "platform")); err == nil {
-		return dir, nil
-	}
-	if err := o.Forge.Export(PlatformRepo, wi.Commit, dir); err != nil {
-		return "", err
-	}
-	return dir, nil
-}
-
-func (o *Orchestrator) policyDir() (string, error) {
-	head, err := o.Forge.Head(RunbooksRepo, "main")
+// layerJob returns a job for one layer of the work item, with the tree of its commit. The
+// plan and the apply of one commit share one checkout on the runner.
+func (o *Orchestrator) layerJob(wi WorkItem, kind, layer string) (jobspec.Job, error) {
+	archive, err := o.Forge.Archive(PlatformRepo, wi.Commit)
 	if err != nil {
-		return "", fmt.Errorf("find policies: %w", err)
+		return jobspec.Job{}, err
 	}
-	dir := filepath.Join(o.DataDir, "work", "runbooks", head)
-	if _, err := os.Stat(filepath.Join(dir, "policy")); err != nil {
-		if err := o.Forge.Export(RunbooksRepo, head, dir); err != nil {
-			return "", err
+	return jobspec.Job{Spec: jobspec.Spec{Kind: kind, Env: wi.Env, Cloud: o.Envs[wi.Env].Cloud,
+		Layer: layer, CheckoutID: wi.ID + "/" + wi.Commit, Variables: o.JobVariables},
+		Checkout: archive}, nil
+}
+
+// run gives the job to a runner and records the tool versions that the runner reports.
+func (o *Orchestrator) run(ctx context.Context, job *Job, spec jobspec.Job) (jobspec.Result, error) {
+	result, err := o.Runners.Run(ctx, spec)
+	if result.ToolDigest != "" {
+		job.ToolDigest = result.ToolDigest
+		if _, dbErr := o.DB.Exec(`UPDATE jobs SET tool_digest = $1 WHERE id = $2`,
+			result.ToolDigest, job.ID); dbErr != nil && err == nil {
+			err = fmt.Errorf("record the tools of job %d: %w", job.ID, dbErr)
 		}
 	}
-	return filepath.Join(dir, "policy"), nil
+	return result, err
 }
 
-// layerApplied reports whether the layer has state with outputs.
+// policyModules reads the policy rules from the runbooks repository.
+func (o *Orchestrator) policyModules() (map[string]string, error) {
+	head, err := o.Forge.Head(RunbooksRepo, "main")
+	if err != nil {
+		return nil, fmt.Errorf("find policies: %w", err)
+	}
+	entries, err := o.Forge.Tree(RunbooksRepo, head, "policy")
+	if err != nil {
+		return nil, fmt.Errorf("list policies: %w", err)
+	}
+	modules := map[string]string{}
+	for _, entry := range entries {
+		if entry.Type != "blob" {
+			continue
+		}
+		source, err := o.Forge.ReadFile(RunbooksRepo, head, entry.Path)
+		if err != nil {
+			return nil, fmt.Errorf("read policy %s: %w", entry.Path, err)
+		}
+		modules[entry.Path] = source
+	}
+	return modules, nil
+}
+
+// layerApplied reports whether the layer was applied and has outputs.
 func (o *Orchestrator) layerApplied(env, layer string) bool {
-	outputs, err := o.Runner.Outputs(env, layer)
+	outputs, err := store.LayerOutputs(o.DB, env, layer)
 	return err == nil && len(outputs) > 0
 }
 
@@ -117,39 +139,73 @@ func (o *Orchestrator) canPlan(env, layer string) bool {
 	return index <= 0 || o.layerApplied(env, Layers[index-1])
 }
 
-func (o *Orchestrator) startJob(wi WorkItem, layer, kind, grantID string) (Job, *os.File, error) {
-	dir := filepath.Join(o.DataDir, "logs", wi.ID)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return Job{}, nil, fmt.Errorf("create log directory %s: %w", dir, err)
+// jobLog is the log of one job. It appends to the job row while the job runs, so the
+// dashboard can show a job that is still in flight.
+type jobLog struct {
+	db  *sql.DB
+	job int64
+
+	mu      sync.Mutex
+	pending []byte
+	flushed time.Time
+}
+
+// logFlushInterval bounds how often a busy job writes its log to the database.
+const logFlushInterval = 400 * time.Millisecond
+
+// Write keeps the text and stores it when enough time passed since the last store.
+func (l *jobLog) Write(text []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.pending = append(l.pending, text...)
+	if time.Since(l.flushed) < logFlushInterval {
+		return len(text), nil
 	}
+	return len(text), l.flush()
+}
+
+// flush stores the pending text. The caller holds the lock.
+func (l *jobLog) flush() error {
+	if len(l.pending) == 0 {
+		return nil
+	}
+	// PostgreSQL does not store a zero byte in a text column.
+	text := strings.ReplaceAll(strings.ToValidUTF8(string(l.pending), "?"), "\x00", "")
+	if _, err := l.db.Exec(`UPDATE jobs SET log = log || $1 WHERE id = $2`, text, l.job); err != nil {
+		return fmt.Errorf("store log of job %d: %w", l.job, err)
+	}
+	l.pending, l.flushed = nil, time.Now()
+	return nil
+}
+
+// Close stores what is left.
+func (l *jobLog) Close() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.flush()
+}
+
+func (o *Orchestrator) startJob(wi WorkItem, layer, kind, grantID string) (Job, *jobLog, error) {
 	job := Job{WorkItem: wi.ID, Layer: layer, Kind: kind, Status: "running", GrantID: grantID,
-		ToolDigest: o.Runner.ToolDigest(), StartedAt: o.now()}
+		StartedAt: o.now()}
 	err := o.DB.QueryRow(`INSERT INTO jobs (work_item, layer, kind, status, grant_id,
 		tool_digest, started_at) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`, job.WorkItem, job.Layer, job.Kind,
 		job.Status, job.GrantID, job.ToolDigest, job.StartedAt).Scan(&job.ID)
 	if err != nil {
 		return Job{}, nil, fmt.Errorf("record job for %s %s: %w", wi.ID, layer, err)
 	}
-	job.LogPath = filepath.Join(dir, fmt.Sprintf("%04d-%s-%s.log", job.ID, kind, layer))
-	logFile, err := os.Create(job.LogPath)
-	if err != nil {
-		return Job{}, nil, fmt.Errorf("create job log %s: %w", job.LogPath, err)
-	}
-	if _, err := o.DB.Exec(`UPDATE jobs SET log_path = $1 WHERE id = $2`, job.LogPath,
-		job.ID); err != nil {
-		logFile.Close()
-		return Job{}, nil, fmt.Errorf("record log path of job %d: %w", job.ID, err)
-	}
-	return job, logFile, nil
+	return job, &jobLog{db: o.DB, job: job.ID}, nil
 }
 
-func (o *Orchestrator) endJob(job Job, logFile *os.File, jobErr error) {
+func (o *Orchestrator) endJob(job Job, log *jobLog, jobErr error) {
 	status := "succeeded"
 	if jobErr != nil {
 		status = "failed"
-		fmt.Fprintf(logFile, "\nJOB FAILED: %v\n", jobErr)
+		fmt.Fprintf(log, "\nJOB FAILED: %v\n", jobErr)
 	}
-	logFile.Close()
+	if err := log.Close(); err != nil {
+		panic(fmt.Sprintf("job table is not writable, stopping: %v", err))
+	}
 	if _, err := o.DB.Exec(`UPDATE jobs SET status = $1, ended_at = $2 WHERE id = $3`, status,
 		o.now(), job.ID); err != nil {
 		panic(fmt.Sprintf("job table is not writable, stopping: %v", err))
@@ -174,7 +230,7 @@ func (o *Orchestrator) planCredential(ctx context.Context, wi WorkItem, layer st
 
 // planLayer runs plan and policy for one layer and stores the result.
 func (o *Orchestrator) planLayer(ctx context.Context, wi WorkItem, layer string) (Plan, error) {
-	checkout, err := o.checkout(wi)
+	spec, err := o.layerJob(wi, jobspec.KindPlan, layer)
 	if err != nil {
 		return Plan{}, err
 	}
@@ -194,7 +250,8 @@ func (o *Orchestrator) planLayer(ctx context.Context, wi WorkItem, layer string)
 	if err != nil {
 		return Plan{}, err
 	}
-	plan, err := o.runPlan(ctx, wi, layer, checkout, cred.KubeConfig, job, logFile)
+	spec.KubeConfig, spec.Log = cred.KubeConfig, logFile
+	plan, err := o.runPlan(ctx, wi, layer, spec, &job, logFile)
 	o.endJob(job, logFile, err)
 	if err != nil {
 		o.emit(audit.Event{Type: "plan.failed", Actor: "runner", Env: wi.Env, Layer: layer,
@@ -205,31 +262,35 @@ func (o *Orchestrator) planLayer(ctx context.Context, wi WorkItem, layer string)
 	return plan, nil
 }
 
-func (o *Orchestrator) runPlan(ctx context.Context, wi WorkItem, layer, checkout,
-	kubeconfig string, job Job, logFile *os.File) (Plan, error) {
-	outDir := filepath.Join(o.DataDir, "plans", wi.ID, fmt.Sprintf("job-%d", job.ID))
-	result, err := o.Runner.Plan(ctx, runner.Job{Env: wi.Env, Cloud: o.Envs[wi.Env].Cloud,
-		Layer: layer, Checkout: checkout, KubeConfig: kubeconfig, Log: logFile}, outDir)
+func (o *Orchestrator) runPlan(ctx context.Context, wi WorkItem, layer string,
+	spec jobspec.Job, job *Job, logFile *jobLog) (Plan, error) {
+	result, err := o.run(ctx, job, spec)
 	if err != nil {
 		return Plan{}, err
 	}
-	facts, err := runner.ReadFacts(result.JSONPath)
+	// The hash that an approver agrees to is the hash of the bytes that are stored here,
+	// and an apply gets exactly these bytes.
+	sha := jobspec.SHA256(result.Plan)
+	if len(result.Plan) == 0 || sha != result.PlanSHA256 {
+		return Plan{}, fmt.Errorf("plan of %s: the runner reported hash %q for a plan of %d "+
+			"bytes with hash %s", layer, result.PlanSHA256, len(result.Plan), sha)
+	}
+	facts, err := planfacts.Parse(result.PlanJSON)
 	if err != nil {
 		return Plan{}, err
 	}
-	policyDir, err := o.policyDir()
+	modules, err := o.policyModules()
 	if err != nil {
 		return Plan{}, err
 	}
 	decision, err := policy.Evaluate(ctx, policy.Input{Kind: wi.Kind, Layer: layer,
-		PlanJSONPath: result.JSONPath, PolicyDir: policyDir})
+		PlanJSON: result.PlanJSON, Modules: modules})
 	if err != nil {
 		return Plan{}, err
 	}
 	fmt.Fprintf(logFile, "\npolicy: tier %s by rule %s\n", decision.Tier, decision.Rule)
-	plan := Plan{WorkItem: wi.ID, Layer: layer, Commit: wi.Commit, SHA256: result.SHA256,
-		PlanPath: result.PlanPath, JSONPath: result.JSONPath, Facts: facts, Policy: decision,
-		CreatedAt: o.now()}
+	plan := Plan{WorkItem: wi.ID, Layer: layer, Commit: wi.Commit, SHA256: sha,
+		Facts: facts, Policy: decision, CreatedAt: o.now()}
 	factsJSON, _ := json.Marshal(facts)
 	decisionJSON, _ := json.Marshal(decision)
 	if _, err := o.DB.Exec(`UPDATE plans SET superseded = 1 WHERE work_item = $1 AND layer = $2`,
@@ -237,8 +298,8 @@ func (o *Orchestrator) runPlan(ctx context.Context, wi WorkItem, layer, checkout
 		return Plan{}, fmt.Errorf("supersede old plans of %s %s: %w", wi.ID, layer, err)
 	}
 	err = o.DB.QueryRow(`INSERT INTO plans (work_item, layer, commit_sha, plan_sha256,
-		plan_path, json_path, facts, policy, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
-		plan.WorkItem, plan.Layer, plan.Commit, plan.SHA256, plan.PlanPath, plan.JSONPath,
+		plan, plan_json, facts, policy, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+		plan.WorkItem, plan.Layer, plan.Commit, plan.SHA256, result.Plan, result.PlanJSON,
 		string(factsJSON), string(decisionJSON), plan.CreatedAt).Scan(&plan.ID)
 	if err != nil {
 		return Plan{}, fmt.Errorf("record plan of %s %s: %w", wi.ID, layer, err)

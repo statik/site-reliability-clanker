@@ -5,6 +5,9 @@
 package forge
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -526,6 +529,67 @@ func (f *Forge) Export(repo, commit, dest string) error {
 	}
 	// An empty tree still gives the directory.
 	return os.MkdirAll(dest, 0o755)
+}
+
+// Archive returns the tree of commit as a gzip-compressed tar file. A runner unpacks it
+// to work on the commit.
+func (f *Forge) Archive(repo, commit string) ([]byte, error) {
+	s, err := f.storage(repo)
+	if err != nil {
+		return nil, err
+	}
+	repository, err := open(s)
+	if err != nil {
+		return nil, err
+	}
+	at, err := commitAt(repository, repo, commit)
+	if err != nil {
+		return nil, err
+	}
+	files, err := filesAt(at)
+	if err != nil {
+		return nil, err
+	}
+	paths := make([]string, 0, len(files))
+	for path := range files {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	var buffer bytes.Buffer
+	zipped := gzip.NewWriter(&buffer)
+	archive := tar.NewWriter(zipped)
+	for _, path := range paths {
+		entry := files[path]
+		if entry.Mode == filemode.Submodule {
+			continue
+		}
+		content, err := s.readBlob(entry.Hash)
+		if err != nil {
+			return nil, fmt.Errorf("read %s of %s: %w", path, repo, err)
+		}
+		header := &tar.Header{Name: path, Mode: 0o644, Size: int64(len(content)),
+			Typeflag: tar.TypeReg, ModTime: at.Committer.When}
+		switch entry.Mode {
+		case filemode.Executable:
+			header.Mode = 0o755
+		case filemode.Symlink:
+			header.Typeflag, header.Linkname, header.Size = tar.TypeSymlink, string(content), 0
+			content = nil
+		}
+		if err := archive.WriteHeader(header); err != nil {
+			return nil, fmt.Errorf("archive %s of %s: %w", path, repo, err)
+		}
+		if _, err := archive.Write(content); err != nil {
+			return nil, fmt.Errorf("archive %s of %s: %w", path, repo, err)
+		}
+	}
+	if err := archive.Close(); err != nil {
+		return nil, fmt.Errorf("finish the archive of %s: %w", repo, err)
+	}
+	if err := zipped.Close(); err != nil {
+		return nil, fmt.Errorf("finish the archive of %s: %w", repo, err)
+	}
+	return buffer.Bytes(), nil
 }
 
 // trees returns the tree at the common commit of base and head, and the tree at head. This
