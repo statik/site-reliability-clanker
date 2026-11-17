@@ -4,6 +4,8 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite" // registers the "sqlite" driver
@@ -116,9 +118,30 @@ func ParseTime(s string) time.Time {
 	return t
 }
 
+// JournalEnv names the environment variable that selects the journal mode of the database.
+const JournalEnv = "CLANKER_DB_JOURNAL"
+
+// journalMode returns the SQLite journal mode. The default is WAL. WAL needs shared
+// memory, which a network file system does not give, so a control plane whose data
+// directory is on one (Amazon EFS on Fargate) sets the variable to DELETE.
+func journalMode() (string, error) {
+	switch mode := strings.ToUpper(os.Getenv(JournalEnv)); mode {
+	case "", "WAL":
+		return "WAL", nil
+	case "DELETE":
+		return "DELETE", nil
+	default:
+		return "", fmt.Errorf("%s is %q: use WAL or DELETE", JournalEnv, mode)
+	}
+}
+
 // Open opens the database file at path and applies the schema.
 func Open(path string) (*sql.DB, error) {
-	dsn := "file:" + path + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(10000)" +
+	mode, err := journalMode()
+	if err != nil {
+		return nil, err
+	}
+	dsn := "file:" + path + "?_pragma=journal_mode(" + mode + ")&_pragma=busy_timeout(10000)" +
 		"&_pragma=foreign_keys(ON)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {

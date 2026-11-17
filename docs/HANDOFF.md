@@ -29,6 +29,31 @@ Everything in this section was run on the local target (kind on Docker, macOS ar
 | iOS app | `ios/`. Builds, 71 tests pass, runs in the simulator against the control plane |
 | Fresh clone | A fresh clone built and ran the blank-slate deployment and the scripted month |
 
+## The setup wizard (added 2026-11-17)
+
+- `clanker setup` serves a wizard on `127.0.0.1:7069`. `make release` builds self-contained
+  binaries (tag `bundle`) for macOS and Linux in `dist/`.
+- **Ran:** the macOS binary, started outside a checkout, walked through the local target in
+  a real browser and started the control plane (`web/scripts/setup-wizard-check.mjs`). It
+  used the data directory of the running demo, so a first deployment from an empty machine
+  through the wizard was not run. The command of the ECS task definition ran in the same
+  Amazon Linux 2023 image on this machine: it installed `git`, downloaded the Linux arm64
+  binary, checked the hash, started the control plane with the DELETE journal mode and
+  passed the health check. With a wrong hash it stopped.
+- **Not run:** anything in a real AWS account. The sign-in, review, deployment, tunnel and
+  removal are tested against a stand-in for the AWS CLI. `cfn-lint` passes on the template.
+  The open risks are the ones that only AWS can answer: the database and the repositories on
+  EFS, the ECS Exec tunnel to the loopback port, and the start time of the container.
+- **Not built:** installing the environment on AWS from the cloud control plane. The runner
+  has only a local state path, the broker has no AWS path, and nothing publishes the
+  Paperboat images for a cloud. On a cloud, `clanker up` starts in a standby mode. The
+  container has no OpenTofu, `opa` or `kubectl` yet.
+- The dashboard still trusts a header for the user. This is acceptable only because the
+  dashboard listens on the loopback address inside the container and the tunnel needs an
+  AWS session with permission for ECS Exec.
+- A binary that a browser downloads is unsigned, so macOS can refuse to start it. The
+  `curl` command in the README avoids this.
+
 ## What is validated only
 
 | Item | State |

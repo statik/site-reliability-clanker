@@ -387,11 +387,18 @@ func up(ctx context.Context, o options) error {
 		}()
 	}
 	go c.notifier.Run(ctx)
-	go c.monitor.Run(ctx, []string{o.env}, 10*time.Second)
-	go c.detector.Run(ctx, []string{o.env}, 20*time.Second)
 	go schedulerLoop(ctx, c)
-	if err := firstRun(ctx, c, o); err != nil {
-		return err
+	if o.cloud == "local" {
+		go c.monitor.Run(ctx, []string{o.env}, 10*time.Second)
+		go c.detector.Run(ctx, []string{o.env}, 20*time.Second)
+		if err := firstRun(ctx, c, o); err != nil {
+			return err
+		}
+	} else {
+		// The runner and the broker can apply only the local target today. On a cloud the
+		// control plane starts and serves the dashboard, and proposes no deployment.
+		slog.Warn("the control plane does not install an environment on this cloud yet",
+			"cloud", o.cloud, "env", o.env)
 	}
 	httpServer := &http.Server{Addr: o.addr, Handler: handler,
 		ReadHeaderTimeout: 10 * time.Second}

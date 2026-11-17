@@ -9,5 +9,6 @@ bin/
 .env
 .DS_Store
 site/out/
+internal/bundle/bundle.tar*
 web/test-results/
 .claude/worktrees/

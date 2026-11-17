@@ -1,0 +1,329 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Home of the Site Reliability Clanker control plane: one container on Amazon ECS with
+  Fargate, in its own network, with its data on an encrypted Amazon EFS file system. It
+  accepts no connection from the internet. You reach it through ECS Exec.
+
+Parameters:
+  EnvName:
+    Type: String
+    AllowedPattern: "^[a-z][a-z0-9-]{1,22}[a-z0-9]$"
+    Description: Name of the environment that this control plane manages.
+  BinaryUrl:
+    Type: String
+    AllowedPattern: "^https://.+"
+    Description: Download address of the clanker binary for Linux on arm64.
+  BinarySha256:
+    Type: String
+    AllowedPattern: "^[0-9a-f]{64}$"
+    Description: SHA-256 of that binary. The container refuses a file with another hash.
+  KeyParameterName:
+    Type: String
+    AllowedPattern: "^/[a-zA-Z0-9/_.-]+$"
+    Description: Name of the Parameter Store entry that holds the model API key.
+  HasModelKey:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Description: Whether that entry exists. Without it the agent uses recorded answers.
+  Cpu:
+    Type: String
+    Default: "512"
+    AllowedValues: ["512", "1024"]
+  Memory:
+    Type: String
+    Default: "1024"
+    AllowedValues: ["1024", "2048"]
+
+Conditions:
+  WithModelKey: !Equals [!Ref HasModelKey, "true"]
+
+Resources:
+  Network:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.250.0.0/24
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "clanker-${EnvName}-control"
+
+  Gateway:
+    Type: AWS::EC2::InternetGateway
+
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Network
+      InternetGatewayId: !Ref Gateway
+
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Network
+      CidrBlock: 10.250.0.0/26
+      AvailabilityZone: !Select [0, !GetAZs ""]
+
+  Routes:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Network
+
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      RouteTableId: !Ref Routes
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Gateway
+
+  SubnetRoutes:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Subnet
+      RouteTableId: !Ref Routes
+
+  TaskFirewall:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Control plane of Site Reliability Clanker. No inbound rule.
+      VpcId: !Ref Network
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS to AWS, to the model provider and to the binary download
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          CidrIp: 10.250.0.0/24
+          Description: NFS to the data file system
+
+  DataFirewall:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Data of the Clanker control plane. NFS from the control plane only.
+      VpcId: !Ref Network
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref TaskFirewall
+          Description: NFS from the control plane
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 127.0.0.1/32
+          Description: No outbound traffic
+
+  Data:
+    Type: AWS::EFS::FileSystem
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Encrypted: true
+      PerformanceMode: generalPurpose
+      ThroughputMode: elastic
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub "clanker-${EnvName}-control"
+
+  DataMount:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref Data
+      SubnetId: !Ref Subnet
+      SecurityGroups: [!Ref DataFirewall]
+
+  DataAccess:
+    Type: AWS::EFS::AccessPoint
+    Properties:
+      FileSystemId: !Ref Data
+      PosixUser:
+        Uid: "1000"
+        Gid: "1000"
+      RootDirectory:
+        Path: /clanker
+        CreationInfo:
+          OwnerUid: "1000"
+          OwnerGid: "1000"
+          Permissions: "0750"
+
+  Logs:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/clanker/${EnvName}/control-plane"
+      RetentionInDays: 30
+
+  # The role that ECS uses to start the container: write the log, read the model key.
+  StartRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: start-the-control-plane
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt Logs.Arn
+              - Effect: Allow
+                Action: ssm:GetParameters
+                Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${KeyParameterName}"
+
+  # The role that the control plane runs as. The access broker is this principal.
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: tunnel-and-data
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssmmessages:CreateControlChannel
+                  - ssmmessages:CreateDataChannel
+                  - ssmmessages:OpenControlChannel
+                  - ssmmessages:OpenDataChannel
+                Resource: "*"
+              - Effect: Allow
+                Action: [elasticfilesystem:ClientMount, elasticfilesystem:ClientWrite]
+                Resource: !GetAtt Data.Arn
+                Condition:
+                  StringEquals:
+                    elasticfilesystem:AccessPointArn: !GetAtt DataAccess.Arn
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "clanker-${EnvName}-control"
+
+  Task:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "clanker-${EnvName}-control"
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: !Ref Cpu
+      Memory: !Ref Memory
+      RuntimePlatform:
+        CpuArchitecture: ARM64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !GetAtt StartRole.Arn
+      TaskRoleArn: !GetAtt Role.Arn
+      Volumes:
+        - Name: data
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref Data
+            TransitEncryption: ENABLED
+            AuthorizationConfig:
+              AccessPointId: !Ref DataAccess
+              IAM: ENABLED
+      ContainerDefinitions:
+        - Name: clanker
+          Image: public.ecr.aws/amazonlinux/amazonlinux:2023
+          Essential: true
+          EntryPoint: ["/bin/bash", "-euc"]
+          # The image has no clanker in it. The container installs git, downloads the
+          # released binary and refuses it if the hash is not the one that the wizard read
+          # from the release. The access point of the file system maps every user to one
+          # owner, so git must not compare the owner of a repository with the user.
+          Command:
+            - |
+              dnf install -y -q git
+              git config --system --add safe.directory '*'
+              cd /usr/local/bin
+              curl -fsSL --retry 5 -o clanker "$BINARY_URL"
+              echo "$BINARY_SHA256  clanker" | sha256sum -c -
+              chmod 0755 clanker
+              exec clanker up --cloud aws --env "$CLANKER_ENV" --demo=false \
+                --data /data --addr 127.0.0.1:7070
+          Environment:
+            - Name: BINARY_URL
+              Value: !Ref BinaryUrl
+            - Name: BINARY_SHA256
+              Value: !Ref BinarySha256
+            - Name: CLANKER_ENV
+              Value: !Ref EnvName
+            - Name: HOME
+              Value: /root
+            # The data directory is on a network file system. See internal/store.
+            - Name: CLANKER_DB_JOURNAL
+              Value: DELETE
+          Secrets: !If
+            - WithModelKey
+            - - Name: OPENROUTER_API_KEY
+                ValueFrom: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${KeyParameterName}"
+            - !Ref AWS::NoValue
+          MountPoints:
+            - SourceVolume: data
+              ContainerPath: /data
+          LinuxParameters:
+            InitProcessEnabled: true
+          HealthCheck:
+            Command: [CMD-SHELL, "curl -fs -o /dev/null http://127.0.0.1:7070/api/v1/work-items"]
+            Interval: 15
+            Timeout: 5
+            Retries: 4
+            StartPeriod: 120
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref Logs
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: clanker
+
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn: [DefaultRoute, SubnetRoutes, DataMount]
+    Properties:
+      ServiceName: control-plane
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref Task
+      LaunchType: FARGATE
+      PlatformVersion: LATEST
+      DesiredCount: 1
+      EnableExecuteCommand: true
+      # Never two copies at once: the database has one writer.
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 0
+        MaximumPercent: 100
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: false
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets: [!Ref Subnet]
+          SecurityGroups: [!Ref TaskFirewall]
+          # The container needs a path out to AWS, to the model provider and to the binary
+          # download. A public address with no inbound rule gives that path for less than a
+          # NAT gateway.
+          AssignPublicIp: ENABLED
+
+Outputs:
+  Cluster:
+    Value: !Ref Cluster
+  Service:
+    Value: !GetAtt Service.Name
+  RoleArn:
+    Description: The principal that the access broker of the control plane runs as.
+    Value: !GetAtt Role.Arn
+  LogGroup:
+    Value: !Ref Logs
