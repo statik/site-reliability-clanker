@@ -140,7 +140,6 @@ extension Palette {
     let title: [NSAttributedString.Key: Any] = [.foregroundColor: text.uiColor]
     UINavigationBar.appearance().titleTextAttributes = title
     UINavigationBar.appearance().largeTitleTextAttributes = title
-    UITabBar.appearance().unselectedItemTintColor = text.uiColor
   }
 }
 
