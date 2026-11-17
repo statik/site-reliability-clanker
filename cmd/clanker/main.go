@@ -4,6 +4,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -198,7 +199,12 @@ func destroy(ctx context.Context, o options) error {
 	}
 	layers := slices.Clone(orchestrator.Layers)
 	slices.Reverse(layers)
-	admin := filepath.Join(r.StateDir(o.env), "kubeconfig")
+	// The teardown uses the administrator kubeconfig of the operator. Before the cluster
+	// exists there is none, and the layers below the cluster need none.
+	admin, err := os.ReadFile(filepath.Join(r.StateDir(o.env), "kubeconfig"))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("read the administrator kubeconfig of %s: %w", o.env, err)
+	}
 	for _, layer := range layers {
 		outputs, err := r.Outputs(o.env, layer)
 		if err != nil {
@@ -208,8 +214,8 @@ func destroy(ctx context.Context, o options) error {
 			continue
 		}
 		fmt.Printf("Destroying %s/%s\n", o.env, layer)
-		job := runner.Job{Env: o.env, Cloud: o.cloud, Layer: layer, Checkout: runner.Checkout{Dir: o.sourceDir},
-			KubeConfig: admin, Log: os.Stdout}
+		job := runner.Job{Env: o.env, Cloud: o.cloud, Layer: layer,
+			Checkout: runner.Checkout{Dir: o.sourceDir}, KubeConfig: string(admin), Log: os.Stdout}
 		if err := r.Destroy(ctx, job); err != nil {
 			return err
 		}
