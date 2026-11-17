@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Opening scene of the explainer video</title>
+  <link rel="stylesheet" href="../css/site.css">
+  <link rel="stylesheet" href="scene.css">
+</head>
+<body>
+  <!-- narration.md, segment "opening". The beats: 1 the name and the platform, 2 the
+       tagline, 3 inference, 5 three kinds of maintenance work (4 only hides the notes). -->
+  <main class="scene">
+    <div class="opening-head">
+      <div>
+        <div class="lockup appear">
+          <img class="lockup-mark" src="../img/icon.svg" alt="" width="60" height="60">
+          <p class="lockup-name">S.R.C.</p>
+          <p class="lockup-full">Site Reliability Clanker</p>
+        </div>
+        <p class="lockup-line appear">An AI site reliability engineer that installs, upgrades,
+          patches, and monitors your product.</p>
+      </div>
+      <div class="ingredients">
+        <p class="ingredients-title appear">Core ingredients</p>
+        <ul>
+          <li class="ingredient appear" style="--i: 0"><p class="ingredient-name">Compute</p></li>
+          <li class="ingredient appear" style="--i: 1"><p class="ingredient-name">Memory</p></li>
+          <li class="ingredient appear" style="--i: 2"><p class="ingredient-name">Storage</p></li>
+          <li class="ingredient ingredient-inference appear"><p class="ingredient-name">Inference</p></li>
+        </ul>
+      </div>
+    </div>
+    <div class="matrix" id="matrix"></div>
+  </main>
+  <script type="module" src="opening.js"></script>
+</body>
+</html>

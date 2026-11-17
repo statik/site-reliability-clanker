@@ -2,7 +2,8 @@
 // Step 4 of the video build: put it together with ffmpeg.
 //
 // 1. Cut each recording to the length of its segment (1080p, 30 frames a second, H.264),
-//    with a short fade in.
+//    with a short fade in. A recording of a running application keeps its own colours
+//    and gets a frame in the colours of the site.
 // 2. Join the segments.
 // 3. Lay each caption picture over its sentence, mix the narration over the music (the
 //    music gets quieter while the voice speaks), and write out/explainer.mp4.
@@ -19,6 +20,21 @@ import { FPS, GAP, OUT, TIMELINE, WORK } from "./script.mjs";
 const FADE_IN = 0.4;
 const FADE_OUT = 1.2;
 const MUSIC_LEVEL = 0.4;
+// The frame around a recording of the dashboard or of Paperboat: --dark and --honey of
+// css/site.css. The recording is 1456 x 819 inside a 2 pixel line, above the band of the
+// captions, so that no caption lies on the recording. The recorder makes a 1440 x 810
+// picture, so the recording keeps its size.
+const SURROUND = "0x1C1917";
+const RULE = "0xF0B53F";
+const FRAMED = [
+  "scale=1456:819:flags=lanczos",
+  `pad=1460:823:2:2:color=${RULE}`,
+  `pad=1920:1080:230:28:color=${SURROUND}`,
+];
+
+function isApplication(recording) {
+  return recording.shows.startsWith("tour:") || recording.shows.startsWith("dashboard:");
+}
 
 function ffmpeg(args) {
   execFileSync("ffmpeg", ["-v", "error", "-y", ...args], { stdio: ["ignore", "inherit", "inherit"] });
@@ -32,7 +48,7 @@ function cutSegments(timeline, recordings) {
     const last = index === timeline.segments.length - 1;
     const filters = [
       `fps=${FPS}`,
-      "scale=1920:1080:flags=lanczos",
+      ...(isApplication(recording) ? FRAMED : ["scale=1920:1080:flags=lanczos"]),
       // Hold the last frame if the recording is a little shorter than the narration.
       "tpad=stop_mode=clone:stop_duration=30",
       `fade=t=in:st=0:d=${FADE_IN}`,

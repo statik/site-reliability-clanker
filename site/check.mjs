@@ -3,7 +3,7 @@
 //
 //   node check.mjs
 //
-// For every page, at a desktop and a phone width, in the light and the dark theme, it
+// For every page, at a desktop and a phone width, it
 // fails on: a request to any host that is not this machine, a console error, a broken
 // image, or a page that scrolls sideways. It then checks that the text is there without
 // JavaScript, that the keys move through the walkthrough, and that reduced motion stops
@@ -18,7 +18,6 @@ import { SITE_DIR, serveSite } from "./lib/serve.mjs";
 const PORT = 4174;
 const PAGES = ["index", "walkthrough", "architecture", "screens"];
 const VIEWPORTS = { desktop: { width: 1440, height: 900 }, phone: { width: 390, height: 844 } };
-const THEMES = ["light", "dark"];
 const OUT = join(SITE_DIR, "out", "check");
 
 const problems = [];
@@ -51,12 +50,12 @@ async function checkLayout(page, label) {
 
 async function screenshots(browser, base) {
   for (const [size, viewport] of Object.entries(VIEWPORTS)) {
-    for (const theme of THEMES) {
+    {
       const context = await browser.newContext({
-        viewport, colorScheme: theme, reducedMotion: "reduce",
+        viewport, reducedMotion: "reduce",
       });
       for (const name of PAGES) {
-        const label = `${name} ${size} ${theme}`;
+        const label = `${name} ${size}`;
         const page = await context.newPage();
         watch(page, label);
         await page.goto(`${base}/${name}.html`, { waitUntil: "networkidle" });
@@ -67,7 +66,7 @@ async function screenshots(browser, base) {
           await Promise.all(Array.from(document.images).map((image) => image.decode().catch(() => {})));
         });
         await checkLayout(page, label);
-        await page.screenshot({ path: join(OUT, `${name}-${size}-${theme}.png`), fullPage: true });
+        await page.screenshot({ path: join(OUT, `${name}-${size}.png`), fullPage: true });
         await page.close();
       }
       await context.close();

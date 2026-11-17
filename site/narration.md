@@ -8,61 +8,69 @@ Format:
 
 - Each `##` heading starts a segment. The heading is the segment's name.
 - `source:` is what the segment shows. `fallback:` is what it shows when the source is not
-  available (the dashboard is not up, or Blender is not installed).
-  - `blender:title` is the 3D title sequence (`video/title.py`).
-  - `site:<page>` is a page of this site. `tour:<name>` and `dashboard:<name>` are the
-    scripted click-throughs in `lib/tours.mjs`.
+  available (the dashboard is not up).
+  - `site:<page>` is a page of this site. The drawn scenes of the video are pages too:
+    `site:video/opening.html`, `site:video/setup.html` and `site:video/pipeline.html`.
+  - `tour:<name>` and `dashboard:<name>` are the scripted click-throughs in `lib/tours.mjs`.
 - Each list item is one caption and one spoken sentence. The segment is as long as its
   sentences.
 - A caption can start with a cue in square brackets, for a `site:` source. The recorder
   does it when the sentence starts: `[#id]` scrolls to that part of the page, `[flow:N]`
-  moves the system diagram to stop N, and `[page:file.html]` opens another page.
+  moves the system diagram to stop N, `[beat:N]` shows part N of a drawn scene, and
+  `[page:file.html]` opens another page.
 - A caption can start with `(if event.type)` or `(unless event.type)`, before the cue. The
   sentence is then used only if the month has (or does not have) an event of that type, so
   the narration does not tell of something that a new run of the month did not do.
 - `{days}`, `{grants}`, `{held}`, `{events}` and `{rollback_seconds}` are filled in from
   `data/month.json`, so the narration cannot disagree with the data.
-- The voice says some words differently from how the caption spells them (AI, AWS). That
+- The voice says some words differently from how the caption spells them (AI, AWS, S.R.C.). That
   list is in `video/script.mjs`.
 
-## title
+## opening
 
-source: blender:title
-fallback: site:index.html
+source: site:video/opening.html
 
-- Site Reliability Clanker.
-- An AI site reliability engineer that asks first.
+- [beat:1] This is S.R.C.: Site Reliability Clanker.
+- [beat:2] Don't build a legacy product installer. Build an AI site reliability engineer that installs, upgrades, patches, and monitors your product.
+- [beat:3] Inference is now one of the core ingredients, alongside storage, memory, and compute.
+- [beat:5] A Kubernetes version reaches its end of support. A base image gets a vulnerability. The database needs a patch.
 
 ## problem
 
 source: site:index.html
 
-- [#problem-title] Most of operations is maintenance.
-- A Kubernetes version reaches its end of support. A base image gets a vulnerability. The database needs a patch.
-- An AI agent could do this work.
-- But an agent with standing access to production is a risk that you carry every day.
+- [#problem-title] An AI agent with standing access to production is a risk that you carry every day.
 - And the person who must approve a change often cannot read the plan.
+
+## setup
+
+source: site:video/setup.html
+
+- [beat:1] Setup is one download. It opens a wizard in your browser.
+- [beat:2] You sign in to your cloud. Today, the wizard sets up the local target only.
+- [beat:3] The wizard starts the control plane, and hands it over.
+- [beat:4] The control plane deploys the rest of the product: six layers, each under its own grant, after two people approve.
+- [beat:5] Then it maintains the product: upgrades, patches, drift and incidents.
+
+## change
+
+source: site:video/pipeline.html
+
+- [beat:2] A detector sees a new release.
+- [beat:3] S.R.C. uses AI to understand and propose the change, as deterministic code.
+- [beat:4] A strict policy engine sets the risk tier from the plan itself.
+- [beat:5] An adversarial review then challenges the risk level. It can raise the tier, and never lower it.
+- [beat:6] Then a person must approve. Slack, Teams and email tell the approvers.
+- [beat:7] The access broker issues a grant, for one layer only.
+- [beat:8] The runner applies exactly the approved plan.
+- [beat:9] A canary check verifies the result. By then, the grant is gone.
 
 ## example
 
 source: tour:paperboat
 
-- So we built a test subject. Paperboat rents out live fish.
-- It has a live inventory, fish that age, deliveries, and a support desk.
-- Clanker deployed it, and then looked after it for one month.
-
-## change
-
-source: site:architecture.html
-
-- [#flow-title] Follow one change through the system.
-- [flow:1] A detector sees that a new release is published.
-- [flow:3] The model drafts the change, as a pull request. That is all the model can do.
-- [flow:6] Policy code reads the plan, and sets the risk tier.
-- [flow:8] A person approves.
-- [flow:9] The access broker issues a grant, for one layer only.
-- [flow:10] The runner applies exactly the plan that was approved.
-- [flow:14] A canary check verifies the result. By then, the grant is already gone.
+- Our test subject is Paperboat. It rents out live fish.
+- S.R.C. deployed it, and then looked after it for one month.
 
 ## approval
 
@@ -71,7 +79,6 @@ fallback: site:index.html
 
 - [#approver-title] The approver sees one sentence: what changes, and why now.
 - [.approval] Then the impact, the risk tier, the safety steps, and the permission requested.
-- The model writes the words. The facts come from the plan.
 
 ## timeline
 
@@ -82,11 +89,7 @@ fallback: site:walkthrough.html
 - [#feature-release] A feature release.
 - [#cve] A security patch.
 - (if verify.failed) [#bad-release] Then a bad release. The health check passed, but the canary failed.
-- (if verify.failed) Clanker rolled it back in {rollback_seconds} seconds.
-- (if incident.opened) [#incident] At two in the morning, inventory requests start to fail.
-- (if agent.failed) The model writes a diagnosis, but it proposes no routine fix. So code stops, and a human decides.
-- (unless agent.failed) The model writes a diagnosis. What may run is for policy code to decide.
-- (if apply.refused) [#stale-plan] Later, an approved plan goes stale. The apply is refused, and the approval is asked again.
+- (if verify.failed) S.R.C. rolled it back in {rollback_seconds} seconds.
 
 ## access
 
@@ -94,14 +97,13 @@ source: dashboard:access
 fallback: site:architecture.html
 
 - [#grant-title] The agent has no standing write access.
-- [#grant-figure] Each grant is signed, scoped to one layer, and tied to the approved plan.
-- [.lanes] In {days} days, there were {grants} grants.
-- All together, they lasted {held}.
+- [.lanes] In {days} days, there were {grants} grants. All together, they lasted {held}.
 
 ## close
 
-source: site:walkthrough.html
+source: site:index.html
 
-- [#audit] Every one of the {events} records is in a hash-chained audit log.
-- Today, the local target runs end to end. The stacks for AWS, Google Cloud and Azure are validated, and not yet applied.
-- [page:index.html] Site Reliability Clanker. The model proposes. Code decides. And a person approves.
+- [#cost-title] Runbooks are fixed scripts. A daily cap controls the cost of inference.
+- [#evals-title] Evals measure each role. Your product should get better and easier to manage when new models come out.
+- [#hero-title] S.R.C. gives you the convenience of managed services, without a third-party contract.
+- The model proposes. Code decides. And a person approves.

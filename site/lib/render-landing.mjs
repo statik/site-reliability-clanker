@@ -1,7 +1,8 @@
 // Prerender the parts of the landing page that come from the exported month.
 
 import { clock, dayYear, duration, html, plural, shortHash } from "./html.mjs";
-import { displayName } from "./month.mjs";
+import { displayName, incidentRefusal } from "./month.mjs";
+import { pickFlowItem } from "./render-architecture.mjs";
 import { tierTag } from "./render-walkthrough.mjs";
 import { PRINCIPLES } from "./story.mjs";
 
@@ -20,7 +21,7 @@ export function renderStats(totals) {
 }
 
 function evidenceLines(month, totals) {
-  const refusal = month.events.find((event) => event.type === "agent.failed");
+  const refusal = incidentRefusal(month);
   const stale = month.events.find((event) => event.type === "apply.refused");
   const pulls = month.events.filter((event) => event.type === "pr.opened").length;
   const manual = month.events.find((event) => event.type === "sim.manual_change");
@@ -144,4 +145,28 @@ export function renderApproval(month) {
 export function renderApproverNames(month) {
   const people = month.users.filter((user) => user.role !== "viewer");
   return html`${people.map((user) => displayName(user.name, month.users)).join(", ")}`;
+}
+
+// The notice that the chat channels get for an approval request, with the text that
+// internal/notify builds from the event: the summary, the sentence, the facts and the link.
+export function renderNotice(month) {
+  const id = pickFlowItem(month).work_item.id;
+  const request = month.events.find(
+    (event) => event.type === "approval.requested" && event.work_item === id,
+  );
+  const facts = [
+    ["Work item", id], ["Environment", request.env], ["Tier", request.data.tier],
+    ["Rule", request.data.rule], ["Approvers required", request.data.approvers_required],
+  ];
+  return html`<figure class="notice reveal">
+    <div class="notice-card">
+      <p class="notice-title">${request.summary}</p>
+      <p>${request.data.sentence} Open the dashboard and sign in to decide. You cannot approve
+        from this message.</p>
+      <dl class="notice-facts">${facts.map(([label, value]) => html`<div><dt>${label}</dt><dd>${value}</dd></div>`)}</dl>
+      <p class="notice-link">Open in Clanker <span aria-hidden="true">&rarr;</span></p>
+    </div>
+    <figcaption class="figure-caption">A drawing, not a screenshot. The words are the notice
+      for ${id}, as the control plane sends it to Slack and to Teams.</figcaption>
+  </figure>`;
 }

@@ -4,8 +4,8 @@
 import { html } from "./html.mjs";
 
 const GROUPS = [
-  ["dashboard", "The Clanker dashboard", "What an approver sees. Captured from the running demo."],
-  ["paperboat", "Paperboat, the managed application", "The fish rental business that Clanker deploys and looks after."],
+  ["dashboard", "The S.R.C. dashboard", "What an approver sees. Captured from the running demo."],
+  ["paperboat", "Paperboat, the managed application", "The fish rental business that S.R.C. deploys and looks after."],
   ["notifications", "Where the notifications arrive", "The mail inbox and the webhook sink of the demo, with the real messages of the month."],
 ];
 

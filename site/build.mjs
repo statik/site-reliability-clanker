@@ -16,10 +16,10 @@ import { fileURLToPath } from "node:url";
 import { dayYear, html } from "./lib/html.mjs";
 import { steps, totals } from "./lib/month.mjs";
 import {
-  renderFlowSteps, renderGrantCard, renderGrantLanes, renderRefusal, renderStatePaths,
-  renderStateSvg, renderSystemSvg,
+  renderFlowSteps, renderGrantCard, renderGrantLanes, renderMachine, renderRefusal, renderStatePaths,
+  renderStateSvg,
 } from "./lib/render-architecture.mjs";
-import { renderApproval, renderPrinciples, renderStats } from "./lib/render-landing.mjs";
+import { renderApproval, renderNotice, renderPrinciples, renderStats } from "./lib/render-landing.mjs";
 import { renderGallery } from "./lib/render-screens.mjs";
 import { renderRail, renderSteps } from "./lib/render-walkthrough.mjs";
 
@@ -58,6 +58,7 @@ function fragments() {
       stats: renderStats(monthTotals),
       principles: renderPrinciples(month, monthTotals),
       approval: renderApproval(month),
+      notice: renderNotice(month),
       period,
     },
     "walkthrough.html": {
@@ -66,7 +67,7 @@ function fragments() {
       period,
     },
     "architecture.html": {
-      system: renderSystemSvg(),
+      machine: renderMachine(month),
       flow: renderFlowSteps(month),
       states: renderStateSvg(month),
       paths: renderStatePaths(month),

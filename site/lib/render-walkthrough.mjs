@@ -290,12 +290,6 @@ export function renderRail(stepList, context) {
       <div class="axis-row axis-grants"><span class="axis-name">Grants</span>
         <div class="axis-lane">${blips}</div></div>
       <div class="axis-row axis-dates"><span class="axis-name"></span>
-        <div class="axis-lane">${ticks}<span class="boat" aria-hidden="true">${raw(BOAT_SVG)}</span></div></div>
+        <div class="axis-lane">${ticks}<span class="axis-marker" aria-hidden="true"></span></div></div>
     </div>`;
 }
-
-export const BOAT_SVG =
-  '<svg viewBox="0 0 32 24" width="32" height="24" focusable="false">' +
-  '<path class="boat-sail" d="M16 1 L24 14 H8 Z"/>' +
-  '<path class="boat-hull" d="M1 14 H31 L24 23 H8 Z"/>' +
-  '<path class="boat-fold" d="M16 1 V14"/></svg>';

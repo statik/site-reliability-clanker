@@ -207,3 +207,15 @@ export function steps(month) {
   });
   return list;
 }
+
+/**
+ * Returns the event where code refused what the Investigator proposed for an incident.
+ * A failure of another model role, for example of the Reviewer, is not a refusal.
+ */
+export function incidentRefusal(month, events = month.events) {
+  return events.find(
+    (event) =>
+      event.type === "agent.failed" &&
+      month.work_items[event.work_item]?.work_item.kind === "incident",
+  );
+}

@@ -3,17 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Walkthrough: one month with Site Reliability Clanker</title>
+  <title>Walkthrough: one month with S.R.C. (Site Reliability Clanker)</title>
   <meta name="description" content="The scripted month, step by step, drawn from the real audit log of the prototype: who did what, when, at which risk tier, who approved it, and how long each grant lasted.">
-  <meta name="color-scheme" content="light dark">
-  <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="img/icon-small.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/site.css">
   <script src="js/boot.js"></script>
 </head>
 <body class="page-walkthrough">
   <a class="skip-link" href="#main">Skip to main content</a>
   <header class="shell">
-    <a class="shell-name" href="index.html"><span class="shell-prefix">Site Reliability</span> Clanker</a>
+    <a class="shell-name" href="index.html"><img class="shell-logo" src="img/icon-small.svg" alt="" width="24" height="24">S.R.C. <span class="shell-full">Site Reliability Clanker</span></a>
     <nav aria-label="Site">
       <ul>
         <li><a href="index.html">Overview</a></li>
@@ -23,10 +23,6 @@
         <li><a href="https://github.com/statik/site-reliability-clanker" rel="noopener">GitHub</a></li>
       </ul>
     </nav>
-    <button type="button" class="theme-toggle js-only" aria-label="Switch theme">
-      <svg class="icon-sun" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 12a4 4 0 1 1-4 4 4 4 0 0 1 4-4m0-2a6 6 0 1 0 6 6 6 6 0 0 0-6-6ZM5.4 6.8l1.4-1.4 3.5 3.5-1.4 1.4zM2 15h5v2H2zM5.4 25.2l3.5-3.5 1.4 1.4-3.5 3.5zM15 25h2v5h-2zM21.7 23.1l1.4-1.4 3.5 3.5-1.4 1.4zM25 15h5v2h-5zM21.7 8.9l3.5-3.5 1.4 1.4-3.5 3.5zM15 2h2v5h-2z"/></svg>
-      <svg class="icon-moon" viewBox="0 0 32 32" aria-hidden="true"><path d="M13.5 5.4a11 11 0 0 0 13 13.1A11 11 0 1 1 13.5 5.4M15 3A13 13 0 1 0 29 17.6a1 1 0 0 0-1.5-1A9 9 0 0 1 15.4 4.5a1 1 0 0 0-.4-1.5Z"/></svg>
-    </button>
   </header>
 
   <main id="main">
@@ -35,7 +31,7 @@
         <!-- build:period -->
 17 Nov 2026 to 16 Dec 2026
 <!-- /build:period --></p>
-      <h1 class="reveal">One month with Clanker, one change at a time.</h1>
+      <h1 class="reveal">One month with S.R.C., one change at a time.</h1>
       <p class="section-lead reveal">A fish rental business goes from nothing to production, and then
         a month of ordinary trouble happens to it. Each step below is drawn from the audit log
         of the real run. The headlines are ours. The names, times, tiers and numbers are the
@@ -96,50 +92,48 @@ Next <span aria-hidden="true">→</span></button>
 and a mark for each of the 18 grants. Each mark is a few seconds of access.">
 <div class="axis-row axis-health"><span class="axis-name">Health</span>
 <div class="axis-lane"><span class="health is-good"
-style="left:0.70%;width:0.62%"
+style="left:2.57%;width:0.63%"
 title="17 Nov: 100% of 64 sampled requests succeeded"></span><span class="health is-good"
-style="left:23.82%;width:0.63%"
+style="left:26.32%;width:0.63%"
 title="24 Nov: 100% of 24 sampled requests succeeded"></span><span class="health is-good"
-style="left:27.57%;width:0.62%"
+style="left:29.45%;width:0.63%"
 title="25 Nov: 100% of 88 sampled requests succeeded"></span><span class="health is-good"
-style="left:43.82%;width:0.63%"
+style="left:46.32%;width:0.62%"
 title="30 Nov: 100% of 80 sampled requests succeeded"></span><span class="health is-bad"
-style="left:63.82%;width:0.63%"
-title="6 Dec: 88% of 136 sampled requests succeeded"><span class="health-label">88%</span></span><span class="health is-good"
-style="left:70.70%;width:0.63%"
-title="8 Dec: 100% of 32 sampled requests succeeded"></span><span class="health is-bad"
-style="left:80.70%;width:0.63%"
-title="11 Dec: 56% of 128 sampled requests succeeded"><span class="health-label">56%</span></span><span class="health is-good"
-style="left:87.57%;width:0.63%"
-title="13 Dec: 100% of 32 sampled requests succeeded"></span><span class="health is-good"
-style="left:90.70%;width:0.63%"
-title="14 Dec: 100% of 24 sampled requests succeeded"></span><span class="health is-good"
-style="left:93.82%;width:0.63%"
-title="15 Dec: 100% of 72 sampled requests succeeded"></span><span class="health is-bad"
+style="left:66.32%;width:0.62%"
+title="6 Dec: 85% of 136 sampled requests succeeded"><span class="health-label">85%</span></span><span class="health is-good"
+style="left:73.20%;width:0.63%"
+title="8 Dec: 100% of 24 sampled requests succeeded"></span><span class="health is-good"
+style="left:83.20%;width:0.63%"
+title="11 Dec: 100% of 96 sampled requests succeeded"></span><span class="health is-good"
+style="left:89.45%;width:0.63%"
+title="13 Dec: 100% of 24 sampled requests succeeded"></span><span class="health is-good"
+style="left:93.20%;width:0.63%"
+title="14 Dec: 100% of 32 sampled requests succeeded"></span><span class="health is-bad"
 style="left:96.32%;width:0.63%"
-title="15 Dec: 77% of 176 sampled requests succeeded"><span class="health-label">77%</span></span></div></div>
+title="15 Dec: 89% of 256 sampled requests succeeded"><span class="health-label">89%</span></span></div></div>
 <div class="axis-row axis-grants"><span class="axis-name">Grants</span>
 <div class="axis-lane"><span class="blip blip-apply"
-style="left:0.80%"></span><span class="blip blip-apply"
-style="left:0.80%"></span><span class="blip blip-apply"
-style="left:0.80%"></span><span class="blip blip-apply"
-style="left:0.80%"></span><span class="blip blip-apply"
-style="left:0.80%"></span><span class="blip blip-apply"
-style="left:0.80%"></span><span class="blip blip-runbook"
-style="left:24.14%"></span><span class="blip blip-apply"
-style="left:27.75%"></span><span class="blip blip-apply"
-style="left:44.42%"></span><span class="blip blip-apply"
-style="left:64.42%"></span><span class="blip blip-apply"
-style="left:64.42%"></span><span class="blip blip-apply"
-style="left:81.09%"></span><span class="blip blip-runbook"
-style="left:87.76%"></span><span class="blip blip-runbook"
-style="left:91.10%"></span><span class="blip blip-runbook"
-style="left:91.10%"></span><span class="blip blip-apply"
-style="left:94.43%"></span><span class="blip blip-debug"
+style="left:3.00%"></span><span class="blip blip-apply"
+style="left:3.00%"></span><span class="blip blip-apply"
+style="left:3.00%"></span><span class="blip blip-apply"
+style="left:3.00%"></span><span class="blip blip-apply"
+style="left:3.00%"></span><span class="blip blip-apply"
+style="left:3.00%"></span><span class="blip blip-runbook"
+style="left:26.34%"></span><span class="blip blip-apply"
+style="left:29.95%"></span><span class="blip blip-apply"
+style="left:46.62%"></span><span class="blip blip-apply"
+style="left:66.62%"></span><span class="blip blip-apply"
+style="left:66.62%"></span><span class="blip blip-apply"
+style="left:83.29%"></span><span class="blip blip-runbook"
+style="left:89.96%"></span><span class="blip blip-runbook"
+style="left:93.29%"></span><span class="blip blip-runbook"
+style="left:93.29%"></span><span class="blip blip-apply"
+style="left:96.63%"></span><span class="blip blip-debug"
 style="left:96.94%"></span><span class="blip blip-runbook"
 style="left:96.94%"></span></div></div>
 <div class="axis-row axis-dates"><span class="axis-name"></span>
-<div class="axis-lane"><span class="axis-tick" style="left:0.00%">17 Nov</span><span class="axis-tick" style="left:23.33%">24 Nov</span><span class="axis-tick" style="left:46.67%">1 Dec</span><span class="axis-tick" style="left:70.00%">8 Dec</span><span class="axis-tick" style="left:93.33%">15 Dec</span><span class="boat" aria-hidden="true"><svg viewBox="0 0 32 24" width="32" height="24" focusable="false"><path class="boat-sail" d="M16 1 L24 14 H8 Z"/><path class="boat-hull" d="M1 14 H31 L24 23 H8 Z"/><path class="boat-fold" d="M16 1 V14"/></svg></span></div></div>
+<div class="axis-lane"><span class="axis-tick" style="left:0.00%">17 Nov</span><span class="axis-tick" style="left:23.33%">24 Nov</span><span class="axis-tick" style="left:46.67%">1 Dec</span><span class="axis-tick" style="left:70.00%">8 Dec</span><span class="axis-tick" style="left:93.33%">15 Dec</span><span class="axis-marker" aria-hidden="true"></span></div></div>
 </div>
 <!-- /build:rail -->
       </div>
@@ -147,7 +141,7 @@ style="left:96.94%"></span></div></div>
 
     <!-- build:steps -->
 <section class="step" id="blank-slate" data-step="0"
-data-at="0.80" aria-labelledby="blank-slate-title">
+data-at="3.00" aria-labelledby="blank-slate-title">
 <div class="step-inner">
 <div class="step-text">
 <p class="kicker reveal">Step 1 of 14 ·
@@ -161,11 +155,11 @@ the plan and rates it <strong>T3</strong> under the rule
 <code>high-risk-layer</code>, so it needs
 two approvers.
 Alice Ng and Bob Okafor approve. The broker issues the first grant of the
-month to <code>applier-00-bootstrap</code> and takes it back 0.2 s later.</p>
+month to <code>applier-00-bootstrap</code> and takes it back 0.4 s later.</p>
 <div class="reveal"><dl class="facts">
 <div><dt>Risk tier</dt><dd><span class="tag tag-t3">T3</span> <span class="fact-note">rule <code>high-risk-layer</code></span></dd></div>
 <div><dt>Approved by</dt><dd>Alice Ng and Bob Okafor</dd></div>
-<div><dt>Write or debug access</dt><dd>1 grant, 0.2 s in total</dd></div>
+<div><dt>Write or debug access</dt><dd>1 grant, 0.4 s in total</dd></div>
 <div><dt>Outcome</dt><dd>Applying</dd></div>
 </dl></div>
 <p class="principle-note reveal"><span class="principle-number">Principle
@@ -181,164 +175,169 @@ Blank-slate deployment of local</p>
 </div>
 <ul class="grants"><li class="grant">
 <div class="grant-head">
-<span class="mono">G-7a8c589e5773</span>
+<span class="mono">G-fa5b1e814140</span>
 <span class="grant-identity mono">applier-00-bootstrap</span>
 <span class="tag tag-green">Used, then revoked</span>
 </div>
 <div class="grant-bar" role="img"
-aria-label="Held for 0.2 s of a 30-minute window">
+aria-label="Held for 0.4 s of a 30-minute window">
 <span class="grant-fill" style="--share:0.60%"></span>
 </div>
-<p class="grant-note">Issued 05:45:10, ended 05:45:10. Held <strong>0.2 s</strong> of a
+<p class="grant-note">Issued 21:35:08, ended 21:35:08. Held <strong>0.4 s</strong> of a
 30-minute window. Approved by: Alice Ng and Bob Okafor.</p>
 </li></ul>
 <table class="events">
 <caption class="visually-hidden">Main events of the step blank-slate</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:44:59.835Z">17 Nov 05:44:59</time></td>
-<td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
-Carol Reyes</span></td>
-<td class="ev-what">Carol Reyes signed a standing approval for runbook restart-deployment</td>
-</tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:44:59.836Z">17 Nov 05:44:59</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:34:56.421Z">17 Nov 21:34:56</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Carol Reyes</span></td>
 <td class="ev-what">Carol Reyes signed a standing approval for runbook db-backup</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:00.668Z">17 Nov 05:45:00</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:34:56.425Z">17 Nov 21:34:56</time></td>
+<td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
+Carol Reyes</span></td>
+<td class="ev-what">Carol Reyes signed a standing approval for runbook db-maintenance</td>
+</tr><tr>
+<td class="ev-time"><time datetime="2026-11-17T21:34:58.334Z">17 Nov 21:34:58</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
 <td class="ev-what">Blank-slate deployment of local is tier T3 by rule high-risk-layer <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:08.161Z">17 Nov 05:45:08</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:04.724Z">17 Nov 21:35:04</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Approval needed: Blank-slate deployment of local <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:10.181Z">17 Nov 05:45:10</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:08.509Z">17 Nov 21:35:08</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Alice Ng</span></td>
 <td class="ev-what">Blank-slate deployment of local: approve by Alice Ng <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:10.186Z">17 Nov 05:45:10</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:08.514Z">17 Nov 21:35:08</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Bob Okafor</span></td>
 <td class="ev-what">Blank-slate deployment of local: approve by Bob Okafor <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:10.189Z">17 Nov 05:45:10</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:08.522Z">17 Nov 21:35:08</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-7a8c589e5773: applier-00-bootstrap may apply 00-bootstrap until 2026-11-17T06:15:10.189Z <span class="ev-wi">WI-0001</span></td>
+<td class="ev-what">Grant G-fa5b1e814140: applier-00-bootstrap may apply 00-bootstrap until 2026-11-17T22:05:08.521Z <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:10.381Z">17 Nov 05:45:10</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:08.889Z">17 Nov 21:35:08</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-7a8c589e5773 ended; the credential is gone <span class="ev-wi">WI-0001</span></td>
+<td class="ev-what">Grant G-fa5b1e814140 ended; the credential is gone <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:10.381Z">17 Nov 05:45:10</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:08.890Z">17 Nov 21:35:08</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 00-bootstrap <span class="ev-wi">WI-0001</span></td>
 </tr></tbody>
 </table>
 <details class="all-events">
-<summary>All 19 events of this step, and 1 by email, 1 by slack, 1 by teams and 1 by discord notifications</summary>
+<summary>All 20 events of this step, and 1 by email, 1 by slack, 1 by teams and 1 by discord notifications</summary>
 <table class="events">
 <caption class="visually-hidden">All events of the step blank-slate</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:44:59.835Z">17 Nov 05:44:59</time></td>
-<td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
-Carol Reyes</span></td>
-<td class="ev-what">Carol Reyes signed a standing approval for runbook restart-deployment</td>
-</tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:44:59.836Z">17 Nov 05:44:59</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:34:56.421Z">17 Nov 21:34:56</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Carol Reyes</span></td>
 <td class="ev-what">Carol Reyes signed a standing approval for runbook db-backup</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:44:59.836Z">17 Nov 05:44:59</time></td>
-<td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
-Carol Reyes</span></td>
-<td class="ev-what">Carol Reyes signed a standing approval for runbook restore-drill</td>
-</tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:44:59.836Z">17 Nov 05:44:59</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:34:56.425Z">17 Nov 21:34:56</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Carol Reyes</span></td>
 <td class="ev-what">Carol Reyes signed a standing approval for runbook db-maintenance</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:44:59.837Z">17 Nov 05:44:59</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:34:56.429Z">17 Nov 21:34:56</time></td>
+<td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
+Carol Reyes</span></td>
+<td class="ev-what">Carol Reyes signed a standing approval for runbook restart-deployment</td>
+</tr><tr>
+<td class="ev-time"><time datetime="2026-11-17T21:34:56.433Z">17 Nov 21:34:56</time></td>
+<td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
+Carol Reyes</span></td>
+<td class="ev-what">Carol Reyes signed a standing approval for runbook restore-drill</td>
+</tr><tr>
+<td class="ev-time"><time datetime="2026-11-17T21:34:56.435Z">17 Nov 21:34:56</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Blank-slate deployment of local <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:00.667Z">17 Nov 05:45:00</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:34:57.147Z">17 Nov 21:34:57</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Plan of 00-bootstrap: 1 to add, 0 to change, 0 to destroy, 0 to replace <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:00.668Z">17 Nov 05:45:00</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:34:58.327Z">17 Nov 21:34:58</time></td>
+<td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
+reviewer</span></td>
+<td class="ev-what">Adversarial review agrees with tier T3 of the policy engine <span class="ev-wi">WI-0001</span></td>
+</tr><tr>
+<td class="ev-time"><time datetime="2026-11-17T21:34:58.332Z">17 Nov 21:34:58</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Blank-slate deployment of local: Detected → Planned <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:00.668Z">17 Nov 05:45:00</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:34:58.334Z">17 Nov 21:34:58</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
 <td class="ev-what">Blank-slate deployment of local is tier T3 by rule high-risk-layer <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:08.159Z">17 Nov 05:45:08</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:04.718Z">17 Nov 21:35:04</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 explainer</span></td>
 <td class="ev-what">Explainer wrote the approval summary <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:08.160Z">17 Nov 05:45:08</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:04.722Z">17 Nov 21:35:04</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Blank-slate deployment of local: Planned → AwaitingApproval <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:08.161Z">17 Nov 05:45:08</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:04.724Z">17 Nov 21:35:04</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Approval needed: Blank-slate deployment of local <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:10.181Z">17 Nov 05:45:10</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:08.509Z">17 Nov 21:35:08</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Alice Ng</span></td>
 <td class="ev-what">Blank-slate deployment of local: approve by Alice Ng <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:10.186Z">17 Nov 05:45:10</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:08.514Z">17 Nov 21:35:08</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Bob Okafor</span></td>
 <td class="ev-what">Blank-slate deployment of local: approve by Bob Okafor <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:10.187Z">17 Nov 05:45:10</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:08.517Z">17 Nov 21:35:08</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Bob Okafor</span></td>
 <td class="ev-what">Blank-slate deployment of local: AwaitingApproval → Approved <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:10.189Z">17 Nov 05:45:10</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:08.520Z">17 Nov 21:35:08</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Blank-slate deployment of local: Approved → Applying <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:10.189Z">17 Nov 05:45:10</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:08.522Z">17 Nov 21:35:08</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-7a8c589e5773: applier-00-bootstrap may apply 00-bootstrap until 2026-11-17T06:15:10.189Z <span class="ev-wi">WI-0001</span></td>
+<td class="ev-what">Grant G-fa5b1e814140: applier-00-bootstrap may apply 00-bootstrap until 2026-11-17T22:05:08.521Z <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:10.192Z">17 Nov 05:45:10</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:08.535Z">17 Nov 21:35:08</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Apply of 00-bootstrap started <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:10.381Z">17 Nov 05:45:10</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:08.889Z">17 Nov 21:35:08</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-7a8c589e5773 ended; the credential is gone <span class="ev-wi">WI-0001</span></td>
+<td class="ev-what">Grant G-fa5b1e814140 ended; the credential is gone <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:10.381Z">17 Nov 05:45:10</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:08.890Z">17 Nov 21:35:08</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 00-bootstrap <span class="ev-wi">WI-0001</span></td>
@@ -347,7 +346,7 @@ runner</span></td>
 </details></div>
 </div>
 </section><section class="step" id="deploy" data-step="1"
-data-at="0.80" aria-labelledby="deploy-title">
+data-at="3.00" aria-labelledby="deploy-title">
 <div class="step-inner">
 <div class="step-text">
 <p class="kicker reveal">Step 2 of 14 ·
@@ -356,13 +355,13 @@ data-at="0.80" aria-labelledby="deploy-title">
 <p class="lead reveal">The same approval covers the rest of the first deployment, because
 policy checked that each of the next five plans only
 creates resources. Every layer still gets its own grant, scoped to that layer:
-10-network, 20-cluster, 30-data, 40-platform and 50-app. The longest, for <code>30-data</code>, lasts
-67 s. Then the verifier checks the result:
+10-network, 20-cluster, 30-data, 40-platform and 50-app. The longest, for <code>20-cluster</code>, lasts
+27 s. Then the verifier checks the result:
 health check answers 200, running version is 1.0.0 and canary: 40 of 40 inventory requests succeeded (error rate 0%). The fish are open for business.</p>
 <div class="reveal"><dl class="facts">
 <div><dt>Risk tier</dt><dd><span class="tag tag-t3">T3</span> <span class="fact-note">rule <code>high-risk-layer</code></span></dd></div>
 <div><dt>Approved by</dt><dd>None given</dd></div>
-<div><dt>Write or debug access</dt><dd>5 grants, 1 min 46 s in total</dd></div>
+<div><dt>Write or debug access</dt><dd>5 grants, 61 s in total</dd></div>
 <div><dt>Outcome</dt><dd>Done</dd></div>
 </dl></div>
 <p class="principle-note reveal"><span class="principle-number">Principle
@@ -378,51 +377,51 @@ Blank-slate deployment of local</p>
 </div>
 <ul class="grants"><li class="grant">
 <div class="grant-head">
-<span class="mono">G-7edfe41f1a76</span>
+<span class="mono">G-41bfab3b4e60</span>
 <span class="grant-identity mono">applier-10-network</span>
 <span class="tag tag-green">Used, then revoked</span>
 </div>
 <div class="grant-bar" role="img"
-aria-label="Held for 2.6 s of a 30-minute window">
+aria-label="Held for 3.3 s of a 30-minute window">
 <span class="grant-fill" style="--share:0.60%"></span>
 </div>
-<p class="grant-note">Issued 05:45:10, ended 05:45:13. Held <strong>2.6 s</strong> of a
+<p class="grant-note">Issued 21:35:09, ended 21:35:12. Held <strong>3.3 s</strong> of a
 30-minute window. Approved by: Alice Ng and Bob Okafor.</p>
 </li><li class="grant">
 <div class="grant-head">
-<span class="mono">G-eb8f22d847aa</span>
+<span class="mono">G-86b438b1eae5</span>
 <span class="grant-identity mono">applier-20-cluster</span>
 <span class="tag tag-green">Used, then revoked</span>
 </div>
 <div class="grant-bar" role="img"
-aria-label="Held for 24 s of a 30-minute window">
-<span class="grant-fill" style="--share:1.33%"></span>
+aria-label="Held for 27 s of a 30-minute window">
+<span class="grant-fill" style="--share:1.52%"></span>
 </div>
-<p class="grant-note">Issued 05:45:19, ended 05:45:43. Held <strong>24 s</strong> of a
+<p class="grant-note">Issued 21:35:18, ended 21:35:46. Held <strong>27 s</strong> of a
 30-minute window. Approved by: Alice Ng and Bob Okafor.</p>
 </li><li class="grant">
 <div class="grant-head">
-<span class="mono">G-fba40a1d0448</span>
+<span class="mono">G-e92fc5ea156c</span>
 <span class="grant-identity mono">applier-30-data</span>
 <span class="tag tag-green">Used, then revoked</span>
 </div>
 <div class="grant-bar" role="img"
-aria-label="Held for 67 s of a 30-minute window">
-<span class="grant-fill" style="--share:3.71%"></span>
+aria-label="Held for 17 s of a 30-minute window">
+<span class="grant-fill" style="--share:0.93%"></span>
 </div>
-<p class="grant-note">Issued 05:45:44, ended 05:46:51. Held <strong>67 s</strong> of a
+<p class="grant-note">Issued 21:35:47, ended 21:36:04. Held <strong>17 s</strong> of a
 30-minute window. Approved by: Alice Ng and Bob Okafor.</p>
 </li><li class="grant">
 <div class="grant-head">
-<span class="mono">G-98e2abba64d2</span>
+<span class="mono">G-bdb0fa3cfd34</span>
 <span class="grant-identity mono">applier-40-platform</span>
 <span class="tag tag-green">Used, then revoked</span>
 </div>
 <div class="grant-bar" role="img"
-aria-label="Held for 1.0 s of a 30-minute window">
+aria-label="Held for 1.2 s of a 30-minute window">
 <span class="grant-fill" style="--share:0.60%"></span>
 </div>
-<p class="grant-note">Issued 05:46:52, ended 05:46:53. Held <strong>1.0 s</strong> of a
+<p class="grant-note">Issued 21:36:05, ended 21:36:07. Held <strong>1.2 s</strong> of a
 30-minute window. Approved by: Alice Ng and Bob Okafor.</p>
 </li></ul>
 <p class="more">and 1 more grant, each revoked.</p>
@@ -430,37 +429,37 @@ aria-label="Held for 1.0 s of a 30-minute window">
 <caption class="visually-hidden">Main events of the step deploy</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:10.849Z">17 Nov 05:45:10</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:09.454Z">17 Nov 21:35:09</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-7edfe41f1a76: applier-10-network may apply 10-network until 2026-11-17T06:15:10.848Z <span class="ev-wi">WI-0001</span></td>
+<td class="ev-what">Grant G-41bfab3b4e60: applier-10-network may apply 10-network until 2026-11-17T22:05:09.453Z <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:13.408Z">17 Nov 05:45:13</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:12.747Z">17 Nov 21:35:12</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-7edfe41f1a76 ended; the credential is gone <span class="ev-wi">WI-0001</span></td>
+<td class="ev-what">Grant G-41bfab3b4e60 ended; the credential is gone <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:13.409Z">17 Nov 05:45:13</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:12.749Z">17 Nov 21:35:12</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 10-network <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:19.401Z">17 Nov 05:45:19</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:18.838Z">17 Nov 21:35:18</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-eb8f22d847aa: applier-20-cluster may apply 20-cluster until 2026-11-17T06:15:19.401Z <span class="ev-wi">WI-0001</span></td>
+<td class="ev-what">Grant G-86b438b1eae5: applier-20-cluster may apply 20-cluster until 2026-11-17T22:05:18.837Z <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:43.388Z">17 Nov 05:45:43</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:46.284Z">17 Nov 21:35:46</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-eb8f22d847aa ended; the credential is gone <span class="ev-wi">WI-0001</span></td>
+<td class="ev-what">Grant G-86b438b1eae5 ended; the credential is gone <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:43.388Z">17 Nov 05:45:43</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:46.285Z">17 Nov 21:35:46</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 20-cluster <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:47:07.663Z">17 Nov 05:47:07</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:36:21.516Z">17 Nov 21:36:21</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 verifier</span></td>
 <td class="ev-what">Verification passed: Blank-slate deployment of local <span class="ev-wi">WI-0001</span></td>
@@ -472,172 +471,172 @@ verifier</span></td>
 <caption class="visually-hidden">All events of the step deploy</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:10.848Z">17 Nov 05:45:10</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:09.451Z">17 Nov 21:35:09</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Plan of 10-network: 3 to add, 0 to change, 0 to destroy, 0 to replace <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:10.848Z">17 Nov 05:45:10</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:09.453Z">17 Nov 21:35:09</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
 <td class="ev-what">Plan of 10-network only creates resources; the approval covers it <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:10.849Z">17 Nov 05:45:10</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:09.454Z">17 Nov 21:35:09</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-7edfe41f1a76: applier-10-network may apply 10-network until 2026-11-17T06:15:10.848Z <span class="ev-wi">WI-0001</span></td>
+<td class="ev-what">Grant G-41bfab3b4e60: applier-10-network may apply 10-network until 2026-11-17T22:05:09.453Z <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:10.849Z">17 Nov 05:45:10</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:09.462Z">17 Nov 21:35:09</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Apply of 10-network started <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:13.408Z">17 Nov 05:45:13</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:12.747Z">17 Nov 21:35:12</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-7edfe41f1a76 ended; the credential is gone <span class="ev-wi">WI-0001</span></td>
+<td class="ev-what">Grant G-41bfab3b4e60 ended; the credential is gone <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:13.409Z">17 Nov 05:45:13</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:12.749Z">17 Nov 21:35:12</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 10-network <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:18.929Z">17 Nov 05:45:18</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:18.223Z">17 Nov 21:35:18</time></td>
 <td class="ev-who"><span class="who who-simulator"><span class="who-kind">Simulator</span>
 simulator</span></td>
 <td class="ev-what">Paperboat images for all releases are in the registry localhost:5001</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:19.400Z">17 Nov 05:45:19</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:18.835Z">17 Nov 21:35:18</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Plan of 20-cluster: 2 to add, 0 to change, 0 to destroy, 0 to replace <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:19.401Z">17 Nov 05:45:19</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:18.837Z">17 Nov 21:35:18</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
 <td class="ev-what">Plan of 20-cluster only creates resources; the approval covers it <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:19.401Z">17 Nov 05:45:19</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:18.838Z">17 Nov 21:35:18</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-eb8f22d847aa: applier-20-cluster may apply 20-cluster until 2026-11-17T06:15:19.401Z <span class="ev-wi">WI-0001</span></td>
+<td class="ev-what">Grant G-86b438b1eae5: applier-20-cluster may apply 20-cluster until 2026-11-17T22:05:18.837Z <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:19.402Z">17 Nov 05:45:19</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:18.848Z">17 Nov 21:35:18</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Apply of 20-cluster started <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:43.388Z">17 Nov 05:45:43</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:46.284Z">17 Nov 21:35:46</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-eb8f22d847aa ended; the credential is gone <span class="ev-wi">WI-0001</span></td>
+<td class="ev-what">Grant G-86b438b1eae5 ended; the credential is gone <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:43.388Z">17 Nov 05:45:43</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:46.285Z">17 Nov 21:35:46</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 20-cluster <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:44.510Z">17 Nov 05:45:44</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:47.306Z">17 Nov 21:35:47</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Plan of 30-data: 9 to add, 0 to change, 0 to destroy, 0 to replace <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:44.510Z">17 Nov 05:45:44</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:47.309Z">17 Nov 21:35:47</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
 <td class="ev-what">Plan of 30-data only creates resources; the approval covers it <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:44.511Z">17 Nov 05:45:44</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:47.311Z">17 Nov 21:35:47</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-fba40a1d0448: applier-30-data may apply 30-data until 2026-11-17T06:15:44.510Z <span class="ev-wi">WI-0001</span></td>
+<td class="ev-what">Grant G-e92fc5ea156c: applier-30-data may apply 30-data until 2026-11-17T22:05:47.310Z <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:45:44.972Z">17 Nov 05:45:44</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:35:47.792Z">17 Nov 21:35:47</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Apply of 30-data started <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:46:51.638Z">17 Nov 05:46:51</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:36:04.566Z">17 Nov 21:36:04</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-fba40a1d0448 ended; the credential is gone <span class="ev-wi">WI-0001</span></td>
+<td class="ev-what">Grant G-e92fc5ea156c ended; the credential is gone <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:46:51.639Z">17 Nov 05:46:51</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:36:04.567Z">17 Nov 21:36:04</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 30-data <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:46:52.719Z">17 Nov 05:46:52</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:36:05.864Z">17 Nov 21:36:05</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Plan of 40-platform: 3 to add, 0 to change, 0 to destroy, 0 to replace <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:46:52.719Z">17 Nov 05:46:52</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:36:05.866Z">17 Nov 21:36:05</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
 <td class="ev-what">Plan of 40-platform only creates resources; the approval covers it <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:46:52.720Z">17 Nov 05:46:52</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:36:05.868Z">17 Nov 21:36:05</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-98e2abba64d2: applier-40-platform may apply 40-platform until 2026-11-17T06:16:52.719Z <span class="ev-wi">WI-0001</span></td>
+<td class="ev-what">Grant G-bdb0fa3cfd34: applier-40-platform may apply 40-platform until 2026-11-17T22:06:05.867Z <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:46:53.156Z">17 Nov 05:46:53</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:36:06.342Z">17 Nov 21:36:06</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Apply of 40-platform started <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:46:54.206Z">17 Nov 05:46:54</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:36:07.550Z">17 Nov 21:36:07</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-98e2abba64d2 ended; the credential is gone <span class="ev-wi">WI-0001</span></td>
+<td class="ev-what">Grant G-bdb0fa3cfd34 ended; the credential is gone <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:46:54.207Z">17 Nov 05:46:54</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:36:07.551Z">17 Nov 21:36:07</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 40-platform <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:46:55.162Z">17 Nov 05:46:55</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:36:08.700Z">17 Nov 21:36:08</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Plan of 50-app: 1 to add, 0 to change, 0 to destroy, 0 to replace <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:46:55.162Z">17 Nov 05:46:55</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:36:08.703Z">17 Nov 21:36:08</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
 <td class="ev-what">Plan of 50-app only creates resources; the approval covers it <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:46:55.163Z">17 Nov 05:46:55</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:36:08.704Z">17 Nov 21:36:08</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-34040874b247: applier-50-app may apply 50-app until 2026-11-17T06:16:55.162Z <span class="ev-wi">WI-0001</span></td>
+<td class="ev-what">Grant G-e7425e8cd81f: applier-50-app may apply 50-app until 2026-11-17T22:06:08.703Z <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:46:55.692Z">17 Nov 05:46:55</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:36:09.253Z">17 Nov 21:36:09</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Apply of 50-app started <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:47:07.631Z">17 Nov 05:47:07</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:36:21.478Z">17 Nov 21:36:21</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-34040874b247 ended; the credential is gone <span class="ev-wi">WI-0001</span></td>
+<td class="ev-what">Grant G-e7425e8cd81f ended; the credential is gone <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:47:07.631Z">17 Nov 05:47:07</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:36:21.479Z">17 Nov 21:36:21</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 50-app <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:47:07.631Z">17 Nov 05:47:07</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:36:21.481Z">17 Nov 21:36:21</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Blank-slate deployment of local: Applying → Verifying <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:47:07.663Z">17 Nov 05:47:07</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:36:21.516Z">17 Nov 21:36:21</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 verifier</span></td>
 <td class="ev-what">Verification passed: Blank-slate deployment of local <span class="ev-wi">WI-0001</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-17T05:47:07.663Z">17 Nov 05:47:07</time></td>
+<td class="ev-time"><time datetime="2026-11-17T21:36:21.518Z">17 Nov 21:36:21</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Blank-slate deployment of local: Verifying → Done <span class="ev-wi">WI-0001</span></td>
@@ -646,7 +645,7 @@ orchestrator</span></td>
 </details></div>
 </div>
 </section><section class="step" id="quiet-week" data-step="2"
-data-at="24.14" aria-labelledby="quiet-week-title">
+data-at="26.34" aria-labelledby="quiet-week-title">
 <div class="step-inner">
 <div class="step-text">
 <p class="kicker reveal">Step 3 of 14 ·
@@ -656,12 +655,12 @@ data-at="24.14" aria-labelledby="quiet-week-title">
 paged. The scheduler runs the scheduled database backup as a
 <strong>T1</strong> runbook, under the standing approval that
 Carol Reyes signed on the first day. Nobody is asked this
-time, and nothing is hidden: the run still needs a grant (0.9 s), and
+time, and nothing is hidden: the run still needs a grant (1.1 s), and
 each use is a record in the audit log.</p>
 <div class="reveal"><dl class="facts">
 <div><dt>Risk tier</dt><dd><span class="tag tag-t1">T1</span> <span class="fact-note">rule <code>standing-approval</code></span></dd></div>
 <div><dt>Approved by</dt><dd>Standing approval</dd></div>
-<div><dt>Write or debug access</dt><dd>1 grant, 0.9 s in total</dd></div>
+<div><dt>Write or debug access</dt><dd>1 grant, 1.1 s in total</dd></div>
 <div><dt>Outcome</dt><dd>Done</dd></div>
 </dl></div>
 <p class="principle-note reveal"><span class="principle-number">Principle
@@ -677,32 +676,32 @@ Scheduled database backup</p>
 </div>
 <ul class="grants"><li class="grant">
 <div class="grant-head">
-<span class="mono">G-a298e43eb94b</span>
+<span class="mono">G-c4c32bfefabe</span>
 <span class="grant-identity mono">runbook</span>
 <span class="tag tag-green">Used, then revoked</span>
 </div>
 <div class="grant-bar" role="img"
-aria-label="Held for 0.9 s of a 15-minute window">
+aria-label="Held for 1.1 s of a 15-minute window">
 <span class="grant-fill" style="--share:0.60%"></span>
 </div>
-<p class="grant-note">Issued 05:47:35, ended 05:47:36. Held <strong>0.9 s</strong> of a
+<p class="grant-note">Issued 21:36:48, ended 21:36:49. Held <strong>1.1 s</strong> of a
 15-minute window. Approved by: the standing approval of Carol Reyes.</p>
 </li></ul>
 <table class="events">
 <caption class="visually-hidden">Main events of the step quiet-week</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-11-24T05:47:35.541Z">24 Nov 05:47:35</time></td>
+<td class="ev-time"><time datetime="2026-11-24T21:36:48.767Z">24 Nov 21:36:48</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-a298e43eb94b: runbook db-backup until 2026-11-24T06:02:35.541Z <span class="ev-wi">WI-0002</span></td>
+<td class="ev-what">Grant G-c4c32bfefabe: runbook db-backup until 2026-11-24T21:51:48.766Z <span class="ev-wi">WI-0002</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-24T05:47:36.878Z">24 Nov 05:47:36</time></td>
+<td class="ev-time"><time datetime="2026-11-24T21:36:50.321Z">24 Nov 21:36:50</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-a298e43eb94b ended; the credential is gone <span class="ev-wi">WI-0002</span></td>
+<td class="ev-what">Grant G-c4c32bfefabe ended; the credential is gone <span class="ev-wi">WI-0002</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-24T05:47:36.879Z">24 Nov 05:47:36</time></td>
+<td class="ev-time"><time datetime="2026-11-24T21:36:50.322Z">24 Nov 21:36:50</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Runbook db-backup finished <span class="ev-wi">WI-0002</span></td>
@@ -714,37 +713,37 @@ runner</span></td>
 <caption class="visually-hidden">All events of the step quiet-week</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-11-24T05:47:35.540Z">24 Nov 05:47:35</time></td>
+<td class="ev-time"><time datetime="2026-11-24T21:36:48.763Z">24 Nov 21:36:48</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 scheduler</span></td>
 <td class="ev-what">Scheduled database backup <span class="ev-wi">WI-0002</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-24T05:47:35.541Z">24 Nov 05:47:35</time></td>
+<td class="ev-time"><time datetime="2026-11-24T21:36:48.764Z">24 Nov 21:36:48</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Scheduled database backup: Detected → Approved <span class="ev-wi">WI-0002</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-24T05:47:35.541Z">24 Nov 05:47:35</time></td>
+<td class="ev-time"><time datetime="2026-11-24T21:36:48.766Z">24 Nov 21:36:48</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Scheduled database backup: Approved → Applying <span class="ev-wi">WI-0002</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-24T05:47:35.541Z">24 Nov 05:47:35</time></td>
+<td class="ev-time"><time datetime="2026-11-24T21:36:48.767Z">24 Nov 21:36:48</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-a298e43eb94b: runbook db-backup until 2026-11-24T06:02:35.541Z <span class="ev-wi">WI-0002</span></td>
+<td class="ev-what">Grant G-c4c32bfefabe: runbook db-backup until 2026-11-24T21:51:48.766Z <span class="ev-wi">WI-0002</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-24T05:47:36.878Z">24 Nov 05:47:36</time></td>
+<td class="ev-time"><time datetime="2026-11-24T21:36:50.321Z">24 Nov 21:36:50</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-a298e43eb94b ended; the credential is gone <span class="ev-wi">WI-0002</span></td>
+<td class="ev-what">Grant G-c4c32bfefabe ended; the credential is gone <span class="ev-wi">WI-0002</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-24T05:47:36.879Z">24 Nov 05:47:36</time></td>
+<td class="ev-time"><time datetime="2026-11-24T21:36:50.322Z">24 Nov 21:36:50</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Runbook db-backup finished <span class="ev-wi">WI-0002</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-24T05:47:36.879Z">24 Nov 05:47:36</time></td>
+<td class="ev-time"><time datetime="2026-11-24T21:36:50.325Z">24 Nov 21:36:50</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Scheduled database backup: Applying → Done <span class="ev-wi">WI-0002</span></td>
@@ -753,7 +752,7 @@ orchestrator</span></td>
 </details></div>
 </div>
 </section><section class="step" id="feature-release" data-step="3"
-data-at="27.75" aria-labelledby="feature-release-title">
+data-at="29.95" aria-labelledby="feature-release-title">
 <div class="step-inner">
 <div class="step-text">
 <p class="kicker reveal">Step 4 of 14 ·
@@ -765,7 +764,7 @@ detector sees that local still runs 1.0.0. The Author role, a
 language model, opens pull request #1, which changes
 1 file. Policy rates it
 <strong>T2</strong> (<code>normal-change</code>): one approver.
-Alice Ng approves at 07:48 UTC. The
+Alice Ng approves at 23:37 UTC. The
 runner applies with a grant for <code>applier-50-app</code> that lives for
 6.2 s. Result: 40 of 40 inventory requests succeeded (error rate 0%).</p>
 <div class="reveal"><dl class="facts">
@@ -787,7 +786,7 @@ local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0</p>
 </div>
 <ul class="grants"><li class="grant">
 <div class="grant-head">
-<span class="mono">G-6cbe1eed7814</span>
+<span class="mono">G-5901fe816c3f</span>
 <span class="grant-identity mono">applier-50-app</span>
 <span class="tag tag-green">Used, then revoked</span>
 </div>
@@ -795,176 +794,181 @@ local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0</p>
 aria-label="Held for 6.2 s of a 30-minute window">
 <span class="grant-fill" style="--share:0.60%"></span>
 </div>
-<p class="grant-note">Issued 07:48:31, ended 07:48:37. Held <strong>6.2 s</strong> of a
+<p class="grant-note">Issued 23:37:44, ended 23:37:50. Held <strong>6.2 s</strong> of a
 30-minute window. Approved by: Alice Ng.</p>
 </li></ul>
 <table class="events">
 <caption class="visually-hidden">Main events of the step feature-release</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:08.800Z">25 Nov 07:48:08</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:21.717Z">25 Nov 23:37:21</time></td>
 <td class="ev-who"><span class="who who-simulator"><span class="who-kind">Simulator</span>
 simulator</span></td>
 <td class="ev-what">Paperboat 1.1.0 is published</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:08.811Z">25 Nov 07:48:08</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:21.723Z">25 Nov 23:37:21</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 detector:release</span></td>
 <td class="ev-what">Paperboat 1.1.0 is published; local runs 1.0.0</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:19.257Z">25 Nov 07:48:19</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:30.810Z">25 Nov 23:37:30</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 clanker-author</span></td>
 <td class="ev-what">Pull request #1: local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0 <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:20.349Z">25 Nov 07:48:20</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:33.355Z">25 Nov 23:37:33</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
 <td class="ev-what">local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0 is tier T2 by rule normal-change <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:27.711Z">25 Nov 07:48:27</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:41.892Z">25 Nov 23:37:41</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Approval needed: local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0 <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:38.205Z">25 Nov 07:48:38</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:51.495Z">25 Nov 23:37:51</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-6cbe1eed7814 ended; the credential is gone <span class="ev-wi">WI-0003</span></td>
+<td class="ev-what">Grant G-5901fe816c3f ended; the credential is gone <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:38.205Z">25 Nov 07:48:38</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:51.496Z">25 Nov 23:37:51</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 50-app <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:38.438Z">25 Nov 07:48:38</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:51.504Z">25 Nov 23:37:51</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Pull request #1 merged after apply <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:38.491Z">25 Nov 07:48:38</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:51.540Z">25 Nov 23:37:51</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 verifier</span></td>
 <td class="ev-what">Verification passed: local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0 <span class="ev-wi">WI-0003</span></td>
 </tr></tbody>
 </table>
 <details class="all-events">
-<summary>All 23 events of this step, and 1 by email, 1 by slack, 1 by teams and 1 by discord notifications</summary>
+<summary>All 24 events of this step, and 1 by email, 1 by slack, 1 by teams and 1 by discord notifications</summary>
 <table class="events">
 <caption class="visually-hidden">All events of the step feature-release</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:08.800Z">25 Nov 07:48:08</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:21.717Z">25 Nov 23:37:21</time></td>
 <td class="ev-who"><span class="who who-simulator"><span class="who-kind">Simulator</span>
 simulator</span></td>
 <td class="ev-what">Paperboat 1.1.0 is published</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:08.811Z">25 Nov 07:48:08</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:21.723Z">25 Nov 23:37:21</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 detector:release</span></td>
 <td class="ev-what">Paperboat 1.1.0 is published; local runs 1.0.0</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:19.200Z">25 Nov 07:48:19</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:30.784Z">25 Nov 23:37:30</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 author</span></td>
 <td class="ev-what">local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0 <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:19.201Z">25 Nov 07:48:19</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:30.787Z">25 Nov 23:37:30</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 author</span></td>
 <td class="ev-what">Author opened pull request #1 for: Paperboat 1.1.0 is published; local runs 1.0.0 <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:19.257Z">25 Nov 07:48:19</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:30.810Z">25 Nov 23:37:30</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 clanker-author</span></td>
 <td class="ev-what">Pull request #1: local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0 <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:19.257Z">25 Nov 07:48:19</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:30.812Z">25 Nov 23:37:30</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 author</span></td>
 <td class="ev-what">local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0: Detected → Drafting <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:20.348Z">25 Nov 07:48:20</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:32.540Z">25 Nov 23:37:32</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Plan of 50-app: 0 to add, 1 to change, 0 to destroy, 0 to replace <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:20.349Z">25 Nov 07:48:20</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:33.349Z">25 Nov 23:37:33</time></td>
+<td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
+reviewer</span></td>
+<td class="ev-what">Adversarial review agrees with tier T2 of the policy engine <span class="ev-wi">WI-0003</span></td>
+</tr><tr>
+<td class="ev-time"><time datetime="2026-11-25T23:37:33.353Z">25 Nov 23:37:33</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0: Drafting → Planned <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:20.349Z">25 Nov 07:48:20</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:33.355Z">25 Nov 23:37:33</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
 <td class="ev-what">local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0 is tier T2 by rule normal-change <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:27.710Z">25 Nov 07:48:27</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:41.887Z">25 Nov 23:37:41</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 explainer</span></td>
 <td class="ev-what">Explainer wrote the approval summary <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:27.711Z">25 Nov 07:48:27</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:41.890Z">25 Nov 23:37:41</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0: Planned → AwaitingApproval <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:27.711Z">25 Nov 07:48:27</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:41.892Z">25 Nov 23:37:41</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Approval needed: local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0 <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:31.549Z">25 Nov 07:48:31</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:44.753Z">25 Nov 23:37:44</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Alice Ng</span></td>
 <td class="ev-what">local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0: approve by Alice Ng <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:31.550Z">25 Nov 07:48:31</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:44.757Z">25 Nov 23:37:44</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Alice Ng</span></td>
 <td class="ev-what">local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0: AwaitingApproval → Approved <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:31.553Z">25 Nov 07:48:31</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:44.764Z">25 Nov 23:37:44</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0: Approved → Applying <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:31.554Z">25 Nov 07:48:31</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:44.767Z">25 Nov 23:37:44</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-6cbe1eed7814: applier-50-app may apply 50-app until 2026-11-25T08:18:31.553Z <span class="ev-wi">WI-0003</span></td>
+<td class="ev-what">Grant G-5901fe816c3f: applier-50-app may apply 50-app until 2026-11-26T00:07:44.765Z <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:32.131Z">25 Nov 07:48:32</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:45.366Z">25 Nov 23:37:45</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Apply of 50-app started <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:38.205Z">25 Nov 07:48:38</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:51.495Z">25 Nov 23:37:51</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-6cbe1eed7814 ended; the credential is gone <span class="ev-wi">WI-0003</span></td>
+<td class="ev-what">Grant G-5901fe816c3f ended; the credential is gone <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:38.205Z">25 Nov 07:48:38</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:51.496Z">25 Nov 23:37:51</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 50-app <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:38.438Z">25 Nov 07:48:38</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:51.504Z">25 Nov 23:37:51</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Pull request #1 merged after apply <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:38.438Z">25 Nov 07:48:38</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:51.505Z">25 Nov 23:37:51</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0: Applying → Verifying <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:38.491Z">25 Nov 07:48:38</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:51.540Z">25 Nov 23:37:51</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 verifier</span></td>
 <td class="ev-what">Verification passed: local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0 <span class="ev-wi">WI-0003</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-25T07:48:38.491Z">25 Nov 07:48:38</time></td>
+<td class="ev-time"><time datetime="2026-11-25T23:37:51.542Z">25 Nov 23:37:51</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0: Verifying → Done <span class="ev-wi">WI-0003</span></td>
@@ -973,7 +977,7 @@ orchestrator</span></td>
 </details></div>
 </div>
 </section><section class="step" id="cve" data-step="4"
-data-at="44.42" aria-labelledby="cve-title">
+data-at="46.62" aria-labelledby="cve-title">
 <div class="step-inner">
 <div class="step-text">
 <p class="kicker reveal">Step 5 of 14 ·
@@ -1005,7 +1009,7 @@ Upgrade Paperboat to 1.1.1 in local (PB-2026-014)</p>
 </div>
 <ul class="grants"><li class="grant">
 <div class="grant-head">
-<span class="mono">G-a6ccdbb9a978</span>
+<span class="mono">G-8d85c81154c0</span>
 <span class="grant-identity mono">applier-50-app</span>
 <span class="tag tag-green">Used, then revoked</span>
 </div>
@@ -1013,176 +1017,181 @@ Upgrade Paperboat to 1.1.1 in local (PB-2026-014)</p>
 aria-label="Held for 6.2 s of a 30-minute window">
 <span class="grant-fill" style="--share:0.60%"></span>
 </div>
-<p class="grant-note">Issued 07:49:24, ended 07:49:30. Held <strong>6.2 s</strong> of a
+<p class="grant-note">Issued 23:38:37, ended 23:38:44. Held <strong>6.2 s</strong> of a
 30-minute window. Approved by: Alice Ng.</p>
 </li></ul>
 <table class="events">
 <caption class="visually-hidden">Main events of the step cve</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:06.914Z">30 Nov 07:49:06</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:19.891Z">30 Nov 23:38:19</time></td>
 <td class="ev-who"><span class="who who-simulator"><span class="who-kind">Simulator</span>
 simulator</span></td>
 <td class="ev-what">Advisory PB-2026-014: Advisory PB-2026-014: vulnerability in the base image of Paperboat 1.1.0; fixed in 1.1.1</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:06.915Z">30 Nov 07:49:06</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:19.893Z">30 Nov 23:38:19</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 detector:advisory</span></td>
 <td class="ev-what">Advisory PB-2026-014: vulnerability in the base image of Paperboat 1.1.0; fixed in 1.1.1</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:15.291Z">30 Nov 07:49:15</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:28.284Z">30 Nov 23:38:28</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 clanker-author</span></td>
 <td class="ev-what">Pull request #2: Upgrade Paperboat to 1.1.1 in local (PB-2026-014) <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:16.374Z">30 Nov 07:49:16</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:30.475Z">30 Nov 23:38:30</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
 <td class="ev-what">Upgrade Paperboat to 1.1.1 in local (PB-2026-014) is tier T2 by rule normal-change <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:22.872Z">30 Nov 07:49:22</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:36.977Z">30 Nov 23:38:36</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Approval needed: Upgrade Paperboat to 1.1.1 in local (PB-2026-014) <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:31.310Z">30 Nov 07:49:31</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:44.562Z">30 Nov 23:38:44</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-a6ccdbb9a978 ended; the credential is gone <span class="ev-wi">WI-0004</span></td>
+<td class="ev-what">Grant G-8d85c81154c0 ended; the credential is gone <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:31.310Z">30 Nov 07:49:31</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:44.563Z">30 Nov 23:38:44</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 50-app <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:31.557Z">30 Nov 07:49:31</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:44.571Z">30 Nov 23:38:44</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Pull request #2 merged after apply <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:31.595Z">30 Nov 07:49:31</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:44.603Z">30 Nov 23:38:44</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 verifier</span></td>
 <td class="ev-what">Verification passed: Upgrade Paperboat to 1.1.1 in local (PB-2026-014) <span class="ev-wi">WI-0004</span></td>
 </tr></tbody>
 </table>
 <details class="all-events">
-<summary>All 23 events of this step, and 3 by slack, 3 by email, 1 by teams and 1 by discord notifications</summary>
+<summary>All 24 events of this step, and 3 by slack, 3 by email, 1 by teams and 1 by discord notifications</summary>
 <table class="events">
 <caption class="visually-hidden">All events of the step cve</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:06.914Z">30 Nov 07:49:06</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:19.891Z">30 Nov 23:38:19</time></td>
 <td class="ev-who"><span class="who who-simulator"><span class="who-kind">Simulator</span>
 simulator</span></td>
 <td class="ev-what">Advisory PB-2026-014: Advisory PB-2026-014: vulnerability in the base image of Paperboat 1.1.0; fixed in 1.1.1</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:06.915Z">30 Nov 07:49:06</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:19.893Z">30 Nov 23:38:19</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 detector:advisory</span></td>
 <td class="ev-what">Advisory PB-2026-014: vulnerability in the base image of Paperboat 1.1.0; fixed in 1.1.1</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:15.245Z">30 Nov 07:49:15</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:28.264Z">30 Nov 23:38:28</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 author</span></td>
 <td class="ev-what">Upgrade Paperboat to 1.1.1 in local (PB-2026-014) <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:15.245Z">30 Nov 07:49:15</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:28.266Z">30 Nov 23:38:28</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 author</span></td>
 <td class="ev-what">Author opened pull request #2 for: Advisory PB-2026-014: vulnerability in the base image of Paperboat 1.1.0; fixed in 1.1.1 <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:15.291Z">30 Nov 07:49:15</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:28.284Z">30 Nov 23:38:28</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 clanker-author</span></td>
 <td class="ev-what">Pull request #2: Upgrade Paperboat to 1.1.1 in local (PB-2026-014) <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:15.291Z">30 Nov 07:49:15</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:28.286Z">30 Nov 23:38:28</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 author</span></td>
 <td class="ev-what">Upgrade Paperboat to 1.1.1 in local (PB-2026-014): Detected → Drafting <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:16.374Z">30 Nov 07:49:16</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:29.671Z">30 Nov 23:38:29</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Plan of 50-app: 0 to add, 1 to change, 0 to destroy, 0 to replace <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:16.374Z">30 Nov 07:49:16</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:30.470Z">30 Nov 23:38:30</time></td>
+<td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
+reviewer</span></td>
+<td class="ev-what">Adversarial review agrees with tier T2 of the policy engine <span class="ev-wi">WI-0004</span></td>
+</tr><tr>
+<td class="ev-time"><time datetime="2026-11-30T23:38:30.473Z">30 Nov 23:38:30</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Upgrade Paperboat to 1.1.1 in local (PB-2026-014): Drafting → Planned <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:16.374Z">30 Nov 07:49:16</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:30.475Z">30 Nov 23:38:30</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
 <td class="ev-what">Upgrade Paperboat to 1.1.1 in local (PB-2026-014) is tier T2 by rule normal-change <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:22.870Z">30 Nov 07:49:22</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:36.969Z">30 Nov 23:38:36</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 explainer</span></td>
 <td class="ev-what">Explainer wrote the approval summary <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:22.871Z">30 Nov 07:49:22</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:36.974Z">30 Nov 23:38:36</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Upgrade Paperboat to 1.1.1 in local (PB-2026-014): Planned → AwaitingApproval <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:22.872Z">30 Nov 07:49:22</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:36.977Z">30 Nov 23:38:36</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Approval needed: Upgrade Paperboat to 1.1.1 in local (PB-2026-014) <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:24.632Z">30 Nov 07:49:24</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:37.849Z">30 Nov 23:38:37</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Alice Ng</span></td>
 <td class="ev-what">Upgrade Paperboat to 1.1.1 in local (PB-2026-014): approve by Alice Ng <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:24.633Z">30 Nov 07:49:24</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:37.853Z">30 Nov 23:38:37</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Alice Ng</span></td>
 <td class="ev-what">Upgrade Paperboat to 1.1.1 in local (PB-2026-014): AwaitingApproval → Approved <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:24.638Z">30 Nov 07:49:24</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:37.859Z">30 Nov 23:38:37</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Upgrade Paperboat to 1.1.1 in local (PB-2026-014): Approved → Applying <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:24.640Z">30 Nov 07:49:24</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:37.862Z">30 Nov 23:38:37</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-a6ccdbb9a978: applier-50-app may apply 50-app until 2026-11-30T08:19:24.639Z <span class="ev-wi">WI-0004</span></td>
+<td class="ev-what">Grant G-8d85c81154c0: applier-50-app may apply 50-app until 2026-12-01T00:08:37.860Z <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:25.243Z">30 Nov 07:49:25</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:38.443Z">30 Nov 23:38:38</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Apply of 50-app started <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:31.310Z">30 Nov 07:49:31</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:44.562Z">30 Nov 23:38:44</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-a6ccdbb9a978 ended; the credential is gone <span class="ev-wi">WI-0004</span></td>
+<td class="ev-what">Grant G-8d85c81154c0 ended; the credential is gone <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:31.310Z">30 Nov 07:49:31</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:44.563Z">30 Nov 23:38:44</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 50-app <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:31.557Z">30 Nov 07:49:31</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:44.571Z">30 Nov 23:38:44</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Pull request #2 merged after apply <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:31.557Z">30 Nov 07:49:31</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:44.572Z">30 Nov 23:38:44</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Upgrade Paperboat to 1.1.1 in local (PB-2026-014): Applying → Verifying <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:31.595Z">30 Nov 07:49:31</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:44.603Z">30 Nov 23:38:44</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 verifier</span></td>
 <td class="ev-what">Verification passed: Upgrade Paperboat to 1.1.1 in local (PB-2026-014) <span class="ev-wi">WI-0004</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-11-30T07:49:31.596Z">30 Nov 07:49:31</time></td>
+<td class="ev-time"><time datetime="2026-11-30T23:38:44.605Z">30 Nov 23:38:44</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Upgrade Paperboat to 1.1.1 in local (PB-2026-014): Verifying → Done <span class="ev-wi">WI-0004</span></td>
@@ -1191,24 +1200,24 @@ orchestrator</span></td>
 </details></div>
 </div>
 </section><section class="step" id="bad-release" data-step="5"
-data-at="64.42" aria-labelledby="bad-release-title">
+data-at="66.62" aria-labelledby="bad-release-title">
 <div class="step-inner">
 <div class="step-text">
 <p class="kicker reveal">Step 6 of 14 ·
 6 Dec 2026 · use case 6</p>
 <h2 class="reveal" id="bad-release-title">A bad release, caught and rolled back</h2>
 <p class="lead reveal">Paperboat 1.2.0-bad looks fine on paper.
-Alice Ng approves it as a normal
-<strong>T2</strong> change, and after the apply the health check
-still answers 200. The canary disagrees: 26 of 40 inventory requests succeeded (error rate 35%). Verification fails,
+Alice Ng and Bob Okafor approves it as a normal
+<strong>T3</strong> change, and after the apply the health check
+still answers 200. The canary disagrees: 23 of 40 inventory requests succeeded (error rate 42%). Verification fails,
 and the orchestrator opens WI-0006.
-Rollback of WI-0005 runs under the approval of the original change. 8.3 s after the failure, the check reads:
+Rollback of WI-0005 runs under the approval of the original change. 8.0 s after the failure, the check reads:
 40 of 40 inventory requests succeeded (error rate 0%). No person had to wake up to decide that half of the inventory
 requests failing is bad.</p>
 <div class="reveal"><dl class="facts">
-<div><dt>Risk tier</dt><dd><span class="tag tag-t2">T2</span> <span class="fact-note">rule <code>normal-change, rollback-of-approved-change</code></span></dd></div>
-<div><dt>Approved by</dt><dd>Alice Ng</dd></div>
-<div><dt>Write or debug access</dt><dd>2 grants, 14 s in total</dd></div>
+<div><dt>Risk tier</dt><dd><span class="tag tag-t3">T3</span> <span class="fact-note">rule <code>adversarial-review, rollback-of-approved-change</code></span></dd></div>
+<div><dt>Approved by</dt><dd>Alice Ng and Bob Okafor</dd></div>
+<div><dt>Write or debug access</dt><dd>2 grants, 13 s in total</dd></div>
 <div><dt>Outcome</dt><dd>RolledBack, Done</dd></div>
 </dl></div>
 <p class="principle-note reveal"><span class="principle-number">Principle
@@ -1216,13 +1225,13 @@ requests failing is bad.</p>
 </div>
 <div class="step-evidence reveal">
 <div class="track-block">
-<p class="track-title"><span class="tag tag-t2">T2</span> <span class="mono">WI-0005</span>
+<p class="track-title"><span class="tag tag-t3">T3</span> <span class="mono">WI-0005</span>
 local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad</p>
 <ol class="track" aria-label="States of WI-0005 in this step">
 <li class="" style="--i:0">Detected</li><li class="" style="--i:1">Drafting</li><li class="" style="--i:2">Planned</li><li class="" style="--i:3">AwaitingApproval</li><li class="" style="--i:4">Approved</li><li class="" style="--i:5">Applying</li><li class="" style="--i:6">Verifying</li><li class="is-bad" style="--i:7">RolledBack</li>
 </ol>
 </div><div class="track-block">
-<p class="track-title"><span class="tag tag-t2">T2</span> <span class="mono">WI-0006</span>
+<p class="track-title"><span class="tag tag-t3">T3</span> <span class="mono">WI-0006</span>
 Roll back: local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad</p>
 <ol class="track" aria-label="States of WI-0006 in this step">
 <li class="" style="--i:0">Detected</li><li class="" style="--i:1">Drafting</li><li class="" style="--i:2">Applying</li><li class="is-good" style="--i:3">Done</li>
@@ -1230,256 +1239,266 @@ Roll back: local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad</p>
 </div>
 <ul class="grants"><li class="grant">
 <div class="grant-head">
-<span class="mono">G-be97ab1ce196</span>
+<span class="mono">G-203b7c576066</span>
 <span class="grant-identity mono">applier-50-app</span>
 <span class="tag tag-green">Used, then revoked</span>
 </div>
 <div class="grant-bar" role="img"
-aria-label="Held for 8.2 s of a 30-minute window">
+aria-label="Held for 6.4 s of a 30-minute window">
 <span class="grant-fill" style="--share:0.60%"></span>
 </div>
-<p class="grant-note">Issued 07:50:22, ended 07:50:30. Held <strong>8.2 s</strong> of a
-30-minute window. Approved by: Alice Ng.</p>
+<p class="grant-note">Issued 23:39:40, ended 23:39:47. Held <strong>6.4 s</strong> of a
+30-minute window. Approved by: Alice Ng and Bob Okafor.</p>
 </li><li class="grant">
 <div class="grant-head">
-<span class="mono">G-0b0f11fe9f00</span>
+<span class="mono">G-a2c6a4839224</span>
 <span class="grant-identity mono">applier-50-app</span>
 <span class="tag tag-green">Used, then revoked</span>
 </div>
 <div class="grant-bar" role="img"
-aria-label="Held for 6.1 s of a 30-minute window">
+aria-label="Held for 6.3 s of a 30-minute window">
 <span class="grant-fill" style="--share:0.60%"></span>
 </div>
-<p class="grant-note">Issued 07:50:33, ended 07:50:39. Held <strong>6.1 s</strong> of a
-30-minute window. Approved by: Alice Ng.</p>
+<p class="grant-note">Issued 23:39:49, ended 23:39:55. Held <strong>6.3 s</strong> of a
+30-minute window. Approved by: Alice Ng and Bob Okafor.</p>
 </li></ul>
 <table class="events">
 <caption class="visually-hidden">Main events of the step bad-release</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:49:59.984Z">6 Dec 07:49:59</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:12.934Z">6 Dec 23:39:12</time></td>
 <td class="ev-who"><span class="who who-simulator"><span class="who-kind">Simulator</span>
 simulator</span></td>
 <td class="ev-what">Paperboat 1.2.0-bad is published</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:49:59.996Z">6 Dec 07:49:59</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:12.938Z">6 Dec 23:39:12</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 detector:release</span></td>
 <td class="ev-what">Paperboat 1.2.0-bad is published; local runs 1.1.1</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:10.979Z">6 Dec 07:50:10</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:22.055Z">6 Dec 23:39:22</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 clanker-author</span></td>
 <td class="ev-what">Pull request #3: local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:12.032Z">6 Dec 07:50:12</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:29.075Z">6 Dec 23:39:29</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
-<td class="ev-what">local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad is tier T2 by rule normal-change <span class="ev-wi">WI-0005</span></td>
+<td class="ev-what">local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad is tier T3 by rule adversarial-review <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:19.272Z">6 Dec 07:50:19</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:37.012Z">6 Dec 23:39:37</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Approval needed: local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:32.073Z">6 Dec 07:50:32</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:47.884Z">6 Dec 23:39:47</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Rollback of WI-0005 runs under the approval of the original change <span class="ev-wi">WI-0006</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:33.146Z">6 Dec 07:50:33</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:49.053Z">6 Dec 23:39:49</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-0b0f11fe9f00: applier-50-app may apply 50-app until 2026-12-06T08:20:33.145Z <span class="ev-wi">WI-0006</span></td>
+<td class="ev-what">Grant G-a2c6a4839224: applier-50-app may apply 50-app until 2026-12-07T00:09:49.052Z <span class="ev-wi">WI-0006</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:39.775Z">6 Dec 07:50:39</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:55.788Z">6 Dec 23:39:55</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-0b0f11fe9f00 ended; the credential is gone <span class="ev-wi">WI-0006</span></td>
+<td class="ev-what">Grant G-a2c6a4839224 ended; the credential is gone <span class="ev-wi">WI-0006</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:40.069Z">6 Dec 07:50:40</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:55.825Z">6 Dec 23:39:55</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 verifier</span></td>
 <td class="ev-what">Verification passed after rollback <span class="ev-wi">WI-0006</span></td>
 </tr></tbody>
 </table>
 <details class="all-events">
-<summary>All 35 events of this step, and 4 by slack, 4 by email, 2 by teams and 2 by discord notifications</summary>
+<summary>All 37 events of this step, and 4 by slack, 4 by email, 2 by teams and 2 by discord notifications</summary>
 <table class="events">
 <caption class="visually-hidden">All events of the step bad-release</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:49:59.984Z">6 Dec 07:49:59</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:12.934Z">6 Dec 23:39:12</time></td>
 <td class="ev-who"><span class="who who-simulator"><span class="who-kind">Simulator</span>
 simulator</span></td>
 <td class="ev-what">Paperboat 1.2.0-bad is published</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:49:59.996Z">6 Dec 07:49:59</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:12.938Z">6 Dec 23:39:12</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 detector:release</span></td>
 <td class="ev-what">Paperboat 1.2.0-bad is published; local runs 1.1.1</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:10.916Z">6 Dec 07:50:10</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:22.037Z">6 Dec 23:39:22</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 author</span></td>
 <td class="ev-what">local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:10.917Z">6 Dec 07:50:10</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:22.038Z">6 Dec 23:39:22</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 author</span></td>
 <td class="ev-what">Author opened pull request #3 for: Paperboat 1.2.0-bad is published; local runs 1.1.1 <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:10.979Z">6 Dec 07:50:10</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:22.055Z">6 Dec 23:39:22</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 clanker-author</span></td>
 <td class="ev-what">Pull request #3: local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:10.980Z">6 Dec 07:50:10</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:22.057Z">6 Dec 23:39:22</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 author</span></td>
 <td class="ev-what">local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad: Detected → Drafting <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:12.032Z">6 Dec 07:50:12</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:23.297Z">6 Dec 23:39:23</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Plan of 50-app: 0 to add, 1 to change, 0 to destroy, 0 to replace <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:12.032Z">6 Dec 07:50:12</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:29.070Z">6 Dec 23:39:29</time></td>
+<td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
+reviewer</span></td>
+<td class="ev-what">Adversarial review raised the tier from T2 to T3 <span class="ev-wi">WI-0005</span></td>
+</tr><tr>
+<td class="ev-time"><time datetime="2026-12-06T23:39:29.073Z">6 Dec 23:39:29</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad: Drafting → Planned <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:12.032Z">6 Dec 07:50:12</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:29.075Z">6 Dec 23:39:29</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
-<td class="ev-what">local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad is tier T2 by rule normal-change <span class="ev-wi">WI-0005</span></td>
+<td class="ev-what">local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad is tier T3 by rule adversarial-review <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:19.271Z">6 Dec 07:50:19</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:37.007Z">6 Dec 23:39:37</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 explainer</span></td>
 <td class="ev-what">Explainer wrote the approval summary <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:19.271Z">6 Dec 07:50:19</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:37.010Z">6 Dec 23:39:37</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad: Planned → AwaitingApproval <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:19.272Z">6 Dec 07:50:19</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:37.012Z">6 Dec 23:39:37</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Approval needed: local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:22.738Z">6 Dec 07:50:22</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:40.952Z">6 Dec 23:39:40</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Alice Ng</span></td>
 <td class="ev-what">local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad: approve by Alice Ng <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:22.739Z">6 Dec 07:50:22</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:40.960Z">6 Dec 23:39:40</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
-Alice Ng</span></td>
+Bob Okafor</span></td>
+<td class="ev-what">local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad: approve by Bob Okafor <span class="ev-wi">WI-0005</span></td>
+</tr><tr>
+<td class="ev-time"><time datetime="2026-12-06T23:39:40.964Z">6 Dec 23:39:40</time></td>
+<td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
+Bob Okafor</span></td>
 <td class="ev-what">local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad: AwaitingApproval → Approved <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:22.742Z">6 Dec 07:50:22</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:40.970Z">6 Dec 23:39:40</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad: Approved → Applying <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:22.743Z">6 Dec 07:50:22</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:40.973Z">6 Dec 23:39:40</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-be97ab1ce196: applier-50-app may apply 50-app until 2026-12-06T08:20:22.742Z <span class="ev-wi">WI-0005</span></td>
+<td class="ev-what">Grant G-203b7c576066: applier-50-app may apply 50-app until 2026-12-07T00:09:40.971Z <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:23.328Z">6 Dec 07:50:23</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:41.570Z">6 Dec 23:39:41</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Apply of 50-app started <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:31.459Z">6 Dec 07:50:31</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:47.828Z">6 Dec 23:39:47</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-be97ab1ce196 ended; the credential is gone <span class="ev-wi">WI-0005</span></td>
+<td class="ev-what">Grant G-203b7c576066 ended; the credential is gone <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:31.460Z">6 Dec 07:50:31</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:47.828Z">6 Dec 23:39:47</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 50-app <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:31.713Z">6 Dec 07:50:31</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:47.837Z">6 Dec 23:39:47</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Pull request #3 merged after apply <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:31.714Z">6 Dec 07:50:31</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:47.838Z">6 Dec 23:39:47</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad: Applying → Verifying <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:31.745Z">6 Dec 07:50:31</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:47.863Z">6 Dec 23:39:47</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 verifier</span></td>
-<td class="ev-what">Verification failed: canary failed: error rate 35% is over the 10% limit on version 1.2.0-bad <span class="ev-wi">WI-0005</span></td>
+<td class="ev-what">Verification failed: canary failed: error rate 42% is over the 10% limit on version 1.2.0-bad <span class="ev-wi">WI-0005</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:32.049Z">6 Dec 07:50:32</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:47.875Z">6 Dec 23:39:47</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Roll back: local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad <span class="ev-wi">WI-0006</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:32.072Z">6 Dec 07:50:32</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:47.882Z">6 Dec 23:39:47</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 clanker-orchestrator</span></td>
 <td class="ev-what">Pull request #4: Roll back WI-0005: local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad <span class="ev-wi">WI-0006</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:32.073Z">6 Dec 07:50:32</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:47.883Z">6 Dec 23:39:47</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Roll back: local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad: Detected → Drafting <span class="ev-wi">WI-0006</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:32.073Z">6 Dec 07:50:32</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:47.884Z">6 Dec 23:39:47</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Rollback of WI-0005 runs under the approval of the original change <span class="ev-wi">WI-0006</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:33.145Z">6 Dec 07:50:33</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:49.049Z">6 Dec 23:39:49</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Plan of 50-app: 0 to add, 1 to change, 0 to destroy, 0 to replace <span class="ev-wi">WI-0006</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:33.145Z">6 Dec 07:50:33</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:49.052Z">6 Dec 23:39:49</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Roll back: local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad: Drafting → Applying <span class="ev-wi">WI-0006</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:33.146Z">6 Dec 07:50:33</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:49.053Z">6 Dec 23:39:49</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-0b0f11fe9f00: applier-50-app may apply 50-app until 2026-12-06T08:20:33.145Z <span class="ev-wi">WI-0006</span></td>
+<td class="ev-what">Grant G-a2c6a4839224: applier-50-app may apply 50-app until 2026-12-07T00:09:49.052Z <span class="ev-wi">WI-0006</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:33.694Z">6 Dec 07:50:33</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:49.592Z">6 Dec 23:39:49</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Apply of 50-app started <span class="ev-wi">WI-0006</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:39.775Z">6 Dec 07:50:39</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:55.788Z">6 Dec 23:39:55</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-0b0f11fe9f00 ended; the credential is gone <span class="ev-wi">WI-0006</span></td>
+<td class="ev-what">Grant G-a2c6a4839224 ended; the credential is gone <span class="ev-wi">WI-0006</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:39.775Z">6 Dec 07:50:39</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:55.788Z">6 Dec 23:39:55</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 50-app <span class="ev-wi">WI-0006</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:40.069Z">6 Dec 07:50:40</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:55.825Z">6 Dec 23:39:55</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 verifier</span></td>
 <td class="ev-what">Verification passed after rollback <span class="ev-wi">WI-0006</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:40.069Z">6 Dec 07:50:40</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:55.827Z">6 Dec 23:39:55</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Roll back: local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad: Applying → Done <span class="ev-wi">WI-0006</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-06T07:50:40.070Z">6 Dec 07:50:40</time></td>
+<td class="ev-time"><time datetime="2026-12-06T23:39:55.829Z">6 Dec 23:39:55</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">local/50-app: upgrade paperboat 1.1.1 -&gt; 1.2.0-bad: Verifying → RolledBack <span class="ev-wi">WI-0005</span></td>
@@ -1488,7 +1507,7 @@ orchestrator</span></td>
 </details></div>
 </div>
 </section><section class="step" id="kubernetes-eol" data-step="6"
-data-at="71.09" aria-labelledby="kubernetes-eol-title">
+data-at="73.29" aria-labelledby="kubernetes-eol-title">
 <div class="step-inner">
 <div class="step-text">
 <p class="kicker reveal">Step 7 of 14 ·
@@ -1514,7 +1533,7 @@ therefore shows this upgrade as planned work and does not apply it.</p>
 <caption class="visually-hidden">Main events of the step kubernetes-eol</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-12-08T07:51:07.875Z">8 Dec 07:51:07</time></td>
+<td class="ev-time"><time datetime="2026-12-08T23:40:21.060Z">8 Dec 23:40:21</time></td>
 <td class="ev-who"><span class="who who-simulator"><span class="who-kind">Simulator</span>
 simulator</span></td>
 <td class="ev-what">Advisory K8S-1.36-EOL: Kubernetes 1.36 reaches end of support; plan the upgrade to 1.37</td>
@@ -1526,7 +1545,7 @@ simulator</span></td>
 <caption class="visually-hidden">All events of the step kubernetes-eol</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-12-08T07:51:07.875Z">8 Dec 07:51:07</time></td>
+<td class="ev-time"><time datetime="2026-12-08T23:40:21.060Z">8 Dec 23:40:21</time></td>
 <td class="ev-who"><span class="who who-simulator"><span class="who-kind">Simulator</span>
 simulator</span></td>
 <td class="ev-what">Advisory K8S-1.36-EOL: Kubernetes 1.36 reaches end of support; plan the upgrade to 1.37</td>
@@ -1535,7 +1554,7 @@ simulator</span></td>
 </details></div>
 </div>
 </section><section class="step" id="database-patch" data-step="7"
-data-at="81.10" aria-labelledby="database-patch-title">
+data-at="83.29" aria-labelledby="database-patch-title">
 <div class="step-inner">
 <div class="step-text">
 <p class="kicker reveal">Step 8 of 14 ·
@@ -1545,12 +1564,12 @@ data-at="81.10" aria-labelledby="database-patch-title">
 17.11, and 17.12 is pending. The change is one variable in
 the layer <code>30-data</code>. Policy rates it
 <strong>T2</strong>, and Alice Ng approves. The
-grant for <code>applier-30-data</code> is held for 67 s: a database restart takes the time that it takes, and the access lasts exactly
+grant for <code>applier-30-data</code> is held for 17 s: a database restart takes the time that it takes, and the access lasts exactly
 that long.</p>
 <div class="reveal"><dl class="facts">
 <div><dt>Risk tier</dt><dd><span class="tag tag-t2">T2</span> <span class="fact-note">rule <code>normal-change</code></span></dd></div>
 <div><dt>Approved by</dt><dd>Alice Ng</dd></div>
-<div><dt>Write or debug access</dt><dd>1 grant, 67 s in total</dd></div>
+<div><dt>Write or debug access</dt><dd>1 grant, 17 s in total</dd></div>
 <div><dt>Outcome</dt><dd>Done</dd></div>
 </dl></div>
 <p class="principle-note reveal"><span class="principle-number">Principle
@@ -1559,200 +1578,205 @@ that long.</p>
 <div class="step-evidence reveal">
 <div class="track-block">
 <p class="track-title"><span class="tag tag-t2">T2</span> <span class="mono">WI-0007</span>
-30-data: bump postgres_version 17.11 -&gt; 17.12 (local)</p>
+30-data (local): bump postgres_version 17.11 -&gt; 17.12</p>
 <ol class="track" aria-label="States of WI-0007 in this step">
 <li class="" style="--i:0">Detected</li><li class="" style="--i:1">Drafting</li><li class="" style="--i:2">Planned</li><li class="" style="--i:3">AwaitingApproval</li><li class="" style="--i:4">Approved</li><li class="" style="--i:5">Applying</li><li class="" style="--i:6">Verifying</li><li class="is-good" style="--i:7">Done</li>
 </ol>
 </div>
 <ul class="grants"><li class="grant">
 <div class="grant-head">
-<span class="mono">G-ee96d7c5df83</span>
+<span class="mono">G-d54027d7a6d5</span>
 <span class="grant-identity mono">applier-30-data</span>
 <span class="tag tag-green">Used, then revoked</span>
 </div>
 <div class="grant-bar" role="img"
-aria-label="Held for 67 s of a 30-minute window">
-<span class="grant-fill" style="--share:3.69%"></span>
+aria-label="Held for 17 s of a 30-minute window">
+<span class="grant-fill" style="--share:0.94%"></span>
 </div>
-<p class="grant-note">Issued 07:51:58, ended 07:53:05. Held <strong>67 s</strong> of a
+<p class="grant-note">Issued 23:41:17, ended 23:41:34. Held <strong>17 s</strong> of a
 30-minute window. Approved by: Alice Ng.</p>
 </li></ul>
 <table class="events">
 <caption class="visually-hidden">Main events of the step database-patch</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:40.899Z">11 Dec 07:51:40</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:40:54.098Z">11 Dec 23:40:54</time></td>
 <td class="ev-who"><span class="who who-simulator"><span class="who-kind">Simulator</span>
 simulator</span></td>
 <td class="ev-what">Advisory PG-17.12: Advisory PG-17.12: Postgres minor release 17.12 is pending; this environment runs 17.11</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:40.900Z">11 Dec 07:51:40</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:40:54.101Z">11 Dec 23:40:54</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 detector:advisory</span></td>
 <td class="ev-what">Advisory PG-17.12: Postgres minor release 17.12 is pending; this environment runs 17.11</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:50.339Z">11 Dec 07:51:50</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:03.773Z">11 Dec 23:41:03</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 clanker-author</span></td>
-<td class="ev-what">Pull request #5: 30-data: bump postgres_version 17.11 -&gt; 17.12 (local) <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">Pull request #5: 30-data (local): bump postgres_version 17.11 -&gt; 17.12 <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:51.558Z">11 Dec 07:51:51</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:07.560Z">11 Dec 23:41:07</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
-<td class="ev-what">30-data: bump postgres_version 17.11 -&gt; 17.12 (local) is tier T2 by rule normal-change <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">30-data (local): bump postgres_version 17.11 -&gt; 17.12 is tier T2 by rule normal-change <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:57.284Z">11 Dec 07:51:57</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:13.261Z">11 Dec 23:41:13</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
-<td class="ev-what">Approval needed: 30-data: bump postgres_version 17.11 -&gt; 17.12 (local) <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">Approval needed: 30-data (local): bump postgres_version 17.11 -&gt; 17.12 <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:53:05.916Z">11 Dec 07:53:05</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:34.558Z">11 Dec 23:41:34</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-ee96d7c5df83 ended; the credential is gone <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">Grant G-d54027d7a6d5 ended; the credential is gone <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:53:05.917Z">11 Dec 07:53:05</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:34.559Z">11 Dec 23:41:34</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 30-data <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:53:06.165Z">11 Dec 07:53:06</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:34.567Z">11 Dec 23:41:34</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Pull request #5 merged after apply <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:53:11.277Z">11 Dec 07:53:11</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:34.597Z">11 Dec 23:41:34</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 verifier</span></td>
-<td class="ev-what">Verification passed: 30-data: bump postgres_version 17.11 -&gt; 17.12 (local) <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">Verification passed: 30-data (local): bump postgres_version 17.11 -&gt; 17.12 <span class="ev-wi">WI-0007</span></td>
 </tr></tbody>
 </table>
 <details class="all-events">
-<summary>All 23 events of this step, and 1 by email, 1 by slack, 1 by teams and 1 by discord notifications</summary>
+<summary>All 24 events of this step, and 1 by email, 1 by slack, 1 by teams and 1 by discord notifications</summary>
 <table class="events">
 <caption class="visually-hidden">All events of the step database-patch</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:40.899Z">11 Dec 07:51:40</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:40:54.098Z">11 Dec 23:40:54</time></td>
 <td class="ev-who"><span class="who who-simulator"><span class="who-kind">Simulator</span>
 simulator</span></td>
 <td class="ev-what">Advisory PG-17.12: Advisory PG-17.12: Postgres minor release 17.12 is pending; this environment runs 17.11</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:40.900Z">11 Dec 07:51:40</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:40:54.101Z">11 Dec 23:40:54</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 detector:advisory</span></td>
 <td class="ev-what">Advisory PG-17.12: Postgres minor release 17.12 is pending; this environment runs 17.11</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:50.278Z">11 Dec 07:51:50</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:03.750Z">11 Dec 23:41:03</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 author</span></td>
-<td class="ev-what">30-data: bump postgres_version 17.11 -&gt; 17.12 (local) <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">30-data (local): bump postgres_version 17.11 -&gt; 17.12 <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:50.278Z">11 Dec 07:51:50</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:03.752Z">11 Dec 23:41:03</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 author</span></td>
 <td class="ev-what">Author opened pull request #5 for: Advisory PG-17.12: Postgres minor release 17.12 is pending; this environment runs 17.11 <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:50.339Z">11 Dec 07:51:50</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:03.773Z">11 Dec 23:41:03</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 clanker-author</span></td>
-<td class="ev-what">Pull request #5: 30-data: bump postgres_version 17.11 -&gt; 17.12 (local) <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">Pull request #5: 30-data (local): bump postgres_version 17.11 -&gt; 17.12 <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:50.340Z">11 Dec 07:51:50</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:03.775Z">11 Dec 23:41:03</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 author</span></td>
-<td class="ev-what">30-data: bump postgres_version 17.11 -&gt; 17.12 (local): Detected → Drafting <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">30-data (local): bump postgres_version 17.11 -&gt; 17.12: Detected → Drafting <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:51.558Z">11 Dec 07:51:51</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:06.478Z">11 Dec 23:41:06</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Plan of 30-data: 0 to add, 1 to change, 0 to destroy, 0 to replace <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:51.558Z">11 Dec 07:51:51</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:07.552Z">11 Dec 23:41:07</time></td>
+<td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
+reviewer</span></td>
+<td class="ev-what">Adversarial review agrees with tier T2 of the policy engine <span class="ev-wi">WI-0007</span></td>
+</tr><tr>
+<td class="ev-time"><time datetime="2026-12-11T23:41:07.556Z">11 Dec 23:41:07</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
-<td class="ev-what">30-data: bump postgres_version 17.11 -&gt; 17.12 (local): Drafting → Planned <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">30-data (local): bump postgres_version 17.11 -&gt; 17.12: Drafting → Planned <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:51.558Z">11 Dec 07:51:51</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:07.560Z">11 Dec 23:41:07</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
-<td class="ev-what">30-data: bump postgres_version 17.11 -&gt; 17.12 (local) is tier T2 by rule normal-change <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">30-data (local): bump postgres_version 17.11 -&gt; 17.12 is tier T2 by rule normal-change <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:57.283Z">11 Dec 07:51:57</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:13.256Z">11 Dec 23:41:13</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 explainer</span></td>
 <td class="ev-what">Explainer wrote the approval summary <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:57.284Z">11 Dec 07:51:57</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:13.259Z">11 Dec 23:41:13</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
-<td class="ev-what">30-data: bump postgres_version 17.11 -&gt; 17.12 (local): Planned → AwaitingApproval <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">30-data (local): bump postgres_version 17.11 -&gt; 17.12: Planned → AwaitingApproval <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:57.284Z">11 Dec 07:51:57</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:13.261Z">11 Dec 23:41:13</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
-<td class="ev-what">Approval needed: 30-data: bump postgres_version 17.11 -&gt; 17.12 (local) <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">Approval needed: 30-data (local): bump postgres_version 17.11 -&gt; 17.12 <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:58.897Z">11 Dec 07:51:58</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:17.109Z">11 Dec 23:41:17</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Alice Ng</span></td>
-<td class="ev-what">30-data: bump postgres_version 17.11 -&gt; 17.12 (local): approve by Alice Ng <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">30-data (local): bump postgres_version 17.11 -&gt; 17.12: approve by Alice Ng <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:58.897Z">11 Dec 07:51:58</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:17.112Z">11 Dec 23:41:17</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Alice Ng</span></td>
-<td class="ev-what">30-data: bump postgres_version 17.11 -&gt; 17.12 (local): AwaitingApproval → Approved <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">30-data (local): bump postgres_version 17.11 -&gt; 17.12: AwaitingApproval → Approved <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:58.898Z">11 Dec 07:51:58</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:17.116Z">11 Dec 23:41:17</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
-<td class="ev-what">30-data: bump postgres_version 17.11 -&gt; 17.12 (local): Approved → Applying <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">30-data (local): bump postgres_version 17.11 -&gt; 17.12: Approved → Applying <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:58.899Z">11 Dec 07:51:58</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:17.117Z">11 Dec 23:41:17</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-ee96d7c5df83: applier-30-data may apply 30-data until 2026-12-11T08:21:58.899Z <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">Grant G-d54027d7a6d5: applier-30-data may apply 30-data until 2026-12-12T00:11:17.116Z <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:51:59.448Z">11 Dec 07:51:59</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:17.712Z">11 Dec 23:41:17</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Apply of 30-data started <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:53:05.916Z">11 Dec 07:53:05</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:34.558Z">11 Dec 23:41:34</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-ee96d7c5df83 ended; the credential is gone <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">Grant G-d54027d7a6d5 ended; the credential is gone <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:53:05.917Z">11 Dec 07:53:05</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:34.559Z">11 Dec 23:41:34</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 30-data <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:53:06.165Z">11 Dec 07:53:06</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:34.567Z">11 Dec 23:41:34</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Pull request #5 merged after apply <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:53:06.165Z">11 Dec 07:53:06</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:34.568Z">11 Dec 23:41:34</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
-<td class="ev-what">30-data: bump postgres_version 17.11 -&gt; 17.12 (local): Applying → Verifying <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">30-data (local): bump postgres_version 17.11 -&gt; 17.12: Applying → Verifying <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:53:11.277Z">11 Dec 07:53:11</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:34.597Z">11 Dec 23:41:34</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 verifier</span></td>
-<td class="ev-what">Verification passed: 30-data: bump postgres_version 17.11 -&gt; 17.12 (local) <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">Verification passed: 30-data (local): bump postgres_version 17.11 -&gt; 17.12 <span class="ev-wi">WI-0007</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-11T07:53:11.277Z">11 Dec 07:53:11</time></td>
+<td class="ev-time"><time datetime="2026-12-11T23:41:34.599Z">11 Dec 23:41:34</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
-<td class="ev-what">30-data: bump postgres_version 17.11 -&gt; 17.12 (local): Verifying → Done <span class="ev-wi">WI-0007</span></td>
+<td class="ev-what">30-data (local): bump postgres_version 17.11 -&gt; 17.12: Verifying → Done <span class="ev-wi">WI-0007</span></td>
 </tr></tbody>
 </table>
 </details></div>
 </div>
 </section><section class="step" id="database-upkeep" data-step="8"
-data-at="87.76" aria-labelledby="database-upkeep-title">
+data-at="89.96" aria-labelledby="database-upkeep-title">
 <div class="step-inner">
 <div class="step-text">
 <p class="kicker reveal">Step 9 of 14 ·
@@ -1761,12 +1785,12 @@ data-at="87.76" aria-labelledby="database-upkeep-title">
 <p class="lead reveal">Database maintenance: vacuum and analyze is due. It is a routine, reversible job, so it runs as a
 <strong>T1</strong> runbook under a standing approval. It is still a
 recorded job with parameters, at a fixed commit of the runbooks repository, and
-not somebody at a database prompt. Grant issued, used for 0.8 s,
+not somebody at a database prompt. Grant issued, used for 1.0 s,
 revoked.</p>
 <div class="reveal"><dl class="facts">
 <div><dt>Risk tier</dt><dd><span class="tag tag-t1">T1</span> <span class="fact-note">rule <code>standing-approval</code></span></dd></div>
 <div><dt>Approved by</dt><dd>Standing approval</dd></div>
-<div><dt>Write or debug access</dt><dd>1 grant, 0.8 s in total</dd></div>
+<div><dt>Write or debug access</dt><dd>1 grant, 1.0 s in total</dd></div>
 <div><dt>Outcome</dt><dd>Done</dd></div>
 </dl></div>
 <p class="principle-note reveal"><span class="principle-number">Principle
@@ -1782,32 +1806,32 @@ Database maintenance: vacuum and analyze</p>
 </div>
 <ul class="grants"><li class="grant">
 <div class="grant-head">
-<span class="mono">G-05d7a84b7b07</span>
+<span class="mono">G-e0649c2dab13</span>
 <span class="grant-identity mono">runbook</span>
 <span class="tag tag-green">Used, then revoked</span>
 </div>
 <div class="grant-bar" role="img"
-aria-label="Held for 0.8 s of a 15-minute window">
+aria-label="Held for 1.0 s of a 15-minute window">
 <span class="grant-fill" style="--share:0.60%"></span>
 </div>
-<p class="grant-note">Issued 07:53:39, ended 07:53:39. Held <strong>0.8 s</strong> of a
+<p class="grant-note">Issued 23:42:02, ended 23:42:03. Held <strong>1.0 s</strong> of a
 15-minute window. Approved by: the standing approval of Carol Reyes.</p>
 </li></ul>
 <table class="events">
 <caption class="visually-hidden">Main events of the step database-upkeep</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-12-13T07:53:39.106Z">13 Dec 07:53:39</time></td>
+<td class="ev-time"><time datetime="2026-12-13T23:42:02.231Z">13 Dec 23:42:02</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-05d7a84b7b07: runbook db-maintenance until 2026-12-13T08:08:39.106Z <span class="ev-wi">WI-0008</span></td>
+<td class="ev-what">Grant G-e0649c2dab13: runbook db-maintenance until 2026-12-13T23:57:02.230Z <span class="ev-wi">WI-0008</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-13T07:53:40.400Z">13 Dec 07:53:40</time></td>
+<td class="ev-time"><time datetime="2026-12-13T23:42:03.759Z">13 Dec 23:42:03</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-05d7a84b7b07 ended; the credential is gone <span class="ev-wi">WI-0008</span></td>
+<td class="ev-what">Grant G-e0649c2dab13 ended; the credential is gone <span class="ev-wi">WI-0008</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-13T07:53:40.400Z">13 Dec 07:53:40</time></td>
+<td class="ev-time"><time datetime="2026-12-13T23:42:03.759Z">13 Dec 23:42:03</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Runbook db-maintenance finished <span class="ev-wi">WI-0008</span></td>
@@ -1819,37 +1843,37 @@ runner</span></td>
 <caption class="visually-hidden">All events of the step database-upkeep</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-12-13T07:53:39.105Z">13 Dec 07:53:39</time></td>
+<td class="ev-time"><time datetime="2026-12-13T23:42:02.225Z">13 Dec 23:42:02</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 scheduler</span></td>
 <td class="ev-what">Database maintenance: vacuum and analyze <span class="ev-wi">WI-0008</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-13T07:53:39.105Z">13 Dec 07:53:39</time></td>
+<td class="ev-time"><time datetime="2026-12-13T23:42:02.227Z">13 Dec 23:42:02</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Database maintenance: vacuum and analyze: Detected → Approved <span class="ev-wi">WI-0008</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-13T07:53:39.105Z">13 Dec 07:53:39</time></td>
+<td class="ev-time"><time datetime="2026-12-13T23:42:02.229Z">13 Dec 23:42:02</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Database maintenance: vacuum and analyze: Approved → Applying <span class="ev-wi">WI-0008</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-13T07:53:39.106Z">13 Dec 07:53:39</time></td>
+<td class="ev-time"><time datetime="2026-12-13T23:42:02.231Z">13 Dec 23:42:02</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-05d7a84b7b07: runbook db-maintenance until 2026-12-13T08:08:39.106Z <span class="ev-wi">WI-0008</span></td>
+<td class="ev-what">Grant G-e0649c2dab13: runbook db-maintenance until 2026-12-13T23:57:02.230Z <span class="ev-wi">WI-0008</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-13T07:53:40.400Z">13 Dec 07:53:40</time></td>
+<td class="ev-time"><time datetime="2026-12-13T23:42:03.759Z">13 Dec 23:42:03</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-05d7a84b7b07 ended; the credential is gone <span class="ev-wi">WI-0008</span></td>
+<td class="ev-what">Grant G-e0649c2dab13 ended; the credential is gone <span class="ev-wi">WI-0008</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-13T07:53:40.400Z">13 Dec 07:53:40</time></td>
+<td class="ev-time"><time datetime="2026-12-13T23:42:03.759Z">13 Dec 23:42:03</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Runbook db-maintenance finished <span class="ev-wi">WI-0008</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-13T07:53:40.401Z">13 Dec 07:53:40</time></td>
+<td class="ev-time"><time datetime="2026-12-13T23:42:03.761Z">13 Dec 23:42:03</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Database maintenance: vacuum and analyze: Applying → Done <span class="ev-wi">WI-0008</span></td>
@@ -1858,7 +1882,7 @@ orchestrator</span></td>
 </details></div>
 </div>
 </section><section class="step" id="restore-drill" data-step="9"
-data-at="91.10" aria-labelledby="restore-drill-title">
+data-at="93.29" aria-labelledby="restore-drill-title">
 <div class="step-inner">
 <div class="step-text">
 <p class="kicker reveal">Step 10 of 14 ·
@@ -1871,7 +1895,7 @@ date on it: 14 Dec 2026.</p>
 <div class="reveal"><dl class="facts">
 <div><dt>Risk tier</dt><dd><span class="tag tag-t1">T1</span> <span class="fact-note">rule <code>standing-approval</code></span></dd></div>
 <div><dt>Approved by</dt><dd>Standing approval</dd></div>
-<div><dt>Write or debug access</dt><dd>2 grants, 2.3 s in total</dd></div>
+<div><dt>Write or debug access</dt><dd>2 grants, 3.0 s in total</dd></div>
 <div><dt>Outcome</dt><dd>Done × 2</dd></div>
 </dl></div>
 <p class="principle-note reveal"><span class="principle-number">Principle
@@ -1893,59 +1917,59 @@ Monthly restore drill</p>
 </div>
 <ul class="grants"><li class="grant">
 <div class="grant-head">
-<span class="mono">G-c0a17a969146</span>
+<span class="mono">G-6ebaabd8146c</span>
 <span class="grant-identity mono">runbook</span>
 <span class="tag tag-green">Used, then revoked</span>
 </div>
 <div class="grant-bar" role="img"
-aria-label="Held for 1.1 s of a 15-minute window">
+aria-label="Held for 1.6 s of a 15-minute window">
 <span class="grant-fill" style="--share:0.60%"></span>
 </div>
-<p class="grant-note">Issued 07:54:12, ended 07:54:13. Held <strong>1.1 s</strong> of a
+<p class="grant-note">Issued 23:42:35, ended 23:42:36. Held <strong>1.6 s</strong> of a
 15-minute window. Approved by: the standing approval of Carol Reyes.</p>
 </li><li class="grant">
 <div class="grant-head">
-<span class="mono">G-084d6765a9aa</span>
+<span class="mono">G-22470eb80333</span>
 <span class="grant-identity mono">runbook</span>
 <span class="tag tag-green">Used, then revoked</span>
 </div>
 <div class="grant-bar" role="img"
-aria-label="Held for 1.2 s of a 15-minute window">
+aria-label="Held for 1.4 s of a 15-minute window">
 <span class="grant-fill" style="--share:0.60%"></span>
 </div>
-<p class="grant-note">Issued 07:54:13, ended 07:54:14. Held <strong>1.2 s</strong> of a
+<p class="grant-note">Issued 23:42:37, ended 23:42:38. Held <strong>1.4 s</strong> of a
 15-minute window. Approved by: the standing approval of Carol Reyes.</p>
 </li></ul>
 <table class="events">
 <caption class="visually-hidden">Main events of the step restore-drill</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:12.139Z">14 Dec 07:54:12</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:35.249Z">14 Dec 23:42:35</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-c0a17a969146: runbook db-backup until 2026-12-14T08:09:12.139Z <span class="ev-wi">WI-0009</span></td>
+<td class="ev-what">Grant G-6ebaabd8146c: runbook db-backup until 2026-12-14T23:57:35.248Z <span class="ev-wi">WI-0009</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:13.731Z">14 Dec 07:54:13</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:37.343Z">14 Dec 23:42:37</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-c0a17a969146 ended; the credential is gone <span class="ev-wi">WI-0009</span></td>
+<td class="ev-what">Grant G-6ebaabd8146c ended; the credential is gone <span class="ev-wi">WI-0009</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:13.731Z">14 Dec 07:54:13</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:37.344Z">14 Dec 23:42:37</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Runbook db-backup finished <span class="ev-wi">WI-0009</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:13.747Z">14 Dec 07:54:13</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:37.364Z">14 Dec 23:42:37</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-084d6765a9aa: runbook restore-drill until 2026-12-14T08:09:13.747Z <span class="ev-wi">WI-0010</span></td>
+<td class="ev-what">Grant G-22470eb80333: runbook restore-drill until 2026-12-14T23:57:37.363Z <span class="ev-wi">WI-0010</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:15.441Z">14 Dec 07:54:15</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:39.244Z">14 Dec 23:42:39</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-084d6765a9aa ended; the credential is gone <span class="ev-wi">WI-0010</span></td>
+<td class="ev-what">Grant G-22470eb80333 ended; the credential is gone <span class="ev-wi">WI-0010</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:15.442Z">14 Dec 07:54:15</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:39.245Z">14 Dec 23:42:39</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Runbook restore-drill finished <span class="ev-wi">WI-0010</span></td>
@@ -1957,72 +1981,72 @@ runner</span></td>
 <caption class="visually-hidden">All events of the step restore-drill</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:12.138Z">14 Dec 07:54:12</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:35.245Z">14 Dec 23:42:35</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 scheduler</span></td>
 <td class="ev-what">Scheduled database backup <span class="ev-wi">WI-0009</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:12.139Z">14 Dec 07:54:12</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:35.246Z">14 Dec 23:42:35</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Scheduled database backup: Detected → Approved <span class="ev-wi">WI-0009</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:12.139Z">14 Dec 07:54:12</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:35.247Z">14 Dec 23:42:35</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Scheduled database backup: Approved → Applying <span class="ev-wi">WI-0009</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:12.139Z">14 Dec 07:54:12</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:35.249Z">14 Dec 23:42:35</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-c0a17a969146: runbook db-backup until 2026-12-14T08:09:12.139Z <span class="ev-wi">WI-0009</span></td>
+<td class="ev-what">Grant G-6ebaabd8146c: runbook db-backup until 2026-12-14T23:57:35.248Z <span class="ev-wi">WI-0009</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:13.731Z">14 Dec 07:54:13</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:37.343Z">14 Dec 23:42:37</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-c0a17a969146 ended; the credential is gone <span class="ev-wi">WI-0009</span></td>
+<td class="ev-what">Grant G-6ebaabd8146c ended; the credential is gone <span class="ev-wi">WI-0009</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:13.731Z">14 Dec 07:54:13</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:37.344Z">14 Dec 23:42:37</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Runbook db-backup finished <span class="ev-wi">WI-0009</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:13.731Z">14 Dec 07:54:13</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:37.346Z">14 Dec 23:42:37</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Scheduled database backup: Applying → Done <span class="ev-wi">WI-0009</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:13.747Z">14 Dec 07:54:13</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:37.360Z">14 Dec 23:42:37</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 scheduler</span></td>
 <td class="ev-what">Monthly restore drill <span class="ev-wi">WI-0010</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:13.747Z">14 Dec 07:54:13</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:37.361Z">14 Dec 23:42:37</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Monthly restore drill: Detected → Approved <span class="ev-wi">WI-0010</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:13.747Z">14 Dec 07:54:13</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:37.363Z">14 Dec 23:42:37</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Monthly restore drill: Approved → Applying <span class="ev-wi">WI-0010</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:13.747Z">14 Dec 07:54:13</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:37.364Z">14 Dec 23:42:37</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-084d6765a9aa: runbook restore-drill until 2026-12-14T08:09:13.747Z <span class="ev-wi">WI-0010</span></td>
+<td class="ev-what">Grant G-22470eb80333: runbook restore-drill until 2026-12-14T23:57:37.363Z <span class="ev-wi">WI-0010</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:15.441Z">14 Dec 07:54:15</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:39.244Z">14 Dec 23:42:39</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-084d6765a9aa ended; the credential is gone <span class="ev-wi">WI-0010</span></td>
+<td class="ev-what">Grant G-22470eb80333 ended; the credential is gone <span class="ev-wi">WI-0010</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:15.442Z">14 Dec 07:54:15</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:39.245Z">14 Dec 23:42:39</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Runbook restore-drill finished <span class="ev-wi">WI-0010</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-14T07:54:15.442Z">14 Dec 07:54:15</time></td>
+<td class="ev-time"><time datetime="2026-12-14T23:42:39.247Z">14 Dec 23:42:39</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Monthly restore drill: Applying → Done <span class="ev-wi">WI-0010</span></td>
@@ -2031,7 +2055,7 @@ orchestrator</span></td>
 </details></div>
 </div>
 </section><section class="step" id="drift" data-step="10"
-data-at="94.43" aria-labelledby="drift-title">
+data-at="96.63" aria-labelledby="drift-title">
 <div class="step-inner">
 <div class="step-text">
 <p class="kicker reveal">Step 11 of 14 ·
@@ -2041,11 +2065,11 @@ data-at="94.43" aria-labelledby="drift-title">
 drift check plans every layer and finds that <code>kubernetes_config_map_v1.retention</code>
 differs from the code. To put it back is a change like any other:
 <strong>T2</strong>, approved by Alice Ng,
-applied with a grant for <code>applier-30-data</code> (0.9 s).</p>
+applied with a grant for <code>applier-30-data</code> (1.0 s).</p>
 <div class="reveal"><dl class="facts">
 <div><dt>Risk tier</dt><dd><span class="tag tag-t2">T2</span> <span class="fact-note">rule <code>normal-change</code></span></dd></div>
 <div><dt>Approved by</dt><dd>Alice Ng</dd></div>
-<div><dt>Write or debug access</dt><dd>1 grant, 0.9 s in total</dd></div>
+<div><dt>Write or debug access</dt><dd>1 grant, 1.0 s in total</dd></div>
 <div><dt>Outcome</dt><dd>Done</dd></div>
 </dl></div>
 <p class="principle-note reveal"><span class="principle-number">Principle
@@ -2061,174 +2085,179 @@ Drift check and reconciliation</p>
 </div>
 <ul class="grants"><li class="grant">
 <div class="grant-head">
-<span class="mono">G-6d4c560636e7</span>
+<span class="mono">G-df8d737fe17d</span>
 <span class="grant-identity mono">applier-30-data</span>
 <span class="tag tag-green">Used, then revoked</span>
 </div>
 <div class="grant-bar" role="img"
-aria-label="Held for 0.9 s of a 30-minute window">
+aria-label="Held for 1.0 s of a 30-minute window">
 <span class="grant-fill" style="--share:0.60%"></span>
 </div>
-<p class="grant-note">Issued 07:54:58, ended 07:54:59. Held <strong>0.9 s</strong> of a
+<p class="grant-note">Issued 23:43:21, ended 23:43:22. Held <strong>1.0 s</strong> of a
 30-minute window. Approved by: Alice Ng.</p>
 </li></ul>
 <table class="events">
 <caption class="visually-hidden">Main events of the step drift</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:45.236Z">15 Dec 07:54:45</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:08.456Z">15 Dec 23:43:08</time></td>
 <td class="ev-who"><span class="who who-simulator"><span class="who-kind">Simulator</span>
 simulator</span></td>
 <td class="ev-what">Someone set the backup retention to 1 day with kubectl</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:48.696Z">15 Dec 07:54:48</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:15.057Z">15 Dec 23:43:15</time></td>
+<td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
+reviewer</span></td>
+<td class="ev-what">The adversarial review failed; the tier of the policy engine stands <span class="ev-wi">WI-0011</span></td>
+</tr><tr>
+<td class="ev-time"><time datetime="2026-12-15T23:43:15.062Z">15 Dec 23:43:15</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
 <td class="ev-what">Drift check and reconciliation is tier T2 by rule normal-change <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:54.709Z">15 Dec 07:54:54</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:21.113Z">15 Dec 23:43:21</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Approval needed: Drift check and reconciliation <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:54.711Z">15 Dec 07:54:54</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:21.118Z">15 Dec 23:43:21</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 detector:drift</span></td>
 <td class="ev-what">Drift in local: kubernetes_config_map_v1.retention differs from the code</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:58.170Z">15 Dec 07:54:58</time></td>
-<td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
-Alice Ng</span></td>
-<td class="ev-what">Drift check and reconciliation: approve by Alice Ng <span class="ev-wi">WI-0011</span></td>
-</tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:58.177Z">15 Dec 07:54:58</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:21.298Z">15 Dec 23:43:21</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-6d4c560636e7: applier-30-data may apply 30-data until 2026-12-15T08:24:58.176Z <span class="ev-wi">WI-0011</span></td>
+<td class="ev-what">Grant G-df8d737fe17d: applier-30-data may apply 30-data until 2026-12-16T00:13:21.297Z <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:59.524Z">15 Dec 07:54:59</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:22.827Z">15 Dec 23:43:22</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-6d4c560636e7 ended; the credential is gone <span class="ev-wi">WI-0011</span></td>
+<td class="ev-what">Grant G-df8d737fe17d ended; the credential is gone <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:59.524Z">15 Dec 07:54:59</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:22.828Z">15 Dec 23:43:22</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 30-data <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:59.554Z">15 Dec 07:54:59</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:22.862Z">15 Dec 23:43:22</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 verifier</span></td>
 <td class="ev-what">Verification passed: Drift check and reconciliation <span class="ev-wi">WI-0011</span></td>
 </tr></tbody>
 </table>
 <details class="all-events">
-<summary>All 21 events of this step, and 1 by email, 1 by slack, 1 by teams and 1 by discord notifications</summary>
+<summary>All 22 events of this step, and 1 by email, 1 by slack, 1 by teams and 1 by discord notifications</summary>
 <table class="events">
 <caption class="visually-hidden">All events of the step drift</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:45.236Z">15 Dec 07:54:45</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:08.456Z">15 Dec 23:43:08</time></td>
 <td class="ev-who"><span class="who who-simulator"><span class="who-kind">Simulator</span>
 simulator</span></td>
 <td class="ev-what">Someone set the backup retention to 1 day with kubectl</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:45.237Z">15 Dec 07:54:45</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:08.459Z">15 Dec 23:43:08</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 detector:drift</span></td>
 <td class="ev-what">Drift check and reconciliation <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:46.465Z">15 Dec 07:54:46</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:10.262Z">15 Dec 23:43:10</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Plan of 30-data: 0 to add, 1 to change, 0 to destroy, 0 to replace <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:47.686Z">15 Dec 07:54:47</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:11.769Z">15 Dec 23:43:11</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Plan of 40-platform: 0 to add, 0 to change, 0 to destroy, 0 to replace <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:48.696Z">15 Dec 07:54:48</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:12.991Z">15 Dec 23:43:12</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Plan of 50-app: 0 to add, 0 to change, 0 to destroy, 0 to replace <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:48.696Z">15 Dec 07:54:48</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:15.057Z">15 Dec 23:43:15</time></td>
+<td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
+reviewer</span></td>
+<td class="ev-what">The adversarial review failed; the tier of the policy engine stands <span class="ev-wi">WI-0011</span></td>
+</tr><tr>
+<td class="ev-time"><time datetime="2026-12-15T23:43:15.060Z">15 Dec 23:43:15</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Drift check and reconciliation: Detected → Planned <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:48.696Z">15 Dec 07:54:48</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:15.062Z">15 Dec 23:43:15</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
 <td class="ev-what">Drift check and reconciliation is tier T2 by rule normal-change <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:54.707Z">15 Dec 07:54:54</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:21.104Z">15 Dec 23:43:21</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 explainer</span></td>
 <td class="ev-what">Explainer wrote the approval summary <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:54.709Z">15 Dec 07:54:54</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:21.111Z">15 Dec 23:43:21</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Drift check and reconciliation: Planned → AwaitingApproval <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:54.709Z">15 Dec 07:54:54</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:21.113Z">15 Dec 23:43:21</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Approval needed: Drift check and reconciliation <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:54.711Z">15 Dec 07:54:54</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:21.118Z">15 Dec 23:43:21</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 detector:drift</span></td>
 <td class="ev-what">Drift in local: kubernetes_config_map_v1.retention differs from the code</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:58.170Z">15 Dec 07:54:58</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:21.286Z">15 Dec 23:43:21</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Alice Ng</span></td>
 <td class="ev-what">Drift check and reconciliation: approve by Alice Ng <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:58.172Z">15 Dec 07:54:58</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:21.290Z">15 Dec 23:43:21</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Alice Ng</span></td>
 <td class="ev-what">Drift check and reconciliation: AwaitingApproval → Approved <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:58.176Z">15 Dec 07:54:58</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:21.296Z">15 Dec 23:43:21</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Drift check and reconciliation: Approved → Applying <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:58.177Z">15 Dec 07:54:58</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:21.298Z">15 Dec 23:43:21</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-6d4c560636e7: applier-30-data may apply 30-data until 2026-12-15T08:24:58.176Z <span class="ev-wi">WI-0011</span></td>
+<td class="ev-what">Grant G-df8d737fe17d: applier-30-data may apply 30-data until 2026-12-16T00:13:21.297Z <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:58.745Z">15 Dec 07:54:58</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:21.873Z">15 Dec 23:43:21</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Apply of 30-data started <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:59.524Z">15 Dec 07:54:59</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:22.827Z">15 Dec 23:43:22</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-6d4c560636e7 ended; the credential is gone <span class="ev-wi">WI-0011</span></td>
+<td class="ev-what">Grant G-df8d737fe17d ended; the credential is gone <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:59.524Z">15 Dec 07:54:59</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:22.828Z">15 Dec 23:43:22</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Applied 30-data <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:59.525Z">15 Dec 07:54:59</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:22.831Z">15 Dec 23:43:22</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Drift check and reconciliation: Applying → Verifying <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:59.554Z">15 Dec 07:54:59</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:22.862Z">15 Dec 23:43:22</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 verifier</span></td>
 <td class="ev-what">Verification passed: Drift check and reconciliation <span class="ev-wi">WI-0011</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-15T07:54:59.555Z">15 Dec 07:54:59</time></td>
+<td class="ev-time"><time datetime="2026-12-15T23:43:22.864Z">15 Dec 23:43:22</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Drift check and reconciliation: Verifying → Done <span class="ev-wi">WI-0011</span></td>
@@ -2246,13 +2275,13 @@ data-at="96.94" aria-labelledby="incident-title">
 <p class="lead reveal">At 02:00:00 UTC the health detector reports:
 Paperboat in local fails 7 of 20 inventory requests. The Investigator role gets a debug
 grant: read-only, one namespace, a 15-minute window, closed
-after 0.7 s. It writes a diagnosis. Which runbook may run is for policy code to decide,
-not for the model.  At 02:00:11, investigator starts the runbook
-<code>restart-deployment</code> on <code>paperboat-api</code> under the standing approval. 2.1 s later it is done.</p>
+after 1.0 s. It writes a diagnosis. Which runbook may run is for policy code to decide,
+not for the model.  At 02:00:10, investigator starts the runbook
+<code>restart-deployment</code> on <code>paperboat-api</code> under the standing approval. 2.0 s later it is done.</p>
 <div class="reveal"><dl class="facts">
 <div><dt>Risk tier</dt><dd><span class="tag tag-t1">T1</span> <span class="fact-note">rule <code>standing-approval</code></span></dd></div>
 <div><dt>Approved by</dt><dd>Standing approval</dd></div>
-<div><dt>Write or debug access</dt><dd>2 grants, 2.8 s in total</dd></div>
+<div><dt>Write or debug access</dt><dd>2 grants, 3.0 s in total</dd></div>
 <div><dt>Outcome</dt><dd>Done × 2</dd></div>
 </dl></div>
 <p class="principle-note reveal"><span class="principle-number">Principle
@@ -2274,39 +2303,39 @@ Restart paperboat-api to mitigate WI-0012</p>
 </div>
 <ul class="grants"><li class="grant">
 <div class="grant-head">
-<span class="mono">G-a2da4821957a</span>
+<span class="mono">G-8ec22e8917ae</span>
 <span class="grant-identity mono">debugger</span>
 <span class="tag tag-green">Used, then revoked</span>
 </div>
 <div class="grant-bar" role="img"
-aria-label="Held for 0.7 s of a 15-minute window">
+aria-label="Held for 1.0 s of a 15-minute window">
 <span class="grant-fill" style="--share:0.60%"></span>
 </div>
-<p class="grant-note">Issued 02:00:00, ended 02:00:00. Held <strong>0.7 s</strong> of a
+<p class="grant-note">Issued 02:00:00, ended 02:00:01. Held <strong>1.0 s</strong> of a
 15-minute window. Approved by: debug session.</p>
 </li><li class="grant">
 <div class="grant-head">
-<span class="mono">G-27356d076111</span>
+<span class="mono">G-b0aeb9529be8</span>
 <span class="grant-identity mono">runbook</span>
 <span class="tag tag-green">Used, then revoked</span>
 </div>
 <div class="grant-bar" role="img"
-aria-label="Held for 2.1 s of a 15-minute window">
+aria-label="Held for 2.0 s of a 15-minute window">
 <span class="grant-fill" style="--share:0.60%"></span>
 </div>
-<p class="grant-note">Issued 02:00:11, ended 02:00:13. Held <strong>2.1 s</strong> of a
+<p class="grant-note">Issued 02:00:10, ended 02:00:12. Held <strong>2.0 s</strong> of a
 15-minute window. Approved by: the standing approval of Carol Reyes.</p>
 </li></ul>
 <table class="events">
 <caption class="visually-hidden">Main events of the step incident</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:00.046Z">16 Dec 02:00:00</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:00.036Z">16 Dec 02:00:00</time></td>
 <td class="ev-who"><span class="who who-simulator"><span class="who-kind">Simulator</span>
 simulator</span></td>
 <td class="ev-what">Fault injected: inventory requests fail</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:00.082Z">16 Dec 02:00:00</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:00.076Z">16 Dec 02:00:00</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 detector:health</span></td>
 <td class="ev-what">Paperboat in local fails 7 of 20 inventory requests</td>
@@ -2314,29 +2343,29 @@ detector:health</span></td>
 <td class="ev-time"><time datetime="2026-12-16T02:00:00.083Z">16 Dec 02:00:00</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Debug grant G-a2da4821957a for investigator: read-only, namespace paperboat, until 2026-12-16T02:15:00.083Z <span class="ev-wi">WI-0012</span></td>
+<td class="ev-what">Debug grant G-8ec22e8917ae for investigator: read-only, namespace paperboat, until 2026-12-16T02:15:00.082Z <span class="ev-wi">WI-0012</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:01.262Z">16 Dec 02:00:01</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:01.575Z">16 Dec 02:00:01</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Debug grant G-a2da4821957a ended; the session is recorded <span class="ev-wi">WI-0012</span></td>
+<td class="ev-what">Debug grant G-8ec22e8917ae ended; the session is recorded <span class="ev-wi">WI-0012</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:11.563Z">16 Dec 02:00:11</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:10.274Z">16 Dec 02:00:10</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 investigator</span></td>
-<td class="ev-what">Diagnosis: The paperboat-api pod (version 1.1.1) is intermittently returning HTTP 500 'request handler failed' on /api/inventory and /api/customers, which matches the alert of 7 of 20 inv… <span class="ev-wi">WI-0012</span></td>
+<td class="ev-what">Diagnosis: paperboat-api 1.1.1 is intermittently failing GET /api/inventory with HTTP 500 ('request handler failed'). Roughly a third of requests fail, which matches the alert's 7 of 20. … <span class="ev-wi">WI-0012</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:11.600Z">16 Dec 02:00:11</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:10.303Z">16 Dec 02:00:10</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-27356d076111: runbook restart-deployment until 2026-12-16T02:15:11.598Z <span class="ev-wi">WI-0013</span></td>
+<td class="ev-what">Grant G-b0aeb9529be8: runbook restart-deployment until 2026-12-16T02:15:10.302Z <span class="ev-wi">WI-0013</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:14.157Z">16 Dec 02:00:14</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:12.775Z">16 Dec 02:00:12</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-27356d076111 ended; the credential is gone <span class="ev-wi">WI-0013</span></td>
+<td class="ev-what">Grant G-b0aeb9529be8 ended; the credential is gone <span class="ev-wi">WI-0013</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:14.157Z">16 Dec 02:00:14</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:12.776Z">16 Dec 02:00:12</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Runbook restart-deployment finished <span class="ev-wi">WI-0013</span></td>
@@ -2348,27 +2377,27 @@ runner</span></td>
 <caption class="visually-hidden">All events of the step incident</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:00.046Z">16 Dec 02:00:00</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:00.036Z">16 Dec 02:00:00</time></td>
 <td class="ev-who"><span class="who who-simulator"><span class="who-kind">Simulator</span>
 simulator</span></td>
 <td class="ev-what">Fault injected: inventory requests fail</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:00.082Z">16 Dec 02:00:00</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:00.076Z">16 Dec 02:00:00</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 detector:health</span></td>
 <td class="ev-what">Paperboat in local fails 7 of 20 inventory requests</td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:00.082Z">16 Dec 02:00:00</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:00.077Z">16 Dec 02:00:00</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 detector:health</span></td>
 <td class="ev-what">Incident: Paperboat in local fails 7 of 20 inventory requests <span class="ev-wi">WI-0012</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:00.082Z">16 Dec 02:00:00</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:00.078Z">16 Dec 02:00:00</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 detector:health</span></td>
 <td class="ev-what">Incident opened: Paperboat in local fails 7 of 20 inventory requests <span class="ev-wi">WI-0012</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:00.082Z">16 Dec 02:00:00</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:00.081Z">16 Dec 02:00:00</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 investigator</span></td>
 <td class="ev-what">Incident: Paperboat in local fails 7 of 20 inventory requests: Detected → Drafting <span class="ev-wi">WI-0012</span></td>
@@ -2376,59 +2405,59 @@ investigator</span></td>
 <td class="ev-time"><time datetime="2026-12-16T02:00:00.083Z">16 Dec 02:00:00</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Debug grant G-a2da4821957a for investigator: read-only, namespace paperboat, until 2026-12-16T02:15:00.083Z <span class="ev-wi">WI-0012</span></td>
+<td class="ev-what">Debug grant G-8ec22e8917ae for investigator: read-only, namespace paperboat, until 2026-12-16T02:15:00.082Z <span class="ev-wi">WI-0012</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:01.262Z">16 Dec 02:00:01</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:01.575Z">16 Dec 02:00:01</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Debug grant G-a2da4821957a ended; the session is recorded <span class="ev-wi">WI-0012</span></td>
+<td class="ev-what">Debug grant G-8ec22e8917ae ended; the session is recorded <span class="ev-wi">WI-0012</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:11.563Z">16 Dec 02:00:11</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:10.274Z">16 Dec 02:00:10</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 investigator</span></td>
-<td class="ev-what">Diagnosis: The paperboat-api pod (version 1.1.1) is intermittently returning HTTP 500 'request handler failed' on /api/inventory and /api/customers, which matches the alert of 7 of 20 inv… <span class="ev-wi">WI-0012</span></td>
+<td class="ev-what">Diagnosis: paperboat-api 1.1.1 is intermittently failing GET /api/inventory with HTTP 500 ('request handler failed'). Roughly a third of requests fail, which matches the alert's 7 of 20. … <span class="ev-wi">WI-0012</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:11.597Z">16 Dec 02:00:11</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:10.297Z">16 Dec 02:00:10</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 investigator</span></td>
 <td class="ev-what">Restart paperboat-api to mitigate WI-0012 <span class="ev-wi">WI-0013</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:11.597Z">16 Dec 02:00:11</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:10.299Z">16 Dec 02:00:10</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Restart paperboat-api to mitigate WI-0012: Detected → Approved <span class="ev-wi">WI-0013</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:11.598Z">16 Dec 02:00:11</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:10.301Z">16 Dec 02:00:10</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Restart paperboat-api to mitigate WI-0012: Approved → Applying <span class="ev-wi">WI-0013</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:11.600Z">16 Dec 02:00:11</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:10.303Z">16 Dec 02:00:10</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-27356d076111: runbook restart-deployment until 2026-12-16T02:15:11.598Z <span class="ev-wi">WI-0013</span></td>
+<td class="ev-what">Grant G-b0aeb9529be8: runbook restart-deployment until 2026-12-16T02:15:10.302Z <span class="ev-wi">WI-0013</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:14.157Z">16 Dec 02:00:14</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:12.775Z">16 Dec 02:00:12</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 broker</span></td>
-<td class="ev-what">Grant G-27356d076111 ended; the credential is gone <span class="ev-wi">WI-0013</span></td>
+<td class="ev-what">Grant G-b0aeb9529be8 ended; the credential is gone <span class="ev-wi">WI-0013</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:14.157Z">16 Dec 02:00:14</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:12.776Z">16 Dec 02:00:12</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Runbook restart-deployment finished <span class="ev-wi">WI-0013</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:14.158Z">16 Dec 02:00:14</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:12.778Z">16 Dec 02:00:12</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Restart paperboat-api to mitigate WI-0012: Applying → Done <span class="ev-wi">WI-0013</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:14.179Z">16 Dec 02:00:14</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:12.809Z">16 Dec 02:00:12</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 investigator</span></td>
 <td class="ev-what">Incident resolved: 20 of 20 inventory requests succeed <span class="ev-wi">WI-0012</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:00:14.180Z">16 Dec 02:00:14</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:00:12.811Z">16 Dec 02:00:12</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 investigator</span></td>
 <td class="ev-what">Incident: Paperboat in local fails 7 of 20 inventory requests: Drafting → Done <span class="ev-wi">WI-0012</span></td>
@@ -2473,69 +2502,74 @@ Run two api replicas for the holiday rush</p>
 <caption class="visually-hidden">Main events of the step stale-plan</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:01:12.189Z">16 Dec 02:01:12</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:01:44.089Z">16 Dec 02:01:44</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Carol Reyes</span></td>
 <td class="ev-what">Pull request #6: Run two api replicas for the holiday rush <span class="ev-wi">WI-0014</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:01:13.549Z">16 Dec 02:01:13</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:01:46.796Z">16 Dec 02:01:46</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
 <td class="ev-what">Run two api replicas for the holiday rush is tier T2 by rule normal-change <span class="ev-wi">WI-0014</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:01:19.337Z">16 Dec 02:01:19</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:01:53.076Z">16 Dec 02:01:53</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Approval needed: Run two api replicas for the holiday rush <span class="ev-wi">WI-0014</span></td>
 </tr></tbody>
 </table>
 <details class="all-events">
-<summary>All 9 events of this step, and 1 by email, 1 by slack, 1 by teams and 1 by discord notifications</summary>
+<summary>All 10 events of this step, and 1 by email, 1 by slack, 1 by teams and 1 by discord notifications</summary>
 <table class="events">
 <caption class="visually-hidden">All events of the step stale-plan</caption>
 <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">What</th></tr></thead>
 <tbody><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:01:12.165Z">16 Dec 02:01:12</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:01:44.082Z">16 Dec 02:01:44</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Carol Reyes</span></td>
 <td class="ev-what">Run two api replicas for the holiday rush <span class="ev-wi">WI-0014</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:01:12.189Z">16 Dec 02:01:12</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:01:44.089Z">16 Dec 02:01:44</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Carol Reyes</span></td>
 <td class="ev-what">Pull request #6: Run two api replicas for the holiday rush <span class="ev-wi">WI-0014</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:01:12.190Z">16 Dec 02:01:12</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:01:44.090Z">16 Dec 02:01:44</time></td>
 <td class="ev-who"><span class="who who-human"><span class="who-kind">Person</span>
 Carol Reyes</span></td>
 <td class="ev-what">Run two api replicas for the holiday rush: Detected → Drafting <span class="ev-wi">WI-0014</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:01:13.549Z">16 Dec 02:01:13</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:01:45.723Z">16 Dec 02:01:45</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 runner</span></td>
 <td class="ev-what">Plan of 50-app: 0 to add, 1 to change, 0 to destroy, 0 to replace <span class="ev-wi">WI-0014</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:01:13.549Z">16 Dec 02:01:13</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:01:46.788Z">16 Dec 02:01:46</time></td>
+<td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
+reviewer</span></td>
+<td class="ev-what">Adversarial review agrees with tier T2 of the policy engine <span class="ev-wi">WI-0014</span></td>
+</tr><tr>
+<td class="ev-time"><time datetime="2026-12-16T02:01:46.793Z">16 Dec 02:01:46</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Run two api replicas for the holiday rush: Drafting → Planned <span class="ev-wi">WI-0014</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:01:13.549Z">16 Dec 02:01:13</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:01:46.796Z">16 Dec 02:01:46</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 policy</span></td>
 <td class="ev-what">Run two api replicas for the holiday rush is tier T2 by rule normal-change <span class="ev-wi">WI-0014</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:01:19.336Z">16 Dec 02:01:19</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:01:53.070Z">16 Dec 02:01:53</time></td>
 <td class="ev-who"><span class="who who-model"><span class="who-kind">Model</span>
 explainer</span></td>
 <td class="ev-what">Explainer wrote the approval summary <span class="ev-wi">WI-0014</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:01:19.337Z">16 Dec 02:01:19</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:01:53.073Z">16 Dec 02:01:53</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Run two api replicas for the holiday rush: Planned → AwaitingApproval <span class="ev-wi">WI-0014</span></td>
 </tr><tr>
-<td class="ev-time"><time datetime="2026-12-16T02:01:19.337Z">16 Dec 02:01:19</time></td>
+<td class="ev-time"><time datetime="2026-12-16T02:01:53.076Z">16 Dec 02:01:53</time></td>
 <td class="ev-who"><span class="who who-code"><span class="who-kind">Code</span>
 orchestrator</span></td>
 <td class="ev-what">Approval needed: Run two api replicas for the holiday rush <span class="ev-wi">WI-0014</span></td>
@@ -2552,46 +2586,46 @@ data-at="96.95" aria-labelledby="audit-title">
 <h2 class="reveal" id="audit-title">The auditor asks for the evidence</h2>
 <p class="lead reveal">Every event of the month is in one append-only log, and each record
 carries the hash of the record before it. The chain
-verifies: 323 events,
-head <code>c1c8d527feb8</code>. In it:
-7 approvals, 12 applies,
+verifies: 331 events,
+head <code>d80982f95770</code>. In it:
+8 approvals, 12 applies,
 5 runbook runs, 1 rollback,
 0 refused applies and
-18 grants. In 29 days, write or debug access existed for a
-total of 3 min 27 s.</p>
+18 grants. In 28 days, write or debug access existed for a
+total of 1 min 53 s.</p>
 <p class="principle-note reveal"><span class="principle-number">Principle
 3</span> What was approved is exactly what runs.</p>
 </div>
 <div class="step-evidence reveal"><div class="chain" aria-label="The last records of the hash chain">
 <div class="chain-link">
-<span class="mono">#320</span>
+<span class="mono">#328</span>
 <span class="chain-type">notify.sent</span>
-<span class="mono chain-hash">fcae703</span>
+<span class="mono chain-hash">2073164</span>
 </div><div class="chain-link">
-<span class="mono">#321</span>
+<span class="mono">#329</span>
 <span class="chain-type">notify.sent</span>
-<span class="mono chain-hash">fb6a7ff</span>
+<span class="mono chain-hash">387418a</span>
 </div><div class="chain-link">
-<span class="mono">#322</span>
+<span class="mono">#330</span>
 <span class="chain-type">notify.sent</span>
-<span class="mono chain-hash">bb41b83</span>
+<span class="mono chain-hash">d4c8aa7</span>
 </div><div class="chain-link">
-<span class="mono">#323</span>
+<span class="mono">#331</span>
 <span class="chain-type">notify.sent</span>
-<span class="mono chain-hash">c1c8d52</span>
+<span class="mono chain-hash">d80982f</span>
 </div>
 <div class="chain-link chain-head"><span>Head</span>
-<span class="mono chain-hash">c1c8d527feb81825…</span>
+<span class="mono chain-hash">d80982f95770c544…</span>
 <span class="tag tag-green">Chain verified</span></div>
 </div>
 <dl class="facts facts-wide">
-<div><dt>Records written by code</dt><dd>241</dd></div>
+<div><dt>Records written by code</dt><dd>248</dd></div>
 <div><dt>By a language model role</dt><dd>28</dd></div>
-<div><dt>By a person</dt><dd>20</dd></div>
+<div><dt>By a person</dt><dd>21</dd></div>
 <div><dt>By the simulator</dt><dd>34</dd></div>
 <div><dt>Notifications sent</dt><dd>64</dd></div>
-<div><dt>Longest grant</dt><dd>67 s
-<span class="fact-note mono">applier-30-data</span></dd></div>
+<div><dt>Longest grant</dt><dd>27 s
+<span class="fact-note mono">applier-20-cluster</span></dd></div>
 </dl></div>
 </div>
 </section>

@@ -10,7 +10,6 @@ import { SITE_DIR } from "../lib/serve.mjs";
 
 export const OUT = join(SITE_DIR, "out");
 export const WORK = join(OUT, "build");
-export const TITLE_CLIP = join(WORK, "title.mp4");
 export const TIMELINE = join(WORK, "timeline.json");
 export const FPS = 30;
 export const SAMPLE_RATE = 48000;
@@ -25,7 +24,7 @@ export const TAIL = 0.9;
 const SPOKEN = [
   [/\bAI\b/g, "A.I."],
   [/\bAWS\b/g, "A.W.S."],
-  [/\bClanker\b/g, "Clanker"],
+  [/\bS\.R\.C\./g, "S R C"],
 ];
 
 function minutesInWords(totalSeconds) {

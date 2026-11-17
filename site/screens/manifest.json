@@ -9,7 +9,7 @@
    "theme": "light",
    "title": "Overview",
    "note": "Is each environment healthy, and what needs a decision now?",
-   "alt": "The Overview view of the Clanker dashboard, light theme."
+   "alt": "The Overview view of the S.R.C. dashboard, light theme."
   },
   {
    "file": "dashboard-timeline-light.png",
@@ -19,7 +19,7 @@
    "theme": "light",
    "title": "Timeline",
    "note": "What happened, when, and what is coming next.",
-   "alt": "The Timeline view of the Clanker dashboard, light theme."
+   "alt": "The Timeline view of the S.R.C. dashboard, light theme."
   },
   {
    "file": "dashboard-approval-light.png",
@@ -29,7 +29,7 @@
    "theme": "light",
    "title": "Approval page",
    "note": "One sentence, the impact, the tier, what changes, and the decision.",
-   "alt": "The Approval page view of the Clanker dashboard, light theme."
+   "alt": "The Approval page view of the S.R.C. dashboard, light theme."
   },
   {
    "file": "dashboard-topology-light.png",
@@ -39,7 +39,7 @@
    "theme": "light",
    "title": "Topology",
    "note": "What exists in the environment and how it is connected.",
-   "alt": "The Topology view of the Clanker dashboard, light theme."
+   "alt": "The Topology view of the S.R.C. dashboard, light theme."
   },
   {
    "file": "dashboard-access-light.png",
@@ -49,7 +49,7 @@
    "theme": "light",
    "title": "Access",
    "note": "Who and what holds which permission now, and the history of grants.",
-   "alt": "The Access view of the Clanker dashboard, light theme."
+   "alt": "The Access view of the S.R.C. dashboard, light theme."
   },
   {
    "file": "dashboard-audit-light.png",
@@ -59,7 +59,7 @@
    "theme": "light",
    "title": "Audit",
    "note": "The searchable, hash-chained event log.",
-   "alt": "The Audit view of the Clanker dashboard, light theme."
+   "alt": "The Audit view of the S.R.C. dashboard, light theme."
   },
   {
    "file": "dashboard-overview-dark.png",
@@ -69,7 +69,7 @@
    "theme": "dark",
    "title": "Overview",
    "note": "Is each environment healthy, and what needs a decision now?",
-   "alt": "The Overview view of the Clanker dashboard, dark theme."
+   "alt": "The Overview view of the S.R.C. dashboard, dark theme."
   },
   {
    "file": "dashboard-timeline-dark.png",
@@ -79,7 +79,7 @@
    "theme": "dark",
    "title": "Timeline",
    "note": "What happened, when, and what is coming next.",
-   "alt": "The Timeline view of the Clanker dashboard, dark theme."
+   "alt": "The Timeline view of the S.R.C. dashboard, dark theme."
   },
   {
    "file": "dashboard-approval-dark.png",
@@ -89,7 +89,7 @@
    "theme": "dark",
    "title": "Approval page",
    "note": "One sentence, the impact, the tier, what changes, and the decision.",
-   "alt": "The Approval page view of the Clanker dashboard, dark theme."
+   "alt": "The Approval page view of the S.R.C. dashboard, dark theme."
   },
   {
    "file": "dashboard-topology-dark.png",
@@ -99,7 +99,7 @@
    "theme": "dark",
    "title": "Topology",
    "note": "What exists in the environment and how it is connected.",
-   "alt": "The Topology view of the Clanker dashboard, dark theme."
+   "alt": "The Topology view of the S.R.C. dashboard, dark theme."
   },
   {
    "file": "dashboard-access-dark.png",
@@ -109,7 +109,7 @@
    "theme": "dark",
    "title": "Access",
    "note": "Who and what holds which permission now, and the history of grants.",
-   "alt": "The Access view of the Clanker dashboard, dark theme."
+   "alt": "The Access view of the S.R.C. dashboard, dark theme."
   },
   {
    "file": "dashboard-audit-dark.png",
@@ -119,7 +119,7 @@
    "theme": "dark",
    "title": "Audit",
    "note": "The searchable, hash-chained event log.",
-   "alt": "The Audit view of the Clanker dashboard, dark theme."
+   "alt": "The Audit view of the S.R.C. dashboard, dark theme."
   },
   {
    "file": "paperboat-inventory-light.png",
@@ -168,8 +168,8 @@
    "group": "notifications",
    "theme": "light",
    "title": "Mail inbox",
-   "note": "The emails that Clanker sent to the approvers during the month.",
-   "alt": "A mail inbox with the notification emails from Clanker, most of them requests for approval."
+   "note": "The emails that S.R.C. sent to the approvers during the month.",
+   "alt": "A mail inbox with the notification emails from S.R.C., most of them requests for approval."
   },
   {
    "file": "mail-approval-light.png",
@@ -179,7 +179,7 @@
    "theme": "light",
    "title": "An approval email",
    "note": "What an approver receives: the change in one sentence, and a link to decide.",
-   "alt": "One notification email from Clanker that asks for an approval."
+   "alt": "One notification email from S.R.C. that asks for an approval."
   },
   {
    "file": "webhook-sink-light.png",
@@ -189,7 +189,7 @@
    "theme": "light",
    "title": "Webhook sink",
    "note": "A local stand-in for Slack, Microsoft Teams and Discord, with the real payloads.",
-   "alt": "The webhook sink page: a list of the chat notifications that Clanker sent."
+   "alt": "The webhook sink page: a list of the chat notifications that S.R.C. sent."
   }
  ],
  "skipped": []
