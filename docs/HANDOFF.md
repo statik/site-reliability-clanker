@@ -10,21 +10,25 @@ issues with the label `needs-owner-review`.
 The control plane must run on AWS as a Nanos unikernel in an auto scaling group, set up by
 the wizard (`clanker setup`). The decisions of the owner are in section 12 of
 `docs/PLAN.md` and in issue #11. In short: the core starts no program and keeps no file; jobs
-run in short-lived runners; all state is in an external PostgreSQL; the dashboard is behind
-a load balancer with OIDC sign-in; the wizard builds the machine image with `ops`.
+run in short-lived runners; all state is in an external PostgreSQL; people sign in with
+OIDC in the core itself (changed by the owner on 2026-11-17, issue #45); the wizard builds
+the machine image with `ops`.
 
 ### State at the end of the second session of 2026-11-17
 
-Next steps 1 to 4 are merged (#39, #42, #43 and #44).
-Nothing waits on a branch. The next work is step 5, OIDC sign-in.
+Next steps 1 to 4 are merged (#39, #42, #43, #44 and #46), and the first part of step 5.
+The next work is the second part of step 5: the device flow for git, the iOS app and
+scripts.
 
 The owner decided three things in that session:
 
 - Issue #40: on AWS the core reads its secrets from Parameter Store with the AWS SDK for
   Go v2. This is work for steps 6 and 7.
 - Issue #41: after a restart, plan again and ask for approval again. Built.
-- Issue #45, for step 5: a role comes from the users table by email; clients that are not
-  a browser use a device grant flow that the core runs itself.
+- Issue #45, for step 5: the sign-in is in the core and not at a load balancer, so that
+  Okta, Google or another provider works on every cloud. A role comes from the users table
+  by email. Clients that are not a browser use a device grant flow that the core runs
+  itself.
 
 Not done in that session: the iOS app was not built after the change that shows a lost job
 as an error (`ios/App/Views/ActivityView.swift`).
@@ -77,8 +81,10 @@ What ran on the build of commit `376617b`, the last change to the Go code:
      made. The check does not watch the rest of the disk.
    - Ran on the local target, on the same commit: `fresh-run.sh` (thirteen work items, the
      chain at 310 events, no error line), `sweep.py` and `stale_plan.py`.
-   - Did not run: the walk through the wizard with a released binary. From a released binary on the local path, only `clanker preflight`
-     ran, which unpacks the files.
+   - The walk through the wizard (`web/scripts/setup-wizard-check.mjs`) ran later on the
+     same day with a released binary from the main branch after #46, started outside a
+     checkout on the data directory of the demo: the control plane started and the
+     hand-over link answered.
    - The local target keeps its data directory (`broker.key`, `database.password`, the
      unpacked bundle, the files of the runner).
    - Not done: the template `internal/setup/controlplane.yaml` (the ECS design) still
@@ -118,9 +124,32 @@ What ran on the build of commit `376617b`, the last change to the Go code:
    - Not examined: the runner process of the killed apply. It was gone after the restart,
      but nothing shows whether it finished its `tofu apply` first. A break of the lock
      connection was tested only by the unit tests of the wait, not by a cut connection.
-5. **OIDC sign-in**, and no trust in the `X-Clanker-User` header. This blocks every public
-   deployment. Issue #45 has the decisions of the owner and the build order: first the
-   signed identity from the load balancer, then the device flow.
+5. **OIDC sign-in**, and no trust in the `X-Clanker-User` header. Issue #45 has the
+   decisions of the owner.
+   - **Done: the sign-in for a browser.** The core runs the authorization code flow with
+     PKCE (`internal/signin`, with `coreos/go-oidc` and `golang.org/x/oauth2`) against a
+     provider with a discovery document. A session is a row in PostgreSQL; the browser
+     holds a random token in a cookie and the database holds its hash. A session lasts
+     twelve hours.
+   - With the sign-in on, every route needs a known user except `/healthz`, `/auth/` and
+     `/runner/v1/`. The user header means nothing. A person whose email is not in the users
+     table is refused. Actions that the demo leaves open (scenes, the clock, the digest, a
+     pull request) need a role.
+   - Settings: `CLANKER_PUBLIC_URL`, `CLANKER_OIDC_ISSUER`, `CLANKER_OIDC_CLIENT_ID`,
+     `CLANKER_OIDC_CLIENT_SECRET` (a secret: not in `Env` of an image for a cloud account)
+     and `CLANKER_ADMIN_EMAIL`, the first admin. On a cloud all five are required. The
+     demo users are not made when the control plane starts with `--demo=false`; `--demo`
+     is on by default. On the local target the sign-in is on when the issuer is
+     set; without it the demo is as before.
+   - Ran: `core-check.sh` and `nanos-check.sh` with a fake identity provider
+     (`scripts/verify/fakeidp`), and `web/scripts/signin-check.mjs` in a real browser on
+     the local target. The results are in the pull request.
+   - Not run: a real provider (Okta, Google, Entra). The sign-in needs the claim
+     `email_verified`, which some providers do not send; that will show with a real one.
+   - **Not built: the device flow.** Until then git, the iOS app and scripts cannot use a
+     control plane with the sign-in. The checks give git the session cookie of the admin.
+     There is no page to add a user or change a role: a user other than the first admin
+     needs a row in the users table.
 6. **Cloud runner and broker:** a launcher that starts a Fargate task, an S3 state backend
    in the runner (the job specification has the field `backend`), a broker that uses STS.
    The ECS task definition in `internal/setup/controlplane.yaml` is the starting point.
@@ -299,7 +328,8 @@ Limits:
 - The access broker paths for the three clouds (STS, service account impersonation, Entra).
 - Swamp integration and the Nanos unikernel track. Both spikes need input from the owner.
 - Use cases 7, 8, 12 and 23 on a real target. Use case 7 is a forecast on the timeline.
-- Real authentication. The dashboard and the iOS app send a user name in a header.
+- A sign-in for clients that are not a browser (the device flow), and a page to manage
+  users. The iOS app still sends a user name in a header, which only the demo reads.
 - A "defer" decision, and enforcement of a maintenance window for tier T3.
 - Quiet hours, escalation and threading for notifications.
 - The move of the control plane into a cloud (bootstrap and pivot).

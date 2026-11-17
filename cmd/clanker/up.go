@@ -271,8 +271,11 @@ func build(ctx context.Context, o options) (*components, error) {
 		c.orch.JobVariables = map[string]string{"TF_VAR_admin_token": demoAdminToken}
 	}
 	c.monitor = monitor.New(c.db, c.clock)
-	if err := seedUsers(c.db); err != nil {
-		return nil, err
+	// The demo users have no way to sign in. They exist only for the user switcher.
+	if o.demo {
+		if err := seedUsers(c.db); err != nil {
+			return nil, err
+		}
 	}
 	if err := seedForge(c.forge, o.source); err != nil {
 		return nil, err
@@ -462,6 +465,9 @@ func up(ctx context.Context, o options) error {
 		}
 	} else {
 		slog.Warn("the dashboard is not built; only the API is served. Run `make web`")
+	}
+	if err := withSignIn(ctx, server, c, o); err != nil {
+		return err
 	}
 	handler, err := server.Handler()
 	if err != nil {

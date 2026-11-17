@@ -40,10 +40,27 @@ async function errorOf(response: Response): Promise<ApiError> {
   return new ApiError(response.status, `HTTP ${response.status}: ${detail}`);
 }
 
+/** Sends the browser to the sign-in, and back to this page after it. */
+export function goToSignIn(): void {
+  const here = window.location.pathname + window.location.search;
+  window.location.assign(`/auth/login?return=${encodeURIComponent(here)}`);
+}
+
+/** Ends the session on the server and opens the sign-in. */
+export async function signOut(): Promise<void> {
+  await fetch("/auth/logout", { method: "POST" });
+  window.location.assign("/");
+}
+
 async function send<T>(url: string, init: RequestInit): Promise<T> {
   const headers = new Headers(init.headers);
+  // The server reads this header only in the demo, where there is no sign-in.
   headers.set("X-Clanker-User", storedUser());
   const response = await fetch(url, { ...init, headers });
+  if (response.status === 401) {
+    // The session ended. Only a control plane with a sign-in answers 401.
+    goToSignIn();
+  }
   if (!response.ok) {
     throw await errorOf(response);
   }
