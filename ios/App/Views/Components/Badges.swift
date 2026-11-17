@@ -1,13 +1,27 @@
 import SwiftUI
 
 extension Tone {
-  var color: Color {
+  var color: PaletteColor {
     switch self {
-    case .good: .green
-    case .attention: .orange
-    case .bad: .red
-    case .active: .accentColor
-    case .neutral: .secondary
+    case .good: Palette.success
+    case .attention: Palette.warning
+    case .bad: Palette.error
+    case .active: Palette.active
+    case .neutral: Palette.textSecondary
+    }
+  }
+}
+
+extension RiskTier {
+  /// The ground of the tier tag, as the website colours the tiers. The text on it is
+  /// `Palette.tagText`.
+  var tagBackground: PaletteColor {
+    switch self {
+    case .t0: Palette.tagGray
+    case .t1: Palette.tagSea
+    case .t2: Palette.tagSky
+    case .t3: Palette.tagRed
+    case .none, .unknown: Palette.tagGray
     }
   }
 }
@@ -72,9 +86,8 @@ struct TierBadge: View {
     .font(.caption)
     .padding(.horizontal, 8)
     .padding(.vertical, 3)
-    .foregroundStyle(tier.tone.color)
-    .background(tier.tone.color.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
-    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(tier.tone.color.opacity(0.45)))
+    .foregroundStyle(Palette.tagText)
+    .background(tier.tagBackground, in: RoundedRectangle(cornerRadius: 10))
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("Risk tier \(tier.code), \(tier.meaning)")
   }
@@ -121,7 +134,7 @@ struct SourceNote: View {
   var body: some View {
     Label(origin.text, systemImage: origin.symbol)
       .font(.caption)
-      .foregroundStyle(.secondary)
+      .foregroundStyle(Palette.textSecondary)
       .accessibilityElement(children: .combine)
   }
 }
@@ -136,10 +149,10 @@ struct FieldRow: View {
     VStack(alignment: .leading, spacing: 2) {
       Text(label)
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Palette.textSecondary)
       Text(value.isEmpty ? "Not stated" : value)
         .font(monospaced ? .callout.monospaced() : .callout)
-        .foregroundStyle(value.isEmpty ? .secondary : .primary)
+        .foregroundStyle(value.isEmpty ? Palette.textSecondary : Palette.text)
         .textSelection(.enabled)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -157,13 +170,13 @@ struct ErrorNotice: View {
     VStack(alignment: .leading, spacing: 8) {
       Label(status ?? "Something went wrong", systemImage: "exclamationmark.triangle.fill")
         .font(.subheadline.weight(.semibold))
-        .foregroundStyle(.red)
+        .foregroundStyle(Palette.error)
       Text(message)
         .font(.callout)
         .textSelection(.enabled)
       if let retry {
         Button("Try again", action: retry)
-          .buttonStyle(.bordered)
+          .buttonStyle(PaletteBoxButtonStyle())
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)

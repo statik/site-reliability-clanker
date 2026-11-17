@@ -10,10 +10,10 @@ struct SignInView: View {
 
   var body: some View {
     NavigationStack {
-      Form {
+      PaletteForm {
         Section {
           HStack(spacing: 12) {
-            PaperBoatMark(size: 36)
+            ProductMark(size: 44)
             Text("The control plane at \(app.settings.controlPlane) asks you to sign in.")
               .font(.callout)
           }
@@ -27,6 +27,7 @@ struct SignInView: View {
         case .idle:
           Section {
             Button("Sign in") { model.begin(app: app) }
+              .foregroundStyle(Palette.interactive)
               .accessibilityIdentifier("sign-in-button")
           } footer: {
             Text(
@@ -40,6 +41,7 @@ struct SignInView: View {
           Section {
             ProgressView("Waiting for the approval")
             Button("Cancel", role: .cancel) { model.cancel() }
+              .foregroundStyle(Palette.interactive)
           }
         case .failed(let message):
           Section {
@@ -78,6 +80,7 @@ private struct CodeSection: View {
         .accessibilityIdentifier("sign-in-code")
       FieldRow(label: "Page", value: grant.page.absoluteString)
       Button("Open the page in the browser", systemImage: "safari", action: open)
+        .foregroundStyle(Palette.interactive)
         .accessibilityIdentifier("sign-in-open-page")
     } header: {
       Text("Your code")

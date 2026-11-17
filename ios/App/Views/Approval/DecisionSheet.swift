@@ -15,7 +15,7 @@ struct DecisionSheet: View {
 
   var body: some View {
     NavigationStack(path: $path) {
-      List {
+      PaletteList {
         if let item = model.detail?.workItem {
           Section {
             Text(item.title).font(.headline)
@@ -72,7 +72,7 @@ struct DecisionFormView: View {
   @State private var clockError: String?
 
   var body: some View {
-    Form {
+    PaletteForm {
       if let detail = model.detail {
         ConfirmationSection(summary: summary(detail))
       }
@@ -111,6 +111,7 @@ struct DecisionFormView: View {
               .frame(maxWidth: .infinity)
           }
         }
+        .foregroundStyle(choice == .reject ? Palette.error : Palette.interactive)
         .disabled(!canSubmit)
         .accessibilityIdentifier("confirm-decision")
       } footer: {

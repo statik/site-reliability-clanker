@@ -41,7 +41,7 @@ struct AuthMode: Decodable, Sendable, Equatable {
   enum CodingKeys: String, CodingKey { case signIn = "sign_in" }
 }
 
-/// The endpoints of the Clanker control plane that this app uses.
+/// The endpoints of the S.R.C. control plane that this app uses.
 struct ControlPlaneAPI: Sendable {
   let client: APIClient
 

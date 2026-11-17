@@ -4,9 +4,14 @@ import SwiftUI
 struct PaperboatManagerApp: App {
   @State private var app = AppModel(options: LaunchOptions.read())
 
+  init() {
+    Palette.applyToBars()
+  }
+
   var body: some Scene {
     WindowGroup {
       RootView()
+        .paletteRoot()
         .environment(app)
         .task { await app.start() }
     }
@@ -23,7 +28,7 @@ struct RootView: View {
         SignInView(notice: notice)
       } else {
         TabView(selection: $app.selectedTab) {
-          tab(.home, "Home", "sailboat") { HomeView() }
+          tab(.home, "Home", "house") { HomeView() }
           tab(.approvals, "Approvals", "hand.raised") { ApprovalsView() }
           tab(.activity, "Activity", "list.bullet.rectangle") { ActivityView() }
           tab(.ask, "Ask", "bubble.left.and.text.bubble.right") { AskView() }
@@ -33,6 +38,7 @@ struct RootView: View {
     }
     .sheet(isPresented: $app.showSettings) {
       SettingsView()
+        .paletteRoot()
     }
   }
 

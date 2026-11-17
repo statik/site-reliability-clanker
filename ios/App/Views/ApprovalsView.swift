@@ -6,15 +6,15 @@ struct ApprovalsView: View {
   @State private var model = WorkItemsModel()
 
   var body: some View {
-    List {
+    PaletteList {
       if let error = model.error {
         Section { ErrorNotice(message: error) { Task { await model.load(app: app) } } }
       }
       if model.hasLoaded && model.error == nil && model.awaiting.isEmpty {
         Section {
           EmptyState(
-            title: "Calm waters",
-            message: "No change waits for a decision. Clanker will put new proposals here.")
+            title: "Nothing to decide",
+            message: "No change waits for a decision. S.R.C. will put new proposals here.")
         }
       }
       if !model.awaiting.isEmpty {
@@ -57,7 +57,7 @@ private struct ApprovalRow: View {
       HStack {
         Text(item.id)
           .font(.caption.monospaced())
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Palette.textSecondary)
         Spacer()
         TierBadge(tier: item.riskTier, showsMeaning: true)
       }
@@ -66,12 +66,12 @@ private struct ApprovalRow: View {
       if !item.summary.isEmpty {
         Text(item.summary)
           .font(.subheadline)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Palette.textSecondary)
           .lineLimit(4)
       }
       Text("\(item.env) · \(item.layers.map(Humanise.layer).joined(separator: ", "))")
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Palette.textSecondary)
     }
     .padding(.vertical, 2)
     .accessibilityElement(children: .combine)

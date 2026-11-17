@@ -15,7 +15,7 @@ struct ApprovalDetailView: View {
 
   var body: some View {
     ScrollViewReader { proxy in
-      List {
+      PaletteList {
         if let error = model.error {
           Section { ErrorNotice(message: error) { Task { await model.load(app: app) } } }
         }
@@ -61,7 +61,7 @@ struct ApprovalDetailView: View {
     EvidenceSection(detail: detail).id("evidence")
     Section("Ask about this change") {
       NavigationLink(value: Route.chat(item.id)) {
-        Label("Ask Clanker about \(item.id)", systemImage: "bubble.left.and.text.bubble.right")
+        Label("Ask S.R.C. about \(item.id)", systemImage: "bubble.left.and.text.bubble.right")
       }
     }
     .id("ask")
@@ -81,17 +81,18 @@ struct ApprovalDetailView: View {
           Label("Decide", systemImage: "hand.raised.fill")
             .font(.headline)
             .frame(maxWidth: .infinity)
+            .foregroundStyle(Palette.textOnInteractive)
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
         .accessibilityIdentifier("decide-button")
         Text("\(model.approvers.headline) so far. Approval releases the apply.")
           .font(.caption)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Palette.textSecondary)
       }
       .padding(.horizontal)
       .padding(.vertical, 10)
-      .background(.bar)
+      .background(Palette.layer)
     }
   }
 
@@ -132,7 +133,7 @@ private struct SummarySection: View {
           .font(.title3.weight(.semibold))
         Text("\(Humanise.kind(item.kind)) in \(item.env)")
           .font(.subheadline)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Palette.textSecondary)
       }
       if !item.explanation.sentence.isEmpty {
         Text(item.explanation.sentence)
