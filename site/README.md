@@ -2,7 +2,8 @@
 
 This directory holds the public concept site for Site Reliability Clanker, the scripts
 that take real screenshots of the running demo, and the build of the explainer video.
-Everything runs on your machine. Nothing here publishes or uploads.
+The scripts run on your machine. The workflow `.github/workflows/pages.yaml` publishes the
+site to GitHub Pages (see "Publish the site").
 
 ## What is here
 
@@ -153,8 +154,24 @@ Things to know:
 - The rendered title is kept in `out/cache/`. It is rendered again only when
   `video/title.py` changes.
 - `NARRATION_VOICE=Samantha ./build-video.sh` uses another voice.
+- To use a voice from ElevenLabs, put `ELEVEN_LABS_API_KEY` and `ELEVEN_LABS_VOICE_ID` in
+  the `.env` file of the repository. The build then sends each sentence of `narration.md`
+  to ElevenLabs and keeps the answer in `out/cache/speech/`, so only a changed sentence is
+  sent again.
 - The ffmpeg from Homebrew has no subtitle filter, so the build burns in the captions as
   pictures, drawn in the site's typeface.
+
+## Publish the site
+
+A push to `main` that changes `site/` starts the workflow `Pages`. It copies the pages,
+`css`, `js`, `fonts`, `img` and `screens` to GitHub Pages. The video is too large for the
+repository, so the workflow gets it from the release `site-video`. After you build a new
+video, replace it and publish again:
+
+```
+gh release upload site-video out/explainer.mp4 --clobber
+gh workflow run Pages
+```
 
 ## Fonts
 
