@@ -87,8 +87,7 @@ exception: it sends one `request_changes` decision as the viewer `dave`. The con
 refuses that decision with status 403, and the screenshot shows the refusal.
 
 The script opens the approval page of `WI-0020`. If the demo has no work item with that
-name, change the name in the script. The pictures in `ios/screenshots` show `WI-0016`, and
-picture 11 (the refusal) is not there, because no decision was sent when they were made.
+name, change the name in the script. The pictures in `ios/screenshots` show `WI-0016`.
 
 ## Colours and icon
 
