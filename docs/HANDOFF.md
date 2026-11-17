@@ -14,103 +14,129 @@ run in short-lived runners; all state is in an external PostgreSQL; people sign 
 OIDC in the core itself (changed by the owner on 2026-11-17, issue #45); the wizard builds
 the machine image with `ops`.
 
-### Work in flight (written 2026-11-17, late in the day, before a new session)
+### Work in flight (written 2026-11-17, in the evening)
 
-Read this section first. It names work that is on this machine only.
+Read this section first.
 
-**Merged today:** #38, #39, #42, #43, #44, #46, #47, #48, #50, #52. Next steps 1 to 4 are
-done. Of step 5, the sign-in for a browser and the device flow for git and scripts are done.
-The adversarial review and typed runbooks are also merged.
+**Merged on 2026-11-17, after the list in the section below:** #53 (evals for the Reviewer and
+the strict form of its answer), #54 to #57 and #59 (the site), #58 (approval in Slack and
+Teams), #60 (the number of T3 approvers is a setting), #62 (the device flow in the iOS
+app). Step 5 of the next steps is done. No pull request is open.
 
-**Branches that are not merged.** Each is local unless the text says that it is pushed.
+**One branch is not merged.**
 
 | Branch | Where | State | To finish |
 |---|---|---|---|
-| `reviewer-evals-checked` | the main checkout | The evals for the Reviewer, a strict parser for its answer, `deferred_layers` in its input, and the fix that keeps secrets out of its concerns. The live eval round ran (see `evals/RESULTS.md` on the branch). The full run on commit `6634911` passed: thirteen work items, the chain at 316 events, no error line, `sweep.py` and `stale_plan.py` as usual. All eight reviews completed and none failed. The Reviewer kept `WI-0005` at T2 with three concerns in this run; in two earlier runs of the same day it raised it to T3. A mirror test of the evals still looked for the mitigation list that typed runbooks removed from the Go code; it now reads the runbook definitions | Push, open a pull request, merge. This text is on this branch |
-| `reviewer-evals` | worktree `.claude/worktrees/agent-ad37772b47ed8d947` | The same commits before the move onto the main branch | Remove the worktree after the merge |
-| `site-video-intro` | worktree `.claude/worktrees/agent-ae36a6a2b9fad684f` | The new site and video. A subagent was at work on it when this was written. See "The site and the video" below | See below |
-| `chat-approval` | worktree `.claude/worktrees/agent-aa1afd77bc263132f` | Approval inside Slack and Teams (issue #49). A subagent was at work on it and had not reported. Nothing of it ran end to end | Read its commits and its tests. Move it onto the main branch. Run `fresh-run.sh`, `core-check.sh` and `nanos-check.sh`. The real Slack and Teams are not tested: the owner put that off |
+| `video-one-idea` | worktree `.claude/worktrees/agent-ae36a6a2b9fad684f`, not pushed | The explainer video, built again on one idea with a script that the owner approved line by line (`site/narration.md` on the branch). 93.7 s, the ElevenLabs voice of the owner, drawn scenes only: the build needs no running demo. The owner heard crackling in the build before this one. This build removes three possible causes (see "The video" below). The owner did not hear this build yet | The owner listens. Then merge, upload `site/out/explainer.mp4` to the release `site-video`, replace `site/img/video-poster.png` (a frame of the old video), change the heading "The whole idea in one short video" if needed, and start the Pages workflow |
 
-The worktrees of earlier sessions are removed. Only the three worktrees in the table are
-left in `.claude/worktrees`. The local branches of the removed worktrees still exist; all
-their work is on the main branch.
+Worktrees that can be removed, because their work is on the main branch:
+`agent-aa1afd77bc263132f` (branch `chat-approval`, locked), `overview-one-idea`,
+`t3-approvers`, `ios-device-flow`. The remote branches `t3-run`, `ios-device-flow` and
+`ios-device-flow-rebased` and many local branches are also merged. Nothing was removed with
+force.
 
-The logs of every live eval round are in `evals/logs/` of the main checkout (`before`,
-`round2`, `round3`, `round4`, `live`, `repeats`, `repro`, `repro2`), which git does not
-track. Keep them: `report.py` needs those logs to write the whole of `RESULTS.md` (the
+The logs of every live eval round are in `evals/logs/` of the main checkout, which git does
+not track. Keep them: `report.py` needs those logs to write the whole of `RESULTS.md` (the
 command is in `evals/README.md`, "Compare two runs").
 
-**The site and the video** (branch `site-video-intro`). The owner asked for all of this:
+**The site** (https://statik.github.io/site-reliability-clanker/, built from the main branch
+by the Pages workflow; a merge that touches `site/` deploys it). What the owner decided:
 
-- No fish and no paper boat as a mark or a metaphor, anywhere on the site or in the video.
-  The demo application keeps its name Paperboat and its real screenshots.
-- The product is called "S.R.C." in the copy. Commands keep the name `clanker`.
-- Tagline: "Don't build a legacy product installer. Build an AI site reliability engineer
-  that installs, upgrades, patches, and monitors your product."
-- More lines of the owner: "The convenience of managed services without needing a 3rd party
-  contract." "Inference is now one of the core ingredients alongside storage, memory, and
-  compute." "Your product should get better and easier to manage automatically when new
-  models come out." "S.R.C. uses AI to understand and propose the change in deterministic
-  code, then uses adversarial review to classify the risk level and a strict policy engine
-  to determine which changes need to be escalated for human review and approval."
-- The problem heading: "Most of operations is maintenance, and most maintenance is
-  repetitive and tedious." (not "is late").
-- The video shows the flow: download the setup app, sign in to your cloud, start the
-  control plane, deploy the product, maintain it. The cloud sign-in is a drawing with the
-  label "AWS: in progress". The owner wants the label kept.
-- Sections on Slack and Teams, on cost control and runbooks, and on the evals. The copy
-  must not name Swamp. It must not say "approve in Slack" before chat approval is merged.
-- The colours of the owner's other project (the SuperComm palette): honey `#F0B53F`,
-  honeyDeep `#D98E2B`, cream `#F7ECD7`, sky `#8AA8C8`, seaMid `#3A6E8F`, seaDeep `#1B354A`,
-  dark `#1C1917`, darkWarm `#292524`, terracotta `#E07856`, sage `#8FBC8F`, red `#C65545`.
-  Dark theme only.
-- The icon: a person who directs aircraft with two handheld wands.
-- An architecture figure made with the `anatomy` skill, for the architecture page and the
-  video. The owner wants to see it when it is ready.
-- The full-screen video was cropped (`object-fit: cover`); the fix is on the branch.
+- The one idea of the site and the video: "Ship an AI site reliability engineer with your
+  product instead of an installer." The overview page follows the order of the video
+  script: the idea, the problem and its cost, the answer, the setup and three steps for
+  every change, the video, the proof, one call to action. The detail sections follow.
+- The copy standard of the owner, from the rejections of this day:
+  - A section that introduces a concept has no result of a run in it.
+  - A heading says what the page or the section is about. No slogan.
+  - A text beside a figure describes the concepts, not the drawing or its animation.
+  - No analogy. The owner rejected one as strained. For permissions the words are:
+    narrowly scoped, issued only for a specific approved change, revoked as soon as the job
+    ends.
+  - A grid of boxes breaks into rows of the same length (4 and 4, not 7 and 1), and the
+    parts of the boxes are at the same height.
+- No fish and no paper boat as a mark or a metaphor on the site or in the video. The demo
+  application keeps its name Paperboat and its real screenshots. The copy must not name
+  Swamp.
+- The product is "S.R.C." in the copy. Commands keep the name `clanker`.
+- Dark theme only, with the palette in `site/css/site.css`. The icon is a person who
+  directs aircraft with two wands.
+- The architecture page has an isometric figure of the system (`site/lib/machine.mjs`, made
+  with the `anatomy` skill). It is not in the video any more. It is not published to a
+  gallery; ask the owner first.
+- The pages are built from `site/data/month.json`. To refresh it: run
+  `scripts/verify/fresh-run.sh`, then push one hand-written change that stays in
+  `AwaitingApproval` (title "Run two api replicas for the holiday rush", `api_replicas` from
+  1 to 2 in `platform/stacks/local/50-app/terraform.tfvars`, as `stale_plan.py` pushes its
+  first branch), then `node export-data.mjs` in `site/`. The pages need that waiting
+  change: without it the approval example shows the incident. No script for this step is
+  committed.
 
-To finish the site and the video:
+**The video.** Rules of the owner:
 
-1. Look at what the subagent left on the branch, and at the stills, before anything else.
-   The owner saw one complete draft (176 s, with the local voice) and wants to see the
-   anatomy figure and the next draft.
-2. The final build uses the ElevenLabs voice of the owner (approved by the owner; the keys
-   are `ELEVEN_LABS_API_KEY` and `ELEVEN_LABS_VOICE_ID` in `.env`). With the demo up and
-   clean: `cd site`, `node export-data.mjs`, `./build-video.sh` with `VIDEO_FOOTAGE` not
-   set. A new export gives the pipeline scene the record of the adversarial review.
-3. Do not upload the video to the release `site-video`, and do not publish the anatomy
-   figure to a gallery, before the owner approves the result.
+- Never build the video with the local voice of macOS, not as a draft and not at all. The
+  branch removes that voice from the build. The keys `ELEVEN_LABS_API_KEY` and
+  `ELEVEN_LABS_VOICE_ID` are in `.env` of the main checkout; a worktree has no `.env`.
+  Each sentence is synthesized once and kept in `site/out/cache/speech/`.
+- Do not upload a video to the release `site-video` before the owner approves it by ear.
+- The video on the public site now is the build of the old script (137 s, the voice of the
+  owner). A copy is in `~/Movies/src-explainer/`.
+- The crackling: the measurements showed no clipped sample and no click between the voice
+  clips. The build on the branch removes a layer of filtered noise from the music, holds
+  the music at one low level (no sidechain compressor), and gives the voice one gain to a
+  peak of -3 dB with no limiting. Nobody confirmed by ear that this was the cause.
+  `~/Movies/src-explainer/` has the voice alone and the music alone for a comparison.
 
 **Decisions of the owner in this session that are not in an issue**
 
 - The model can raise a risk tier and never lower one (the adversarial review, #50).
 - No Swamp. Typed runbooks in this repository (section 5.6 of the plan, #52).
+- Two approvers for tier T3 is a setting: `runbooks/policy/approvals.json`, the value 1 or
+  2, two when the file is absent. An invalid file is an error.
 - The owner has a free Slack workspace as its admin. A test with the real Slack is possible
-  when `chat-approval` is ready: the owner creates the app from the manifest on that branch
-  and puts `CLANKER_SLACK_SIGNING_SECRET`, `CLANKER_SLACK_BOT_TOKEN` and
-  `CLANKER_SLACK_CHANNEL` in `.env`. It needs a public address (`ngrok` is installed; ask
-  the owner before traffic goes through it) and the sign-in switched on. Teams is put off:
-  the free developer tenant of Microsoft is only for some accounts.
+  now: the owner creates the app from `ops/chat/slack/manifest.yaml` and puts
+  `CLANKER_SLACK_SIGNING_SECRET`, `CLANKER_SLACK_BOT_TOKEN` and `CLANKER_SLACK_CHANNEL` in
+  `.env`. It needs a public address (`ngrok` is installed; ask the owner before traffic
+  goes through it) and the sign-in switched on. Teams is put off: the free developer
+  tenant of Microsoft is only for some accounts.
 
 **Questions that wait for the owner**
 
 - Do the setup wizard, the iOS app and the dashboard also get the new colours and the new
-  icon? The recommendation was yes, the dashboard last, because it needs a Carbon theme
-  and new footage.
+  icon? The iOS app still shows the paper boat mark. The recommendation was yes, the
+  dashboard last, because it needs a Carbon theme.
 - How is a pull request on the `runbooks` repository tiered and approved? Until that
   exists, a runbook and the policy rules cannot change after the first seed.
 - A change to `policy/approvals.json` must not be approvable under the rule that it
   lowers: a change of `t3_approvers` from 2 to 1 must itself need two approvers. The pull
   request path for `runbooks` must enforce this. Until that path exists, the file can be
   set only before the first start, because the forge copies `runbooks/` only once.
-- Does the owner want a pass over the 101 functions that are over a cyclomatic complexity
-  of 8, and a check in CI? Only the functions of this session were brought under it.
+- Does the owner want a pass over the functions that are over a cyclomatic complexity of
+  8, and a check in CI? Only the functions of this session were brought under it.
 
-**The order of the work after the branches above are merged**
+**Known gaps from this session**
 
-1. The new colours and icon for the wizard, the iOS app and the dashboard, if the owner
+- The strict parser of the Reviewer refused one live answer in one of the four full runs whose reviews were read ("the
+  answer does not start with a JSON object", `WI-0011`). The tier of the policy engine
+  stood and an `agent.failed` event recorded it. The answer is lost, because the database
+  of that run is gone. Every model call is in the table `agent_calls` with its answer:
+  when `agent.failed` appears again after a full run, read the answer there before the
+  next `fresh-run.sh`, and then decide between a change of the prompt and one retry.
+  `fresh-run.sh` counts only error lines of the log, so it does not show this failure.
+- Approval in chat ran against a stand-in for Slack only (`scripts/verify/chat_check.py`).
+  Teams ran in unit tests only.
+- The iOS app: not run on a real phone, and the button that opens the browser was not
+  pressed. CI does not build the app.
+- The work item detail of the API gives an empty list `valid_approvers` for the first
+  deployment after it is done. This was so before this session. It was not examined.
+- `docs/API.md` still says that the prototype has no authentication.
+
+**The order of the work now**
+
+1. The video, when the owner approves it (the table above).
+2. The new colours and icon for the wizard, the iOS app and the dashboard, if the owner
    says yes.
-2. The pull request path for runbooks, when the owner decides how.
+3. The pull request path for runbooks, when the owner decides how.
 4. Step 6: the cloud runner and broker. Issue #40 has the decision for the secrets
    (Parameter Store with the AWS SDK for Go v2).
 5. Issue #51: scrub the input of the model roles before the JSON frame.
@@ -118,21 +144,33 @@ To finish the site and the video:
 **Things that cost time in this session**
 
 - The hook that guards pushes refuses any command line that has the push command and the
-  word for the default branch, also inside a branch name and beside `--base`. Give a
-  branch a name without that word, and run the push as its own command.
+  word for the default branch, also inside a branch name, beside `--base` and in
+  `origin/<default branch>` later on the same line. Give a branch a name without that
+  word, and run the push as its own command.
+- A force push and `git reset --hard` are refused. When a pull request conflicts after
+  another merge, rebase, push the result under a new branch name, open a new pull request
+  and close the old one.
+- A merge to the main branch of one pull request can make the next one conflict in
+  `docs/HANDOFF.md`. Merge them one after the other.
 - A safety check can misread a long Python heredoc with backslashes as a removal and
   refuse it. Write the script to a file in the scratchpad and run the file.
 - `cd` into a worktree moves the session. Use `cd` back or `git -C`.
 - Do not switch the branch of the main checkout while `fresh-run.sh`, `core-check.sh` or
   `nanos-check.sh` runs. The two core checks need a checkout with no change that is not
-  committed.
-- The full run ends at 316 or 317 audit events now, not 310 (see
-  `scripts/verify/README.md`).
+  committed. The demo is one shared thing: run one verify script at a time.
+- The full run ends at 316 or 317 audit events (see `scripts/verify/README.md`).
 - `git fsck` right after a fetch can fail once because of background maintenance of git.
 - Measure complexity with
   `go run github.com/fzipp/gocyclo/cmd/gocyclo@v0.6.0 -over 8 <files>`.
-- A subagent in a worktree cannot use the demo. Each branch of a subagent needs the full
-  run in the main checkout before its pull request.
+- A subagent in a worktree cannot use the demo. It can start its own control plane in
+  standby mode on its own ports with its own PostgreSQL container, as the iOS work did
+  (7270 and 7290). Each branch that changes the control plane needs the full run in the
+  main checkout before its pull request.
+- CI does not run the tests of `evals/`, of the site or of the iOS app. Run
+  `uv run pytest -q` in `evals/` when Go code that the evals mirror changes.
+- A test that ends while an apply still runs in the background can close its database
+  under the apply. The chat tests wait for the last audit event of the apply
+  (`settle` in `internal/chatops/harness_test.go`).
 
 ### State of the next steps
 
@@ -420,14 +458,7 @@ What ran on the build of commit `376617b`, the last change to the Go code:
   which starts from an empty database.
 - `docs/PLAN.md` sections 5 and 5.4 still describe the first design in places. Section 12
   is the record of the decisions.
-- The site and the video were made from an earlier run with 323 audit records. The demo
-  now has 310. To refresh them: `node export-data.mjs`, `node build.mjs`,
-  `./build-video.sh` in `site/`, then upload the video to the release `site-video`.
-- The video on the branch `site-video-intro` is a draft. It has the local `say` voice, and
-  its four recordings of the dashboard and of Paperboat are cuts of earlier recordings
-  (`VIDEO_FOOTAGE`, see `site/README.md`), because the demo was in use. The final build
-  needs the ElevenLabs key in `.env` and the running demo. The setup step "Sign in to your
-  cloud" in the video is a drawing: the wizard does not set up a cloud yet.
+- The site and the video: see "The site" and "The video" in "Work in flight" above.
 
 ## What runs now
 
