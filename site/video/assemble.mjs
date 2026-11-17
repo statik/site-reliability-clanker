@@ -21,13 +21,15 @@ const FADE_IN = 0.4;
 const FADE_OUT = 1.2;
 const MUSIC_LEVEL = 0.4;
 // The frame around a recording of the dashboard or of Paperboat: --dark and --honey of
-// css/site.css. The recording is 1792 x 1008 inside a 2 pixel line.
+// css/site.css. The recording is 1456 x 819 inside a 2 pixel line, above the band of the
+// captions, so that no caption lies on the recording. The recorder makes a 1440 x 810
+// picture, so the recording keeps its size.
 const SURROUND = "0x1C1917";
 const RULE = "0xF0B53F";
 const FRAMED = [
-  "scale=1792:1008:flags=lanczos",
-  `pad=1796:1012:2:2:color=${RULE}`,
-  `pad=1920:1080:62:34:color=${SURROUND}`,
+  "scale=1456:819:flags=lanczos",
+  `pad=1460:823:2:2:color=${RULE}`,
+  `pad=1920:1080:230:28:color=${SURROUND}`,
 ];
 
 function isApplication(recording) {

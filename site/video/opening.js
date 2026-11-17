@@ -16,16 +16,16 @@ const TARGETS = [
 // the start of that part of the sentence in the voice of the build.
 const LAYERS = [
   {
-    name: "00-bootstrap", note: "changes rarely · high risk",
+    name: "00-bootstrap", note: "rarely · high risk",
     cells: [
-      ["S3 state backend", "evidence bucket · agent identities"],
-      ["Cloud Storage state backend", "evidence bucket · agent identities"],
-      ["Blob Storage state backend", "evidence store · agent identities"],
-      ["local state backend", "evidence store"],
+      ["S3 state backend", "evidence · identities"],
+      ["Cloud Storage state backend", "evidence · identities"],
+      ["Blob Storage state backend", "agent identities"],
+      ["Local state backend", "evidence"],
     ],
   },
   {
-    name: "10-network", note: "changes rarely · high risk",
+    name: "10-network", note: "rarely · high risk",
     cells: [
       ["VPC · subnets · NAT", "private endpoints · registry"],
       ["VPC · subnets · NAT", "private endpoints · registry"],
@@ -34,8 +34,8 @@ const LAYERS = [
     ],
   },
   {
-    name: "20-cluster", note: "changes monthly · medium risk",
-    flag: "Kubernetes: end of support", flagAt: "0.3s",
+    name: "20-cluster", note: "monthly · medium risk",
+    flag: "K8s: end of support", flagAt: "0.3s",
     cells: [
       ["EKS", "node pools · add-ons"],
       ["GKE", "node pools · add-ons"],
@@ -44,27 +44,27 @@ const LAYERS = [
     ],
   },
   {
-    name: "30-data", note: "changes monthly · high risk",
+    name: "30-data", note: "monthly · high risk",
     flag: "Postgres: patch", flagAt: "4.7s",
     cells: [
-      ["RDS for PostgreSQL", "EFS · S3 backup bucket"],
-      ["Cloud SQL for PostgreSQL", "Filestore · backup bucket"],
-      ["Azure Database for PostgreSQL", "Azure Files · Blob Storage"],
-      ["Postgres in the cluster", "shared volume · retention"],
+      ["RDS for PostgreSQL", "EFS · S3 backups"],
+      ["Cloud SQL for PostgreSQL", "Filestore · backups"],
+      ["Azure Database for PostgreSQL", "Azure Files · backups"],
+      ["Postgres in the cluster", "shared volume"],
     ],
   },
   {
-    name: "40-platform", note: "changes monthly · medium risk",
+    name: "40-platform", note: "monthly · medium risk",
     cells: [
-      ["Envoy Gateway · Gateway API", "NLB · secrets"],
-      ["Envoy Gateway · Gateway API", "Cloud Load Balancing · secrets"],
-      ["Envoy Gateway · Gateway API", "Azure Load Balancer · secrets"],
-      ["Envoy Gateway · Gateway API", "cloud-provider-kind · secrets"],
+      ["Envoy Gateway", "NLB · secrets"],
+      ["Envoy Gateway", "Cloud Load Balancing"],
+      ["Envoy Gateway", "Azure Load Balancer"],
+      ["Envoy Gateway", "cloud-provider-kind"],
     ],
   },
   {
-    name: "50-app", note: "changes weekly · low to medium risk",
-    flag: "Base image: vulnerability", flagAt: "2.8s",
+    name: "50-app", note: "weekly · low to medium",
+    flag: "Image: vulnerability", flagAt: "2.8s",
     cells: [
       ["Paperboat Helm release", "configuration"],
       ["Paperboat Helm release", "configuration"],

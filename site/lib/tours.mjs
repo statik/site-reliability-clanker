@@ -115,10 +115,12 @@ export const TOURS = {
   // Overview, then the month on the Timeline, then the work items that the narration
   // talks about: the change that was rolled back, an incident, and the change whose
   // approval is asked again. Each is found through the API, not by a fixed number. With
-  // captions, each page opens when its sentence starts (the cue of the caption).
+  // captions, each page opens when its sentence starts (the cue of the caption), and a
+  // work item that no sentence tells of is not opened.
   async "dashboard-timeline"(page, seconds, captions = []) {
     const began = Date.now();
     const at = (cue, share) => captions.find((caption) => caption.cue === cue)?.offset ?? seconds * share;
+    const told = (cue) => captions.length === 0 || captions.some((caption) => caption.cue === cue);
     const until = (offset) => page.waitForTimeout(Math.max(0, began + offset * 1000 - Date.now()));
     const items = await workItems();
     const show = async (offset, item) => {
@@ -135,8 +137,10 @@ export const TOURS = {
     await until(at("#feature-release", 0.2));
     await optional(() => page.getByRole("button", { name: /local/i }).first().click({ timeout: 2000 }));
     await show(at("#bad-release", 0.4), items.find((item) => item.state === "RolledBack"));
-    await show(at("#incident", 0.6), items.findLast((item) => item.kind === "incident"));
-    await show(at("#stale-plan", 0.8), items.find((item) => item.state === "AwaitingApproval"));
+    if (told("#incident")) await show(at("#incident", 0.6), items.findLast((item) => item.kind === "incident"));
+    if (told("#stale-plan")) {
+      await show(at("#stale-plan", 0.8), items.find((item) => item.state === "AwaitingApproval"));
+    }
     await until(seconds);
   },
 

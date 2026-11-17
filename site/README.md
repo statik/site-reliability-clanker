@@ -18,7 +18,7 @@ site to GitHub Pages (see "Publish the site").
 | `narration.md` | The script of the video: narration, captions, and what each segment shows |
 | `build-video.sh` | Builds `out/explainer.mp4` and `out/explainer.srt` |
 | `lib/`, `video/` | The code behind the scripts above, and the drawn scenes of the video |
-| `css/`, `js/`, `fonts/`, `img/` | The assets of the site. `css/site.css` defines the colours. `img/icon.svg` is the icon |
+| `css/`, `js/`, `fonts/`, `img/` | The assets of the site. `css/site.css` defines the colours. `img/icon.svg` and `img/icon-small.svg` are the icon |
 | `out/` | Build output. Git ignores it |
 
 ## Set up
@@ -136,7 +136,7 @@ is not 120 to 180 seconds long.
 | 2 | `video/narrate.mjs` | Speaks each sentence of `narration.md` with `say`, measures it, and writes the timeline, the narration track and the `.srt` file |
 | 2 | `video/music.mjs` | Synthesizes the music bed from the notes in `js/score.mjs` |
 | 3 | `video/record.mjs` | Playwright records each segment for as long as its narration, and draws the caption pictures |
-| 4 | `video/assemble.mjs` | ffmpeg cuts and joins the segments, puts a frame around the recordings of the running applications, lays the captions over them, and mixes the voice over the music |
+| 4 | `video/assemble.mjs` | ffmpeg cuts and joins the segments, puts a frame around the recordings of the running applications, above the band of the captions, lays the captions over them, and mixes the voice over the music |
 
 Things to know:
 
@@ -193,5 +193,6 @@ The palette is eleven colours, defined once at the top of `css/site.css` (`--hon
 scenes is one of them or a mix of two. The site has a light and a dark theme from the same
 palette. The recordings of the dashboard and of Paperboat keep their own colours.
 
-`img/icon.svg` is the icon: an aircraft marshaller with two wands. It is the favicon, the
-mark in the header and the mark of the video.
+`img/icon.svg` is the icon: an aircraft marshaller with two wands. The video shows it.
+`img/icon-small.svg` is the same mark with fewer and thicker shapes, for the favicon and
+the header, where it is 16 to 32 pixels.

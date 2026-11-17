@@ -43,7 +43,7 @@ function fillDeployment(month) {
     rung.append(
       element("span", "rung-layer", layer),
       element("span", "rung-identity", grant.identity),
-      element("span", "rung-what", "grant issued, layer applied, grant revoked"),
+      element("span", "rung-what", "grant, apply, revoke"),
       element("span", "rung-held", duration(seconds(grant.issued_at, grant.ended_at))),
     );
     ladder.append(rung);

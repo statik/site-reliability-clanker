@@ -56,13 +56,14 @@ source: site:video/setup.html
 
 source: site:video/pipeline.html
 
-- [beat:2] Follow one change. A detector sees a new release.
+- [beat:2] A detector sees a new release.
 - [beat:3] S.R.C. uses AI to understand and propose the change, as deterministic code.
-- [beat:4] A strict policy engine then classifies the risk from the plan itself, not from the AI's description.
-- [beat:5] It decides which changes a person must approve. Slack, Teams and email tell the approvers.
-- [beat:6] The access broker issues a grant, for one layer only.
-- [beat:7] The runner applies exactly the approved plan.
-- [beat:8] A canary check verifies the result. By then, the grant is gone.
+- [beat:4] A strict policy engine sets the risk tier from the plan itself.
+- [beat:5] An adversarial review then challenges the risk level. It can raise the tier, and never lower it.
+- [beat:6] Then a person must approve. Slack, Teams and email tell the approvers.
+- [beat:7] The access broker issues a grant, for one layer only.
+- [beat:8] The runner applies exactly the approved plan.
+- [beat:9] A canary check verifies the result. By then, the grant is gone.
 
 ## example
 
@@ -102,7 +103,7 @@ fallback: site:architecture.html
 
 source: site:index.html
 
-- [#cost-title] Runbooks are fixed scripts. A model for each role and a daily cap control the cost of inference.
+- [#cost-title] Runbooks are fixed scripts. A daily cap controls the cost of inference.
 - [#evals-title] Evals measure each role. Your product should get better and easier to manage when new models come out.
 - [#hero-title] S.R.C. gives you the convenience of managed services, without a third-party contract.
 - The model proposes. Code decides. And a person approves.

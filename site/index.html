@@ -6,14 +6,14 @@
   <title>S.R.C. (Site Reliability Clanker): an AI site reliability engineer that installs, upgrades, patches, and monitors your product</title>
   <meta name="description" content="Don’t build a legacy product installer. Build an AI site reliability engineer that installs, upgrades, patches, and monitors your product. Every change is a pull request that a person approves, and the access to apply it exists for seconds.">
   <meta name="color-scheme" content="light dark">
-  <link rel="icon" href="img/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="img/icon-small.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/site.css">
   <script src="js/boot.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
   <header class="shell">
-    <a class="shell-name" href="index.html"><img class="shell-logo" src="img/icon.svg" alt="" width="24" height="24">S.R.C. <span class="shell-full">Site Reliability Clanker</span></a>
+    <a class="shell-name" href="index.html"><img class="shell-logo" src="img/icon-small.svg" alt="" width="24" height="24">S.R.C. <span class="shell-full">Site Reliability Clanker</span></a>
     <nav aria-label="Site">
       <ul>
         <li><a href="index.html" aria-current="page">Overview</a></li>
@@ -77,8 +77,8 @@
           </div>
         </div>
         <p class="answer reveal">S.R.C. uses AI to understand and propose the change as deterministic
-          code. A strict policy engine then classifies the risk from the plan itself, not from the
-          AI’s description, and decides which changes a person must approve.</p>
+          code. An adversarial review then challenges the risk level, and a strict policy engine
+          decides which changes a person must approve.</p>
       </div>
     </section>
 
@@ -127,7 +127,7 @@
     <section class="section" aria-labelledby="how-title">
       <div class="wrap">
         <p class="kicker">How it works</p>
-        <h2 id="how-title">Every change takes the same seven steps.</h2>
+        <h2 id="how-title">Every change takes the same eight steps.</h2>
         <p class="section-lead">The language model does the reading and the writing. It has no
           credential and no tool that applies a change. Plain code and a person make each
           decision.</p>
@@ -144,6 +144,11 @@
             <h3>Plan and rate</h3>
             <p>The runner makes an OpenTofu plan. Policy rules read the plan and set the risk
               tier, T0 to T3. The model does not rate its own work.</p></li>
+          <li class="reveal"><span class="how-who how-model">Model</span>
+            <h3>Review</h3>
+            <p>A second model call, the Reviewer, reads the plan, the tier and the diff. It
+              looks for reasons for a higher tier. It can raise the tier, and it cannot lower
+              it. Each review is a record in the audit log.</p></li>
           <li class="reveal"><span class="how-who how-model">Model</span>
             <h3>Explain</h3>
             <p>The model writes the approval page in plain language. The counts, the names and
@@ -425,8 +430,9 @@ for WI-0003, as the control plane sends it to Slack and to Teams.</figcaption>
             <tbody>
               <tr><th scope="row">Prompt injection, all four roles</th><td>63</td>
                 <td>No attack succeeded.</td>
-                <td>In round 1, the attack success on the Investigator was 0.20. A log line closed the
-                  frame around untrusted input. The input is now JSON-encoded, and round 2 measured 0.00.</td></tr>
+                <td>The attack success on the Investigator was 0.20 in round 1 and 0.00 in round 2.
+                  The evals also found that a log line closed the frame around untrusted input. That
+                  input is now JSON-encoded.</td></tr>
               <tr><th scope="row">Secret leakage, all four roles</th><td>51</td>
                 <td>No canary secret appeared in an output.</td>
                 <td>In round 1, the Ask role had a leak rate of 0.19. A canary still passed the scrubber

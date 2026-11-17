@@ -28,6 +28,12 @@ const PORT = 4176;
 const VIEWPORT = { width: 1440, height: 810 };
 const CAPTION_SIZE = { width: 1920, height: 1080 };
 const DASHBOARD_USER = "alice";
+// The captions are burned in over the bottom of the picture. A page of the site gets a
+// plain band there while it is recorded, so that no caption lies on the text of the page.
+// The drawn scenes keep their content above the band by their own layout.
+const CAPTION_BAND = `body::after { content: ""; position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
+  height: 172px; background: var(--dark); border-top: 1px solid var(--border-strong); }
+  .motion-toggle { display: none; }`;
 const FOOTAGE = process.env.VIDEO_FOOTAGE ? resolve(process.env.VIDEO_FOOTAGE) : "";
 // A kept clip may differ from its segment by this many seconds; the assembly holds the
 // last frame for the difference.
@@ -65,10 +71,15 @@ function keptFootage(segment) {
   return { file, leadIn: 0, shows: segment.source };
 }
 
+function isScene(name) {
+  return name.startsWith("video/");
+}
+
 async function doCue(page, cue, base) {
   if (!cue) return;
   if (cue.startsWith("page:")) {
     await page.goto(`${base}/${cue.slice(5)}?theme=dark`, { waitUntil: "load" });
+    await page.addStyleTag({ content: CAPTION_BAND });
   } else if (cue.startsWith("beat:")) {
     // A drawn scene (video/scene.js) shows its next part when this value changes.
     await page.evaluate((beat) => {
@@ -91,6 +102,7 @@ async function doCue(page, cue, base) {
 
 async function playSite(page, segment, name, base) {
   await page.goto(`${base}/${name}?theme=dark`, { waitUntil: "load" });
+  if (!isScene(name)) await page.addStyleTag({ content: CAPTION_BAND });
   await page.evaluate(() => document.fonts.ready);
   // The narration drives the system diagram, so stop its own autoplay.
   const play = page.locator(".flow-play[aria-pressed='true']");
@@ -120,6 +132,10 @@ async function record(browser, segment, chosen, base) {
   }
   const created = Date.now();
   const page = await context.newPage();
+  // A drawn scene stops with an error when the data lacks what it shows. That must stop
+  // the build, not leave an empty picture in the video.
+  const failures = [];
+  if (chosen.kind === "site") page.on("pageerror", (error) => failures.push(error.message));
   let sceneStart;
   if (chosen.kind === "site") {
     sceneStart = await playSite(page, segment, chosen.name, base);
@@ -131,6 +147,9 @@ async function record(browser, segment, chosen, base) {
   }
   const video = page.video();
   await context.close();
+  if (failures.length > 0) {
+    throw new Error(`segment "${segment.id}": ${chosen.name} failed: ${failures[0]}`);
+  }
   const file = join(WORK, `raw-${segment.id}.webm`);
   renameSync(await video.path(), file);
   return { file, leadIn: (sceneStart - created) / 1000 };
