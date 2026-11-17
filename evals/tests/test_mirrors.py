@@ -83,13 +83,18 @@ def test_layers_and_repos_match_go() -> None:
     assert f'const PaperboatRepo = "{PAPERBOAT_REPO}"' in go_source("internal/detect/detect.go")
 
 
-def test_mitigations_match_go() -> None:
+def test_mitigations_match_the_runbook_definitions() -> None:
+    definitions = {
+        path.stem: json.loads(path.read_text(encoding="utf-8"))
+        for path in sorted((ROOT / "runbooks" / "jobs").glob("*.json"))
+    }
+    mitigations = [name for name, d in definitions.items() if d.get("incident_mitigation")]
+    assert mitigations == checks.RUNBOOKS
+    for name in mitigations:
+        assert definitions[name]["inputs"]["deployment"]["values"] == checks.ALLOWED_MITIGATIONS
     source = go_source("internal/agent/incident.go")
-    allowed = re.search(r"allowedMitigations = map\[string\]bool\{([^}]*)\}", source)
-    assert allowed is not None
-    assert re.findall(r'"([^"]+)": true', allowed.group(1)) == checks.ALLOWED_MITIGATIONS
-    for runbook in checks.RUNBOOKS:
-        assert f'd.ProposedRunbook != "{runbook}"' in source
+    assert "if !definition.IncidentMitigation {" in source
+    assert 'return map[string]string{"deployment": d.Deployment}' in source
 
 
 def test_input_frames_match_go() -> None:
