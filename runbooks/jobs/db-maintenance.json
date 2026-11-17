@@ -1,0 +1,4 @@
+{
+  "description": "Report the dead rows of the Paperboat database, then vacuum and analyze every table.",
+  "tier": "T1"
+}

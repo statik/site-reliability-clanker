@@ -1,0 +1,10 @@
+{
+  "description": "Restore the newest backup into a scratch database, compare the row counts with production, and drop the scratch database. It does not change the production database.",
+  "tier": "T1",
+  "outputs": {
+    "backup_file": {
+      "type": "string",
+      "description": "The path of the backup that the drill restored."
+    }
+  }
+}

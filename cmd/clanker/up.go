@@ -28,6 +28,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/monitor"
 	"github.com/statik/site-reliability-clanker/internal/notify"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/runbook"
 	"github.com/statik/site-reliability-clanker/internal/runner"
 	"github.com/statik/site-reliability-clanker/internal/sim"
 	"github.com/statik/site-reliability-clanker/internal/sink"
@@ -89,9 +90,6 @@ var demoUsers = []orchestrator.User{
 	{Name: "carol", Display: "Carol Reyes", Role: "admin", Email: "carol@example.com"},
 	{Name: "dave", Display: "Dave Lindqvist", Role: "viewer", Email: "dave@example.com"},
 }
-
-var standingRunbooks = []string{"restart-deployment", "db-backup", "restore-drill",
-	"db-maintenance"}
 
 func seedUsers(db *sql.DB) error {
 	for _, u := range demoUsers {
@@ -358,6 +356,24 @@ func publishImages(ctx context.Context, c *components, o options) error {
 	return err
 }
 
+// signDemoApprovals signs, as the demo admin, a standing approval for each runbook of the
+// runbooks repository that a standing approval can cover.
+func signDemoApprovals(orch *orchestrator.Orchestrator) error {
+	definitions, err := orch.Runbooks()
+	if err != nil {
+		return err
+	}
+	for _, definition := range definitions {
+		if definition.Tier != runbook.StandingTier {
+			continue
+		}
+		if err := orch.SignStandingApproval(definition.Name, "carol"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // firstRun signs the demo standing approvals and opens the blank-slate work item when the
 // control plane has no work item yet.
 func firstRun(ctx context.Context, c *components, o options) error {
@@ -366,10 +382,8 @@ func firstRun(ctx context.Context, c *components, o options) error {
 		return err
 	}
 	if o.demo {
-		for _, name := range standingRunbooks {
-			if err := c.orch.SignStandingApproval(name, "carol"); err != nil {
-				return err
-			}
+		if err := signDemoApprovals(c.orch); err != nil {
+			return err
 		}
 	}
 	wi, err := c.orch.Create(orchestrator.NewWorkItem{

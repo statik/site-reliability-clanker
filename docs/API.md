@@ -33,7 +33,8 @@ log and the snapshots as of that time.
 | `GET /forge/pulls`, `GET /forge/pulls/{id}`, `POST /forge/pulls` | Pull requests. `POST` body `{"branch", "title", "body", "env"}` opens one for a branch and starts the pipeline |
 | `GET /chat`, `POST /chat` | Ask. Body `{"work_item": "", "question": ""}` |
 | `GET /agent/calls` | Model calls with model, tokens, cost and transcript |
-| `POST /runbooks/{name}` | Run a tier T1 runbook. Approver or admin |
+| `GET /runbooks` | The runbooks of the `runbooks` repository: description, tier, inputs, outputs and who signed the standing approval |
+| `POST /runbooks/{name}` | Run a tier T1 runbook. Body `{"env", "params"}`. The parameters must be exactly the inputs of the definition; a request that does not fit answers 400 with the reason. Approver or admin |
 | `POST /debug-sessions` | Open a recorded, read-only debug session. Approver or admin |
 | `POST /environments/{env}/blank-slate` | Open the blank-slate work item. Admin |
 | `GET /sim`, `POST /sim/advance`, `POST /sim/scenes/{name}` | Simulator: virtual clock and scenes of the scripted month |

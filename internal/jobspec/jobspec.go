@@ -85,7 +85,8 @@ type Result struct {
 	ToolDigest string `json:"tool_digest,omitempty"`
 	// PlanSHA256 is the hash that the runner computed for the plan of a plan job.
 	PlanSHA256 string `json:"plan_sha256,omitempty"`
-	// Outputs are the outputs of the layer after an apply job.
+	// Outputs are the outputs of the layer after an apply job, or what the script reported
+	// after a runbook job: each value of a runbook job is text.
 	Outputs  map[string]any  `json:"outputs,omitempty"`
 	Commands []CommandOutput `json:"commands,omitempty"`
 	// Plan and PlanJSON are the plan file of a plan job and its JSON form. They travel

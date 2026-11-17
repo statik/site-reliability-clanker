@@ -1,0 +1,12 @@
+{
+  "description": "Restart one Paperboat deployment and wait for the rollout. It clears state that exists only in process memory. It changes no configuration and no data.",
+  "tier": "T1",
+  "incident_mitigation": true,
+  "inputs": {
+    "deployment": {
+      "type": "string",
+      "description": "The deployment to restart, in the namespace paperboat.",
+      "values": ["paperboat-api", "paperboat-web", "paperboat-worker"]
+    }
+  }
+}

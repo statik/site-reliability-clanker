@@ -198,8 +198,9 @@ func (c *Client) execute(ctx context.Context, spec jobspec.Spec, log io.Writer) 
 		outputs, err := c.Runner.Apply(ctx, job, plan, spec.PlanSHA256)
 		return jobspec.Result{Outputs: outputs}, err
 	case jobspec.KindRunbook:
-		return jobspec.Result{}, c.Runner.Runbook(ctx, RunbookJob{Env: spec.Env, Checkout: checkout,
+		outputs, err := c.Runner.Runbook(ctx, RunbookJob{Env: spec.Env, Checkout: checkout,
 			Name: spec.Runbook, Params: spec.Params, KubeConfig: spec.KubeConfig, Log: log})
+		return jobspec.Result{Outputs: outputs}, err
 	case jobspec.KindDiagnose:
 		outputs := make([]jobspec.CommandOutput, 0, len(spec.Commands))
 		for _, args := range spec.Commands {
