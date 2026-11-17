@@ -48,6 +48,7 @@ destroy: build
 
 # Removes the control-plane database, repositories and logs. Destroy the environment first.
 clean-data:
-	docker ps -aq --filter label=clanker.data=$(abspath .clanker) | xargs -r docker rm -f
-	docker volume ls -q --filter name=clanker-postgres- | xargs -r docker volume rm
+	for name in $$(docker ps -a --filter label=clanker.data=$(abspath .clanker) --format '{{.Names}}'); do \
+		docker rm -f $$name && docker volume rm $$name; \
+	done
 	trash .clanker
