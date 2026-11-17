@@ -19,8 +19,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  CAPTION_LINE, CAPTION_LINES, CAPTION_MIN_SECONDS, FPS, LEAD, OUT, SAMPLE_RATE, TIMELINE, WORK,
-  readScript, wordCount,
+  CAPTION_MIN_SECONDS, FPS, LEAD, OUT, SAMPLE_RATE, TIMELINE, WORK, readScript, wordCount,
 } from "./script.mjs";
 import { readWav, writeWav } from "./wav.mjs";
 
@@ -72,18 +71,6 @@ function stamp(totalSeconds) {
     `${pad(Math.floor(millis / 1000) % 60)},${pad(millis % 1000, 3)}`;
 }
 
-function checkCaptionText(parts) {
-  for (const sentence of parts.flatMap((part) => part.sentences)) {
-    for (const lines of sentence.captions) {
-      const tooLong = lines.length > CAPTION_LINES || lines.some((line) => line.length > CAPTION_LINE);
-      if (tooLong) {
-        throw new Error(`a caption of "${sentence.text}" does not fit ${CAPTION_LINES} lines of ` +
-          `${CAPTION_LINE} characters: ${lines.join(" / ")}`);
-      }
-    }
-  }
-}
-
 // A sentence with two captions shares its time between them by their number of characters.
 function timeCaptions(sentence, pause, numberFrom) {
   const shownUntil = sentence.end + pause * 0.5;
@@ -104,8 +91,8 @@ function timeCaptions(sentence, pause, numberFrom) {
 }
 
 async function main() {
+  // readScript stops on a caption that does not fit two lines.
   const parts = readScript();
-  checkCaptionText(parts);
   if (process.argv.includes("--check")) {
     console.log(`narrate: ${parts.flatMap((part) => part.sentences).length} sentences; every caption fits`);
     return;

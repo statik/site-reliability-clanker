@@ -152,7 +152,7 @@ Things to know:
   time. A sentence with a changed word is sent again, and that costs credits.
 - A caption has at most two lines of 42 characters and stays for at least one second.
   `node video/narrate.mjs --check` tests the text without the voice, and the build stops
-  on a caption that does not fit. A longer sentence is shown as two captions.
+  on a caption that does not fit. A `|` in a longer sentence starts a second caption.
 - The pace comes from the pauses. `pause:` and `hold:` in `narration.md` set the quiet
   after the sentences of a part. `narrate.mjs` prints the words a second of the whole
   video and of the voice alone. The voice itself is not made slower.

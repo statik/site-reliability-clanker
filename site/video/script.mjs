@@ -45,19 +45,6 @@ function fill(text, values) {
   });
 }
 
-function greedyLines(words) {
-  const lines = [];
-  for (const word of words) {
-    if (word.length > CAPTION_LINE) {
-      throw new Error(`narration.md: the word "${word}" is longer than a caption line (${CAPTION_LINE} characters)`);
-    }
-    const last = lines.at(-1);
-    if (last !== undefined && `${last} ${word}`.length <= CAPTION_LINE) lines[lines.length - 1] = `${last} ${word}`;
-    else lines.push(word);
-  }
-  return lines;
-}
-
 // Two lines of about the same length read better than a full line and a short one.
 function balanced(words) {
   let best = null;
@@ -70,19 +57,19 @@ function balanced(words) {
   return best?.pair ?? null;
 }
 
-// The captions of one sentence: each is one or two lines. Most sentences are one caption.
-export function captionsOf(text) {
-  if (text.length <= CAPTION_LINE) return [[text]];
-  const words = text.split(/\s+/);
-  const two = balanced(words);
-  if (two) return [two];
-  const lines = greedyLines(words);
-  const captions = [];
-  for (let index = 0; index < lines.length; index += CAPTION_LINES) {
-    const part = lines.slice(index, index + CAPTION_LINES).join(" ");
-    captions.push(part.length <= CAPTION_LINE ? [part] : balanced(part.split(" ")));
-  }
-  return captions;
+// The captions of one sentence: each is one or two lines. A `|` in the sentence ends a
+// caption, for a sentence that is too long for one.
+function captionsOf(marked) {
+  return marked.split("|").map((piece) => {
+    const text = piece.trim();
+    if (text.length <= CAPTION_LINE) return [text];
+    const lines = balanced(text.split(/\s+/));
+    if (!lines) {
+      throw new Error(`narration.md: "${text}" does not fit ${CAPTION_LINES} caption lines of ` +
+        `${CAPTION_LINE} characters. Put a | in the sentence where a second caption must start`);
+    }
+    return lines;
+  });
 }
 
 function number(value, name, part) {
@@ -113,8 +100,9 @@ export function readScript() {
     if (!line.startsWith("- ")) continue;
     const sentence = line.match(/^- \[([\w-]+)\]\s+(.+)$/);
     if (!sentence) throw new Error(`narration.md: this sentence has no [cue] for its picture: ${line}`);
-    const text = fill(sentence[2].trim(), values);
-    part.sentences.push({ cue: sentence[1], text, captions: captionsOf(text) });
+    const marked = fill(sentence[2].trim(), values);
+    const text = marked.replace(/\s*\|\s*/g, " ");
+    part.sentences.push({ cue: sentence[1], text, captions: captionsOf(marked) });
   }
   if (parts.length === 0) throw new Error("narration.md has no parts");
   for (const part of parts) {

@@ -19,8 +19,9 @@ Format:
 - `{days}` and `{held}` are filled in from `data/month.json`, so the narration cannot
   disagree with the data.
 - A caption has at most two lines of 42 characters and stays for at least one second. The
-  build stops if a caption does not fit. A sentence that is too long for one caption is
-  shown as two captions, one after the other. The voice still says it as one sentence.
+  build stops if a caption does not fit. In a sentence that is too long for one caption, a
+  `|` shows where the second caption starts. The voice still says it as one sentence, and
+  the `|` is not sent to the voice, so you can move it at no cost.
 - Each sentence is sent to ElevenLabs one time and then kept in `out/cache/speech/`. A
   sentence with a changed word is sent again.
 
@@ -55,7 +56,7 @@ hold: 1.0
 pause: 1.6
 hold: 1.2
 
-- [find] One. It finds the work before anyone asks: a new release, a security fix, drift.
+- [find] One. It finds the needed maintenance without someone having to manually | ask for it: a new release, a security fix, drift.
 - [write] It writes each change as infrastructure code, in a pull request.
 - [rate] Two. Code rates the risk of the change. The model has no say in that.
 - [approve] A person reads a plain summary of what will change, and approves.
