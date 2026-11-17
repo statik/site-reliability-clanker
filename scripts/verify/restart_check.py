@@ -1,9 +1,10 @@
-"""Live test of a stop in the middle of an apply, and of two control planes on one database.
+"""Live test of a stop of the control plane, and of two control planes on one database.
 
 Run it from the repository root against the local demo after a complete run. It starts a
-second control plane, which must wait. It opens a pull request, approves it, kills the
-control plane while the apply runs, and starts it again. The work item must then be Failed,
-its job lost and no grant open.
+second control plane, which must wait. It opens a pull request and kills the control plane
+while the plan runs: after the start, the plan must run again and end in a request for
+approval. It approves, kills the control plane while the apply runs, and starts it again.
+The work item must then be Failed, its job lost and no grant open.
 
 It leaves a failed work item and possibly a partly applied change. Run
 scripts/verify/fresh-run.sh for a clean demo afterward.
@@ -61,6 +62,22 @@ def wait(item, wanted, limit=300):
     raise SystemExit(f"{item} is {state(item)} after {limit} s, wanted one of {wanted}")
 
 
+def jobs(item):
+    return [job["status"] for job in call("GET", f"/work-items/{item}").get("jobs") or []]
+
+
+def kill_and_start():
+    subprocess.run(["pkill", "-9", "-f", "clanker up"], check=True)
+    time.sleep(2)
+    check(not answers(), "the control plane is down")
+    with pathlib.Path(".clanker/up.log").open("a") as log:
+        subprocess.Popen(["./bin/clanker", "up"], stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    deadline = time.time() + 120
+    while time.time() < deadline and not answers():
+        time.sleep(1)
+    check(answers(), "the control plane answers again")
+
+
 def check(ok, text):
     print(("ok      " if ok else "FAILED  ") + text, flush=True)
     if not ok:
@@ -95,21 +112,26 @@ git("push", "-q", "origin", "human/three-web", cwd=clone)
 answer = call("POST", "/forge/pulls", {"branch": "human/three-web", "title": "Run three web replicas",
                                        "body": "Restart check", "env": "local"})
 item = answer["work_item"]
-wait(item, {"AwaitingApproval"})
+
+print(f"== kill the control plane while the plan of {item} runs", flush=True)
+deadline = time.time() + 120
+while time.time() < deadline and "running" not in jobs(item):
+    time.sleep(0.2)
+check("running" in jobs(item), f"a job of {item} runs")
+before_stop = state(item)
+kill_and_start()
+check(wait(item, {"AwaitingApproval", "Failed"}) == "AwaitingApproval",
+      f"{item} was {before_stop} at the stop and waits for approval after the start")
+statuses = jobs(item)
+check("lost" in statuses and "succeeded" in statuses, f"its jobs are {statuses}: one lost, one succeeded")
+check("planned_again=" + item in pathlib.Path(".clanker/up.log").read_text(),
+      "the log of the control plane names the work item that it planned again")
 events_before = call("GET", "/audit/verify")["count"]
 call("POST", f"/work-items/{item}/decision", {"decision": "approve", "comment": "restart check"}, user="alice")
 wait(item, {"Applying"}, limit=120)
 
 print(f"== kill the control plane while {item} is in the apply", flush=True)
-subprocess.run(["pkill", "-9", "-f", "clanker up"], check=True)
-time.sleep(2)
-check(not answers(), "the control plane is down")
-with pathlib.Path(".clanker/up.log").open("a") as log:
-    subprocess.Popen(["./bin/clanker", "up"], stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
-deadline = time.time() + 120
-while time.time() < deadline and not answers():
-    time.sleep(1)
-check(answers(), "the control plane answers again")
+kill_and_start()
 
 detail = call("GET", f"/work-items/{item}")
 check(detail["work_item"]["state"] == "Failed", f"{item} is Failed (it is {detail['work_item']['state']})")
@@ -129,6 +151,6 @@ check(not others, f"no work item is in an apply or a verification ({others})")
 check("ended the work that the last stop interrupted" in pathlib.Path(".clanker/up.log").read_text(),
       "the log of the control plane names the reconcile")
 
-print("RESULT:", "the stop in the apply was reconciled and the second control plane waited"
+print("RESULT:", "both stops were reconciled and the second control plane waited"
       if not problems else f"{len(problems)} checks FAILED")
 sys.exit(1 if problems else 0)

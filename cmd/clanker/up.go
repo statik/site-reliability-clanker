@@ -410,16 +410,26 @@ func schedulerLoop(ctx context.Context, c *components) {
 	}
 }
 
-// reconcile ends the work that the last stop of the control plane interrupted.
+// reconcile ends the work that the last stop of the control plane interrupted, and plans
+// again what was not yet in the apply.
 func reconcile(ctx context.Context, c *components) error {
 	ended, err := c.orch.Reconcile(ctx)
 	if err != nil {
 		return err
 	}
-	if ended.Jobs+ended.Grants+len(ended.WorkItems) > 0 {
+	if ended.Jobs+ended.Grants+len(ended.Failed)+len(ended.Replan) > 0 {
 		slog.Warn("ended the work that the last stop interrupted", "jobs", ended.Jobs,
-			"grants", ended.Grants, "work_items", strings.Join(ended.WorkItems, ","))
+			"grants", ended.Grants, "failed", strings.Join(ended.Failed, ","),
+			"planned_again", strings.Join(ended.Replan, ","))
 	}
+	// The plans run one after the other, as they did before the stop.
+	go func() {
+		for _, id := range ended.Replan {
+			if _, err := c.orch.PlanWorkItem(context.WithoutCancel(ctx), id); err != nil {
+				slog.Error("plan a work item again after a restart", "work_item", id, "error", err)
+			}
+		}
+	}()
 	return nil
 }
 

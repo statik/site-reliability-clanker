@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -41,12 +42,22 @@ func TestReconcileEndsWhatAStopInterrupted(t *testing.T) {
 		t.Fatal(err)
 	}
 	o := &Orchestrator{DB: db, Audit: audit.New(db, clock), Broker: b, Clock: clock}
-	states := map[string]string{"WI-0001": StateApplying, "WI-0002": StateVerifying,
-		"WI-0003": StateAwaitingApproval, "WI-0004": StateApproved, "WI-0005": StateDone}
-	for id, state := range states {
-		if _, err := db.Exec(`INSERT INTO work_items (id, title, kind, env, state, created_at,
-			updated_at) VALUES ($1, 'A change', 'app-upgrade', 'local', $2, 'then', 'then')`, id,
-			state); err != nil {
+	// Each item has a state at the stop, its layers, and the state that it must have after.
+	items := []struct{ id, state, layers, want string }{
+		{"WI-0001", StateApplying, `["50-app"]`, StateFailed},
+		{"WI-0002", StateVerifying, `["50-app"]`, StateFailed},
+		{"WI-0003", StateAwaitingApproval, `["50-app"]`, StateAwaitingApproval},
+		{"WI-0004", StateApproved, `["50-app"]`, StateApproved},
+		{"WI-0005", StateDone, `["50-app"]`, StateDone},
+		{"WI-0006", StateDetected, `["00-bootstrap","10-network"]`, StateDetected},
+		{"WI-0007", StateDrafting, `[]`, StateFailed},
+		{"WI-0008", StateApproved, `[]`, StateFailed},
+		{"WI-0009", StateScheduled, `["50-app"]`, StateScheduled},
+	}
+	for _, item := range items {
+		if _, err := db.Exec(`INSERT INTO work_items (id, title, kind, env, layers, state,
+			created_at, updated_at) VALUES ($1, 'A change', 'app-upgrade', 'local', $2, $3, 'then',
+			'then')`, item.id, item.layers, item.state); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -66,15 +77,22 @@ func TestReconcileEndsWhatAStopInterrupted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if done.Jobs != 1 || done.Grants != 1 || len(done.WorkItems) != 2 {
-		t.Fatalf("reconciled %+v, want 1 job, 1 grant and 2 work items", done)
+	if done.Jobs != 1 || done.Grants != 1 {
+		t.Fatalf("reconciled %+v, want 1 job and 1 grant", done)
 	}
-	want := map[string]string{"WI-0001": StateFailed, "WI-0002": StateFailed,
-		"WI-0003": StateAwaitingApproval, "WI-0004": StateApproved, "WI-0005": StateDone}
-	for id, state := range want {
-		wi, err := o.Get(id)
-		if err != nil || wi.State != state {
-			t.Errorf("%s is %s, %v; want %s", id, wi.State, err, state)
+	slices.Sort(done.Failed)
+	slices.Sort(done.Replan)
+	if got := strings.Join(done.Failed, " "); got != "WI-0001 WI-0002 WI-0007 WI-0008" {
+		t.Errorf("failed %s", got)
+	}
+	// The caller plans these again. Until then they keep their state.
+	if got := strings.Join(done.Replan, " "); got != "WI-0004 WI-0006" {
+		t.Errorf("to plan again: %s", got)
+	}
+	for _, item := range items {
+		wi, err := o.Get(item.id)
+		if err != nil || wi.State != item.want {
+			t.Errorf("%s is %s, %v; want %s", item.id, wi.State, err, item.want)
 		}
 	}
 	var status, log string
@@ -102,7 +120,7 @@ func TestReconcileEndsWhatAStopInterrupted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if again.Jobs != 0 || again.Grants != 0 || len(again.WorkItems) != 0 {
+	if again.Jobs != 0 || again.Grants != 0 || len(again.Failed) != 0 {
 		t.Fatalf("a second reconcile ended %+v, want nothing", again)
 	}
 }
