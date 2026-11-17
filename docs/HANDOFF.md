@@ -30,13 +30,15 @@ The adversarial review and typed runbooks are also merged.
 | `reviewer-evals` | worktree `.claude/worktrees/agent-ad37772b47ed8d947` | The same commits before the move onto the main branch | Remove the worktree after the merge |
 | `site-video-intro` | worktree `.claude/worktrees/agent-ae36a6a2b9fad684f` | The new site and video. A subagent was at work on it when this was written. See "The site and the video" below | See below |
 | `chat-approval` | worktree `.claude/worktrees/agent-aa1afd77bc263132f` | Approval inside Slack and Teams (issue #49). A subagent was at work on it and had not reported. Nothing of it ran end to end | Read its commits and its tests. Move it onto the main branch. Run `fresh-run.sh`, `core-check.sh` and `nanos-check.sh`. The real Slack and Teams are not tested: the owner put that off |
-| `typed-runbooks` | worktree `.claude/worktrees/agent-a21389f5eb93058f0` | Merged as #52 | Remove the worktree |
 
-The other worktrees in `.claude/worktrees` are from earlier sessions. The worktree
-`agent-aaec737d59887ddea` held the logs of the eval rounds 1 to 3. A copy is in
-`evals/logs/` of the main checkout (`before`, `round2`, `round3`, `round4`, `live`,
-`repeats`), which git does not track. Keep it: `report.py` needs those logs to write the
-whole of `RESULTS.md` (the command is in `evals/README.md`, "Compare two runs").
+The worktrees of earlier sessions are removed. Only the three worktrees in the table are
+left in `.claude/worktrees`. The local branches of the removed worktrees still exist; all
+their work is on the main branch.
+
+The logs of every live eval round are in `evals/logs/` of the main checkout (`before`,
+`round2`, `round3`, `round4`, `live`, `repeats`, `repro`, `repro2`), which git does not
+track. Keep them: `report.py` needs those logs to write the whole of `RESULTS.md` (the
+command is in `evals/README.md`, "Compare two runs").
 
 **The site and the video** (branch `site-video-intro`). The owner asked for all of this:
 
