@@ -29,7 +29,7 @@
   <main id="main">
     <div class="wrap page-head">
       <p class="kicker reveal">Architecture</p>
-      <h1 class="reveal">Three separate pieces, and one road for every change.</h1>
+      <h1 class="reveal">How a change gets from a finding to production, and who decides at each step.</h1>
       <p class="section-lead reveal">Paperboat is the workload. The platform is the infrastructure
         as code that the agent edits. S.R.C. is the control plane: a dashboard, an agent, a
         policy engine, a runner, an access broker, a git forge and an audit log. A simulator
@@ -40,9 +40,10 @@
       <div class="wrap">
         <p class="kicker">Figure 1</p>
         <h2 id="flow-title">A change, from detection to the audit record.</h2>
-        <p class="section-lead">The figure shows S.R.C. as a bench that you could build. The lit
-          block is one real change from the scripted month. It stops at each part that handled
-          it, and each checkpoint that can stop a change is a real part.</p>
+        <p class="section-lead">Follow one real change through the ten components of S.R.C.
+          The list beside the figure gives what each component recorded, and when. Three of them
+          can end the change: a person can reject it, the access broker refuses a plan that
+          changed after the approval, and a failed verification rolls it back.</p>
         <div class="figure-block flow-layout">
           <div>
             <!-- build:machine -->
