@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>S.R.C. (Site Reliability Clanker): an AI site reliability engineer that installs, upgrades, patches, and monitors your product</title>
-  <meta name="description" content="Don’t build a legacy product installer. Build an AI site reliability engineer that installs, upgrades, patches, and monitors your product. Every change is a pull request that a person approves, and the access to apply it exists for seconds.">
+  <title>S.R.C. (Site Reliability Clanker): ship an AI site reliability engineer with your product instead of an installer</title>
+  <meta name="description" content="Ship an AI site reliability engineer with your product instead of an installer. It installs, upgrades, patches, and monitors your product. Every change is a pull request that a person approves, and the access for it ends with the job.">
   <meta name="color-scheme" content="dark">
   <link rel="icon" href="img/icon-small.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/site.css">
@@ -29,17 +29,12 @@
     <section class="hero" aria-labelledby="hero-title">
       <canvas class="hero-backdrop" id="hero-backdrop" aria-hidden="true"></canvas>
       <div class="wrap">
-        <h1 class="reveal" id="hero-title">Don’t build a legacy product installer. Build an AI site reliability engineer that installs, upgrades, patches, and monitors your product.</h1>
-        <p class="hero-lead reveal">S.R.C. (Site Reliability Clanker) keeps a cloud application deployed,
-          patched and backed up. It finds the work, writes each change as a pull request, and
-          explains it in plain language. A person approves. Only then does it get access: for
-          that one change, for seconds.</p>
-        <ul class="hero-values reveal">
-          <li>The convenience of managed services, without a third-party contract.</li>
-          <li>Inference is now one of the core ingredients, alongside storage, memory, and compute.</li>
-        </ul>
+        <h1 class="reveal" id="hero-title">Ship an AI site reliability engineer with your product instead of an installer.</h1>
+        <p class="hero-lead reveal">S.R.C. (Site Reliability Clanker) installs, upgrades, patches,
+          and monitors your product. It writes each change as a pull request, a person approves,
+          and it gets access only for that one change.</p>
         <div class="btn-row reveal">
-          <a class="btn btn-primary" href="#how-title">See how it works <span aria-hidden="true">&darr;</span></a>
+          <a class="btn btn-primary" href="#closing-title">Try it on your laptop <span aria-hidden="true">&darr;</span></a>
           <a class="btn btn-tertiary" href="#video-title">Watch the video <span aria-hidden="true">&darr;</span></a>
         </div>
         <p class="hero-hint reveal">A working prototype. It runs end to end on a local cluster
@@ -51,40 +46,35 @@
     <section class="section" aria-labelledby="problem-title">
       <div class="wrap">
         <p class="kicker">The problem</p>
-        <h2 id="problem-title">Most of operations is maintenance, and most maintenance is repetitive and tedious.</h2>
+        <h2 id="problem-title">You sell software that your customers run themselves.</h2>
         <div class="cards">
           <div class="card reveal">
-            <h3>The same steps, again and again.</h3>
-            <p>A Kubernetes version reaches its end of support. A base image gets a CVE. The database
-              has a patch. The backups need a restore test. Each job is small, and each one is the
-              same steps as the last time. Together they are a full-time job that nobody wants.</p>
+            <h3>So you build an installer. Then upgrades. Then patches.</h3>
+            <p>A Kubernetes version reaches its end of support. A base image gets a CVE. The
+              database has a patch. The backups need a restore test. None of this work is your
+              product, and it does not end.</p>
           </div>
           <div class="card reveal">
-            <h3>Automation with standing access is a standing risk.</h3>
-            <p>A pipeline or an agent that can change production at any time is a credential that
-              works at 03:00, for anybody who holds it. Give an AI that credential, and you have
-              made the risk larger and less predictable.</p>
+            <h3>Every customer runs them a little differently, and a little late.</h3>
+            <p>The steps are run by hand, by people who have other work, in an environment that
+              you cannot see. No two installations are in the same state.</p>
           </div>
           <div class="card reveal">
-            <h3>The person who approves cannot read the plan.</h3>
-            <p>The people who are accountable for a change are often not the people who can read
-              four hundred lines of infrastructure diff. So they approve what they do not
-              understand, or they slow everything down.</p>
+            <h3>Late patches turn into outages and security incidents.</h3>
+            <p>An upgrade that waits for a quiet week waits for months. The fix existed, and the
+              installation did not have it.</p>
           </div>
         </div>
-        <p class="answer reveal">S.R.C. uses AI to understand and propose the change as deterministic
-          code. An adversarial review then challenges the risk level, and a strict policy engine
-          decides which changes a person must approve.</p>
       </div>
     </section>
 
     <section class="section section-alt" aria-labelledby="what-title">
       <div class="wrap">
-        <p class="kicker">What it does</p>
-        <h2 id="what-title">It does the operations work that a small team has no time for.</h2>
-        <p class="section-lead">You give S.R.C. an application and a target. It deploys the
-          application, and then it looks after it. For each job below, it finds the work, prepares
-          the change and asks you. It does not wait for a ticket.</p>
+        <p class="kicker">The answer</p>
+        <h2 id="what-title">Don’t build an installer. Ship an AI site reliability engineer with your product.</h2>
+        <p class="section-lead">It installs, upgrades, patches, and monitors your product. For each
+          job below, it finds the work, prepares the change and asks. It does not wait for a
+          ticket.</p>
         <div class="cards">
           <div class="card reveal">
             <h3>Deploys from a blank slate</h3>
@@ -117,70 +107,82 @@
               runbook. Policy code decides if that runbook can run without a person.</p>
           </div>
         </div>
+        <p class="answer reveal">The convenience of managed services, without a third-party
+          contract.</p>
       </div>
     </section>
 
     <section class="section" aria-labelledby="how-title">
       <div class="wrap">
         <p class="kicker">How it works</p>
-        <h2 id="how-title">Every change takes the same eight steps.</h2>
-        <p class="section-lead">The language model does the reading and the writing. It has no
-          credential and no tool that applies a change. Plain code and a person make each
-          decision.</p>
+        <h2 id="how-title">Setup is one download. Then every change takes the same three steps.</h2>
+        <p class="section-lead">A wizard starts the control plane. The control plane then deploys
+          your product, layer by layer. After that, it keeps the product up to date like this.</p>
         <ol class="how">
-          <li class="reveal"><span class="how-who how-code">Code</span>
-            <h3>Detect</h3>
-            <p>Detectors watch for new releases, security fixes, versions near their end of
-              support, schedules, drift and failing requests.</p></li>
-          <li class="reveal"><span class="how-who how-model">Model</span>
-            <h3>Draft</h3>
-            <p>The model writes the change as a pull request in your infrastructure repository.
-              That is all it can do.</p></li>
-          <li class="reveal"><span class="how-who how-code">Code</span>
-            <h3>Plan and rate</h3>
-            <p>The runner makes an OpenTofu plan. Policy rules read the plan and set the risk
-              tier, T0 to T3, from the plan itself. The model that wrote the change has no say in
-              its tier.</p></li>
-          <li class="reveal"><span class="how-who how-model">Model</span>
-            <h3>Review</h3>
-            <p>A second model call, the Reviewer, reads the plan, the tier and the diff. It
-              looks for reasons for a higher tier. It can raise the tier, and it cannot lower
-              it. Each review is a record in the audit log.</p></li>
-          <li class="reveal"><span class="how-who how-model">Model</span>
-            <h3>Explain</h3>
-            <p>The model writes the approval page in plain language. The counts, the names and
-              the tier come from the plan, and the model cannot change them.</p></li>
-          <li class="reveal"><span class="how-who how-human">Person</span>
-            <h3>Approve</h3>
-            <p>A notice goes out by email and chat. A person decides in the dashboard or the
-              phone app. A high-risk change can ask for a second approver. Routine, low-risk
-              work needs no click: it runs under a standing approval that a person signed
-              once.</p></li>
-          <li class="reveal"><span class="how-who how-code">Code</span>
-            <h3>Apply</h3>
-            <p>The access broker issues a signed grant for one layer. The runner applies exactly
-              the plan that was approved. The grant is revoked when the job ends.</p></li>
-          <li class="reveal"><span class="how-who how-code">Code</span>
-            <h3>Verify</h3>
-            <p>A canary check tests the result. If it fails, S.R.C. rolls the release back
-              without waiting for a person. For some incidents it also runs a routine runbook,
-              such as a restart, by itself. Each step is a record in a hash-chained audit
-              log.</p></li>
+          <li class="reveal">
+            <h3>It finds the work and writes the change.</h3>
+            <p>It finds the work before anyone asks: a new release, a security fix, drift. It
+              writes each change as infrastructure code, in a pull request.</p></li>
+          <li class="reveal">
+            <h3>Code rates the risk, and a person approves.</h3>
+            <p>Code rates the risk of the change. The model has no say in that. A person reads a
+              plain summary of what will change, and approves. Routine, low-risk work runs under a
+              standing approval that a person signed once.</p></li>
+          <li class="reveal">
+            <h3>It gets access for that one change.</h3>
+            <p>Permissions are narrowly scoped, and issued only for that approved change. They are
+              revoked as soon as the job ends. Then it checks the result, and rolls back if the
+              check fails.</p></li>
         </ol>
+        <p class="answer reveal">S.R.C. uses AI to understand and propose the change as deterministic
+          code. An adversarial review then challenges the risk level, and a strict policy engine
+          decides which changes a person must approve.</p>
         <div class="btn-row">
-          <a class="btn btn-tertiary" href="architecture.html">See the architecture <span aria-hidden="true">&rarr;</span></a>
+          <a class="btn btn-tertiary" href="architecture.html">See each component on the architecture page <span aria-hidden="true">&rarr;</span></a>
         </div>
 
-        <h2 class="video-title" id="video-title">The whole idea in less than three minutes.</h2>
+        <h2 class="video-title" id="video-title">The whole idea in one short video.</h2>
         <figure class="video reveal">
           <video controls preload="none" playsinline poster="img/video-poster.png"
             src="out/explainer.mp4"></video>
-          <figcaption class="figure-caption">The video is built from a real run of the prototype.</figcaption>
+          <figcaption class="figure-caption">The numbers in the video come from a real run of the prototype.</figcaption>
         </figure>
       </div>
     </section>
 
-    <section class="section section-alt" aria-labelledby="principles-title">
+    <section class="section section-alt" aria-labelledby="numbers-title">
+      <div class="wrap">
+        <p class="kicker">Proof: one month, measured</p>
+        <h2 id="numbers-title">The agent worked for a month. It held write access for minutes.</h2>
+        <p class="section-lead">We ran it on a demo application with a realistic architecture, to model the workflows. One scripted month on the local target: a first
+          deployment, three releases, a rollback, patches, backups, a restore drill, drift and an
+          incident at 02:00. These numbers are counted from its audit log.
+          The month: <!-- build:period -->
+17 Nov 2026 to 16 Dec 2026
+<!-- /build:period -->.</p>
+        <!-- build:stats -->
+<dl class="stats"><div class="stat reveal">
+<dt>days of operation</dt><dd><span class="stat-value">28</span>
+<span class="stat-note">one scripted month on the local target</span></dd></div><div class="stat reveal">
+<dt>audit records</dt><dd><span class="stat-value">331</span>
+<span class="stat-note">hash chain verified</span></dd></div><div class="stat reveal">
+<dt>human approvals</dt><dd><span class="stat-value">8</span>
+<span class="stat-note">for 14 work items</span></dd></div><div class="stat reveal">
+<dt>grants issued</dt><dd><span class="stat-value">18</span>
+<span class="stat-note">18 already revoked</span></dd></div><div class="stat reveal">
+<dt>of write or debug access</dt><dd><span class="stat-value">1 min 53 s</span>
+<span class="stat-note">in 28 days, in total</span></dd></div><div class="stat reveal">
+<dt>automatic rollback</dt><dd><span class="stat-value">1</span>
+<span class="stat-note">caught by the canary check</span></dd></div></dl>
+<!-- /build:stats -->
+        <div class="btn-row">
+          <a class="btn btn-primary" href="#closing-title">Try it on your laptop <span aria-hidden="true">&darr;</span></a>
+          <a class="btn btn-tertiary" href="walkthrough.html">See each step with its real events <span aria-hidden="true">&rarr;</span></a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="principles-title">
       <div class="wrap">
         <p class="kicker">Why you can trust it</p>
         <h2 id="principles-title">Five rules decide almost everything else.</h2>
@@ -225,7 +227,7 @@ are validated against the same contract and are not applied yet.</p>
       </div>
     </section>
 
-    <section class="section" aria-labelledby="approver-title">
+    <section class="section section-alt" aria-labelledby="approver-title">
       <div class="wrap">
         <p class="kicker">What an approver sees</p>
         <h2 id="approver-title">Decide in less than a minute. Or read down to the raw plan.</h2>
@@ -301,7 +303,7 @@ is an illustration of the approval page. For the dashboard itself, see
       </div>
     </section>
 
-    <section class="section section-alt" aria-labelledby="notify-title">
+    <section class="section" aria-labelledby="notify-title">
       <div class="wrap">
         <p class="kicker">Slack and Teams</p>
         <h2 id="notify-title">Slack and Teams tell the right people. The approval page is where they decide.</h2>
@@ -347,37 +349,6 @@ for WI-0003, as the control plane sends it to Slack and to Teams.</figcaption>
           In the runs of the prototype the messages went to a local webhook sink, not to a real
           workspace (see <a href="screens.html">Live screens</a>). Quiet hours, escalation and
           threads are not built.</p>
-      </div>
-    </section>
-
-    <section class="section" aria-labelledby="numbers-title">
-      <div class="wrap">
-        <p class="kicker">Proof: one month, measured</p>
-        <h2 id="numbers-title">The agent worked for a month. It held write access for minutes.</h2>
-        <p class="section-lead">The prototype looked after a test application for one scripted month on the local target: a first
-          deployment, three releases, a rollback, patches, backups, a restore drill, drift and an
-          incident at 02:00. These numbers are counted from its audit log.
-          The month: <!-- build:period -->
-17 Nov 2026 to 16 Dec 2026
-<!-- /build:period -->.</p>
-        <!-- build:stats -->
-<dl class="stats"><div class="stat reveal">
-<dt>days of operation</dt><dd><span class="stat-value">28</span>
-<span class="stat-note">one scripted month on the local target</span></dd></div><div class="stat reveal">
-<dt>audit records</dt><dd><span class="stat-value">331</span>
-<span class="stat-note">hash chain verified</span></dd></div><div class="stat reveal">
-<dt>human approvals</dt><dd><span class="stat-value">8</span>
-<span class="stat-note">for 14 work items</span></dd></div><div class="stat reveal">
-<dt>grants issued</dt><dd><span class="stat-value">18</span>
-<span class="stat-note">18 already revoked</span></dd></div><div class="stat reveal">
-<dt>of write or debug access</dt><dd><span class="stat-value">1 min 53 s</span>
-<span class="stat-note">in 28 days, in total</span></dd></div><div class="stat reveal">
-<dt>automatic rollback</dt><dd><span class="stat-value">1</span>
-<span class="stat-note">caught by the canary check</span></dd></div></dl>
-<!-- /build:stats -->
-        <div class="btn-row">
-          <a class="btn btn-tertiary" href="walkthrough.html">See each step with its real events <span aria-hidden="true">&rarr;</span></a>
-        </div>
       </div>
     </section>
 
@@ -461,7 +432,8 @@ for WI-0003, as the control plane sends it to Slack and to Teams.</figcaption>
         </div>
         <p class="figure-caption">The logs behind the result table cost 1.4374 US dollars at list
           price.</p>
-        <p class="answer reveal">Your product should get better and easier to manage when new
+        <p class="answer reveal">Inference is now one of the core ingredients, alongside storage,
+          memory, and compute. Your product should get better and easier to manage when new
           models come out.</p>
         <p class="section-lead">The model of each role is one setting. Each eval task runs
           against a named model, so you can measure a new model before a role uses it. Nothing
