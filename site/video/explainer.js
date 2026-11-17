@@ -106,6 +106,8 @@ function fill(month) {
 
 function show(cue) {
   const shot = shots.find((one) => one.dataset.cues.split(" ").includes(cue));
+  const leaving = shots.some((one) => one !== shot && one.classList.contains("is-active"));
+  root.style.setProperty("--wait", leaving ? `${LEAVE_MS}ms` : "0s");
   for (const one of shots) one.classList.toggle("is-active", one === shot);
   const step = shot?.dataset.step ?? "";
   if (step !== stepNumber.textContent) {
@@ -113,7 +115,7 @@ function show(cue) {
     window.setTimeout(() => {
       stepNumber.textContent = step;
       stepNumber.classList.toggle("is-active", step !== "");
-    }, LEAVE_MS);
+    }, leaving ? LEAVE_MS : 0);
   }
   for (const part of document.querySelectorAll(`[data-at="${cue}"]`)) part.classList.add("is-shown");
   count(cue);

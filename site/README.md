@@ -84,8 +84,7 @@ them: change `lib/` and run the build.
 ## Capture the screenshots
 
 ```
-node capture.mjs           # screenshots into screens/
-node capture.mjs --video   # also record click-through videos into out/segments/
+node capture.mjs
 ```
 
 | Target | Address | Views |
