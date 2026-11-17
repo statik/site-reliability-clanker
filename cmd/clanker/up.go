@@ -201,9 +201,7 @@ func build(o options) (*components, error) {
 		return nil, err
 	}
 	c.log = audit.New(c.db, c.clock)
-	if c.forge, err = forge.New(filepath.Join(o.dataDir, "repos"), c.db); err != nil {
-		return nil, err
-	}
+	c.forge = forge.New(c.db)
 	if c.runner, err = runner.New(o.dataDir); err != nil {
 		return nil, err
 	}

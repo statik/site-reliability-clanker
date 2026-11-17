@@ -1,90 +1,219 @@
-// Package forge is the small git forge inside the control plane. Repositories are bare
-// directories on disk. The git CLI does all history, diff and merge work. Pull requests are
-// rows in the control-plane database.
+// Package forge is the small git forge inside the control plane. The objects and the
+// references of each repository are rows in the database of the control plane, and so are
+// the pull requests. A git library does the history work in this process, so the forge
+// starts no program and keeps no file.
 package forge
 
 import (
-	"bytes"
-	"context"
 	"database/sql"
+	"errors"
 	"fmt"
-	"net/http"
-	"net/http/cgi"
+	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/filemode"
+	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/storage"
 )
 
-// Forge manages the bare repositories under Root.
+const mainBranch = "main"
+
+// Forge manages the repositories in the database.
 type Forge struct {
-	Root string
-	db   *sql.DB
-	mu   sync.Mutex
+	db *sql.DB
+	// mu makes each change of a branch one step in this process. The database guards the
+	// same step against another process: a branch moves only from the commit that the
+	// writer read.
+	mu       sync.Mutex
+	storages map[string]*sqlStorage
+	// Now gives the time of new commits. Tests replace it.
+	Now func() time.Time
 }
 
-// New returns a forge that keeps its repositories under root.
-func New(root string, db *sql.DB) (*Forge, error) {
-	if err := os.MkdirAll(root, 0o755); err != nil {
-		return nil, fmt.Errorf("create forge directory %s: %w", root, err)
-	}
-	return &Forge{Root: root, db: db}, nil
+// New returns a forge that keeps its repositories in db.
+func New(db *sql.DB) *Forge {
+	return &Forge{db: db, storages: map[string]*sqlStorage{}, Now: time.Now}
 }
-
-func (f *Forge) repoPath(repo string) string { return filepath.Join(f.Root, repo+".git") }
 
 // Exists reports whether the repository is present.
 func (f *Forge) Exists(repo string) bool {
-	_, err := os.Stat(filepath.Join(f.repoPath(repo), "HEAD"))
-	return err == nil
+	var name string
+	return f.db.QueryRow(`SELECT name FROM git_repos WHERE name = $1`, repo).Scan(&name) == nil
 }
 
 // Repos lists the repository names.
 func (f *Forge) Repos() ([]string, error) {
-	entries, err := os.ReadDir(f.Root)
+	rows, err := f.db.Query(`SELECT name FROM git_repos ORDER BY name`)
 	if err != nil {
-		return nil, fmt.Errorf("list forge directory %s: %w", f.Root, err)
+		return nil, fmt.Errorf("list repositories: %w", err)
 	}
+	defer rows.Close()
 	names := []string{}
-	for _, e := range entries {
-		if e.IsDir() && strings.HasSuffix(e.Name(), ".git") {
-			names = append(names, strings.TrimSuffix(e.Name(), ".git"))
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("read repository name: %w", err)
 		}
+		names = append(names, name)
 	}
-	sort.Strings(names)
-	return names, nil
+	return names, rows.Err()
 }
 
-func runGit(dir string, env []string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
-	cmd.Env = append(cmd.Env, env...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("git %s in %s: %w: %s", strings.Join(args, " "), dir, err,
-			strings.TrimSpace(stderr.String()))
-	}
-	return stdout.String(), nil
+// storage returns the storage of a repository that exists.
+func (f *Forge) storage(repo string) (*sqlStorage, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.storageLocked(repo)
 }
 
-func (f *Forge) git(repo string, args ...string) (string, error) {
-	return runGit(f.repoPath(repo), nil, args...)
+func (f *Forge) storageLocked(repo string) (*sqlStorage, error) {
+	if s, ok := f.storages[repo]; ok {
+		return s, nil
+	}
+	if !f.Exists(repo) {
+		return nil, fmt.Errorf("repository %s does not exist", repo)
+	}
+	s := newStorage(f.db, repo)
+	f.storages[repo] = s
+	return s, nil
 }
 
-func authorEnv(author string) []string {
-	email := author + "@clanker.invalid"
-	return []string{
-		"GIT_AUTHOR_NAME=" + author, "GIT_AUTHOR_EMAIL=" + email,
-		"GIT_COMMITTER_NAME=" + author, "GIT_COMMITTER_EMAIL=" + email,
+func open(s *sqlStorage) (*git.Repository, error) {
+	repository, err := git.Open(s, nil)
+	if err != nil {
+		return nil, fmt.Errorf("open repository %s: %w", s.repo, err)
 	}
+	return repository, nil
+}
+
+func (f *Forge) signature(author string) object.Signature {
+	return object.Signature{Name: author, Email: author + "@clanker.invalid", When: f.Now()}
+}
+
+func branchRef(branch string) plumbing.ReferenceName {
+	return plumbing.NewBranchReferenceName(branch)
+}
+
+// commitAt resolves a branch name, a reference or a commit hash to a commit.
+func commitAt(repository *git.Repository, repo, ref string) (*object.Commit, error) {
+	hash, err := repository.ResolveRevision(plumbing.Revision(ref))
+	if err != nil {
+		return nil, fmt.Errorf("find %s in %s: %w", ref, repo, err)
+	}
+	commit, err := repository.CommitObject(*hash)
+	if err != nil {
+		return nil, fmt.Errorf("read commit %s of %s: %w", ref, repo, err)
+	}
+	return commit, nil
+}
+
+func filesAt(commit *object.Commit) (map[string]file, error) {
+	tree, err := commit.Tree()
+	if err != nil {
+		return nil, fmt.Errorf("read tree of commit %s: %w", commit.Hash, err)
+	}
+	return flatten(tree)
+}
+
+func (s *sqlStorage) writeBlob(content []byte) (plumbing.Hash, error) {
+	return s.SetEncodedObject(memoryObject(plumbing.BlobObject, content))
+}
+
+func (s *sqlStorage) readBlob(hash plumbing.Hash) ([]byte, error) {
+	encoded, err := s.EncodedObject(plumbing.BlobObject, hash)
+	if err != nil {
+		return nil, err
+	}
+	reader, err := encoded.Reader()
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+	return io.ReadAll(reader)
+}
+
+// writeCommit stores a commit of the files and returns its hash.
+func (f *Forge) writeCommit(s *sqlStorage, files map[string]file, author, message string,
+	parents ...plumbing.Hash) (plumbing.Hash, error) {
+	tree, err := s.writeTree(files)
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+	signature := f.signature(author)
+	if !strings.HasSuffix(message, "\n") {
+		message += "\n"
+	}
+	commit := &object.Commit{Author: signature, Committer: signature, Message: message,
+		TreeHash: tree, ParentHashes: parents}
+	encoded := s.NewEncodedObject()
+	if err := commit.Encode(encoded); err != nil {
+		return plumbing.ZeroHash, fmt.Errorf("encode commit: %w", err)
+	}
+	return s.SetEncodedObject(encoded)
+}
+
+// moveBranch points the branch at the new commit, only if it still points at old. A zero
+// old means that the branch must not exist yet.
+func moveBranch(s *sqlStorage, branch string, updated, old plumbing.Hash) error {
+	name := branchRef(branch)
+	if old.IsZero() {
+		if _, err := s.Reference(name); err == nil {
+			return fmt.Errorf("branch %s of %s exists already", branch, s.repo)
+		}
+		return s.SetReference(plumbing.NewHashReference(name, updated))
+	}
+	err := s.CheckAndSetReference(plumbing.NewHashReference(name, updated),
+		plumbing.NewHashReference(name, old))
+	if errors.Is(err, storage.ErrReferenceHasChanged) {
+		return fmt.Errorf("branch %s of %s moved during the change: try again", branch, s.repo)
+	}
+	return err
+}
+
+var skipNames = map[string]bool{".terraform": true, ".git": true, "node_modules": true}
+
+// readTree stores the files below dir as blobs and adds them to files below prefix.
+func readTree(s *sqlStorage, dir, prefix string, files map[string]file) error {
+	return filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if skipNames[d.Name()] {
+			return filepath.SkipDir
+		}
+		if d.IsDir() || strings.Contains(d.Name(), ".tfstate") || strings.HasSuffix(d.Name(), ".tfplan") {
+			return nil
+		}
+		relative, err := filepath.Rel(dir, path)
+		if err != nil {
+			return err
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		hash, err := s.writeBlob(content)
+		if err != nil {
+			return err
+		}
+		mode := filemode.Regular
+		if info.Mode().Perm()&0o111 != 0 {
+			mode = filemode.Executable
+		}
+		files[filepath.ToSlash(filepath.Join(prefix, relative))] = file{Mode: mode, Hash: hash}
+		return nil
+	})
 }
 
 // Seed creates the repository and commits the given source directories into it. Each key of
@@ -96,74 +225,49 @@ func (f *Forge) Seed(repo string, sources map[string]string, message string) err
 	if f.Exists(repo) {
 		return nil
 	}
-	if _, err := runGit(f.Root, nil, "init", "--bare", "--initial-branch=main",
-		f.repoPath(repo)); err != nil {
-		return err
-	}
-	if _, err := f.git(repo, "config", "http.receivepack", "true"); err != nil {
-		return err
-	}
-	work, err := os.MkdirTemp("", "clanker-seed-")
-	if err != nil {
-		return fmt.Errorf("create temporary directory for seed of %s: %w", repo, err)
-	}
-	defer os.RemoveAll(work)
-	if _, err := runGit(work, nil, "init", "--initial-branch=main"); err != nil {
-		return err
-	}
+	// The repository becomes visible only with its first commit: the row in git_repos is
+	// the last write.
+	s := newStorage(f.db, repo)
+	files := map[string]file{}
 	for dest, src := range sources {
-		if err := copyTree(src, filepath.Join(work, dest)); err != nil {
+		if err := readTree(s, src, dest, files); err != nil {
 			return fmt.Errorf("copy %s into repository %s: %w", src, repo, err)
 		}
 	}
-	env := authorEnv("clanker-bootstrap")
-	if _, err := runGit(work, env, "add", "-A"); err != nil {
+	commit, err := f.writeCommit(s, files, "clanker-bootstrap", message)
+	if err != nil {
+		return fmt.Errorf("seed repository %s: %w", repo, err)
+	}
+	if err := s.SetReference(plumbing.NewHashReference(branchRef(mainBranch), commit)); err != nil {
 		return err
 	}
-	if _, err := runGit(work, env, "commit", "-m", message); err != nil {
+	if err := s.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD,
+		branchRef(mainBranch))); err != nil {
 		return err
 	}
-	_, err = runGit(work, env, "push", f.repoPath(repo), "main")
-	return err
-}
-
-var skipNames = map[string]bool{".terraform": true, ".git": true, "node_modules": true}
-
-func copyTree(src, dest string) error {
-	return filepath.WalkDir(src, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if skipNames[d.Name()] {
-			return filepath.SkipDir
-		}
-		rel, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
-		}
-		target := filepath.Join(dest, rel)
-		if d.IsDir() {
-			return os.MkdirAll(target, 0o755)
-		}
-		if strings.Contains(d.Name(), ".tfstate") || strings.HasSuffix(d.Name(), ".tfplan") {
-			return nil
-		}
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		info, err := d.Info()
-		if err != nil {
-			return err
-		}
-		return os.WriteFile(target, content, info.Mode().Perm())
-	})
+	if _, err := f.db.Exec(`INSERT INTO git_repos (name) VALUES ($1) ON CONFLICT (name) DO NOTHING`,
+		repo); err != nil {
+		return fmt.Errorf("record repository %s: %w", repo, err)
+	}
+	f.storages[repo] = s
+	return nil
 }
 
 // Head returns the commit that ref points to.
 func (f *Forge) Head(repo, ref string) (string, error) {
-	out, err := f.git(repo, "rev-parse", "--verify", ref+"^{commit}")
-	return strings.TrimSpace(out), err
+	s, err := f.storage(repo)
+	if err != nil {
+		return "", err
+	}
+	repository, err := open(s)
+	if err != nil {
+		return "", err
+	}
+	commit, err := commitAt(repository, repo, ref)
+	if err != nil {
+		return "", err
+	}
+	return commit.Hash.String(), nil
 }
 
 // CommitRequest describes a commit to create on a branch.
@@ -177,6 +281,11 @@ type CommitRequest struct {
 	Deletes []string
 }
 
+// cleanPath makes a path of a request safe: no leading slash and no step out of the tree.
+func cleanPath(path string) string {
+	return strings.TrimPrefix(filepath.ToSlash(filepath.Clean("/"+path)), "/")
+}
+
 // Commit writes the files on top of Base and moves Branch to the new commit. When Branch
 // exists, the commit goes on top of the branch.
 func (f *Forge) Commit(req CommitRequest) (string, error) {
@@ -185,47 +294,102 @@ func (f *Forge) Commit(req CommitRequest) (string, error) {
 	if len(req.Files) == 0 && len(req.Deletes) == 0 {
 		return "", fmt.Errorf("commit to %s/%s: no file changes given", req.Repo, req.Branch)
 	}
-	start := req.Base
-	if _, err := f.git(req.Repo, "rev-parse", "--verify", "refs/heads/"+req.Branch); err == nil {
-		start = req.Branch
-	}
-	work, err := os.MkdirTemp("", "clanker-commit-")
+	s, err := f.storageLocked(req.Repo)
 	if err != nil {
-		return "", fmt.Errorf("create temporary directory for commit: %w", err)
-	}
-	defer os.RemoveAll(work)
-	if _, err := runGit(work, nil, "clone", "--quiet", f.repoPath(req.Repo), "."); err != nil {
 		return "", err
 	}
-	if _, err := runGit(work, nil, "checkout", "--quiet", "-B", req.Branch, start); err != nil {
+	repository, err := open(s)
+	if err != nil {
 		return "", err
 	}
+	start, old := req.Base, plumbing.ZeroHash
+	if reference, err := s.Reference(branchRef(req.Branch)); err == nil {
+		start, old = reference.Hash().String(), reference.Hash()
+	}
+	parent, err := commitAt(repository, req.Repo, start)
+	if err != nil {
+		return "", err
+	}
+	files, err := filesAt(parent)
+	if err != nil {
+		return "", err
+	}
+	before := len(files)
+	changed := false
 	for path, content := range req.Files {
-		target := filepath.Join(work, filepath.Clean("/"+path))
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return "", fmt.Errorf("create directory for %s: %w", path, err)
+		hash, err := s.writeBlob([]byte(content))
+		if err != nil {
+			return "", err
 		}
-		if err := os.WriteFile(target, []byte(content), 0o644); err != nil {
-			return "", fmt.Errorf("write %s: %w", path, err)
+		path = cleanPath(path)
+		mode := filemode.Regular
+		if existing, ok := files[path]; ok {
+			mode = existing.Mode
+			changed = changed || existing.Hash != hash
 		}
+		files[path] = file{Mode: mode, Hash: hash}
 	}
 	for _, path := range req.Deletes {
-		if err := os.Remove(filepath.Join(work, filepath.Clean("/"+path))); err != nil {
-			return "", fmt.Errorf("delete %s: %w", path, err)
+		path = cleanPath(path)
+		if _, ok := files[path]; !ok {
+			return "", fmt.Errorf("delete %s: the file is not in %s/%s", path, req.Repo, start)
 		}
+		delete(files, path)
 	}
-	env := authorEnv(req.Author)
-	if _, err := runGit(work, env, "add", "-A"); err != nil {
+	if !changed && len(files) == before {
+		return "", fmt.Errorf("commit to %s/%s: the files are the same as in %s", req.Repo,
+			req.Branch, start)
+	}
+	commit, err := f.writeCommit(s, files, req.Author, req.Message, parent.Hash)
+	if err != nil {
 		return "", err
 	}
-	if _, err := runGit(work, env, "commit", "--quiet", "-m", req.Message); err != nil {
+	if err := moveBranch(s, req.Branch, commit, old); err != nil {
 		return "", err
 	}
-	if _, err := runGit(work, env, "push", "--quiet", "origin", req.Branch); err != nil {
-		return "", err
+	return commit.String(), nil
+}
+
+// mergeCommits merges theirs into ours and returns the files of the result.
+func mergeCommits(s *sqlStorage, ours, theirs *object.Commit) (map[string]file, error) {
+	bases, err := ours.MergeBase(theirs)
+	if err != nil {
+		return nil, fmt.Errorf("find the common commit of %s and %s: %w", ours.Hash, theirs.Hash, err)
 	}
-	out, err := runGit(work, nil, "rev-parse", "HEAD")
-	return strings.TrimSpace(out), err
+	if len(bases) == 0 {
+		return nil, fmt.Errorf("%s and %s have no common commit", ours.Hash, theirs.Hash)
+	}
+	baseFiles, err := filesAt(bases[0])
+	if err != nil {
+		return nil, err
+	}
+	ourFiles, err := filesAt(ours)
+	if err != nil {
+		return nil, err
+	}
+	theirFiles, err := filesAt(theirs)
+	if err != nil {
+		return nil, err
+	}
+	return mergeFiles(baseFiles, ourFiles, theirFiles, func(b, o, t file) (file, bool, error) {
+		if o.Mode != t.Mode || !o.Mode.IsFile() {
+			return file{}, false, nil
+		}
+		texts := make([]string, 0, 3)
+		for _, side := range []file{b, o, t} {
+			content, err := s.readBlob(side.Hash)
+			if err != nil {
+				return file{}, false, err
+			}
+			texts = append(texts, string(content))
+		}
+		merged, clean := mergeLines(texts[0], texts[1], texts[2])
+		if !clean {
+			return file{}, false, nil
+		}
+		hash, err := s.writeBlob([]byte(merged))
+		return file{Mode: o.Mode, Hash: hash}, err == nil, err
+	})
 }
 
 // Merge merges branch into main with a merge commit and returns the new head of main.
@@ -233,24 +397,39 @@ func (f *Forge) Commit(req CommitRequest) (string, error) {
 func (f *Forge) Merge(repo, branch, author, message string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	work, err := os.MkdirTemp("", "clanker-merge-")
+	s, err := f.storageLocked(repo)
 	if err != nil {
-		return "", fmt.Errorf("create temporary directory for merge: %w", err)
-	}
-	defer os.RemoveAll(work)
-	if _, err := runGit(work, nil, "clone", "--quiet", f.repoPath(repo), "."); err != nil {
 		return "", err
 	}
-	env := authorEnv(author)
-	if _, err := runGit(work, env, "merge", "--quiet", "--no-ff", "-m", message,
-		"origin/"+branch); err != nil {
+	repository, err := open(s)
+	if err != nil {
 		return "", err
 	}
-	if _, err := runGit(work, env, "push", "--quiet", "origin", "main"); err != nil {
+	ours, err := commitAt(repository, repo, mainBranch)
+	if err != nil {
 		return "", err
 	}
-	out, err := runGit(work, nil, "rev-parse", "HEAD")
-	return strings.TrimSpace(out), err
+	theirs, err := commitAt(repository, repo, branch)
+	if err != nil {
+		return "", err
+	}
+	if merged, err := theirs.IsAncestor(ours); err != nil {
+		return "", fmt.Errorf("compare %s with main: %w", branch, err)
+	} else if merged {
+		return ours.Hash.String(), nil
+	}
+	files, err := mergeCommits(s, ours, theirs)
+	if err != nil {
+		return "", fmt.Errorf("merge %s into main of %s: %w", branch, repo, err)
+	}
+	commit, err := f.writeCommit(s, files, author, message, ours.Hash, theirs.Hash)
+	if err != nil {
+		return "", err
+	}
+	if err := moveBranch(s, mainBranch, commit, ours.Hash); err != nil {
+		return "", err
+	}
+	return commit.String(), nil
 }
 
 // UpdateBranch merges main into branch, so that a plan of the branch includes every change
@@ -259,73 +438,191 @@ func (f *Forge) Merge(repo, branch, author, message string) (string, error) {
 func (f *Forge) UpdateBranch(repo, branch, author string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	work, err := os.MkdirTemp("", "clanker-update-")
+	s, err := f.storageLocked(repo)
 	if err != nil {
-		return "", fmt.Errorf("create temporary directory for branch update: %w", err)
-	}
-	defer os.RemoveAll(work)
-	if _, err := runGit(work, nil, "clone", "--quiet", f.repoPath(repo), "."); err != nil {
 		return "", err
 	}
-	if _, err := runGit(work, nil, "checkout", "--quiet", branch); err != nil {
+	repository, err := open(s)
+	if err != nil {
 		return "", err
 	}
-	env := authorEnv(author)
-	if _, err := runGit(work, env, "merge", "--quiet", "--no-edit", "origin/main"); err != nil {
+	ours, err := commitAt(repository, repo, branch)
+	if err != nil {
+		return "", err
+	}
+	theirs, err := commitAt(repository, repo, mainBranch)
+	if err != nil {
+		return "", err
+	}
+	if contained, err := theirs.IsAncestor(ours); err != nil {
+		return "", fmt.Errorf("compare %s with main: %w", branch, err)
+	} else if contained {
+		return ours.Hash.String(), nil
+	}
+	if behind, err := ours.IsAncestor(theirs); err != nil {
+		return "", fmt.Errorf("compare %s with main: %w", branch, err)
+	} else if behind {
+		// The branch has nothing of its own: it only moves forward to main.
+		if err := moveBranch(s, branch, theirs.Hash, ours.Hash); err != nil {
+			return "", err
+		}
+		return theirs.Hash.String(), nil
+	}
+	files, err := mergeCommits(s, ours, theirs)
+	if err != nil {
 		return "", fmt.Errorf("branch %s conflicts with main: %w", branch, err)
 	}
-	if _, err := runGit(work, env, "push", "--quiet", "origin", branch); err != nil {
+	commit, err := f.writeCommit(s, files, author, "Merge main into "+branch, ours.Hash, theirs.Hash)
+	if err != nil {
 		return "", err
 	}
-	out, err := runGit(work, nil, "rev-parse", "HEAD")
-	return strings.TrimSpace(out), err
+	if err := moveBranch(s, branch, commit, ours.Hash); err != nil {
+		return "", err
+	}
+	return commit.String(), nil
 }
 
 // Export writes the tree of commit into dest.
 func (f *Forge) Export(repo, commit, dest string) error {
-	if err := os.MkdirAll(dest, 0o755); err != nil {
-		return fmt.Errorf("create export directory %s: %w", dest, err)
-	}
-	archive := exec.Command("git", "archive", "--format=tar", commit)
-	archive.Dir = f.repoPath(repo)
-	untar := exec.Command("tar", "-x", "-C", dest)
-	pipe, err := archive.StdoutPipe()
+	s, err := f.storage(repo)
 	if err != nil {
-		return fmt.Errorf("connect git archive to tar: %w", err)
+		return err
 	}
-	untar.Stdin = pipe
-	var stderr bytes.Buffer
-	archive.Stderr = &stderr
-	untar.Stderr = &stderr
-	if err := untar.Start(); err != nil {
-		return fmt.Errorf("start tar: %w", err)
+	repository, err := open(s)
+	if err != nil {
+		return err
 	}
-	if err := archive.Run(); err != nil {
-		return fmt.Errorf("git archive %s of %s: %w: %s", commit, repo, err, stderr.String())
+	at, err := commitAt(repository, repo, commit)
+	if err != nil {
+		return err
 	}
-	if err := untar.Wait(); err != nil {
-		return fmt.Errorf("extract %s of %s: %w: %s", commit, repo, err, stderr.String())
+	files, err := filesAt(at)
+	if err != nil {
+		return err
 	}
-	return nil
+	for path, entry := range files {
+		if entry.Mode == filemode.Submodule {
+			continue
+		}
+		content, err := s.readBlob(entry.Hash)
+		if err != nil {
+			return fmt.Errorf("read %s of %s: %w", path, repo, err)
+		}
+		target := filepath.Join(dest, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return fmt.Errorf("create directory for %s: %w", target, err)
+		}
+		switch entry.Mode {
+		case filemode.Symlink:
+			err = os.Symlink(string(content), target)
+		case filemode.Executable:
+			err = os.WriteFile(target, content, 0o755)
+		default:
+			err = os.WriteFile(target, content, 0o644)
+		}
+		if err != nil {
+			return fmt.Errorf("write %s: %w", target, err)
+		}
+	}
+	// An empty tree still gives the directory.
+	return os.MkdirAll(dest, 0o755)
+}
+
+// trees returns the tree at the common commit of base and head, and the tree at head. This
+// is the comparison that a pull request shows: what head adds since it left base.
+func (f *Forge) trees(repo, base, head string) (*object.Tree, *object.Tree, error) {
+	s, err := f.storage(repo)
+	if err != nil {
+		return nil, nil, err
+	}
+	repository, err := open(s)
+	if err != nil {
+		return nil, nil, err
+	}
+	baseCommit, err := commitAt(repository, repo, base)
+	if err != nil {
+		return nil, nil, err
+	}
+	headCommit, err := commitAt(repository, repo, head)
+	if err != nil {
+		return nil, nil, err
+	}
+	common, err := baseCommit.MergeBase(headCommit)
+	if err != nil {
+		return nil, nil, fmt.Errorf("find the common commit of %s and %s: %w", base, head, err)
+	}
+	if len(common) == 0 {
+		return nil, nil, fmt.Errorf("%s and %s have no common commit in %s", base, head, repo)
+	}
+	from, err := common[0].Tree()
+	if err != nil {
+		return nil, nil, err
+	}
+	to, err := headCommit.Tree()
+	if err != nil {
+		return nil, nil, err
+	}
+	return from, to, nil
 }
 
 // Diff returns the unified diff from base to head.
 func (f *Forge) Diff(repo, base, head string) (string, error) {
-	return f.git(repo, "diff", "--no-color", base+"..."+head)
+	from, to, err := f.trees(repo, base, head)
+	if err != nil {
+		return "", err
+	}
+	patch, err := from.Patch(to)
+	if err != nil {
+		return "", fmt.Errorf("compare %s with %s in %s: %w", base, head, repo, err)
+	}
+	return patch.String(), nil
 }
 
 // ChangedPaths lists the files that differ between base and head.
 func (f *Forge) ChangedPaths(repo, base, head string) ([]string, error) {
-	out, err := f.git(repo, "diff", "--name-only", base+"..."+head)
+	from, to, err := f.trees(repo, base, head)
 	if err != nil {
 		return nil, err
 	}
-	return strings.Fields(out), nil
+	changes, err := object.DiffTree(from, to)
+	if err != nil {
+		return nil, fmt.Errorf("compare %s with %s in %s: %w", base, head, repo, err)
+	}
+	seen := map[string]bool{}
+	for _, change := range changes {
+		for _, name := range []string{change.From.Name, change.To.Name} {
+			if name != "" {
+				seen[name] = true
+			}
+		}
+	}
+	paths := make([]string, 0, len(seen))
+	for path := range seen {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	return paths, nil
 }
 
 // ReadFile returns the content of path at ref.
 func (f *Forge) ReadFile(repo, ref, path string) (string, error) {
-	return f.git(repo, "show", ref+":"+path)
+	s, err := f.storage(repo)
+	if err != nil {
+		return "", err
+	}
+	repository, err := open(s)
+	if err != nil {
+		return "", err
+	}
+	commit, err := commitAt(repository, repo, ref)
+	if err != nil {
+		return "", err
+	}
+	found, err := commit.File(cleanPath(path))
+	if err != nil {
+		return "", fmt.Errorf("read %s at %s in %s: %w", path, ref, repo, err)
+	}
+	return found.Contents()
 }
 
 // TreeEntry is one row of a directory listing.
@@ -337,23 +634,39 @@ type TreeEntry struct {
 
 // Tree lists the directory at path and ref.
 func (f *Forge) Tree(repo, ref, path string) ([]TreeEntry, error) {
-	target := ref
-	if path != "" {
-		target = ref + ":" + strings.TrimSuffix(path, "/")
-	}
-	out, err := f.git(repo, "ls-tree", target)
+	s, err := f.storage(repo)
 	if err != nil {
 		return nil, err
 	}
-	entries := []TreeEntry{}
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		meta, name, ok := strings.Cut(line, "\t")
-		fields := strings.Fields(meta)
-		if !ok || len(fields) < 2 {
-			continue
+	repository, err := open(s)
+	if err != nil {
+		return nil, err
+	}
+	commit, err := commitAt(repository, repo, ref)
+	if err != nil {
+		return nil, err
+	}
+	tree, err := commit.Tree()
+	if err != nil {
+		return nil, err
+	}
+	path = strings.Trim(path, "/")
+	if path != "" {
+		if tree, err = tree.Tree(path); err != nil {
+			return nil, fmt.Errorf("list %s at %s in %s: %w", path, ref, repo, err)
 		}
-		entries = append(entries, TreeEntry{Name: name, Type: fields[1],
-			Path: strings.TrimPrefix(path+"/"+name, "/")})
+	}
+	entries := []TreeEntry{}
+	for _, entry := range tree.Entries {
+		kind := "blob"
+		switch entry.Mode {
+		case filemode.Dir:
+			kind = "tree"
+		case filemode.Submodule:
+			kind = "commit"
+		}
+		entries = append(entries, TreeEntry{Name: entry.Name, Type: kind,
+			Path: strings.TrimPrefix(path+"/"+entry.Name, "/")})
 	}
 	sort.Slice(entries, func(i, j int) bool {
 		if entries[i].Type != entries[j].Type {
@@ -374,45 +687,56 @@ type LogEntry struct {
 
 // Log returns the newest commits of ref, at most limit.
 func (f *Forge) Log(repo, ref string, limit int) ([]LogEntry, error) {
-	out, err := f.git(repo, "log", fmt.Sprintf("-n%d", limit), "--format=%H%x1f%an%x1f%aI%x1f%s",
-		ref)
+	s, err := f.storage(repo)
 	if err != nil {
 		return nil, err
 	}
+	repository, err := open(s)
+	if err != nil {
+		return nil, err
+	}
+	start, err := commitAt(repository, repo, ref)
+	if err != nil {
+		return nil, err
+	}
+	commits, err := repository.Log(&git.LogOptions{From: start.Hash, Order: git.LogOrderCommitterTime})
+	if err != nil {
+		return nil, fmt.Errorf("read history of %s in %s: %w", ref, repo, err)
+	}
+	defer commits.Close()
 	entries := []LogEntry{}
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		parts := strings.Split(line, "\x1f")
-		if len(parts) != 4 {
-			continue
+	for len(entries) < limit {
+		commit, err := commits.Next()
+		if errors.Is(err, io.EOF) {
+			break
 		}
-		entries = append(entries, LogEntry{Commit: parts[0], Author: parts[1], Date: parts[2],
-			Subject: parts[3]})
+		if err != nil {
+			return nil, fmt.Errorf("read history of %s in %s: %w", ref, repo, err)
+		}
+		subject, _, _ := strings.Cut(commit.Message, "\n")
+		entries = append(entries, LogEntry{Commit: commit.Hash.String(), Author: commit.Author.Name,
+			Date: commit.Author.When.Format(time.RFC3339), Subject: subject})
 	}
 	return entries, nil
 }
 
 // Branches lists the branch names of the repository.
 func (f *Forge) Branches(repo string) ([]string, error) {
-	out, err := f.git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads")
+	s, err := f.storage(repo)
 	if err != nil {
 		return nil, err
 	}
-	return strings.Fields(out), nil
-}
-
-// HTTPHandler serves clone and push over HTTP with git http-backend. Mount it at prefix.
-func (f *Forge) HTTPHandler(prefix string) (http.Handler, error) {
-	execPath, err := runGit(f.Root, nil, "--exec-path")
+	references, err := s.IterReferences()
 	if err != nil {
 		return nil, err
 	}
-	backend := filepath.Join(strings.TrimSpace(execPath), "git-http-backend")
-	if _, err := os.Stat(backend); err != nil {
-		return nil, fmt.Errorf("find git-http-backend at %s: %w", backend, err)
-	}
-	return &cgi.Handler{
-		Path: backend,
-		Root: prefix,
-		Env:  []string{"GIT_PROJECT_ROOT=" + f.Root, "GIT_HTTP_EXPORT_ALL=1"},
-	}, nil
+	names := []string{}
+	err = references.ForEach(func(reference *plumbing.Reference) error {
+		if reference.Name().IsBranch() {
+			names = append(names, reference.Name().Short())
+		}
+		return nil
+	})
+	sort.Strings(names)
+	return names, err
 }

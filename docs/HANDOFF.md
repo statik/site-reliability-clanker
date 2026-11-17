@@ -54,13 +54,18 @@ group. Section 12 of the plan records the five decisions that follow from the la
   account. The ECS template is the starting point for the runner jobs.
 - **What the unikernel needs, in build order:** policy on the OPA library (done); the
   database outside the process (done: PostgreSQL); the forge on a git library with its
-  objects in the database; the split of core and runners; a lease, so that two instances
+  objects in the database (done); the split of core and runners; a lease, so that two instances
   never write; OIDC sign-in; the image build and the stack in the wizard; a run in a real
   account.
-- **Open risks:** the forge needs its own three-way merge, because the git library merges
-  only by fast-forward. The control plane still keeps plans, logs, OpenTofu state and its
-  signing key as files in the data directory; these must move before the unikernel can
-  hold no state.
+- **Forge (2026-11-17):** the forge starts no program. It uses go-git 5.19.3 with its
+  objects and references in PostgreSQL, and its own three-way merge. The line merge gave the
+  same result as `git merge-file` in 400 random cases: 320 clean and equal, 80 refused by
+  both. The git client cloned, pushed and fetched over HTTP, and `git fsck --strict` found
+  no fault in the objects that the forge wrote. Two changes to lines next to each other
+  are a conflict, as in git.
+- **Open risks:** the control plane still keeps plans, job logs, OpenTofu state and its
+  signing key as files in the data directory, and it still starts `tofu`, `kubectl`, `helm`
+  and the runbook scripts. These must move to the runners before the unikernel can run it.
 - **Nanos boot test (2026-11-17, a throwaway probe, on a laptop):** a Go program as a Nanos
   image read its environment from the image configuration, made an outbound HTTPS request,
   connected to PostgreSQL 18 and inserted a row, and answered HTTP from the host. A

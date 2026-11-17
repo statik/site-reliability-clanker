@@ -97,6 +97,15 @@ CREATE TABLE IF NOT EXISTS agent_calls (
   transcript TEXT NOT NULL DEFAULT '', at TEXT NOT NULL);
 
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+CREATE TABLE IF NOT EXISTS git_repos (name TEXT PRIMARY KEY);
+
+CREATE TABLE IF NOT EXISTS git_objects (
+  repo TEXT NOT NULL, hash TEXT NOT NULL, kind SMALLINT NOT NULL, content BYTEA NOT NULL,
+  PRIMARY KEY (repo, hash));
+
+CREATE TABLE IF NOT EXISTS git_refs (
+  repo TEXT NOT NULL, name TEXT NOT NULL, target TEXT NOT NULL, PRIMARY KEY (repo, name));
 `
 
 // TimeFormat is the layout for every timestamp column. It sorts as text.
