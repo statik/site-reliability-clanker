@@ -18,7 +18,7 @@ struct ProgressSections: View {
         Label {
           Text("The runner refused the apply: \(progress.refusal)")
         } icon: {
-          Image(systemName: "hand.raised.slash.fill").foregroundStyle(.red)
+          Image(systemName: "hand.raised.slash.fill").foregroundStyle(Palette.error)
         }
         .font(.callout)
       }
@@ -58,11 +58,11 @@ private struct LayerProgressRow: View {
       }
       Label(layer.grant.text, systemImage: layer.grant.symbol)
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Palette.textSecondary)
       if !layer.note.isEmpty {
         Text(layer.note)
           .font(.caption)
-          .foregroundStyle(layer.status == .failed ? Color.red : Color.secondary)
+          .foregroundStyle(layer.status == .failed ? Palette.error : Palette.textSecondary)
       }
       if let jobID = layer.jobID {
         NavigationLink(value: Route.jobLog(jobID)) {
@@ -101,7 +101,7 @@ private struct VerificationRow: View {
     ForEach(checks, id: \.self) { check in
       Text("• \(check)")
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Palette.textSecondary)
     }
   }
 }
@@ -121,11 +121,11 @@ struct StepRow: View {
         if !step.detail.isEmpty {
           Text(step.detail)
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Palette.textSecondary)
         }
         Text(Timestamps.display(step.time))
           .font(.caption2.monospacedDigit())
-          .foregroundStyle(.tertiary)
+          .foregroundStyle(Palette.textHelper)
       }
     }
     .accessibilityElement(children: .combine)

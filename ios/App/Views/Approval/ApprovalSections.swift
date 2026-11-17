@@ -8,7 +8,7 @@ struct ChangesSection: View {
       if changes.layers.isEmpty {
         Text("This work item has no plan. Nothing is known about what it changes.")
           .font(.callout)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Palette.textSecondary)
       } else {
         Text(changes.hasPlans ? changes.totalText : "Every layer is planned at apply time")
           .font(.headline)
@@ -31,14 +31,14 @@ private struct DestructiveCallout: View {
     if resources.isEmpty {
       Label("Nothing is destroyed or replaced", systemImage: "checkmark.shield")
         .font(.callout)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Palette.textSecondary)
     } else {
       VStack(alignment: .leading, spacing: 8) {
         Label(
           "\(resources.count) destroyed or replaced", systemImage: "exclamationmark.triangle.fill"
         )
         .font(.subheadline.weight(.semibold))
-        .foregroundStyle(.red)
+        .foregroundStyle(Palette.error)
         ForEach(resources) { resource in
           ResourceLineView(resource: resource, showsLayer: true)
         }
@@ -71,7 +71,7 @@ private struct LayerChangesView: View {
             + "the approval covered it.", systemImage: "clock.badge.checkmark"
         )
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Palette.textSecondary)
       }
       ForEach(layer.resources) { resource in
         ResourceLineView(resource: resource, showsLayer: false)
@@ -82,7 +82,7 @@ private struct LayerChangesView: View {
           .font(.subheadline.weight(.semibold))
         Text(layer.countsText)
           .font(.caption)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Palette.textSecondary)
       }
       .accessibilityElement(children: .combine)
     }
@@ -101,7 +101,7 @@ struct ResourceLineView: View {
       if showsLayer {
         Text("in \(Humanise.layer(resource.layer))")
           .font(.caption)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Palette.textSecondary)
       }
       ForEach(resource.details, id: \.self) { detail in
         Text(detail)
@@ -109,7 +109,7 @@ struct ResourceLineView: View {
       }
       Text(resource.address)
         .font(.caption2.monospaced())
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Palette.textSecondary)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .accessibilityElement(children: .combine)
@@ -124,9 +124,9 @@ struct SafetySection: View {
       VStack(alignment: .leading, spacing: 4) {
         Text("Checks before the change")
           .font(.caption)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Palette.textSecondary)
         if explanation.preChecks.isEmpty {
-          Text("Not stated").font(.callout).foregroundStyle(.secondary)
+          Text("Not stated").font(.callout).foregroundStyle(Palette.textSecondary)
         }
         ForEach(explanation.preChecks, id: \.self) { check in
           Label(check, systemImage: "checklist")
@@ -152,7 +152,7 @@ struct PermissionSection: View {
       if permission.lines.isEmpty {
         Text("No layer of this work item needs a write permission.")
           .font(.callout)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Palette.textSecondary)
       }
       ForEach(permission.lines) { line in
         VStack(alignment: .leading, spacing: 4) {
@@ -163,7 +163,7 @@ struct PermissionSection: View {
           if !line.brokerRule.isEmpty {
             Text("Broker rule: \(line.brokerRule)")
               .font(.caption)
-              .foregroundStyle(.secondary)
+              .foregroundStyle(Palette.textSecondary)
           }
         }
         .accessibilityElement(children: .combine)
@@ -233,10 +233,10 @@ struct DiffView: View {
     .accessibilityLabel("Pull request diff")
   }
 
-  private func color(of line: Substring) -> Color {
-    if line.hasPrefix("+") && !line.hasPrefix("+++") { return .green }
-    if line.hasPrefix("-") && !line.hasPrefix("---") { return .red }
-    return .primary
+  private func color(of line: Substring) -> PaletteColor {
+    if line.hasPrefix("+") && !line.hasPrefix("+++") { return Palette.success }
+    if line.hasPrefix("-") && !line.hasPrefix("---") { return Palette.error }
+    return Palette.text
   }
 }
 
@@ -293,7 +293,7 @@ private struct ApprovalLine: View {
       StatusLabel(text: name, symbol: symbol, tone: tone)
       Text("\(note) · \(Timestamps.display(approval.at))")
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Palette.textSecondary)
       if !approval.comment.isEmpty {
         Text("“\(approval.comment)”")
           .font(.callout)

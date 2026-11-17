@@ -9,7 +9,7 @@ struct SettingsView: View {
 
   var body: some View {
     NavigationStack {
-      Form {
+      PaletteForm {
         SignedInSection()
         Section("Connection") {
           StatusLabel(
@@ -28,18 +28,20 @@ struct SettingsView: View {
           }
         }
         Section {
-          addressField("Clanker control plane", text: $controlPlane)
+          addressField("S.R.C. control plane", text: $controlPlane)
           addressField("Paperboat", text: $paperboat)
           if let addressError {
             ErrorNotice(message: addressError)
           }
           Button("Use these addresses") { saveAddresses() }
+            .foregroundStyle(Palette.interactive)
             .disabled(!hasAddressChanges)
           Button("Reset to defaults") {
             controlPlane = AppSettings.defaultControlPlane
             paperboat = AppSettings.defaultPaperboat
             saveAddresses()
           }
+          .foregroundStyle(Palette.interactive)
         } header: {
           Text("Servers")
         } footer: {
@@ -49,10 +51,10 @@ struct SettingsView: View {
         }
         Section("About") {
           HStack(spacing: 12) {
-            PaperBoatMark(size: 36)
+            ProductMark(size: 44)
             Text(
               "Paperboat Manager shows how the fish rental business runs and lets you decide "
-                + "on the work that Site Reliability Clanker proposes.")
+                + "on the work that S.R.C. (Site Reliability Clanker) proposes.")
             .font(.callout)
           }
         }
@@ -79,7 +81,7 @@ struct SettingsView: View {
     VStack(alignment: .leading, spacing: 2) {
       Text(label)
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Palette.textSecondary)
       TextField(label, text: text)
         .keyboardType(.URL)
         .textInputAutocapitalization(.never)
@@ -132,6 +134,7 @@ private struct SignedInSection: View {
       }
       keychainProblem
       Button("Sign out", role: .destructive) { app.signOut() }
+        .foregroundStyle(Palette.error)
         .accessibilityIdentifier("sign-out")
     } header: {
       Text("Signed in as")

@@ -1,7 +1,7 @@
 import Foundation
 
 /// How a status reads on screen: always an icon and a word, with colour as a third signal.
-enum Tone: Sendable, Equatable {
+enum Tone: Sendable, Equatable, CaseIterable {
   case good, attention, bad, active, neutral
 }
 
@@ -149,15 +149,6 @@ enum RiskTier: Sendable, Equatable, Hashable {
     case .t2: "wrench.and.screwdriver"
     case .t3: "exclamationmark.triangle.fill"
     case .none, .unknown: "questionmark.diamond"
-    }
-  }
-
-  var tone: Tone {
-    switch self {
-    case .t0, .t1: .neutral
-    case .t2: .active
-    case .t3: .bad
-    case .none, .unknown: .neutral
     }
   }
 }

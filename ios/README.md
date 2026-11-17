@@ -2,7 +2,7 @@
 
 Paperboat Manager is a native SwiftUI app for the manager of Paperboat, the fish rental
 business. It shows how the business application runs. It also lets the manager approve,
-schedule, send back or reject the work that Site Reliability Clanker proposes.
+schedule, send back or reject the work that S.R.C. (Site Reliability Clanker) proposes.
 
 The app uses only the HTTP API of the control plane (`docs/API.md`) and three endpoints of
 Paperboat (`/api/stats`, `/api/version`, `/api/healthz`). It has no third-party dependencies.
@@ -81,10 +81,39 @@ ios/run.sh -initialScreen approvals -workItem WI-0020 -debugUser alice
 ios/scripts/screenshots.sh
 ```
 
-The script starts the app on each main screen, in light and in dark mode, and saves the
-pictures in `ios/screenshots`. It uses the live servers. All its requests are reads, with one
+The script starts the app on each main screen and saves the pictures in `ios/screenshots`.
+Four more pictures show a large text size. It uses the live servers. All its requests are reads, with one
 exception: it sends one `request_changes` decision as the viewer `dave`. The control plane
 refuses that decision with status 403, and the screenshot shows the refusal.
+
+The script opens the approval page of `WI-0020`. If the demo has no work item with that
+name, change the name in the script. The pictures in `ios/screenshots` show `WI-0016`, and
+picture 11 (the refusal) is not there, because no decision was sent when they were made.
+
+## Colours and icon
+
+The app has the colours and the icon of the S.R.C. website (`site/css/site.css`,
+`site/img/icon.svg`). Like the website, it has one theme: a warm dark ground, cream text
+and honey for what you can tap. It does not follow the light or dark setting of the phone
+(`UIUserInterfaceStyle` is `Dark`). Dynamic Type works as before.
+
+- `App/Views/Components/Palette.swift` is the only file that has colour values. Each view
+  takes its colours from `Palette`.
+- `Tests/PaletteTests.swift` calculates the WCAG contrast of each pair of text and ground
+  that the app uses. Text has a contrast of 4.5:1 or more.
+- `App/Views/Components/ProductMark.swift` draws the mark of the product.
+- `scripts/make_icon.sh` renders the app icon from `site/img/icon.svg`. It needs
+  `rsvg-convert` and `magick`. The figure is at 80% of its size, because iOS cuts the
+  corners of an app icon more than the SVG does.
+
+iOS draws these parts with its own colours, and the app does not change them:
+
+- The status bar, the keyboard and the text-selection handles.
+- The glass of the tab bar and of the round buttons in the navigation bar. The back arrow
+  and the tab items that are not selected are almost white (`#F7F3F1`), not cream.
+- The two buttons of the date picker in "Approve and schedule", and its calendar.
+- The arrow of a row that opens or closes, and the arrow at the end of a row.
+- The grey text of an empty text field.
 
 ## Configuration
 
@@ -204,6 +233,6 @@ ios/
   App/ViewModels    @Observable types, one for each screen
   App/Views         SwiftUI views
   Tests             unit tests and fixtures
-  scripts           make_icon.swift draws the app icon; screenshots.sh takes the screenshots
-  screenshots       each main screen in light and dark mode
+  scripts           make_icon.sh renders the app icon; screenshots.sh takes the screenshots
+  screenshots       each main screen, and four screens with a large text size
 ```

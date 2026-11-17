@@ -6,7 +6,7 @@ struct ActivityView: View {
   @State private var model = WorkItemsModel()
 
   var body: some View {
-    List {
+    PaletteList {
       if let error = model.error {
         Section { ErrorNotice(message: error) { Task { await model.load(app: app) } } }
       }
@@ -29,7 +29,7 @@ struct ActivityView: View {
         Section {
           EmptyState(
             title: "No work items",
-            message: "Nothing matches. Work that Clanker detects or proposes shows up here.")
+            message: "Nothing matches. Work that S.R.C. detects or proposes shows up here.")
         }
       }
     }
@@ -78,9 +78,8 @@ private struct StateFilterBar: View {
         .font(.subheadline)
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .foregroundStyle(isSelected ? Color.white : Color.primary)
-        .background(
-          isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.fill.secondary), in: Capsule())
+        .foregroundStyle(isSelected ? Palette.textOnInteractive : Palette.text)
+        .background(isSelected ? Palette.interactive : Palette.layerRaised, in: Capsule())
     }
     .buttonStyle(.plain)
     .accessibilityLabel("\(title), \(count) work items")
@@ -99,7 +98,7 @@ struct ActivityDetailView: View {
 
   var body: some View {
     ScrollViewReader { proxy in
-      List {
+      PaletteList {
         if let error = model.error {
           Section { ErrorNotice(message: error) { Task { await model.load(app: app) } } }
         }
@@ -153,7 +152,7 @@ struct ActivityDetailView: View {
         }
       }
       NavigationLink(value: Route.chat(item.id)) {
-        Label("Ask Clanker about \(item.id)", systemImage: "bubble.left.and.text.bubble.right")
+        Label("Ask S.R.C. about \(item.id)", systemImage: "bubble.left.and.text.bubble.right")
       }
     }
   }
@@ -177,7 +176,7 @@ private struct JobsSection: View {
               }
               Text(Timestamps.display(job.startedAt))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.textSecondary)
             }
             .accessibilityElement(children: .combine)
           }
@@ -232,10 +231,10 @@ private struct TimelineRow: View {
           .font(.callout)
         Text("\(event.type) · \(event.actor)\(event.layer.isEmpty ? "" : " · \(event.layer)")")
           .font(.caption.monospaced())
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Palette.textSecondary)
         Text("#\(event.seq) · \(Timestamps.display(event.ts))")
           .font(.caption2.monospacedDigit())
-          .foregroundStyle(.tertiary)
+          .foregroundStyle(Palette.textHelper)
       }
     }
     .accessibilityElement(children: .combine)
@@ -267,6 +266,7 @@ struct JobLogView: View {
       }
       .padding()
     }
+    .paletteGround()
     .navigationTitle("Job \(jobID)")
     .navigationBarTitleDisplayMode(.inline)
     .task(id: app.generation) { await model.load(id: jobID, app: app) }

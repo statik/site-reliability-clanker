@@ -10,7 +10,7 @@ struct AskView: View {
   }
 }
 
-/// A conversation with Clanker, global or scoped to one work item.
+/// A conversation with S.R.C., global or scoped to one work item.
 struct ChatView: View {
   @Environment(AppModel.self) private var app
   @State private var model: ChatModel
@@ -30,15 +30,15 @@ struct ChatView: View {
               .id(entry.id)
           }
           if model.isSending {
-            Label("Clanker reads the records", systemImage: "ellipsis.bubble")
+            Label("S.R.C. reads the records", systemImage: "ellipsis.bubble")
               .font(.callout)
-              .foregroundStyle(.secondary)
+              .foregroundStyle(Palette.textSecondary)
               .id("sending")
           }
           if let error = model.error {
             ErrorNotice(message: error)
               .padding(12)
-              .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))
+              .background(Palette.layer, in: RoundedRectangle(cornerRadius: 12))
           }
           SuggestionList(suggestions: model.suggestions) { question in
             model.draft = question
@@ -49,13 +49,14 @@ struct ChatView: View {
         .padding()
       }
       .scrollDismissesKeyboard(.interactively)
+      .paletteGround()
       .onChange(of: model.entries.last?.id) { _, last in
         guard let last else { return }
         withAnimation { proxy.scrollTo(last, anchor: .bottom) }
       }
     }
     .safeAreaInset(edge: .bottom) { composer }
-    .navigationTitle(model.workItem.isEmpty ? "Ask Clanker" : "Ask about \(model.workItem)")
+    .navigationTitle(model.workItem.isEmpty ? "Ask S.R.C." : "Ask about \(model.workItem)")
     .navigationBarTitleDisplayMode(.inline)
     .task(id: app.generation) { await model.load(app: app) }
   }
@@ -64,7 +65,12 @@ struct ChatView: View {
     HStack(alignment: .bottom, spacing: 8) {
       TextField("Ask a question", text: $model.draft, axis: .vertical)
         .lineLimit(1...4)
-        .textFieldStyle(.roundedBorder)
+        .textFieldStyle(.plain)
+        .foregroundStyle(Palette.text)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(Palette.background, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Palette.fieldBorder))
         .focused($isComposing)
         .accessibilityIdentifier("chat-input")
       Button {
@@ -79,7 +85,7 @@ struct ChatView: View {
     }
     .padding(.horizontal)
     .padding(.vertical, 8)
-    .background(.bar)
+    .background(Palette.layer)
   }
 }
 
@@ -98,7 +104,7 @@ private struct ChatIntro: View {
           + "cannot approve or apply anything.")
     }
     .font(.caption)
-    .foregroundStyle(.secondary)
+    .foregroundStyle(Palette.textSecondary)
     .accessibilityElement(children: .combine)
   }
 }
@@ -109,15 +115,15 @@ private struct ChatBubble: View {
 
   var body: some View {
     VStack(alignment: entry.isAssistant ? .leading : .trailing, spacing: 6) {
-      Text(entry.isAssistant ? "Clanker · AI-written" : entry.user)
+      Text(entry.isAssistant ? "S.R.C. · AI-written" : entry.user)
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Palette.textSecondary)
       Text(entry.body)
         .font(.callout)
         .textSelection(.enabled)
         .padding(10)
         .background(
-          entry.isAssistant ? AnyShapeStyle(.fill.tertiary) : AnyShapeStyle(.tint.opacity(0.18)),
+          entry.isAssistant ? Palette.layerRaised : Palette.tagHoney,
           in: RoundedRectangle(cornerRadius: 14))
       if !entry.citations.isEmpty {
         CitationList(citations: entry.citations, open: open)
@@ -136,7 +142,7 @@ private struct CitationList: View {
     VStack(alignment: .leading, spacing: 4) {
       Text("Sources")
         .font(.caption2)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Palette.textSecondary)
       ForEach(citations, id: \.self) { citation in
         if citation.type == "work_item" || citation.type == "grant" {
           Button {
@@ -146,14 +152,12 @@ private struct CitationList: View {
               .font(.caption)
               .multilineTextAlignment(.leading)
           }
-          .buttonStyle(.bordered)
-          .buttonBorderShape(.capsule)
-          .controlSize(.small)
+          .buttonStyle(PaletteBoxButtonStyle())
           .accessibilityHint("Opens the source")
         } else {
           Label(citation.label, systemImage: symbol(citation))
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Palette.textSecondary)
         }
       }
     }
@@ -176,7 +180,7 @@ private struct SuggestionList: View {
     VStack(alignment: .leading, spacing: 8) {
       Text("Suggested questions")
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Palette.textSecondary)
       ForEach(suggestions, id: \.self) { question in
         Button {
           ask(question)
@@ -186,7 +190,7 @@ private struct SuggestionList: View {
             .multilineTextAlignment(.leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(PaletteBoxButtonStyle())
       }
     }
     .padding(.top, 8)

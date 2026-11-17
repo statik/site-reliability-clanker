@@ -27,12 +27,13 @@ targets:
       properties:
         CFBundleDisplayName: Paperboat
         UILaunchScreen: {}
+        UIUserInterfaceStyle: Dark
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: >-
-          Paperboat Manager talks to the Clanker control plane and to Paperboat on your
+          Paperboat Manager talks to the S.R.C. control plane and to Paperboat on your
           local network.
     settings:
       base:
@@ -43,7 +44,6 @@ targets:
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Manual
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_PREVIEWS: YES
   PaperboatManagerTests:
     type: bundle.unit-test

@@ -27,9 +27,9 @@ struct HomeView: View {
   }
 
   private var content: some View {
-    List {
+    PaletteList {
       if let error = model.controlPlaneError {
-        Section("Clanker control plane") {
+        Section("S.R.C. control plane") {
           ErrorNotice(message: error) { Task { await model.load(app: app) } }
         }
       }
@@ -60,7 +60,7 @@ private struct WaitingSection: View {
     Section {
       if items.isEmpty {
         Label("Nothing waits for your decision", systemImage: "checkmark.circle")
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Palette.textSecondary)
       }
       ForEach(items) { item in
         NavigationLink(value: Route.approval(item.id)) {
@@ -70,7 +70,7 @@ private struct WaitingSection: View {
     } header: {
       Label("Needs your decision", systemImage: "hand.raised.fill")
         .font(.headline)
-        .foregroundStyle(items.isEmpty ? Color.secondary : Color.orange)
+        .foregroundStyle(items.isEmpty ? Palette.textSecondary : Palette.warning)
         .textCase(nil)
     }
   }
@@ -87,12 +87,12 @@ private struct WaitingRow: View {
       if !item.summary.isEmpty {
         Text(item.summary)
           .font(.subheadline)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Palette.textSecondary)
           .lineLimit(3)
       }
       Text("\(item.id) · \(item.env) · \(item.trigger)")
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Palette.textSecondary)
     }
     .accessibilityElement(children: .combine)
     .accessibilityHint("Opens the approval page")
@@ -116,7 +116,7 @@ private struct BusinessSection: View {
         } trailing: {
           Text("Version \(business.version.version)")
             .font(.subheadline.monospaced())
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Palette.textSecondary)
         }
         StatGrid(stats: business.stats)
       } else {
@@ -160,13 +160,13 @@ private struct StatTile: View {
     VStack(alignment: .leading, spacing: 4) {
       Label(label, systemImage: symbol)
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Palette.textSecondary)
       Text(value, format: .number)
         .font(.title2.weight(.semibold).monospacedDigit())
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(10)
-    .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 10))
+    .background(Palette.layerRaised, in: RoundedRectangle(cornerRadius: 10))
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("\(label): \(value)")
   }
@@ -184,7 +184,7 @@ private struct EnvironmentSection: View {
         if let health = environment.health {
           Text("p95 \(health.p95MS.formatted(.number.precision(.fractionLength(1)))) ms")
             .font(.subheadline.monospacedDigit())
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Palette.textSecondary)
         }
       }
       if history.count > 1 {
@@ -237,21 +237,22 @@ private struct HealthChart: View {
     VStack(alignment: .leading, spacing: 4) {
       Text("Probe success, last \(samples.count) samples")
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Palette.textSecondary)
       Chart(Array(samples.enumerated()), id: \.offset) { index, sample in
         BarMark(
           x: .value("Sample", index), y: .value("Success", sample.successRate * 100), width: 3
         )
-        .foregroundStyle(sample.ok == sample.total ? Color.green : Color.red)
+        .foregroundStyle(sample.ok == sample.total ? Palette.success : Palette.error)
       }
       .chartYScale(domain: 0...100)
       .chartXAxis(.hidden)
       .chartYAxis {
         AxisMarks(values: [0, 50, 100]) { value in
-          AxisGridLine()
+          AxisGridLine().foregroundStyle(Palette.separator)
           AxisValueLabel {
             if let percent = value.as(Int.self) { Text("\(percent)%") }
           }
+          .foregroundStyle(Palette.textSecondary)
         }
       }
       .frame(height: 72)

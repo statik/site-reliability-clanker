@@ -6,7 +6,7 @@ struct AccessView: View {
   @State private var model = AccessModel()
 
   var body: some View {
-    List {
+    PaletteList {
       if let error = model.error {
         Section { ErrorNotice(message: error) { Task { await model.load(app: app) } } }
       }
@@ -56,7 +56,7 @@ private struct ActiveGrantsSection: View {
           StatusLabel(text: "No write permission is active", symbol: "lock.fill", tone: .good)
           Text("Right now the agent can only read.")
             .font(.callout)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Palette.textSecondary)
         }
         .accessibilityElement(children: .combine)
       }
@@ -122,11 +122,11 @@ private struct GrantRow: View {
         .font(.callout)
       Text("\(grant.id) · \(Timestamps.display(grant.issuedAt))\(lifetime)")
         .font(.caption.monospacedDigit())
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Palette.textSecondary)
       if !grant.approvers.isEmpty {
         Text("Approved by: \(grant.approvers.joined(separator: ", "))")
           .font(.caption)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Palette.textSecondary)
       }
     }
     .accessibilityElement(children: .combine)
