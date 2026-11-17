@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -93,7 +94,22 @@ func runbook(t *testing.T, name string, log *bytes.Buffer) jobspec.Job {
 		Checkout: scripts(t, map[string]string{
 			"jobs/hello.sh": "#!/bin/bash\necho \"hello $PARAM_WHO\"\n",
 			"jobs/fail.sh":  "#!/bin/bash\necho before the failure\nexit 3\n",
+			"jobs/report.sh": "#!/bin/bash\necho \"file=/backups/$PARAM_WHO.dump\" >>\"$OUTPUT_FILE\"\n" +
+				"echo \"objects=31\" >>\"$OUTPUT_FILE\"\n",
 		}), Log: log}
+}
+
+func TestTheOutputsOfARunbookComeBackFromTheRunner(t *testing.T) {
+	d, _, _ := setup(t)
+	result, err := d.Run(context.Background(), runbook(t, "report", &bytes.Buffer{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The runner sends text. The core gives each output its declared type.
+	want := map[string]any{"file": "/backups/carol.dump", "objects": "31"}
+	if !reflect.DeepEqual(result.Outputs, want) {
+		t.Errorf("outputs = %#v, want %#v", result.Outputs, want)
+	}
 }
 
 func TestARunnerRunsTheJobAndTheLogComesBack(t *testing.T) {

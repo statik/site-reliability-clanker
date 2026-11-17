@@ -42,10 +42,10 @@ func ValidName(text string) bool { return name.MatchString(text) }
 
 // Field describes one input or one output.
 type Field struct {
-	// Type is TypeString or TypeInteger.
+	// Type is TypeString or TypeInteger. An input is always a string.
 	Type        string `json:"type"`
 	Description string `json:"description"`
-	// Values are the only values that a string input can have. An output has none.
+	// Values are the only values that an input can have. An output has none.
 	Values []string `json:"values,omitempty"`
 }
 
@@ -57,6 +57,8 @@ type Definition struct {
 	// Tier is the risk tier that a run needs.
 	Tier string `json:"tier"`
 	// IncidentMitigation means that the Investigator can propose the runbook for an incident.
+	// The Investigator gives one parameter, "deployment", so such a runbook must have
+	// exactly that input.
 	IncidentMitigation bool `json:"incident_mitigation,omitempty"`
 	// Inputs are the parameters. A request must give each one, and no other.
 	Inputs map[string]Field `json:"inputs,omitempty"`
@@ -74,7 +76,8 @@ func Parse(runbookName string, raw []byte) (Definition, error) {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&d); err != nil {
-		return Definition{}, fmt.Errorf("decode the definition of runbook %s: %w", runbookName, err)
+		return Definition{}, fmt.Errorf("decode the definition of runbook %s: %w", runbookName,
+			err)
 	}
 	if d.Name != "" {
 		return Definition{}, fmt.Errorf("the definition of runbook %s has a name: the name "+
@@ -123,25 +126,20 @@ func checkNames(groups ...map[string]Field) error {
 	return nil
 }
 
-// checkInput makes sure that no input is free text: a string input names its values.
+// checkInput makes sure that no input is free text: an input is a string that names its
+// values.
 func checkInput(f Field) error {
-	switch f.Type {
-	case TypeInteger:
-		if len(f.Values) > 0 {
-			return errors.New("an integer input has no list of values")
-		}
-		return nil
-	case TypeString:
-		if len(f.Values) == 0 {
-			return errors.New("a string input must list its values")
-		}
-		if slices.Contains(f.Values, "") {
-			return errors.New("an empty value is not permitted")
-		}
-		return nil
-	default:
-		return fmt.Errorf("the type %q is not %s or %s", f.Type, TypeString, TypeInteger)
+	if f.Type != TypeString {
+		return fmt.Errorf("the type %q is not %s: an input is a string with a list of values",
+			f.Type, TypeString)
 	}
+	if len(f.Values) == 0 {
+		return errors.New("an input must list its values")
+	}
+	if slices.Contains(f.Values, "") {
+		return errors.New("an empty value is not permitted")
+	}
+	return nil
 }
 
 func checkOutput(f Field) error {
@@ -177,22 +175,10 @@ func (d Definition) CheckInputs(params map[string]string) error {
 		if !given {
 			return fmt.Errorf("runbook %s needs the input %q", d.Name, input)
 		}
-		if err := checkValue(d.Inputs[input], value); err != nil {
-			return fmt.Errorf("input %q of runbook %s: %w", input, d.Name, err)
+		if permitted := d.Inputs[input].Values; !slices.Contains(permitted, value) {
+			return fmt.Errorf("input %q of runbook %s: %q is not one of %s", input, d.Name,
+				value, list(permitted))
 		}
-	}
-	return nil
-}
-
-func checkValue(f Field, value string) error {
-	if f.Type == TypeInteger {
-		if _, err := strconv.ParseInt(value, 10, 64); err != nil {
-			return fmt.Errorf("%q is not an integer", value)
-		}
-		return nil
-	}
-	if !slices.Contains(f.Values, value) {
-		return fmt.Errorf("%q is not one of %s", value, list(f.Values))
 	}
 	return nil
 }

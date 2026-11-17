@@ -17,7 +17,7 @@ const restart = `{
   "inputs": {
     "deployment": {"type": "string", "description": "The deployment.",
       "values": ["paperboat-api", "paperboat-web"]},
-    "replicas": {"type": "integer", "description": "The number of pods."}
+    "wait": {"type": "string", "description": "Wait for the rollout.", "values": ["yes", "no"]}
   },
   "outputs": {
     "file": {"type": "string", "description": "A path."},
@@ -36,11 +36,18 @@ func parse(t *testing.T) runbook.Definition {
 
 func TestParseReadsADefinition(t *testing.T) {
 	d := parse(t)
-	if d.Name != "restart-deployment" || d.Tier != "T1" || !d.IncidentMitigation {
-		t.Errorf("definition = %+v", d)
-	}
-	if got := d.Inputs["deployment"].Values; len(got) != 2 {
-		t.Errorf("values = %q", got)
+	want := runbook.Definition{Name: "restart-deployment", Description: "Restart one deployment.",
+		Tier: "T1", IncidentMitigation: true,
+		Inputs: map[string]runbook.Field{
+			"deployment": {Type: "string", Description: "The deployment.",
+				Values: []string{"paperboat-api", "paperboat-web"}},
+			"wait": {Type: "string", Description: "Wait for the rollout.",
+				Values: []string{"yes", "no"}}},
+		Outputs: map[string]runbook.Field{
+			"file":    {Type: "string", Description: "A path."},
+			"objects": {Type: "integer", Description: "A count."}}}
+	if !reflect.DeepEqual(d, want) {
+		t.Errorf("definition = %+v\nwant %+v", d, want)
 	}
 }
 
@@ -50,28 +57,31 @@ func TestParseRefusesABadDefinition(t *testing.T) {
 		"name that steps out": {"../x", `{"description":"x","tier":"T1"}`, "name"},
 		"not JSON":            {"a-job", `description: x`, "decode"},
 		"empty file":          {"a-job", ``, "decode"},
-		"unknown field":       {"a-job", `{"description":"x","tier":"T1","steps":[]}`, "unknown field"},
+		"unknown field": {"a-job", `{"description":"x","tier":"T1","steps":[]}`,
+			"unknown field"},
 		"name in the file": {"a-job", `{"name":"other","description":"x","tier":"T1"}`,
 			"name of the file"},
 		"no description": {"a-job", `{"description":" ","tier":"T1"}`, "no description"},
 		"no tier":        {"a-job", `{"description":"x"}`, "tier"},
 		"unknown tier":   {"a-job", `{"description":"x","tier":"T9"}`, "tier"},
 		"input name in upper case": {"a-job", `{"description":"x","tier":"T1","inputs":
-			{"Deployment":{"type":"integer","description":"d"}}}`, "not valid"},
+			{"Target":{"type":"string","description":"d","values":["a"]}}}`, "not valid"},
 		"input without description": {"a-job", `{"description":"x","tier":"T1","inputs":
-			{"count":{"type":"integer"}}}`, "no description"},
+			{"target":{"type":"string","values":["a"]}}}`, "no description"},
 		"input of unknown type": {"a-job", `{"description":"x","tier":"T1","inputs":
-			{"on":{"type":"boolean","description":"d"}}}`, "type"},
+			{"on":{"type":"boolean","description":"d","values":["true"]}}}`, "is not string"},
+		"integer input": {"a-job", `{"description":"x","tier":"T1","inputs":
+			{"count":{"type":"integer","description":"d"}}}`, "is not string"},
 		"free text input": {"a-job", `{"description":"x","tier":"T1","inputs":
 			{"target":{"type":"string","description":"d"}}}`, "must list its values"},
 		"empty value": {"a-job", `{"description":"x","tier":"T1","inputs":
 			{"target":{"type":"string","description":"d","values":[""]}}}`, "empty value"},
-		"integer input with values": {"a-job", `{"description":"x","tier":"T1","inputs":
-			{"count":{"type":"integer","description":"d","values":["1"]}}}`, "no list of values"},
 		"output with values": {"a-job", `{"description":"x","tier":"T1","outputs":
 			{"file":{"type":"string","description":"d","values":["a"]}}}`, "no list of values"},
 		"output of unknown type": {"a-job", `{"description":"x","tier":"T1","outputs":
 			{"file":{"type":"path","description":"d"}}}`, "type"},
+		"output without description": {"a-job", `{"description":"x","tier":"T1","outputs":
+			{"file":{"type":"string"}}}`, "no description"},
 	}
 	for label, tc := range cases {
 		_, err := runbook.Parse(tc.name, []byte(tc.raw))
@@ -83,7 +93,7 @@ func TestParseRefusesABadDefinition(t *testing.T) {
 
 func TestCheckInputs(t *testing.T) {
 	d := parse(t)
-	good := map[string]string{"deployment": "paperboat-web", "replicas": "3"}
+	good := map[string]string{"deployment": "paperboat-web", "wait": "yes"}
 	if err := d.CheckInputs(good); err != nil {
 		t.Fatalf("good inputs: %v", err)
 	}
@@ -93,20 +103,20 @@ func TestCheckInputs(t *testing.T) {
 	}{
 		"no parameters": {nil, `needs the input "deployment"`},
 		"a missing input": {map[string]string{"deployment": "paperboat-api"},
-			`needs the input "replicas"`},
-		"an unknown input": {map[string]string{"deployment": "paperboat-api", "replicas": "1",
+			`needs the input "wait"`},
+		"an unknown input": {map[string]string{"deployment": "paperboat-api", "wait": "no",
 			"namespace": "kube-system"}, `has no input "namespace"`},
-		"a value outside the set": {map[string]string{"deployment": "postgres", "replicas": "1"},
+		"a value outside the set": {map[string]string{"deployment": "postgres", "wait": "no"},
 			"is not one of paperboat-api, paperboat-web"},
-		"an empty value": {map[string]string{"deployment": "", "replicas": "1"}, "is not one of"},
+		"an empty value": {map[string]string{"deployment": "", "wait": "no"}, "is not one of"},
+		"a value in another case": {map[string]string{"deployment": "Paperboat-API",
+			"wait": "no"}, "is not one of"},
+		"a value with a space": {map[string]string{"deployment": "paperboat-api ",
+			"wait": "no"}, "is not one of"},
 		"shell text as a value": {map[string]string{"deployment": "paperboat-api; rm -r /",
-			"replicas": "1"}, "is not one of"},
-		"text for an integer": {map[string]string{"deployment": "paperboat-api",
-			"replicas": "many"}, "is not an integer"},
-		"a fraction for an integer": {map[string]string{"deployment": "paperboat-api",
-			"replicas": "1.5"}, "is not an integer"},
-		"an integer with a space": {map[string]string{"deployment": "paperboat-api",
-			"replicas": " 1"}, "is not an integer"},
+			"wait": "no"}, "is not one of"},
+		"a value of another input": {map[string]string{"deployment": "paperboat-api",
+			"wait": "paperboat-api"}, `input "wait"`},
 	}
 	for label, tc := range cases {
 		err := d.CheckInputs(tc.params)

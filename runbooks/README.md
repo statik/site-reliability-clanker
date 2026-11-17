@@ -19,7 +19,7 @@ head of `main` and checks each request against it before a work item or a grant 
 
 ```json
 {
-  "description": "Restart one Paperboat deployment and wait for the rollout.",
+  "description": "Restart one Paperboat deployment and wait for the rollout. It changes no data.",
   "tier": "T1",
   "incident_mitigation": true,
   "inputs": {
@@ -28,22 +28,23 @@ head of `main` and checks each request against it before a work item or a grant 
       "description": "The deployment to restart, in the namespace paperboat.",
       "values": ["paperboat-api", "paperboat-web", "paperboat-worker"]
     }
-  },
-  "outputs": {}
+  }
 }
 ```
+
+This is `jobs/restart-deployment.json`. It has no outputs. `jobs/db-backup.json` has two.
 
 | Field | Meaning |
 |---|---|
 | `description` | What the runbook does and what it does not change. Required |
 | `tier` | The risk tier that a run needs: `T0` to `T3`. A standing approval covers only `T1`, so the control plane runs only a `T1` runbook |
-| `incident_mitigation` | `true` when the Investigator can propose the runbook for an incident. The default is `false` |
+| `incident_mitigation` | `true` when the Investigator can propose the runbook for an incident. The default is `false`. The Investigator gives one parameter, `deployment`, so such a runbook must have exactly that input |
 | `inputs` | The parameters, by name. A request must give each one and no other |
 | `outputs` | The values that the script reports, by name. A run must report each one and no other |
 
-An input or an output has a `type` (`string` or `integer`) and a `description`. A string
-input also has `values`, the only values that a request can give. There is no input of
-free text.
+An input has the `type` `string`, a `description` and `values`, the only values that a
+request can give. There is no input of free text. An output has a `type` (`string` or
+`integer`) and a `description`.
 
 The name of the runbook is the name of the two files: lower-case letters, digits and `-`.
 The name of an input or an output has lower-case letters, digits and `_`.

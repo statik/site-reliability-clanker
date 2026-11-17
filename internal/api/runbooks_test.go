@@ -55,8 +55,8 @@ func TestTheRunbookListHasTheDefinitions(t *testing.T) {
 		t.Fatalf("%d rows: %s", len(rows), answer.Body)
 	}
 	backup := map[string]any{"name": "db-backup", "tier": "T1", "standing_approver": "carol",
-		"description": "Take a logical backup of the Paperboat database, check that it can be " +
-			"listed, and delete the backups that are older than the retention policy.",
+		"description": "Back up the Paperboat database, check the backup, apply the retention " +
+			"policy.",
 		"outputs": map[string]any{
 			"backup_file": map[string]any{"type": "string",
 				"description": "The path of the new backup on the database volume."},

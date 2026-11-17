@@ -1,5 +1,5 @@
 {
-  "description": "Restore the newest backup into a scratch database, compare the row counts with production, and drop the scratch database. It does not change the production database.",
+  "description": "Restore the newest backup into a scratch database and compare the row counts.",
   "tier": "T1",
   "outputs": {
     "backup_file": {
