@@ -273,9 +273,6 @@ html:not(.js) .js-only { display: none !important; }
   max-width: 54ch; margin-top: var(--s-6); font-size: clamp(1.125rem, 0.6vw + 1rem, 1.5rem);
   font-weight: 300; line-height: 1.4;
 }
-.hero-values { max-width: 60ch; margin-top: var(--s-6); padding-left: var(--s-5);
-  border-left: 2px solid var(--honey); color: var(--text-secondary); line-height: 1.45; }
-.hero-values li + li { margin-top: var(--s-3); }
 .hero-hint { margin-top: var(--s-6); color: var(--text-secondary); font-size: 0.875rem; }
 .motion-toggle {
   position: absolute; right: var(--s-5); bottom: var(--s-5); min-height: 2rem;
@@ -709,19 +706,13 @@ html:not(.js) .chip { border: 0; background: none; padding: 0; cursor: default; 
 
 .how { display: grid; gap: 1px; margin-top: var(--s-8); list-style: none; padding: 0;
   background: var(--border-subtle); border: 1px solid var(--border-subtle); counter-reset: how; }
-@media (min-width: 42rem) { .how { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 66rem) { .how { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 66rem) { .how { grid-template-columns: repeat(3, 1fr); } }
 .how li { position: relative; padding: var(--s-5) var(--s-5) var(--s-7); background: var(--background);
   counter-increment: how; }
 .how li::before { content: counter(how); display: block; font-size: 2rem; font-weight: 300;
   line-height: 1; color: var(--text-helper); margin-bottom: var(--s-5); }
 .how h3 { font-size: 1.25rem; font-weight: 400; line-height: 1.4; }
 .how p { margin-top: var(--s-3); color: var(--text-secondary); font-size: 0.875rem; line-height: 1.45; }
-.how-who { position: absolute; top: var(--s-5); right: var(--s-5); padding: 0 var(--s-3);
-  border-radius: 0.9375rem; font-size: 0.75rem; letter-spacing: 0.32px; line-height: 1.5rem; }
-.how-code { background: var(--tag-sea-bg); color: var(--tag-text); }
-.how-model { background: var(--tag-sky-bg); color: var(--tag-text); }
-.how-human { background: var(--tag-honey-bg); color: var(--tag-text); }
 
 .video-title { margin-top: var(--s-10); font-size: clamp(1.5rem, 1.4vw + 1rem, 2rem); font-weight: 300;
   line-height: 1.25; max-width: 28ch; }
