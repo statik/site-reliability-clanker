@@ -16,9 +16,10 @@ the machine image with `ops`.
 
 ### State at the end of the second session of 2026-11-17
 
-Next steps 1 to 4 are merged (#39, #42, #43, #44 and #46), and the first part of step 5.
-The next work is the second part of step 5: the device flow for git, the iOS app and
-scripts.
+Next steps 1 to 4 are merged, and of step 5 the sign-in for a browser and the device flow
+for git and scripts (#39, #42, #43, #44, #46, #47 and #48).
+The next work is the last part of step 5, the device flow in the iOS app. Step 6 comes
+after that.
 
 The owner decided three things in that session:
 
@@ -146,10 +147,32 @@ What ran on the build of commit `376617b`, the last change to the Go code:
      the local target. The results are in the pull request.
    - Not run: a real provider (Okta, Google, Entra). The sign-in needs the claim
      `email_verified`, which some providers do not send; that will show with a real one.
-   - **Not built: the device flow.** Until then git, the iOS app and scripts cannot use a
-     control plane with the sign-in. The checks give git the session cookie of the admin.
-     There is no page to add a user or change a role: a user other than the first admin
-     needs a row in the users table.
+   - **Done: the device flow for a program** (`internal/signin/device.go`). It follows the
+     OAuth 2.0 device authorization grant, and the core is its own authorization server.
+     A program asks `POST /auth/device/code` for a code. A person who is signed in in a
+     browser approves the code at `/auth/device`. The program then gets a token from
+     `POST /auth/device/token`. A token lasts twelve hours and the database holds only its
+     hash. A program sends it as a bearer token, or as the password of basic
+     authentication, which is what git does. A program with a token cannot approve a code.
+   - `clanker login --server <address>` runs the flow and keeps the token in the
+     configuration directory of the user. `clanker git-credential` is a credential helper
+     that gives the token to git.
+   - `clanker token --server <address>` prints the token for a script.
+   - Nobody pushes to the main branch of a repository of the forge over HTTP, with or
+     without the sign-in. It changes only when the forge merges a pull request.
+   - Ran: `core-check.sh` runs `clanker login`, approves the code as the admin, calls the
+     API with the token, clones two repositories with the credential helper, pushes a
+     branch, and is refused a push to the main branch. `web/scripts/signin-check.mjs`
+     approves a code in a real browser.
+   - Limits to know before a run in a real account: a sign-in, a code and a token leave no
+     audit event. A tier T3 change needs two approvers, and a control plane on a cloud
+     has only the first admin until somebody adds a row to the users table. The request
+     for a code is open to everybody and is not slowed down.
+   - Not built: the iOS app does not use the device flow yet, and still sends the user
+     header, which only the demo reads. There is no page to add a user or change a role: a
+     user other than the first admin needs a row in the users table. There is no list of
+     tokens and no way to end one token before its twelve hours. The core does not slow
+     down a program that asks for its token too often.
 6. **Cloud runner and broker:** a launcher that starts a Fargate task, an S3 state backend
    in the runner (the job specification has the field `backend`), a broker that uses STS.
    The ECS task definition in `internal/setup/controlplane.yaml` is the starting point.
@@ -328,8 +351,7 @@ Limits:
 - The access broker paths for the three clouds (STS, service account impersonation, Entra).
 - Swamp integration and the Nanos unikernel track. Both spikes need input from the owner.
 - Use cases 7, 8, 12 and 23 on a real target. Use case 7 is a forecast on the timeline.
-- A sign-in for clients that are not a browser (the device flow), and a page to manage
-  users. The iOS app still sends a user name in a header, which only the demo reads.
+- The device flow in the iOS app, a page to manage users, and a way to end one token.
 - A "defer" decision, and enforcement of a maintenance window for tier T3.
 - Quiet hours, escalation and threading for notifications.
 - The move of the control plane into a cloud (bootstrap and pivot).

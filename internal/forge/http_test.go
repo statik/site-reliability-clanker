@@ -98,6 +98,21 @@ func TestTheGitClientCanCloneAndPush(t *testing.T) {
 	if got, _ := f.Head(repo, "human/replicas"); got != gitClient(t, checkout, "rev-parse", "HEAD") {
 		t.Fatal("the second push did not move the branch")
 	}
+
+	// Nobody pushes to main. It changes only when the forge merges a pull request.
+	before, _ := f.Head(repo, "main")
+	for _, target := range []string{"HEAD:main", ":main"} {
+		push := exec.Command("git", "push", "origin", target)
+		push.Dir = checkout
+		push.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_CONFIG_GLOBAL=/dev/null",
+			"GIT_CONFIG_SYSTEM=/dev/null")
+		if out, err := push.CombinedOutput(); err == nil {
+			t.Fatalf("git push origin %s was accepted:\n%s", target, out)
+		}
+	}
+	if after, _ := f.Head(repo, "main"); after != before {
+		t.Fatalf("a refused push moved main from %s to %s", before, after)
+	}
 }
 
 func TestTheHandlerRefusesWhatItDoesNotServe(t *testing.T) {

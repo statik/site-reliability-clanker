@@ -56,6 +56,8 @@ type Service struct {
 	db       *sql.DB
 	verifier *oidc.IDTokenVerifier
 	oauth    oauth2.Config
+	// public is the address of the dashboard as a browser sees it, with no slash at the end.
+	public string
 	// secure is set when the dashboard is served over HTTPS. The cookies then go over
 	// HTTPS only.
 	secure bool
@@ -84,6 +86,7 @@ func New(ctx context.Context, db *sql.DB, cfg Config) (*Service, error) {
 			Endpoint:    provider.Endpoint(),
 			RedirectURL: strings.TrimSuffix(cfg.PublicURL, "/") + "/auth/callback",
 			Scopes:      []string{oidc.ScopeOpenID, "email", "profile"}},
+		public: strings.TrimSuffix(cfg.PublicURL, "/"),
 		secure: public.Scheme == "https",
 		now:    time.Now,
 	}, nil
@@ -134,6 +137,10 @@ func (s *Service) Handler() http.Handler {
 	mux.HandleFunc("GET /auth/login", s.login)
 	mux.HandleFunc("GET /auth/callback", s.callback)
 	mux.HandleFunc("POST /auth/logout", s.logout)
+	mux.HandleFunc("POST /auth/device/code", s.deviceCode)
+	mux.HandleFunc("POST /auth/device/token", s.deviceToken)
+	mux.HandleFunc("GET /auth/device", s.devicePage)
+	mux.HandleFunc("POST /auth/device", s.deviceDecision)
 	return mux
 }
 
@@ -158,24 +165,53 @@ func (s *Service) login(w http.ResponseWriter, r *http.Request) {
 		oauth2.S256ChallengeOption(verifier)), http.StatusFound)
 }
 
-// identity checks the answer of the provider and returns the verified email.
-func (s *Service) identity(r *http.Request) (email, back string, err error) {
+// loginState reads what the login kept in the cookie of this browser, and checks that the
+// answer of the provider belongs to that login.
+func loginState(r *http.Request) (nonce, verifier, back string, err error) {
 	saved, err := r.Cookie(loginCookie)
 	if err != nil {
-		return "", "", errors.New("this browser did not start a sign-in, or the sign-in took " +
-			"longer than ten minutes")
+		return "", "", "", errors.New("this browser did not start a sign-in, or the sign-in " +
+			"took longer than ten minutes")
 	}
 	// The return path is the last part and can hold dots of its own.
 	parts := strings.SplitN(saved.Value, ".", 4)
 	if len(parts) != 4 {
-		return "", "", errors.New("the sign-in cookie is not valid")
+		return "", "", "", errors.New("the sign-in cookie is not valid")
 	}
-	state, nonce, verifier := parts[0], parts[1], parts[2]
-	if subtle.ConstantTimeCompare([]byte(r.URL.Query().Get("state")), []byte(state)) != 1 {
-		return "", "", errors.New("the answer of the identity provider does not belong to this sign-in")
+	if subtle.ConstantTimeCompare([]byte(r.URL.Query().Get("state")), []byte(parts[0])) != 1 {
+		return "", "", "", errors.New("the answer of the identity provider does not belong to " +
+			"this sign-in")
 	}
 	if problem := r.URL.Query().Get("error"); problem != "" {
-		return "", "", fmt.Errorf("the identity provider refused the sign-in: %s", problem)
+		return "", "", "", fmt.Errorf("the identity provider refused the sign-in: %s", problem)
+	}
+	if back, err = url.QueryUnescape(parts[3]); err != nil {
+		back = "/"
+	}
+	return parts[1], parts[2], localPath(back), nil
+}
+
+// confirmedEmail returns the email address of an ID token that the provider confirmed.
+func confirmedEmail(idToken *oidc.IDToken) (string, error) {
+	var claims struct {
+		Email    string `json:"email"`
+		Verified bool   `json:"email_verified"`
+	}
+	if err := idToken.Claims(&claims); err != nil {
+		return "", fmt.Errorf("read the claims of the ID token: %w", err)
+	}
+	if claims.Email == "" || !claims.Verified {
+		return "", errors.New("the identity provider did not confirm an email address for " +
+			"this account: the ID token needs the claims email and email_verified")
+	}
+	return strings.ToLower(claims.Email), nil
+}
+
+// identity checks the answer of the provider and returns the verified email.
+func (s *Service) identity(r *http.Request) (email, back string, err error) {
+	nonce, verifier, back, err := loginState(r)
+	if err != nil {
+		return "", "", err
 	}
 	token, err := s.oauth.Exchange(r.Context(), r.URL.Query().Get("code"),
 		oauth2.VerifierOption(verifier))
@@ -193,22 +229,8 @@ func (s *Service) identity(r *http.Request) (email, back string, err error) {
 	if subtle.ConstantTimeCompare([]byte(idToken.Nonce), []byte(nonce)) != 1 {
 		return "", "", errors.New("the ID token does not belong to this sign-in")
 	}
-	var claims struct {
-		Email    string `json:"email"`
-		Verified bool   `json:"email_verified"`
-	}
-	if err := idToken.Claims(&claims); err != nil {
-		return "", "", fmt.Errorf("read the claims of the ID token: %w", err)
-	}
-	if claims.Email == "" || !claims.Verified {
-		return "", "", errors.New("the identity provider did not confirm an email address for " +
-			"this account: the ID token needs the claims email and email_verified")
-	}
-	back, err = url.QueryUnescape(parts[3])
-	if err != nil {
-		back = "/"
-	}
-	return strings.ToLower(claims.Email), localPath(back), nil
+	email, err = confirmedEmail(idToken)
+	return email, back, err
 }
 
 func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
@@ -251,16 +273,34 @@ func (s *Service) logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Email returns the email of the person whose session the request carries. It returns
-// ErrNoSession when there is no session or the session ended.
+// presented returns the secret that a request carries and the table that knows it: the
+// session cookie of a browser, or the token of a program. A program sends its token as a
+// bearer token, or as the password of basic authentication, which is what git does.
+func presented(r *http.Request) (secret, table string) {
+	if saved, err := r.Cookie(sessionCookie); err == nil {
+		return saved.Value, "sessions"
+	}
+	if bearer, found := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); found {
+		return bearer, "tokens"
+	}
+	if _, password, ok := r.BasicAuth(); ok {
+		return password, "tokens"
+	}
+	return "", ""
+}
+
+// Email returns the email of the person behind a request: the person of the session of a
+// browser, or the person who approved the token of a program. It returns ErrNoSession
+// when the request carries neither, or what it carries ended.
 func (s *Service) Email(r *http.Request) (string, error) {
-	saved, err := r.Cookie(sessionCookie)
-	if err != nil {
+	secret, table := presented(r)
+	if secret == "" {
 		return "", ErrNoSession
 	}
 	var email, expires string
-	err = s.db.QueryRowContext(r.Context(), `SELECT email, expires FROM sessions WHERE id = $1`,
-		hash(saved.Value)).Scan(&email, &expires)
+	// table is one of two constants above, never text from the request.
+	err := s.db.QueryRowContext(r.Context(), `SELECT email, expires FROM `+table+` WHERE id = $1`,
+		hash(secret)).Scan(&email, &expires)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrNoSession
 	}

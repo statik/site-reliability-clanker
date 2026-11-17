@@ -133,7 +133,7 @@ fi
 if ! curl -fs -b "${jar}" -o /dev/null "${base}/api/v1/overview"; then fail "the overview does not answer"; fi
 
 echo "== clone a seeded repository and push a branch"
-# git sends the session of the admin. A sign-in for git itself is not built yet.
+# git sends the session of the admin here. core-check.sh covers the device flow for git.
 git -c http.cookieFile="${jar}" clone -q "${base}/git/runbooks.git" "${work}/runbooks" 2>>"${work}/git.log"
 git -C "${work}/runbooks" fsck --strict --no-dangling >/dev/null || fail "fsck of runbooks"
 if [ "$(git -C "${work}/runbooks" rev-parse 'HEAD^{tree}')" != "$(git -C "${repo}" rev-parse 'HEAD:runbooks')" ]; then
