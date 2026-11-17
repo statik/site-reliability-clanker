@@ -34,7 +34,7 @@ Three things, kept deliberately separate:
 
 | Piece | What it is | Why it exists |
 |---|---|---|
-| **Paperboat** (the workload) | A small multi-service document-sharing app | Something realistic to operate: needs a database, a shared file system, a load balancer, and has versioned releases |
+| **Paperboat** (the workload) | A small multi-service fish rental app: real-time inventory, fish aging, delivery tracking and customer support interactions | Something realistic to operate: needs a database, a shared file system, a load balancer, and has versioned releases |
 | **Platform** (the IaC) | OpenTofu modules and per-environment stacks for each cloud | The thing the agent actually edits |
 | **Clanker** (the control plane) | Dashboard, agent, runner, access broker, git forge, audit log | The product concept being prototyped |
 
@@ -79,18 +79,29 @@ flowchart LR
 
 ## 3. The managed workload: Paperboat
 
-Small enough to build in days, shaped like a typical enterprise app.
+Small enough to build in days, shaped like a typical enterprise app. Paperboat is a fish rental
+business: customers rent live fish, the business delivers them and collects them at the end of
+the rental.
+
+| Domain area | What the app tracks |
+|---|---|
+| Inventory | Each fish and each tank in real time: species, status (available, reserved, rented, in transit, quarantined, retired), location |
+| Aging | Age and condition of each fish, updated by the worker; fish past the rental age limit for their species are retired from the rentable stock |
+| Rentals | Reservation, rental period, return, pricing |
+| Delivery | Delivery and collection jobs with status, driver, time window and a manifest document |
+| Customer support | Tickets and interactions attached to a customer, rental or delivery |
 
 | Service | Role | Depends on |
 |---|---|---|
-| `web` | Browser UI | `api` via the load balancer |
-| `api` | REST API, auth, metadata | Postgres, shared file system |
-| `worker` | Background jobs (previews, indexing) | Postgres, shared file system |
+| `web` | Browser UI: live inventory board, rentals, deliveries, support desk | `api` via the load balancer |
+| `api` | REST API and live inventory stream | Postgres, shared file system |
+| `worker` | Background jobs: fish aging, delivery progress, manifest and health-certificate files, support escalation | Postgres, shared file system |
 | `migrate` | Schema migration job run on each release | Postgres |
-| `loadgen` | Synthetic traffic so SLOs and graphs mean something | `web` |
+| `loadgen` | Synthetic customers so inventory moves and SLOs and graphs mean something | `web` |
 
-`api` and `worker` mount the same volume read-write-many, which is what forces a real network
-file system on each cloud instead of a block disk.
+`api` and `worker` mount the same volume read-write-many (fish photos, health certificates,
+delivery manifests), which is what forces a real network file system on each cloud instead of
+a block disk.
 
 Releases are pre-built so upgrade scenarios are repeatable:
 
@@ -705,7 +716,9 @@ Defaults are chosen so work can start; each is cheap to change before the milest
 | Control-plane language | Go backend; front end is React because Carbon's primary library is React | TypeScript backend as well | M0 |
 | Approving from chat | Not offered; messages link to the dashboard | Signed, single-use approve links or a Slack/Teams app with verified identity mapping | M6 |
 | Slack integration depth | Incoming webhook | Slack app, for threading and richer interaction | M2 |
-| Forge | Forgejo, bundled | Gitea, or an external GitHub/GitLab | M2 |
+| Forge | **Chosen 2026-11-16:** a small forge built into the control plane (bare repositories, the `git` CLI, pull requests in the control-plane database). It makes bootstrap simplest | Forgejo, Gitea, or an external GitHub/GitLab | M2 |
+| Control-plane database | **Chosen 2026-11-16:** embedded SQLite, so the control plane is one binary. Sections 5 and 5.4 say Postgres; read them as SQLite | Postgres | M2 |
+| Workload name | Paperboat, kept after the change from document sharing to fish rental | A fish-themed name | M7 |
 | Where the control plane runs | Docker Compose on one machine | Small dedicated management cluster | M3 |
 | Broker trust for the prototype | One scoped credential per cloud | Workload identity federation from day one | M3 |
 | Models per role | Configurable, set at bootstrap | Single model for everything | M4 |

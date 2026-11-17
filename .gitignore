@@ -1,0 +1,12 @@
+.clanker/
+node_modules/
+dist/
+bin/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.env
+.DS_Store
+site/out/
+web/test-results/
