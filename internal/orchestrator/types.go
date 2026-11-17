@@ -203,7 +203,9 @@ type Orchestrator struct {
 	JobVariables map[string]string
 
 	envLocks sync.Map
-	idMu     sync.Mutex
+	// decideLocks holds one lock for each work item that somebody decided on.
+	decideLocks sync.Map
+	idMu        sync.Mutex
 }
 
 func (o *Orchestrator) lockEnv(env string) func() {
