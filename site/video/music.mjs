@@ -3,9 +3,8 @@
 //
 // A small offline synthesizer plays the score in js/score.mjs (the same notes as the
 // soundtrack button on the walkthrough page) for the length of the video and writes
-// out/build/music.wav. A soft pad, a low bass, a plucked melody with an echo, and quiet
-// filtered noise like water. No samples and no downloads; the noise uses a fixed seed, so
-// every build gives the same file.
+// out/build/music.wav. A soft pad, a low bass, and a plucked melody with an echo. No
+// samples, no downloads and no noise, so every build gives the same file.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -65,22 +64,6 @@ function addEcho(channel, delaySeconds, feedback, repeats) {
   }
 }
 
-// Low-passed noise with a slow swell: water under the music.
-function addWater(left, right) {
-  let seed = 20261116;
-  const random = () => {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    return seed / 4294967296 - 0.5;
-  };
-  let low = 0;
-  for (let index = 0; index < left.length; index += 1) {
-    low += (random() - low) * 0.06;
-    const swell = 0.6 + 0.4 * Math.sin((TWO_PI * 0.11 * index) / SAMPLE_RATE);
-    left[index] += low * swell * 0.22;
-    right[index] += low * (1.2 - swell) * 0.22;
-  }
-}
-
 function main() {
   const { duration } = JSON.parse(readFileSync(TIMELINE, "utf8"));
   const frames = Math.ceil(duration * SAMPLE_RATE);
@@ -98,7 +81,6 @@ function main() {
   }
   addEcho(pluckLeft, BEAT_SECONDS * 0.75, 0.4, 3);
   addEcho(pluckRight, BEAT_SECONDS * 1.5, 0.4, 2);
-  addWater(left, right);
   let peak = 0;
   for (let index = 0; index < frames; index += 1) {
     left[index] += pluckLeft[index];

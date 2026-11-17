@@ -15,16 +15,16 @@ site to GitHub Pages (see "Publish the site").
 | `build.mjs` | Writes the data-driven parts of the pages from `data/month.json` and `screens/manifest.json` |
 | `capture.mjs` | Takes the screenshots in `screens/` with Playwright |
 | `check.mjs` | Opens every page in a browser and fails on the problems listed below |
-| `narration.md` | The script of the video: narration, captions, and what each segment shows |
+| `narration.md` | The script of the video: the sentences, their captions, and the cue of each picture |
 | `build-video.sh` | Builds `out/explainer.mp4` and `out/explainer.srt` |
-| `lib/`, `video/` | The code behind the scripts above, and the drawn scenes of the video |
+| `lib/`, `video/` | The code behind the scripts above, and the drawn pictures of the video |
 | `css/`, `js/`, `fonts/`, `img/` | The assets of the site. `css/site.css` defines the colours. `img/icon.svg` and `img/icon-small.svg` are the icon |
 | `out/` | Build output. Git ignores it |
 
 ## Set up
 
-You need Node 22 or later and pnpm. The video build also needs ffmpeg and the macOS `say`
-command.
+You need Node 22 or later and pnpm. The video build also needs ffmpeg and the two
+ElevenLabs settings (see "Build the video").
 
 ```
 cd site
@@ -84,8 +84,7 @@ them: change `lib/` and run the build.
 ## Capture the screenshots
 
 ```
-node capture.mjs           # screenshots into screens/
-node capture.mjs --video   # also record click-through videos into out/segments/
+node capture.mjs
 ```
 
 | Target | Address | Views |
@@ -127,42 +126,55 @@ by itself with reduced motion.
 
 The result is `out/explainer.mp4` (1920 x 1080, H.264, AAC, captions burned in) and
 `out/explainer.srt` (the same captions as a sidecar file). The script fails if the video
-is not 120 to 180 seconds long.
+is not 60 to 110 seconds long.
+
+The video has one idea: ship an AI site reliability engineer with your product instead of
+an installer. It tells of the problem, the solution, the first setup, how a change goes
+through in three steps, the numbers of the scripted month, and the command to try it.
+The build needs no running demo. Every picture is drawn from `data/month.json`.
 
 | Step | Script | What it does |
 |---|---|---|
-| 1 | `build.mjs` | Makes the pages from the data |
-| 2 | `video/narrate.mjs` | Speaks each sentence of `narration.md` with `say`, measures it, and writes the timeline, the narration track and the `.srt` file |
-| 2 | `video/music.mjs` | Synthesizes the music bed from the notes in `js/score.mjs` |
-| 3 | `video/record.mjs` | Playwright records each segment for as long as its narration, and draws the caption pictures |
-| 4 | `video/assemble.mjs` | ffmpeg cuts and joins the segments, puts a frame around the recordings of the running applications, above the band of the captions, lays the captions over them, and mixes the voice over the music |
+| 1 | `video/narrate.mjs` | Checks the captions, gets each sentence of `narration.md` from the ElevenLabs voice, measures it, and writes the timeline, the narration track and the `.srt` file |
+| 1 | `video/music.mjs` | Synthesizes the music bed from the notes in `js/score.mjs` |
+| 2 | `video/record.mjs` | Playwright records `video/explainer.html` for each part, for as long as its narration, and draws the caption pictures |
+| 3 | `video/assemble.mjs` | ffmpeg cuts and joins the parts, lays the captions over them, and mixes the voice over a quiet, steady music bed |
 
 Things to know:
 
 - To change the video, edit `narration.md`. The top of that file explains the format.
-- A segment with `source: dashboard:...` shows the real dashboard when it is up at
-  `http://127.0.0.1:7070`. If it is not up, the segment shows its `fallback`.
-- Three segments are drawn scenes, not recordings: `video/opening.html` (the layers of the
-  platform on each target), `video/setup.html` (from the download to a product that is
-  looked after) and `video/pipeline.html` (one change through its checkpoints). The
-  narration moves them with `[beat:N]` cues. Their numbers come from `data/month.json`.
-  The step "Sign in to your cloud" of the setup scene is a drawing and says so, because
-  the wizard does not set up a cloud yet. `video/wizard/` holds the two real screenshots
-  of the setup wizard that the scene shows.
-- `VIDEO_FOOTAGE=<directory> ./build-video.sh` builds the video while the demo is not
-  available. The build then does not contact the running applications. It takes the
-  picture of each `tour:` and `dashboard:` segment from `<directory>/<segment>.mp4`, a clip
-  that you kept from an earlier recording, and stops if a clip is not as long as its segment.
+- The voice is the ElevenLabs voice of the owner. Put `ELEVEN_LABS_API_KEY` and
+  `ELEVEN_LABS_VOICE_ID` in the `.env` file at the root of the repository, or in the
+  environment. Without them the build stops. There is no other voice.
+- The build sends each sentence of `narration.md` and the name of the model to ElevenLabs,
+  and nothing else. It keeps the answer in `out/cache/speech/`, so a sentence is sent one
+  time. A sentence with a changed word is sent again, and that costs credits.
+- A caption has at most two lines of 42 characters and stays for at least one second.
+  `node video/narrate.mjs --check` tests the text without the voice, and the build stops
+  on a caption that does not fit. A `|` in a longer sentence starts another caption. The
+  duration in the sentence about the held access stays on one caption line.
+- The pace comes from the pauses. `pause:` and `hold:` in `narration.md` set the quiet
+  after the sentences of a part. `narrate.mjs` prints the words a second of the whole
+  video and of the voice alone. The voice itself is not made slower.
+- Each sentence in `narration.md` has a cue, for example `[approve]`. `video/explainer.html`
+  has one picture for each cue or group of cues (`data-cues`), and `video/scene.css` gives
+  every picture the same way in and out. A part of a picture with `data-at` appears when
+  its cue starts; `--at` is the share of the sentence that passes first, so a change of
+  the words does not need a change of the picture.
+- The pictures of the three steps follow one change of the month: the patch of the
+  database, which the model wrote and which is done. Its pull request, tier, summary for
+  the approver, approver and grant are on the screen. The summaries of the application
+  upgrades name the demo application, which the video leaves out.
+- The sound: `narrate.mjs` brings the voice track to a peak of -3 dB with one gain.
+  `assemble.mjs` lays the music under it at one steady level, about 15 dB under the voice,
+  with no compressor. A limiter is there only as a safety net and adds no gain. The music
+  has no noise in it. The build keeps `out/build/narration.wav` (the voice alone) and
+  `out/build/music.wav` (the bed alone).
+- The end card shows `make demo`, the command of "Run the local demo" in the README of
+  the repository, and the address of the site.
 - Playwright records a 1440 x 810 window, so that the text is large enough to read, and
   ffmpeg scales it to 1920 x 1080.
-- A sentence in `narration.md` can depend on the data, with `(if event.type)`. A new run
-  of the month that has no stale plan, for example, gets a video without that sentence.
 - The build deletes its large intermediate files when it succeeds.
-- `NARRATION_VOICE=Samantha ./build-video.sh` uses another voice.
-- To use a voice from ElevenLabs, put `ELEVEN_LABS_API_KEY` and `ELEVEN_LABS_VOICE_ID` in
-  the `.env` file of the repository. The build then sends each sentence of `narration.md`
-  to ElevenLabs and keeps the answer in `out/cache/speech/`, so only a changed sentence is
-  sent again.
 - The ffmpeg from Homebrew has no subtitle filter, so the build burns in the captions as
   pictures, drawn in the site's typeface.
 
@@ -188,18 +200,19 @@ System, written by hand in `css/site.css`.
 ## Colours and icon
 
 The palette is eleven colours, defined once at the top of `css/site.css` (`--honey`,
-`--cream`, `--dark` and the others). Every other colour of the site and of the drawn
-scenes is one of them or a mix of two. The site has one theme, a warm dark ground. The recordings of the dashboard and of Paperboat keep their own colours.
+`--cream`, `--dark` and the others). Every other colour of the site and of the pictures
+of the video is one of them or a mix of two. The site has one theme, a warm dark ground.
 
 ## The figure of the system
 
-Figure 1 of the architecture page, and the scene `video/pipeline.html`, show S.R.C. as a
-bench with real parts. `lib/machine.mjs` draws it with the Anatomy kit, an isometric SVG
+Figure 1 of the architecture page shows S.R.C. as a bench with real parts. The video does
+not show it. `lib/machine.mjs` draws it with the Anatomy kit, an isometric SVG
 kit under the MIT licence. Its core file is in `lib/anatomy/` with the licence, and its
 styles are `css/anatomy.css`; the site has no other copy and installs nothing for it.
 `lib/machine.mjs` also works out where each moving part is at each of the ten stops of a
 change, and `js/machine.js` eases between those places.
 
-`img/icon.svg` is the icon: an aircraft marshaller with two wands. The video shows it.
+`img/icon.svg` is the icon: an aircraft marshaller with two wands. The video shows it
+beside the name.
 `img/icon-small.svg` is the same mark with fewer and thicker shapes, for the favicon and
 the header, where it is 16 to 32 pixels.

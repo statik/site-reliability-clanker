@@ -1,9 +1,7 @@
 #!/usr/bin/env node
-// Take real screenshots of the running demo into screens/, and with --video record the
-// scripted click-throughs into out/segments/.
+// Take real screenshots of the running demo into screens/.
 //
 //   node capture.mjs            screenshots of everything that is up
-//   node capture.mjs --video    also record the click-through videos
 //
 // Targets: the Clanker dashboard (http://127.0.0.1:7070), Paperboat
 // (http://localhost:8088), the mail inbox (http://127.0.0.1:8025) and the webhook sink
@@ -13,23 +11,20 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { chromium } from "playwright";
 
 import { SITE_DIR } from "./lib/serve.mjs";
 import {
-  DASHBOARD, MAIL, PAPERBOAT, SINK, TOURS, dashboardIsUp, dashboardNav, makeReadOnly,
-  openDashboard, waitingWorkItem,
-} from "./lib/tours.mjs";
+  DASHBOARD, MAIL, PAPERBOAT, SINK, dashboardIsUp, dashboardNav, makeReadOnly, openDashboard,
+  waitingWorkItem,
+} from "./lib/demo.mjs";
 
 const SCREENS = join(SITE_DIR, "screens");
-const SEGMENTS = join(SITE_DIR, "out", "segments");
 const VIEWPORT = { width: 1440, height: 900 };
-const VIDEO_SIZE = { width: 1920, height: 1080 };
 const MAX_HEIGHT = 2200;
 const DASHBOARD_USER = "alice";
-const TOUR_SECONDS = 20;
 
 const DASHBOARD_VIEWS = [
   { slug: "overview", area: "Overview", title: "Overview", note: "Is each environment healthy, and what needs a decision now?" },
@@ -192,46 +187,13 @@ async function captureNotifications(browser) {
   await context.close();
 }
 
-async function recordTour(browser, name, setup = async () => {}) {
-  const context = await browser.newContext({
-    viewport: VIDEO_SIZE, colorScheme: "dark", recordVideo: { dir: SEGMENTS, size: VIDEO_SIZE },
-  });
-  await makeReadOnly(context);
-  await setup(context);
-  const page = await context.newPage();
-  try {
-    await TOURS[name](page, TOUR_SECONDS);
-  } catch (error) {
-    console.log(`skip: video ${name}: ${error.message.split("\n")[0]}`);
-  }
-  const video = page.video();
-  await context.close();
-  await rename(await video.path(), join(SEGMENTS, `tour-${name}.webm`));
-  console.log(`  wrote out/segments/tour-${name}.webm`);
-}
-
 async function main() {
   await mkdir(SCREENS, { recursive: true });
   const browser = await chromium.launch();
   try {
-    const dashboardUp = await captureDashboard(browser);
-    const paperboatUp = await capturePaperboat(browser);
+    await captureDashboard(browser);
+    await capturePaperboat(browser);
     await captureNotifications(browser);
-    if (process.argv.includes("--video")) {
-      await mkdir(SEGMENTS, { recursive: true });
-      if (paperboatUp) await recordTour(browser, "paperboat");
-      if (dashboardUp) {
-        const asUser = (context) => context.addInitScript((user) => {
-          window.localStorage.setItem("clanker.user", user);
-          window.localStorage.setItem("clanker.theme", "g100");
-        }, DASHBOARD_USER);
-        for (const name of ["dashboard-approval", "dashboard-timeline", "dashboard-access"]) {
-          await recordTour(browser, name, asUser);
-        }
-      } else {
-        console.log("skip: dashboard videos. The dashboard is not up.");
-      }
-    }
   } finally {
     await browser.close();
   }
