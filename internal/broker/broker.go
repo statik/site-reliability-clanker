@@ -261,6 +261,26 @@ func (b *Broker) List(includePlan bool) ([]Grant, error) {
 	return grants, rows.Err()
 }
 
+// Unended returns the grants that are issued or active, oldest first. After a start of the
+// control plane, these are the grants of work that the stop interrupted.
+func (b *Broker) Unended() ([]Grant, error) {
+	rows, err := b.db.Query(`SELECT ` + grantColumns + ` FROM grants
+		WHERE status IN ('issued', 'active') ORDER BY issued_at`)
+	if err != nil {
+		return nil, fmt.Errorf("list grants that did not end: %w", err)
+	}
+	defer rows.Close()
+	grants := []Grant{}
+	for rows.Next() {
+		g, err := scanGrant(rows)
+		if err != nil {
+			return nil, err
+		}
+		grants = append(grants, g)
+	}
+	return grants, rows.Err()
+}
+
 func (b *Broker) setStatus(id, status string, ended bool) error {
 	endedAt := ""
 	if ended {

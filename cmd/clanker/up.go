@@ -183,10 +183,12 @@ func adapters(db *sql.DB, o options) ([]notify.Adapter, error) {
 
 // components holds everything that `up` starts.
 type components struct {
-	db    *sql.DB
-	clock *sim.Clock
-	log   *audit.Log
-	forge *forge.Forge
+	// writer is the hold on the database. Only one control plane has it at a time.
+	writer *store.Writer
+	db     *sql.DB
+	clock  *sim.Clock
+	log    *audit.Log
+	forge  *forge.Forge
 	// runner reads the files of the runner directory. Only the local target uses it, for
 	// the administrator kubeconfig and the image registry.
 	runner     *runner.Runner
@@ -226,7 +228,7 @@ func localTarget(c *components, o options) (target, error) {
 		manualChange: localtarget.ManualChange(adminKubeconfig)}, nil
 }
 
-func build(o options) (*components, error) {
+func build(ctx context.Context, o options) (*components, error) {
 	c := &components{}
 	var on target
 	if o.cloud == "local" {
@@ -239,6 +241,12 @@ func build(o options) (*components, error) {
 		}
 	}
 	secret, err := loadSecrets(o)
+	if err != nil {
+		return nil, err
+	}
+	c.writer, err = store.HoldWriter(ctx, secret.databaseURL, func() {
+		slog.Warn("another control plane writes to this database; waiting until it stops")
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -402,12 +410,39 @@ func schedulerLoop(ctx context.Context, c *components) {
 	}
 }
 
+// reconcile ends the work that the last stop of the control plane interrupted.
+func reconcile(ctx context.Context, c *components) error {
+	ended, err := c.orch.Reconcile(ctx)
+	if err != nil {
+		return err
+	}
+	if ended.Jobs+ended.Grants+len(ended.WorkItems) > 0 {
+		slog.Warn("ended the work that the last stop interrupted", "jobs", ended.Jobs,
+			"grants", ended.Grants, "work_items", strings.Join(ended.WorkItems, ","))
+	}
+	return nil
+}
+
 func up(ctx context.Context, o options) error {
-	c, err := build(o)
+	c, err := build(ctx, o)
 	if err != nil {
 		return err
 	}
 	defer c.db.Close()
+	defer c.writer.Close()
+	// A control plane that lost its hold on the database must stop: another one can write.
+	ctx, stop := context.WithCancelCause(ctx)
+	defer stop(nil)
+	go func() {
+		select {
+		case <-c.writer.Lost():
+			stop(errors.New("the connection that holds the writer lock of the database broke"))
+		case <-ctx.Done():
+		}
+	}()
+	if err := reconcile(ctx, c); err != nil {
+		return err
+	}
 	server := &api.Server{Orch: c.orch, Audit: c.log, Forge: c.forge, Broker: c.broker,
 		Monitor: c.monitor, Notifier: c.notifier, Agent: c.agent, Detector: c.detector,
 		Sim: c.sim, Clock: c.clock, Runners: c.dispatcher.Handler()}
@@ -458,6 +493,9 @@ func up(ctx context.Context, o options) error {
 		"webhook_sink", "http://"+o.sinkAddr)
 	if err := httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("control plane on %s: %w", o.addr, err)
+	}
+	if cause := context.Cause(ctx); cause != nil && !errors.Is(cause, context.Canceled) {
+		return cause
 	}
 	return nil
 }
