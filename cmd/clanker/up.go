@@ -22,6 +22,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/detect"
 	"github.com/statik/site-reliability-clanker/internal/dispatch"
 	"github.com/statik/site-reliability-clanker/internal/forge"
+	"github.com/statik/site-reliability-clanker/internal/localtarget"
 	"github.com/statik/site-reliability-clanker/internal/monitor"
 	"github.com/statik/site-reliability-clanker/internal/notify"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
@@ -220,7 +221,15 @@ func build(o options) (*components, error) {
 		}
 		return path, nil
 	}
-	if c.broker, err = broker.New(c.db, c.clock, o.dataDir, adminKubeconfig); err != nil {
+	// Only the local target has a credential issuer and a manual change now. On a cloud
+	// the broker exchanges no grant and the drift scene reports that it cannot run.
+	var issuer broker.Issuer
+	var manualChange func(context.Context, string) error
+	if o.cloud == "local" {
+		issuer = localtarget.Credentials{AdminKubeconfig: adminKubeconfig}
+		manualChange = localtarget.ManualChange(adminKubeconfig)
+	}
+	if c.broker, err = broker.New(c.db, c.clock, o.dataDir, issuer); err != nil {
 		return nil, err
 	}
 	c.orch = &orchestrator.Orchestrator{DB: c.db, Audit: c.log, Forge: c.forge,
@@ -262,7 +271,7 @@ func build(o options) (*components, error) {
 		Monitor: c.monitor, Clock: c.clock, OnFinding: c.agent.HandleFinding}
 	c.sim = &sim.Simulator{DB: c.db, Clock: c.clock, Audit: c.log, Forge: c.forge,
 		Detector: c.detector, Orch: c.orch, Monitor: c.monitor, Notifier: c.notifier,
-		SourceDir: o.sourceDir, AdminToken: demoAdminToken, AdminKubeconfig: adminKubeconfig,
+		SourceDir: o.sourceDir, AdminToken: demoAdminToken, ManualChange: manualChange,
 		Env: o.env}
 	c.orch.Hooks = orchestrator.Hooks{Explain: c.agent.Explain, Verify: c.monitor.Verify,
 		LayerApplied: func(ctx context.Context, wi orchestrator.WorkItem, layer string) error {
