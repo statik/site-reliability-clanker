@@ -3,6 +3,99 @@
 State of the work on 2026-11-17. A new session can continue from this file and from the
 issues with the label `needs-owner-review`.
 
+## Start here (written at the end of the session of 2026-11-17)
+
+### The goal now
+
+The control plane must run on AWS as a Nanos unikernel in an auto scaling group, set up by
+the wizard (`clanker setup`). The decisions of the owner are in section 12 of
+`docs/PLAN.md` and in issue #11. In short: the core starts no program and keeps no file; jobs
+run in short-lived runners; all state is in an external PostgreSQL; the dashboard is behind
+a load balancer with OIDC sign-in; the wizard builds the machine image with `ops`.
+
+### Work that is not merged
+
+Branch `runner-process` (pushed) holds the core and runner split. It has no pull request
+yet. It contains two steps:
+
+1. The core holds no file path (plans, plan JSON, job logs and layer outputs are rows in
+   PostgreSQL; policy rules and runbook scripts come from the forge).
+2. Each job runs in a `clanker runner` process that gets its one job from the core over
+   HTTP with a token.
+
+All Go tests and `make lint` pass on the branch. The full run (`scripts/verify/fresh-run.sh`)
+was started on this build and had passed the first deployment and the first scene when the
+session ended. **It was not seen to finish.**
+
+To finish this work:
+
+1. Look at the live demo: `curl -s http://127.0.0.1:7070/api/v1/work-items`. A complete run
+   has thirteen work items, twelve in `Done` and `WI-0005` in `RolledBack`, and
+   `curl -s http://127.0.0.1:7070/api/v1/audit/verify` says `ok`. If the run is not complete
+   or the control plane is down, run `scripts/verify/fresh-run.sh` again (about 40 minutes).
+2. Run `python3 scripts/verify/sweep.py` and
+   `python3 scripts/verify/stale_plan.py <new directory>`.
+3. Check that the data directory `.clanker` has no `plans`, `creds` or `repos` directory.
+   (`logs` holds only the log of the local image build.)
+4. Open one pull request from `runner-process`, say what ran, and merge it when the checks
+   pass. The branch `core-without-files` is the first step alone; delete it after the merge.
+
+### Next steps, in order
+
+1. **Local-only code behind interfaces.** The access broker (`internal/broker/credentials.go`)
+   and the simulator start `kubectl`. Move that code to packages that only the local target
+   wires in. Then make the lint check follow imports inside this module, from a core entry
+   point.
+2. **A core entry point with no file.** Today the core still writes: the unpacked bundle,
+   the data directory, `broker.key`, `database.password`. On a cloud the signing key and the
+   database address must come from a secret store at start. `ops` writes `Env` into the
+   image, so a secret must never be in `Env`.
+3. **Boot the real core under Nanos** with `ops/run-local.sh`, in the standby mode
+   (`clanker up --cloud aws --demo=false`), against PostgreSQL. Only a throwaway probe ran
+   under Nanos so far.
+4. **A guard for one writer.** The pool has one connection, but that does not stop two
+   instances. Put the guard in PostgreSQL. Reconcile jobs that were in flight when the core
+   stopped.
+5. **OIDC sign-in**, and no trust in the `X-Clanker-User` header. This blocks every public
+   deployment.
+6. **Cloud runner and broker:** a launcher that starts a Fargate task, an S3 state backend
+   in the runner (the job specification has the field `backend`), a broker that uses STS.
+   The ECS task definition in `internal/setup/controlplane.yaml` is the starting point.
+7. **The wizard for AWS:** build the image with `ops`, create the stack (auto scaling group,
+   load balancer, RDS), switch `setup.Config.EnableAWS` on.
+8. **A run in a real account.**
+
+### What the owner must give
+
+- For step 8: the AWS profile, the region and a spending limit; a domain name for the
+  certificate; an OIDC identity provider. The owner chose "apply with a budget cap" but
+  named no profile, region or amount. Do not pick one of the local profiles.
+- The estimate for the home of the control plane is 47 to 50 USD each month. It is from
+  list prices and is not checked against the pricing pages.
+
+### Rules that cost time when they are forgotten
+
+- `CLAUDE.md` has the standing rule: merge a pull request when its checks pass **and the
+  change was run**. A unit test is not a run for a change to the control plane; use
+  `scripts/verify/`.
+- A push over SSH needs the owner at the keyboard (Secretive). On 2026-11-17 the owner
+  allowed one push over HTTPS with the `gh` token; SSH worked later that day.
+- A hook blocks a command line that contains the push command together with the name of
+  the default branch, also inside quoted text. Run the push as its own command, and put
+  such text in a file.
+- The shell is bash 3.2. Put Python and long text in a file, not in a heredoc inside a
+  compound command. A safety check refuses compound commands that remove things; run a
+  removal as its own simple command.
+- Do not script an approval through the dashboard. Approvals in the checks go through the
+  API as the demo users.
+- The schema has no migration. A change to a table needs `scripts/verify/fresh-run.sh`,
+  which starts from an empty database.
+- `docs/PLAN.md` sections 5 and 5.4 still describe the first design in places. Section 12
+  is the record of the decisions.
+- The site and the video were made from an earlier run with 323 audit records. The demo
+  now has 310. To refresh them: `node export-data.mjs`, `node build.mjs`,
+  `./build-video.sh` in `site/`, then upload the video to the release `site-video`.
+
 ## What runs now
 
 Everything in this section was run on the local target (kind on Docker, macOS arm64).
