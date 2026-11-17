@@ -104,6 +104,9 @@ class Client:
                 return response.status, response.read().decode()
         except urllib.error.HTTPError as error:
             return error.code, error.read().decode()
+        except urllib.error.URLError as error:
+            # The control plane does not listen yet, or not any more.
+            return 0, str(error.reason)
 
     def api(self, method, path, body=None):
         status, text = self.send(method, BASE + "/api/v1" + path, body=body)
