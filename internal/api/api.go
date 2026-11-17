@@ -227,6 +227,16 @@ func open(path string) bool {
 		strings.HasPrefix(path, "/runner/v1/")
 }
 
+// gitPush reports whether a request is a part of a push with the git client: the list of
+// references for a push, or the objects.
+func gitPush(r *http.Request) bool {
+	if !strings.HasPrefix(r.URL.Path, "/git/") {
+		return false
+	}
+	return strings.HasSuffix(r.URL.Path, "/git-receive-pack") ||
+		r.URL.Query().Get("service") == "git-receive-pack"
+}
+
 // gate lets a request through only when a known user is signed in. A browser that opens a
 // page goes to the sign-in. Every other request gets an error and no content.
 func (s *Server) gate(next http.Handler) http.Handler {
@@ -235,9 +245,12 @@ func (s *Server) gate(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		_, err := s.Identify(r)
+		user, err := s.Identify(r)
 		var se statusError
 		switch {
+		case err == nil && gitPush(r) && user.Role != "approver" && user.Role != "admin":
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": user.Name +
+				" has role " + user.Role + "; a push needs one of: approver, admin"})
 		case err == nil:
 			next.ServeHTTP(w, r)
 		case errors.Is(err, ErrNotSignedIn):

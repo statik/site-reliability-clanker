@@ -89,6 +89,18 @@ func TestTheGateLetsAUserThroughAndChecksTheRole(t *testing.T) {
 	if answer.Code != http.StatusOK || !strings.Contains(answer.Body.String(), `"sign_in":true`) {
 		t.Errorf("a signed-in user: %d %s", answer.Code, answer.Body)
 	}
+	// A viewer can read a repository with the git client and cannot push.
+	for _, tc := range []struct{ method, path string }{
+		{"GET", "/git/runbooks.git/info/refs?service=git-receive-pack"},
+		{"POST", "/git/runbooks.git/git-receive-pack"}} {
+		if got := ask(handler, tc.method, tc.path).Code; got != http.StatusForbidden {
+			t.Errorf("%s %s by a viewer answered %d, want 403", tc.method, tc.path, got)
+		}
+	}
+	read := ask(handler, "GET", "/git/runbooks.git/info/refs?service=git-upload-pack").Code
+	if read == http.StatusForbidden || read == http.StatusUnauthorized {
+		t.Errorf("a read with the git client by a viewer answered %d", read)
+	}
 	// A viewer cannot start what the demo leaves open to everybody.
 	for _, path := range []string{"/api/v1/sim/scenes/drift", "/api/v1/sim/advance",
 		"/api/v1/notifications/digest", "/api/v1/forge/pulls"} {

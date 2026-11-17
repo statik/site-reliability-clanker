@@ -36,7 +36,7 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Check formatting
-        run: test -z "$(gofmt -l cmd internal apps/paperboat)"
+        run: test -z "$(gofmt -l cmd internal scripts apps/paperboat)"
       - name: Check that the core starts no program
         run: make lint-core
       - name: Vet and test the control plane

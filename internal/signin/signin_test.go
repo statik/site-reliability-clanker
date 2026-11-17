@@ -84,8 +84,9 @@ func TestSignInGivesASessionAndGoesBackToThePage(t *testing.T) {
 		t.Fatalf("before the sign-in the page answered %d", status)
 	}
 	s.provider.SignInAs(fakeidp.Person{Email: "Alice@Example.com", Verified: true})
-	status, body := s.get(t, "/auth/login?return=/approvals")
-	if status != http.StatusOK || body != "alice@example.com at /approvals" {
+	// The return path has a dot, as the version of a release has.
+	status, body := s.get(t, "/auth/login?return=/work/WI-0001.2")
+	if status != http.StatusOK || body != "alice@example.com at /work/WI-0001.2" {
 		t.Fatalf("after the sign-in: %d %q", status, body)
 	}
 	if status, body := s.get(t, "/other"); status != http.StatusOK || body != "alice@example.com at /other" {
@@ -125,7 +126,8 @@ func TestCallbackRefusesAnAnswerThatThisBrowserDidNotAskFor(t *testing.T) {
 
 func TestSignInGoesOnlyToAPathOfThisSite(t *testing.T) {
 	for target, want := range map[string]string{"/approvals?x=1": "/approvals?x=1", "": "/",
-		"https://evil.example/": "/", "//evil.example/": "/", "/\\evil.example": "/"} {
+		"https://evil.example/": "/", "//evil.example/": "/", "/\\evil.example": "/", "/\t/evil.example": "/",
+		"/\n/evil.example": "/"} {
 		if got := localPath(target); got != want {
 			t.Errorf("localPath(%q) = %q, want %q", target, got, want)
 		}

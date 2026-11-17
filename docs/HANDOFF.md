@@ -137,8 +137,9 @@ What ran on the build of commit `376617b`, the last change to the Go code:
      pull request) need a role.
    - Settings: `CLANKER_PUBLIC_URL`, `CLANKER_OIDC_ISSUER`, `CLANKER_OIDC_CLIENT_ID`,
      `CLANKER_OIDC_CLIENT_SECRET` (a secret: not in `Env` of an image for a cloud account)
-     and `CLANKER_ADMIN_EMAIL`, the first admin. On a cloud all five are required and the
-     demo users are not made. On the local target the sign-in is on when the issuer is
+     and `CLANKER_ADMIN_EMAIL`, the first admin. On a cloud all five are required. The
+     demo users are not made when the control plane starts with `--demo=false`; `--demo`
+     is on by default. On the local target the sign-in is on when the issuer is
      set; without it the demo is as before.
    - Ran: `core-check.sh` and `nanos-check.sh` with a fake identity provider
      (`scripts/verify/fakeidp`), and `web/scripts/signin-check.mjs` in a real browser on

@@ -118,6 +118,13 @@ func localPath(target string) string {
 		strings.Contains(target, "\\") {
 		return "/"
 	}
+	// A browser drops a tab or a line end from an address, which can turn a path into the
+	// address of another site.
+	for _, c := range target {
+		if c < 0x20 || c == 0x7f {
+			return "/"
+		}
+	}
 	return target
 }
 
@@ -158,7 +165,8 @@ func (s *Service) identity(r *http.Request) (email, back string, err error) {
 		return "", "", errors.New("this browser did not start a sign-in, or the sign-in took " +
 			"longer than ten minutes")
 	}
-	parts := strings.Split(saved.Value, ".")
+	// The return path is the last part and can hold dots of its own.
+	parts := strings.SplitN(saved.Value, ".", 4)
 	if len(parts) != 4 {
 		return "", "", errors.New("the sign-in cookie is not valid")
 	}
