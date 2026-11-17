@@ -251,7 +251,7 @@ html:not(.js) .js-only { display: none !important; }
 .prose p + p { margin-top: var(--s-5); }
 .prose { max-width: 64ch; }
 
-.page-head { padding: var(--s-9) 0 var(--s-7); }
+.page-head { padding-top: var(--s-9); padding-bottom: var(--s-7); }
 .page-head h1 { max-width: 28ch; }
 
 /* ------------------------------------------------------------------ buttons, tags */
