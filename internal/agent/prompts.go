@@ -13,4 +13,6 @@ var (
 	investigatorSystem string
 	//go:embed prompts/ask.txt
 	askSystem string
+	//go:embed prompts/reviewer.txt
+	reviewerSystem string
 )

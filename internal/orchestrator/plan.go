@@ -355,6 +355,9 @@ func (o *Orchestrator) PlanWorkItem(ctx context.Context, id string) (WorkItem, e
 	if len(deferred) > 0 && tier < "T3" {
 		tier, rule = "T3", "deferred-layers"
 	}
+	if changes || len(deferred) > 0 {
+		tier, rule = o.review(ctx, wi, tier, rule)
+	}
 	wi.Tier, wi.TierRule = tier, rule
 	if err := o.setState(&wi, StatePlanned, "orchestrator", "plans saved"); err != nil {
 		return WorkItem{}, err
@@ -376,6 +379,45 @@ func (o *Orchestrator) PlanWorkItem(ctx context.Context, id string) (WorkItem, e
 		Data: map[string]any{"tier": tier, "rule": rule, "sentence": wi.Explanation.Sentence,
 			"approvers_required": policy.ApproversRequired(tier), "title": wi.Title}})
 	return wi, nil
+}
+
+// ReviewRule is the tier rule of a work item whose tier the adversarial review made higher.
+const ReviewRule = "adversarial-review"
+
+// review runs the adversarial review of a planned change and returns the tier and the
+// rule of the work item. The review can make the tier of the policy engine higher. It can
+// never make it lower: a model that is told, or tricked, to call a change safe changes
+// nothing. When the review fails, the tier of the policy engine stands and the failure is
+// in the audit log.
+func (o *Orchestrator) review(ctx context.Context, wi WorkItem, tier, rule string) (string, string) {
+	if o.Hooks.Review == nil {
+		return tier, rule
+	}
+	plans, err := o.Plans(wi.ID, false)
+	if err != nil {
+		plans = nil
+	}
+	review, err := o.Hooks.Review(ctx, wi, plans, tier)
+	if err != nil {
+		o.emit(audit.Event{Type: "agent.failed", Actor: "reviewer", Env: wi.Env, WorkItem: wi.ID,
+			Summary: "The adversarial review failed; the tier of the policy engine stands",
+			Data:    map[string]any{"error": err.Error(), "policy_tier": tier}})
+		return tier, rule
+	}
+	if review.Tier == "" {
+		return tier, rule
+	}
+	final, finalRule := tier, rule
+	summary := fmt.Sprintf("Adversarial review agrees with tier %s of the policy engine", tier)
+	if review.Tier > tier {
+		final, finalRule = review.Tier, ReviewRule
+		summary = fmt.Sprintf("Adversarial review raised the tier from %s to %s", tier, final)
+	}
+	o.emit(audit.Event{Type: "review.completed", Actor: "reviewer", Env: wi.Env, WorkItem: wi.ID,
+		Summary: summary, Data: map[string]any{"policy_tier": tier, "policy_rule": rule,
+			"proposed_tier": review.Tier, "tier": final, "concerns": review.Concerns,
+			"model": review.Source}})
+	return final, finalRule
 }
 
 func (o *Orchestrator) explain(ctx context.Context, wi *WorkItem) {

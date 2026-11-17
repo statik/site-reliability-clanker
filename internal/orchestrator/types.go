@@ -147,12 +147,30 @@ type Clock interface{ Now() time.Time }
 type Hooks struct {
 	// Explain writes the prose for the approval page. Nil selects the template text.
 	Explain func(ctx context.Context, wi WorkItem, plans []Plan) (Explanation, error)
+	// Review is the adversarial review of a planned change: it looks for reasons why the
+	// change needs a higher tier than policyTier, the tier of the policy engine. Nil skips
+	// the review. The orchestrator uses the result only to make the tier higher.
+	Review func(ctx context.Context, wi WorkItem, plans []Plan, policyTier string) (Review, error)
 	// Verify checks the environment after an apply. Nil skips the check.
 	Verify func(ctx context.Context, wi WorkItem) (VerifyResult, error)
 	// LayerApplied runs after each layer of a work item is applied. An error stops the apply.
 	LayerApplied func(ctx context.Context, wi WorkItem, layer string) error
 	// Applied runs after a successful apply and verification, for example to take a snapshot.
 	Applied func(ctx context.Context, wi WorkItem)
+}
+
+// Tiers are the risk tiers, from the lowest to the highest. They sort as text.
+var Tiers = []string{"T0", "T1", "T2", "T3"}
+
+// Review is the result of the adversarial review of a planned change.
+type Review struct {
+	// Tier is the tier that the reviewer thinks the change needs. It is empty when there
+	// was no review.
+	Tier string `json:"tier"`
+	// Concerns are the reasons of the reviewer, for the approver to read.
+	Concerns []string `json:"concerns"`
+	// Source is the model that reviewed.
+	Source string `json:"source,omitempty"`
 }
 
 // VerifyResult is the outcome of the check after an apply.

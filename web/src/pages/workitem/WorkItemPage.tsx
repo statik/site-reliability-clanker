@@ -174,6 +174,40 @@ function Diagnosis({ events }: { events: AuditEvent[] }) {
   );
 }
 
+/**
+ * The adversarial review of the plan, from its audit event. The reviewer is a second model
+ * that looks for reasons for a higher tier. It can raise the tier and never lower it.
+ */
+function AdversarialReview({ events }: { events: AuditEvent[] }) {
+  const event = events.findLast((candidate) => candidate.type === "review.completed");
+  if (event === undefined) {
+    return null;
+  }
+  const field = (key: string) => {
+    const value = event.data?.[key];
+    return typeof value === "string" ? value : "";
+  };
+  const listed = event.data?.["concerns"];
+  const concerns = Array.isArray(listed)
+    ? listed.filter((concern): concern is string => typeof concern === "string")
+    : [];
+  return (
+    <Tile className="app-stack-tight" decorator={<AiMark source={field("model")} what="review" />}>
+      <p className="app-label">Adversarial review, {formatTime(event.ts)}</p>
+      <p className="app-prose">
+        {event.summary}. The policy engine set tier {field("policy_tier")} by rule{" "}
+        <span className="app-mono">{field("policy_rule")}</span>. The review can raise the tier.
+        It cannot lower it.
+      </p>
+      {concerns.length > 0 && (
+        <ul className="app-prose">
+          {concerns.map((concern) => <li key={concern}>{concern}</li>)}
+        </ul>
+      )}
+    </Tile>
+  );
+}
+
 function Detail({ detail, reload }: { detail: WorkItemDetail; reload: () => void }) {
   const item = detail.work_item;
   const text = item.explanation;
@@ -195,6 +229,7 @@ function Detail({ detail, reload }: { detail: WorkItemDetail; reload: () => void
       <Section title="2. Impact" aside={mark}><Impact item={item} /></Section>
       <Section title="3. Risk tier and the rule that set it">
         <TierRule item={item} plans={detail.plans ?? []} />
+        <AdversarialReview events={detail.events ?? []} />
       </Section>
       <Section title="4. What changes">
         <Changes plans={detail.plans ?? []} deferred={detail.deferred_layers ?? []} />

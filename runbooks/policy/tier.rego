@@ -4,7 +4,8 @@
 #   input.plan    the output of `tofu show -json`
 #
 # The result is data.clanker.tier.decision: the tier, the rule that set it and the reasons.
-# The model never sets a tier. Only this file does.
+# No model lowers a tier. This file sets the tier. After it, the adversarial review of the
+# control plane can make the tier of a work item higher, and never lower.
 package clanker.tier
 
 import rego.v1

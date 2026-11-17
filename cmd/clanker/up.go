@@ -308,7 +308,8 @@ func build(ctx context.Context, o options) (*components, error) {
 		Detector: c.detector, Orch: c.orch, Monitor: c.monitor, Notifier: c.notifier,
 		Source: o.source, AdminToken: demoAdminToken, ManualChange: on.manualChange,
 		Env: o.env}
-	c.orch.Hooks = orchestrator.Hooks{Explain: c.agent.Explain, Verify: c.monitor.Verify,
+	c.orch.Hooks = orchestrator.Hooks{Explain: c.agent.Explain, Review: c.agent.Review,
+		Verify: c.monitor.Verify,
 		LayerApplied: func(ctx context.Context, wi orchestrator.WorkItem, layer string) error {
 			if !o.demo || o.cloud != "local" || layer != "10-network" {
 				return nil
