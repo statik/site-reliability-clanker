@@ -16,8 +16,8 @@ import { fileURLToPath } from "node:url";
 import { dayYear, html } from "./lib/html.mjs";
 import { steps, totals } from "./lib/month.mjs";
 import {
-  renderFlowSteps, renderGrantCard, renderGrantLanes, renderRefusal, renderStatePaths,
-  renderStateSvg, renderSystemSvg,
+  renderFlowSteps, renderGrantCard, renderGrantLanes, renderMachine, renderRefusal, renderStatePaths,
+  renderStateSvg,
 } from "./lib/render-architecture.mjs";
 import { renderApproval, renderNotice, renderPrinciples, renderStats } from "./lib/render-landing.mjs";
 import { renderGallery } from "./lib/render-screens.mjs";
@@ -67,7 +67,7 @@ function fragments() {
       period,
     },
     "architecture.html": {
-      system: renderSystemSvg(),
+      machine: renderMachine(month),
       flow: renderFlowSteps(month),
       states: renderStateSvg(month),
       paths: renderStatePaths(month),

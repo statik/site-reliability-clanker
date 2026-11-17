@@ -9,8 +9,10 @@ export const PRINCIPLES = [
   {
     title: "The model proposes. Code decides.",
     text:
-      "The language model drafts changes, summaries and answers. It never rates its own " +
-      "risk, never holds a cloud credential, and has no tool that applies a change.",
+      "The language model drafts changes, summaries and answers. Fixed rules set the risk " +
+      "tier from the plan itself. A second model can raise that tier and can never lower it. " +
+      "The model that wrote the change has no say in its tier, holds no cloud credential, " +
+      "and has no tool that applies a change.",
   },
   {
     title: "Every change is a pull request.",

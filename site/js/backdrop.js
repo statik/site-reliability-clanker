@@ -1,6 +1,6 @@
 // The hero backdrop: the six layers of a platform as rows of resources with the links
 // between them. A few changes move up through the layers, one layer at a time, and wait at
-// each one. Drawn on a 2D canvas with the colours of the current theme. It animates only
+// each one. Drawn on a 2D canvas with the colours of the site. It animates only
 // while it is on screen, the tab is visible and the reader has not asked for reduced
 // motion; otherwise it shows one still frame. The button on the hero pauses it.
 
@@ -14,7 +14,7 @@ const NODE = 6;
 const CHANGES = 5;
 const SECONDS_PER_LAYER = 3.2;
 
-// The custom properties hold light-dark() and color-mix(), which a canvas does not take.
+// The custom properties hold color-mix(), which a canvas does not take.
 // An element that uses the property gives the colour that the browser worked out.
 function token(name) {
   const probe = document.createElement("span");
@@ -100,7 +100,7 @@ function start(canvas) {
   const context = canvas.getContext("2d");
   if (!context) return;
   const toggle = document.querySelector(".motion-toggle");
-  let colors = palette();
+  const colors = palette();
   let width = 0;
   let height = 0;
   let time = 12;
@@ -157,10 +157,6 @@ function start(canvas) {
     updateLoop();
   }).observe(canvas);
   document.addEventListener("visibilitychange", updateLoop);
-  document.addEventListener("themechange", () => {
-    colors = palette();
-    draw();
-  });
   reducedMotion.addEventListener("change", () => {
     paused = reducedMotion.matches;
     updateLoop();

@@ -78,7 +78,7 @@ function isScene(name) {
 async function doCue(page, cue, base) {
   if (!cue) return;
   if (cue.startsWith("page:")) {
-    await page.goto(`${base}/${cue.slice(5)}?theme=dark`, { waitUntil: "load" });
+    await page.goto(`${base}/${cue.slice(5)}`, { waitUntil: "load" });
     await page.addStyleTag({ content: CAPTION_BAND });
   } else if (cue.startsWith("beat:")) {
     // A drawn scene (video/scene.js) shows its next part when this value changes.
@@ -101,7 +101,7 @@ async function doCue(page, cue, base) {
 }
 
 async function playSite(page, segment, name, base) {
-  await page.goto(`${base}/${name}?theme=dark`, { waitUntil: "load" });
+  await page.goto(`${base}/${name}`, { waitUntil: "load" });
   if (!isScene(name)) await page.addStyleTag({ content: CAPTION_BAND });
   await page.evaluate(() => document.fonts.ready);
   // The narration drives the system diagram, so stop its own autoplay.

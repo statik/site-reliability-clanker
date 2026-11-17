@@ -84,52 +84,30 @@ body { background: var(--background); color: var(--text-primary); font-family: v
 .change-tier { opacity: 0; transition: opacity 0.4s var(--ease-enter); }
 .beat-1 .change, .beat-2 .change { opacity: 1; transform: none; }
 
-.scene .stages { display: grid; grid-template-columns: repeat(9, 1fr); margin-top: 24px; }
-.stage { position: relative; height: 128px; opacity: 0.4; transition: opacity 0.4s var(--ease); }
-.stage.is-active, .stage.is-passed { opacity: 1; }
-.beat-1 .stages, .beat-2 .stages { opacity: 1; transform: none; transition-delay: 0.3s; }
+/* The figure of the system on the left, and the stop that the narration is at beside it. */
+.machine-row { display: grid; grid-template-columns: 880px 1fr; gap: 28px; margin-top: 18px; }
+.beat-1 .machine-row, .beat-2 .machine-row { opacity: 1; transform: none; transition-delay: 0.3s; }
+.machine-stage { height: 495px; background: var(--dark); border: 1px solid var(--border-strong); }
+.machine-stage svg { display: block; width: 100%; height: 100%; }
+.machine-count { height: 34px; font-family: var(--font-mono); font-size: 18px; color: var(--honey); }
 
-/* The track: a line through all checkpoints, and a mark on each one. */
-.stage-mark { position: relative; height: 30px; }
-.stage-mark::before { content: ""; position: absolute; left: 0; right: 0; top: 14px; height: 2px;
-  background: var(--border-strong); }
-.stage:last-child .stage-mark::before { right: auto; width: 15px; }
-.stage-mark::after { content: ""; position: absolute; left: 0; top: 14px; height: 2px; width: 0;
-  background: var(--support-success); transition: width 0.6s var(--ease); }
-.stage.is-passed .stage-mark::after { width: 100%; }
-.stage:last-child.is-passed .stage-mark::after { width: 15px; }
-.stage-dot { position: absolute; left: 0; top: 0; z-index: 1; width: 30px; height: 30px; box-sizing: border-box;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--background); border: 2px solid var(--border-strong);
-  font-family: var(--font-mono); font-size: 17px; color: var(--text-secondary);
-  transition: border-color 0.3s var(--ease), background-color 0.3s var(--ease), color 0.3s var(--ease); }
-.stage.is-active .stage-dot { border-color: var(--interactive); background: var(--interactive);
-  color: var(--text-on-interactive); }
-.stage.is-passed .stage-dot { border-color: var(--support-success); color: var(--support-success); }
-.stage-name { margin-top: 10px; font-size: 19px; font-weight: 600; line-height: 1.25; white-space: nowrap; }
-.stage-who { font-size: 17px; line-height: 1.3; color: var(--text-helper); }
-.stage-who.is-person { color: var(--person); }
-.stage-result { font-size: 17px; line-height: 1.4; color: var(--support-success); white-space: nowrap; opacity: 0;
-  transition: opacity 0.4s var(--ease-enter); }
-.stage.is-passed .stage-result { opacity: 1; }
-
-/* The panel of the checkpoint that the narration tells of. */
-.details { position: relative; height: 330px; margin-top: 20px; }
-.detail { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 400px; gap: 40px;
-  padding: 26px 32px; background: var(--layer-01); border-top: 2px solid var(--interactive);
-  font-size: 21px; line-height: 1.4; opacity: 0; transition: opacity 0.5s var(--ease); }
+/* The panel of the stop that the narration tells of. */
+.details { position: relative; height: 461px; }
+.detail { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between;
+  padding: 22px 24px; background: var(--layer-01); border-top: 2px solid var(--interactive);
+  font-size: 20px; line-height: 1.4; opacity: 0; transition: opacity 0.5s var(--ease); }
 .detail.is-active { opacity: 1; }
-.detail-title { margin-bottom: 14px; font-size: 32px; font-weight: 300; line-height: 1.2; }
+.detail-title { margin-bottom: 14px; font-size: 29px; font-weight: 300; line-height: 1.2; }
 .detail p + p, .detail .tiers + p, .detail .person + p, .detail .window + p { margin-top: 10px; }
-.detail .mono { font-size: 19px; }
+.detail .mono { font-size: 18px; }
 .detail .quiet { color: var(--text-helper); }
+.detail .detail-small { font-size: 17px; line-height: 1.35; }
 .detail .ok { color: var(--support-success); }
-.detail aside { padding-left: 28px; border-left: 1px solid var(--border-strong); }
+.detail aside { padding-top: 14px; border-top: 1px solid var(--border-strong); }
 .detail-label { font-size: 17px; color: var(--text-helper); }
 .detail-record { font-family: var(--font-mono); font-size: 17px; color: var(--text-helper); }
-.detail aside .detail-record { margin-top: 22px; }
 
-.scene .tiers { display: grid; grid-template-columns: repeat(4, 84px); gap: 4px; }
+.scene .tiers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 .tiers li { padding: 6px 0; text-align: center; font-family: var(--font-mono); font-size: 20px;
   background: var(--layer-02); color: var(--text-helper); }
 .tiers .is-set { background: var(--honey); color: var(--dark); }
@@ -150,6 +128,17 @@ body { background: var(--background); color: var(--text-primary); font-family: v
 /* ------------------------------------------------------------------ setup */
 
 .scene .steps { display: grid; grid-template-columns: repeat(5, 1fr); }
+/* The track: a line through all steps, and a mark on each one. */
+.stage-mark { position: relative; height: 30px; }
+.stage-mark::before { content: ""; position: absolute; left: 0; right: 0; top: 14px; height: 2px;
+  background: var(--border-strong); }
+.stage-mark::after { content: ""; position: absolute; left: 0; top: 14px; height: 2px; width: 0;
+  background: var(--support-success); transition: width 0.6s var(--ease); }
+.stage-dot { position: absolute; left: 0; top: 0; z-index: 1; width: 30px; height: 30px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--background); border: 2px solid var(--border-strong);
+  font-family: var(--font-mono); font-size: 17px; color: var(--text-secondary);
+  transition: border-color 0.3s var(--ease), background-color 0.3s var(--ease), color 0.3s var(--ease); }
 .setup-step { position: relative; opacity: 0.4; transition: opacity 0.4s var(--ease); }
 .setup-step.is-active, .setup-step.is-passed { opacity: 1; }
 .setup-step:last-child .stage-mark::before { right: auto; width: 15px; }
@@ -162,11 +151,11 @@ body { background: var(--background); color: var(--text-primary); font-family: v
 .beat-1 .steps { opacity: 1; transform: none; }
 
 .panels { position: relative; height: 476px; margin-top: 28px; }
-.panel { position: absolute; inset: 0; display: grid; grid-template-columns: 440px 1fr; gap: 40px;
+.panel { position: absolute; inset: 0; display: grid; grid-template-columns: 440px 1fr; gap: 40px; align-items: center;
   opacity: 0; transition: opacity 0.5s var(--ease); }
 .panel.is-active { opacity: 1; }
-.panel-title { font-size: 32px; font-weight: 300; line-height: 1.2; }
-.panel-text { margin-top: 16px; font-size: 20px; line-height: 1.4; color: var(--text-secondary); }
+.panel-title { font-size: 36px; font-weight: 300; line-height: 1.2; }
+.panel-text { margin-top: 18px; font-size: 22px; line-height: 1.4; color: var(--text-secondary); }
 .panel-text + .panel-text { margin-top: 10px; }
 .panel .tag { margin-bottom: 14px; }
 .terminal { margin-top: 20px; padding: 16px 20px; background: var(--dark); border: 1px solid var(--border-strong);
@@ -175,23 +164,23 @@ body { background: var(--background); color: var(--text-primary); font-family: v
 
 /* A real screenshot of the wizard: the part of the page that matters, in a frame. */
 .wizard-shot { padding: 12px 12px 8px; background: var(--layer-01); border: 1px solid var(--honey);
-  border-radius: 10px; align-self: start; min-width: 0; }
+  border-radius: 10px; min-width: 0; }
 .wizard-crop { height: 434px; overflow: hidden; border-radius: 6px; background: var(--cream); }
 .wizard-crop img { display: block; max-width: none; height: auto; }
 .wizard-target { width: 1229px; margin: -92px 0 0 -326px; }
 .wizard-handover { width: 1775px; margin: -133px 0 0 -494px; }
 .wizard-shot figcaption { margin-top: 8px; font-size: 17px; color: var(--text-helper); }
 
-.sketch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; align-content: start; }
-.sketch-step { position: relative; height: 170px; padding: 18px 20px; border: 1px dashed var(--border-strong); }
-.sketch-step + .sketch-step::before { content: ""; position: absolute; left: -29px; top: 84px; width: 28px;
+.sketch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+.sketch-step { position: relative; height: 220px; padding: 18px 20px; border: 1px dashed var(--border-strong); }
+.sketch-step + .sketch-step::before { content: ""; position: absolute; left: -29px; top: 110px; width: 28px;
   border-top: 1px dashed var(--border-strong); }
 .sketch-number { font-family: var(--font-mono); font-size: 17px; color: var(--text-helper); }
-.sketch-name { margin-top: 10px; font-size: 22px; line-height: 1.25; }
+.sketch-name { margin-top: 14px; font-size: 26px; line-height: 1.25; }
 .sketch-note { grid-column: 1 / -1; font-size: 19px; color: var(--text-helper); }
 
-.scene .ladder { display: grid; gap: 8px; align-content: start; }
-.rung { display: grid; grid-template-columns: 170px 250px 1fr 90px; align-items: center; height: 56px;
+.scene .ladder { display: grid; gap: 10px; }
+.rung { display: grid; grid-template-columns: 170px 250px 1fr 90px; align-items: center; height: 64px;
   padding: 0 18px; background: var(--layer-01); border-left: 2px solid var(--support-success);
   font-family: var(--font-mono); font-size: 19px; opacity: 0; transform: translateY(8px);
   transition: opacity 0.5s var(--ease-enter), transform 0.5s var(--ease-enter); }
@@ -200,7 +189,7 @@ body { background: var(--background); color: var(--text-primary); font-family: v
 .rung-held { text-align: right; color: var(--support-success); }
 .panel.is-active .rung { opacity: 1; transform: none; transition-delay: calc(0.8s + var(--row) * 0.9s); }
 
-.scene .kinds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; align-content: start; }
-.kind { height: 124px; padding: 16px 20px; background: var(--layer-01); border-top: 2px solid var(--border-strong); }
-.kind-count { font-size: 44px; font-weight: 300; line-height: 1; }
-.kind-name { margin-top: 12px; font-size: 20px; color: var(--text-secondary); }
+.scene .kinds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.kind { height: 180px; padding: 16px 20px; background: var(--layer-01); border-top: 2px solid var(--border-strong); }
+.kind-count { font-size: 64px; font-weight: 300; line-height: 1; }
+.kind-name { margin-top: 16px; font-size: 23px; color: var(--text-secondary); }

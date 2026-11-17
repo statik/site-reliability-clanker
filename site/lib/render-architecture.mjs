@@ -1,120 +1,13 @@
-// Prerender the architecture page: the system diagram with a real change travelling
+// Prerender the architecture page: the figure of the system with a real change moving
 // through it, the work item state machine with real paths, and the grant figures.
 
-import { clock, day, dayYear, duration, html, list, raw, shortHash } from "./html.mjs";
+import { plateHtml } from "./anatomy/iso-kit.mjs";
+import { clock, day, dayYear, duration, html, list, plural, raw, shortHash } from "./html.mjs";
+import { renderMachineSvg } from "./machine.mjs";
 import { displayName, grantViews } from "./month.mjs";
-import { BOAT_SVG, tierTag } from "./render-walkthrough.mjs";
+import { tierTag } from "./render-walkthrough.mjs";
 
-// ---------------------------------------------------------------- system diagram
-
-const NODE_W = 150;
-const NODE_H = 44;
-
-const SYSTEM_NODES = {
-  approver: { x: 80, y: 110, label: "Approver", w: 120 },
-  dashboard: { x: 270, y: 110, label: "Dashboard" },
-  orchestrator: { x: 450, y: 110, label: "Orchestrator" },
-  agent: { x: 630, y: 110, label: "Agent runtime", kind: "model" },
-  policy: { x: 270, y: 230, label: "Policy engine" },
-  forge: { x: 630, y: 230, label: "Git forge" },
-  detectors: { x: 270, y: 350, label: "Detectors" },
-  broker: { x: 450, y: 350, label: "Access broker" },
-  runner: { x: 630, y: 350, label: "Runner" },
-  audit: { x: 450, y: 462, label: "Audit log and evidence", w: 510 },
-  openrouter: { x: 935, y: 60, label: "OpenRouter", kind: "model" },
-  environment: { x: 935, y: 350, label: "Environment", w: 0 },
-  kubernetes: { x: 935, y: 235, label: "Kubernetes" },
-  postgres: { x: 935, y: 297, label: "Managed Postgres" },
-  files: { x: 935, y: 359, label: "Shared file system" },
-  balancer: { x: 935, y: 421, label: "Load balancer" },
-  metrics: { x: 935, y: 483, label: "Metrics and logs" },
-};
-
-const SYSTEM_EDGES = [
-  ["approver", "dashboard"], ["dashboard", "orchestrator"], ["orchestrator", "agent"],
-  ["agent", "openrouter"], ["agent", "forge"], ["forge", "orchestrator"],
-  ["orchestrator", "policy"], ["detectors", "orchestrator"], ["orchestrator", "runner"],
-  ["runner", "broker"], ["broker", "audit"], ["runner", "audit"],
-];
-
-const STOP_NODES = {
-  "finding.opened": "detectors",
-  "workitem.created": "orchestrator",
-  "agent.drafted": "agent",
-  "pr.opened": "forge",
-  "plan.created": "runner",
-  "policy.evaluated": "policy",
-  "approval.requested": "dashboard",
-  "approval.recorded": "approver",
-  "grant.issued": "broker",
-  "apply.started": "environment",
-  "grant.revoked": "broker",
-  "apply.succeeded": "runner",
-  "verify.passed": "environment",
-  "pr.merged": "forge",
-};
-
-function boxEdgePoint(node, toward) {
-  const halfW = (node.w ?? NODE_W) / 2;
-  const halfH = NODE_H / 2;
-  const dx = toward.x - node.x;
-  const dy = toward.y - node.y;
-  if (dx === 0 && dy === 0) return { x: node.x, y: node.y };
-  const scale = Math.min(
-    dx === 0 ? Infinity : halfW / Math.abs(dx),
-    dy === 0 ? Infinity : halfH / Math.abs(dy),
-  );
-  return { x: node.x + dx * scale, y: node.y + dy * scale };
-}
-
-function straightEdge(from, to, className) {
-  const start = boxEdgePoint(from, to);
-  const end = boxEdgePoint(to, from);
-  return `<path class="${className}" d="M${start.x.toFixed(1)} ${start.y.toFixed(1)} L${end.x.toFixed(1)} ${end.y.toFixed(1)}" marker-end="url(#arrow)"/>`;
-}
-
-function systemNode(id, node) {
-  if (id === "environment") return "";
-  const width = node.w ?? NODE_W;
-  const x = node.x - width / 2;
-  const y = node.y - NODE_H / 2;
-  const kind = node.kind ? ` node-${node.kind}` : "";
-  return `<g class="node${kind}" data-node="${id}">
-    <rect x="${x}" y="${y}" width="${width}" height="${NODE_H}"/>
-    <text x="${node.x}" y="${node.y + 5}" text-anchor="middle">${node.label}</text>
-  </g>`;
-}
-
-export function renderSystemSvg() {
-  const edges = SYSTEM_EDGES.map(([from, to]) =>
-    straightEdge(SYSTEM_NODES[from], SYSTEM_NODES[to], "edge")).join("");
-  const nodes = Object.entries(SYSTEM_NODES).map(([id, node]) => systemNode(id, node)).join("");
-  return raw(`<svg class="diagram system-diagram" viewBox="0 0 1100 520" role="img"
-    aria-labelledby="system-title system-desc">
-    <title id="system-title">The parts of the system</title>
-    <desc id="system-desc">An approver uses the dashboard. Inside the control plane, the
-      orchestrator works with the agent runtime, the policy engine, detectors, the git forge,
-      a runner and an access broker, and every part writes to the audit log. The agent calls a
-      language model through OpenRouter. Only the runner changes the environment, and only
-      with short-lived credentials from the broker.</desc>
-    <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9"
-      markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="arrow-head" d="M0 0 L10 5 L0 10 z"/></marker></defs>
-    <rect class="group" x="170" y="40" width="560" height="460"/>
-    <text class="group-label" x="186" y="64">S.R.C. control plane</text>
-    <rect class="group" x="830" y="170" width="210" height="350" data-node="environment"/>
-    <text class="group-label" x="846" y="194">One environment per cloud</text>
-    ${edges}
-    <path class="edge" d="M705 350 L828 350" marker-end="url(#arrow)"/>
-    <text class="edge-label" x="766" y="340" text-anchor="middle">plan, apply</text>
-    <path class="edge edge-readonly" d="M705 96 L850 180" marker-end="url(#arrow)"/>
-    <text class="edge-label" x="812" y="124" text-anchor="middle">read-only tools</text>
-    <text class="edge-label" x="640" y="174" text-anchor="start">opens PRs</text>
-    ${nodes}
-    <g class="token" id="system-token" transform="translate(270 350)" aria-hidden="true">
-      <circle r="20"/><g transform="translate(-13 -10) scale(0.82)">${BOAT_SVG.replace(/<\/?svg[^>]*>/g, "")}</g>
-    </g>
-  </svg>`);
-}
+// ---------------------------------------------------------------- the figure of the system
 
 export function pickFlowItem(month) {
   const details = Object.values(month.work_items);
@@ -122,36 +15,71 @@ export function pickFlowItem(month) {
     detail.work_item.kind === "app-upgrade") ?? details.find((detail) => detail.pull);
 }
 
-export function renderFlowSteps(month) {
+// The ten stops of the figure, each with the real event of the work item that it shows.
+// An export from before the adversarial review has no record of one.
+function flowStops(month) {
   const detail = pickFlowItem(month);
   const id = detail.work_item.id;
-  const created = month.events.find(
-    (event) => event.type === "workitem.created" && event.work_item === id,
-  );
+  const own = month.events.filter((event) => event.work_item === id);
+  const find = (type) => own.find((event) => event.type === type);
+  const created = find("workitem.created");
   const finding = month.events.filter(
     (event) => event.type === "finding.opened" && event.seq < created.seq,
-  ).at(-1);
-  const own = month.events.filter((event) => event.work_item === id && STOP_NODES[event.type]);
-  const seen = new Set();
-  const stops = [finding, ...own].filter((event) => {
-    if (!event || seen.has(event.type)) return false;
-    seen.add(event.type);
-    return true;
-  });
-  const total = month.events.filter((event) => event.work_item === id).length;
-  const items = stops.map((event) => {
-    const node = SYSTEM_NODES[STOP_NODES[event.type]];
-    return html`<li data-node="${STOP_NODES[event.type]}" data-x="${node.x}" data-y="${node.y}">
-      <span class="flow-where">${node.label}</span>
+  ).at(-1) ?? created;
+  const review = find("review.completed");
+  const policy = find("policy.evaluated");
+  const stops = [
+    ["Detector", "the feeler", finding],
+    ["Author, a model", "the press", find("agent.drafted")],
+    ["Runner: the plan", "the gauge", find("plan.created")],
+    ["Policy engine", "the tier pointer", policy],
+    ["Adversarial review, a model", "the pawl", review ?? {
+      summary: "This export of the month is older than the review, so it has no record of one", ts: policy.ts,
+    }],
+    ["Approver, a person", "the key and the barrier", find("approval.recorded")],
+    ["Access broker", "the timer", find("grant.issued")],
+    ["Runner: the apply", "the lift and one drawer", find("apply.succeeded")],
+    ["Verification", "the gauge on the cabinet", find("verify.passed")],
+    ["Audit log", "the chain", {
+      summary: `${plural(own.length, "record")} for ${id}, each with the hash of the record before it`, ts: own.at(-1).ts,
+    }],
+  ];
+  return {
+    detail, created, stops,
+    tier: policy.data.tier,
+    raisedTo: review?.data?.tier ?? policy.data.tier,
+  };
+}
+
+export function renderMachine(month) {
+  const { detail, tier, raisedTo } = flowStops(month);
+  const svg = renderMachineSvg({ tier, raisedTo, layer: detail.work_item.layers[0] });
+  return raw(plateHtml({
+    fig: "Fig 1",
+    title: "One change through S.R.C.",
+    hint: "Step through the stops",
+    readout: "stop 1 of 10 · detect",
+    keys: [
+      { mark: "lit", label: "The change, and what moves for it: the tier pointer, the timer, the gauge" },
+      { mark: "raised", label: "The bench: the core of the control plane. It starts no program and keeps no file" },
+      { mark: "edge", label: "The cabinet: one target, six drawers for the six layers" },
+      { mark: "dim", label: "Behind the bench: the database that holds all state, and the model provider" },
+    ],
+    caption: "The pawl of the review can lift the tier pointer and cannot lower it. The barrier opens when the "
+      + "approvers that the tier needs turn their keys. The timer is the grant: while it runs, the lift may open "
+      + "one drawer. The chain along the front edge is the audit log, and each stop adds links.",
+    body: `<div class="iso-stage" id="machine-stage">${svg}</div>`,
+  }));
+}
+
+export function renderFlowSteps(month) {
+  const { detail, created, stops } = flowStops(month);
+  const items = stops.map(([where, part, event], index) => html`<li data-stop="${index}">
+      <span class="flow-where">${where} <span class="flow-part">${part}</span></span>
       <span class="flow-what">${event.summary}</span>
-      <time class="mono" datetime="${event.ts}">${clock(event.ts)}</time></li>`;
-  });
-  items.push(html`<li data-node="audit" data-x="${SYSTEM_NODES.audit.x}" data-y="${SYSTEM_NODES.audit.y}">
-    <span class="flow-where">Audit log</span>
-    <span class="flow-what">${total} records for ${id}, each with the hash of the record before it</span>
-    <time class="mono" datetime="${stops.at(-1).ts}">${clock(stops.at(-1).ts)}</time></li>`);
+      <time class="mono" datetime="${event.ts}">${clock(event.ts)}</time></li>`);
   return html`<p class="figure-source">The steps below are the real events of work item
-      <span class="mono">${id}</span> (${detail.work_item.title}), ${dayYear(created.ts)}, times in UTC.</p>
+      <span class="mono">${detail.work_item.id}</span> (${detail.work_item.title}), ${dayYear(created.ts)}, times in UTC.</p>
     <ol class="flow-steps" id="flow-steps">${items}</ol>`;
 }
 

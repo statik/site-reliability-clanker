@@ -45,7 +45,6 @@ python3 -m http.server 4173
 Open <http://127.0.0.1:4173/>. Do not use the ports 5001, 7070, 7071, 8025 or 8088: the
 demo uses them.
 
-- The theme follows the system setting. The button in the header changes it.
 - On the walkthrough, the right arrow or Space goes to the next step and the left arrow
   goes back. Home and End go to the first and the last step.
 - The text is in the HTML, so the pages work without JavaScript.
@@ -114,7 +113,7 @@ earlier picture of it.
 node check.mjs
 ```
 
-It opens the four pages at 1440 and 390 pixels wide, in both themes, and writes full-page
+It opens the four pages at 1440 and 390 pixels wide, and writes full-page
 screenshots to `out/check/`. It fails on a request to another host, a console error, a
 broken image, or a page that scrolls sideways. It also checks that the text is there
 without JavaScript, that the keys move through the walkthrough, and that nothing plays
@@ -190,8 +189,16 @@ System, written by hand in `css/site.css`.
 
 The palette is eleven colours, defined once at the top of `css/site.css` (`--honey`,
 `--cream`, `--dark` and the others). Every other colour of the site and of the drawn
-scenes is one of them or a mix of two. The site has a light and a dark theme from the same
-palette. The recordings of the dashboard and of Paperboat keep their own colours.
+scenes is one of them or a mix of two. The site has one theme, a warm dark ground. The recordings of the dashboard and of Paperboat keep their own colours.
+
+## The figure of the system
+
+Figure 1 of the architecture page, and the scene `video/pipeline.html`, show S.R.C. as a
+bench with real parts. `lib/machine.mjs` draws it with the Anatomy kit, an isometric SVG
+kit under the MIT licence. Its core file is in `lib/anatomy/` with the licence, and its
+styles are `css/anatomy.css`; the site has no other copy and installs nothing for it.
+`lib/machine.mjs` also works out where each moving part is at each of the ten stops of a
+change, and `js/machine.js` eases between those places.
 
 `img/icon.svg` is the icon: an aircraft marshaller with two wands. The video shows it.
 `img/icon-small.svg` is the same mark with fewer and thicker shapes, for the favicon and

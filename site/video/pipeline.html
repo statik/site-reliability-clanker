@@ -1,15 +1,16 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <title>Pipeline scene of the explainer video</title>
+  <link rel="stylesheet" href="../css/anatomy.css">
   <link rel="stylesheet" href="../css/site.css">
   <link rel="stylesheet" href="scene.css">
 </head>
 <body>
-  <!-- narration.md, segment "change". One real change of the month passes nine
-       checkpoints. The row shows all of them; the panel under it shows the one that the
-       narration tells of. pipeline.js fills the elements with data-fill from
+  <!-- narration.md, segment "change". One real change of the month goes through
+       the figure of the system (lib/machine.mjs), stop by stop. The panel beside the figure
+       tells of the stop that the narration is at. pipeline.js fills the elements with data-fill from
        data/month.json. -->
   <main class="scene">
     <div class="change appear">
@@ -21,37 +22,11 @@
       </span>
     </div>
 
-    <ol class="stages appear" id="stages">
-      <li class="stage"><div class="stage-mark"><span class="stage-dot">1</span></div>
-        <h2 class="stage-name">Detect</h2><p class="stage-who">Code</p>
-        <p class="stage-result" data-fill="result-detect"></p></li>
-      <li class="stage"><div class="stage-mark"><span class="stage-dot">2</span></div>
-        <h2 class="stage-name">Plan</h2><p class="stage-who">Model</p>
-        <p class="stage-result" data-fill="result-plan"></p></li>
-      <li class="stage"><div class="stage-mark"><span class="stage-dot">3</span></div>
-        <h2 class="stage-name">Policy tier</h2><p class="stage-who">Code</p>
-        <p class="stage-result" data-fill="result-policy"></p></li>
-      <li class="stage"><div class="stage-mark"><span class="stage-dot">4</span></div>
-        <h2 class="stage-name">Review</h2><p class="stage-who">Model</p>
-        <p class="stage-result" data-fill="result-review"></p></li>
-      <li class="stage"><div class="stage-mark"><span class="stage-dot">5</span></div>
-        <h2 class="stage-name">Approval</h2><p class="stage-who is-person">Person</p>
-        <p class="stage-result" data-fill="result-approval"></p></li>
-      <li class="stage"><div class="stage-mark"><span class="stage-dot">6</span></div>
-        <h2 class="stage-name">Grant</h2><p class="stage-who">Code</p>
-        <p class="stage-result" data-fill="result-grant" id="result-grant"></p></li>
-      <li class="stage"><div class="stage-mark"><span class="stage-dot">7</span></div>
-        <h2 class="stage-name">Apply</h2><p class="stage-who">Code</p>
-        <p class="stage-result" data-fill="result-apply"></p></li>
-      <li class="stage"><div class="stage-mark"><span class="stage-dot">8</span></div>
-        <h2 class="stage-name">Verify</h2><p class="stage-who">Code</p>
-        <p class="stage-result" data-fill="result-verify"></p></li>
-      <li class="stage"><div class="stage-mark"><span class="stage-dot">9</span></div>
-        <h2 class="stage-name">Audit record</h2><p class="stage-who">Code</p>
-        <p class="stage-result" data-fill="result-audit"></p></li>
-    </ol>
-
-    <div class="details" id="details">
+    <div class="machine-row appear">
+      <div class="iso machine-stage" id="machine"></div>
+      <div class="machine-side">
+        <p class="machine-count" id="machine-count"></p>
+        <div class="details" id="details">
       <section class="detail">
         <div>
           <h1 class="detail-title">A detector finds the work.</h1>
@@ -65,9 +40,17 @@
         <div>
           <h1 class="detail-title">The model writes the change as a pull request.</h1>
           <p data-fill="pull"></p>
-          <p class="mono" data-fill="plan-hash"></p>
         </div>
         <aside><p class="detail-label">The limit</p><p>The model has no tool that applies a change.</p>
+          <p class="detail-record" data-fill="record-author"></p></aside>
+      </section>
+      <section class="detail">
+        <div>
+          <h1 class="detail-title">A runner makes the plan and saves it.</h1>
+          <p data-fill="plan"></p>
+          <p class="mono" data-fill="plan-hash"></p>
+        </div>
+        <aside><p class="detail-label">Later</p><p>The apply uses this plan, and no other.</p>
           <p class="detail-record" data-fill="record-plan"></p></aside>
       </section>
       <section class="detail">
@@ -84,7 +67,8 @@
           <h1 class="detail-title">A second model call challenges the tier.</h1>
           <p>The Reviewer reads the plan, the tier and the diff. It looks for reasons for a
             higher tier.</p>
-          <p class="quiet" data-fill="review"></p>
+          <p data-fill="review"></p>
+          <p class="quiet detail-small" data-fill="review-concern"></p>
         </div>
         <aside><p class="detail-label">The limit</p><p>It can raise the tier. It cannot lower it.</p>
           <p class="detail-record" data-fill="record-review"></p></aside>
@@ -137,6 +121,8 @@
         </div>
         <aside><p class="detail-label">The chain</p><p>Each record holds the hash of the record before it.</p></aside>
       </section>
+        </div>
+      </div>
     </div>
   </main>
   <script type="module" src="pipeline.js"></script>

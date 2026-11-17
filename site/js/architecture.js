@@ -1,10 +1,11 @@
 // Motion for the architecture page. Three figures, each driven by steps:
-// 1. A real change travels through the system diagram, stop by stop.
+// 1. A real change travels through the figure of the system, stop by stop.
 // 2. A marker follows the real path of a work item through the state machine.
 // 3. A grant appears, is checked, is used, and is revoked.
 // With reduced motion nothing plays by itself: the buttons still step through the
 // figures, and each change is immediate.
 
+import { mountMachine } from "./machine.js";
 import { reducedMotion } from "./site.js";
 
 const FLOW_STOP_MS = 2400;
@@ -18,7 +19,8 @@ function whenVisible(element, callback) {
 
 function startFlow(figure) {
   const stops = Array.from(figure.querySelectorAll("#flow-steps li"));
-  const token = figure.querySelector("#system-token");
+  const machine = mountMachine(figure.querySelector("svg.machine"));
+  const readout = figure.querySelector("[data-readout]");
   const playButton = figure.querySelector(".flow-play");
   const previousButton = figure.querySelector(".flow-prev");
   const nextButton = figure.querySelector(".flow-next");
@@ -28,18 +30,14 @@ function startFlow(figure) {
   let timer = null;
 
   function render() {
-    const stop = stops[current];
-    token.style.transform = `translate(${stop.dataset.x}px, ${stop.dataset.y}px)`;
+    machine.go(current, { still: reducedMotion.matches });
     stops.forEach((item, index) => {
       item.classList.toggle("is-active", index === current);
       if (index === current) item.setAttribute("aria-current", "step");
       else item.removeAttribute("aria-current");
     });
-    const visited = new Set(stops.slice(0, current).map((item) => item.dataset.node));
-    figure.querySelectorAll(".system-diagram [data-node]").forEach((node) => {
-      node.classList.toggle("is-active", node.dataset.node === stop.dataset.node);
-      node.classList.toggle("is-visited", visited.has(node.dataset.node));
-    });
+    const where = stops[current].querySelector(".flow-where").firstChild.textContent.trim();
+    readout.textContent = `stop ${current + 1} of ${stops.length} · ${where.toLowerCase()}`;
   }
 
   function go(index) {

@@ -2,7 +2,7 @@
 // Scroll, or use the keys: right arrow, Page Down or Space for the next step; left arrow
 // or Page Up for the previous step; Home and End for the first and the last step.
 // The text is already in the page. This script tracks the step on screen, moves the
-// paper boat on the month axis, and scrolls for the keys and buttons.
+// marker on the month axis, and scrolls for the keys and buttons.
 
 import { reducedMotion } from "./site.js";
 
@@ -19,7 +19,7 @@ function start(rail) {
   const previous = rail.querySelector(".rail-prev");
   const next = rail.querySelector(".rail-next");
   const counter = rail.querySelector(".rail-counter");
-  const boat = rail.querySelector(".boat");
+  const marker = rail.querySelector(".axis-marker");
   let current = -1;
 
   function render(index) {
@@ -33,7 +33,7 @@ function start(rail) {
     previous.disabled = index <= 0;
     next.disabled = index === steps.length - 1;
     counter.textContent = `${Math.max(index, 0) + 1} / ${steps.length}`;
-    if (boat && index >= 0) boat.style.setProperty("--at", `${steps[index].dataset.at}%`);
+    if (marker && index >= 0) marker.style.setProperty("--at", `${steps[index].dataset.at}%`);
     document.dispatchEvent(new CustomEvent("stepchange", { detail: { index } }));
   }
 
