@@ -10,7 +10,8 @@ from typing import Any
 from clanker_evals.gotext import go_json, sorted_map, truncate
 
 RELEASE_NOTE_LIMIT = 4000
-TRANSCRIPT_LIMIT = 8000
+TRANSCRIPT_LIMIT = 14000
+REVIEW_DIFF_LIMIT = 12000
 TIERS = ["T0", "T1", "T2", "T3"]
 # The history that recentChanges gives for an environment that has run 1.0.0 for nine days.
 QUIET_HISTORY = ["WI-0001 Create environment local: Done, 216h0m0s ago"]
@@ -140,6 +141,44 @@ def explain_input(
     }
     if release_note is not None:
         facts["release_note"] = truncate(release_note, RELEASE_NOTE_LIMIT)
+    return frame(sorted_map(facts))
+
+
+def review_input(
+    work_item: dict[str, Any],
+    plans: list[dict[str, Any]],
+    policy_tier: str | None = None,
+    diff: str | None = None,
+) -> str:
+    """Return the user message of Agent.Review, as reviewInput and frame write it.
+
+    Args:
+        work_item: The keys title, kind, layers and trigger. The key env is optional; without
+            it the environment is "local".
+        plans: The plans with the decision of the policy engine for each. A layer of the
+            work item without a plan is a deferred layer.
+        policy_tier: The tier that the policy engine gave the work item. None takes the
+            highest tier of the plans. Give T3 when a layer is deferred and no plan is T3.
+        diff: The diff of the pull request. None is a work item without a pull request, so
+            the input has no diff field.
+
+    Returns:
+        The input of the review as JSON inside the <data> frame.
+    """
+    highest = max((p["policy"]["tier"] for p in plans), default=TIERS[0])
+    planned = {p["layer"] for p in plans}
+    facts: dict[str, Any] = {
+        "title": work_item["title"],
+        "kind": work_item["kind"],
+        "env": work_item.get("env", "local"),
+        "layers": work_item["layers"],
+        "trigger": work_item["trigger"],
+        "policy_tier": policy_tier or highest,
+        "plans": plans,
+        "deferred_layers": [layer for layer in work_item["layers"] if layer not in planned],
+    }
+    if diff is not None:
+        facts["diff"] = truncate(diff, REVIEW_DIFF_LIMIT)
     return frame(sorted_map(facts))
 
 

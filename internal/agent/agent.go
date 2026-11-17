@@ -185,10 +185,8 @@ func detailKey(wi orchestrator.WorkItem, plans []orchestrator.Plan) string {
 	return ""
 }
 
-// Explain writes the prose of the approval page. It is the Explain hook of the orchestrator.
-// Without a recording in replay mode it returns the template text.
-func (a *Agent) Explain(ctx context.Context, wi orchestrator.WorkItem,
-	plans []orchestrator.Plan) (orchestrator.Explanation, error) {
+// deferredLayers returns the layers of a work item that have no plan yet.
+func deferredLayers(wi orchestrator.WorkItem, plans []orchestrator.Plan) []string {
 	planned := map[string]bool{}
 	for _, p := range plans {
 		planned[p.Layer] = true
@@ -199,6 +197,14 @@ func (a *Agent) Explain(ctx context.Context, wi orchestrator.WorkItem,
 			deferred = append(deferred, layer)
 		}
 	}
+	return deferred
+}
+
+// Explain writes the prose of the approval page. It is the Explain hook of the orchestrator.
+// Without a recording in replay mode it returns the template text.
+func (a *Agent) Explain(ctx context.Context, wi orchestrator.WorkItem,
+	plans []orchestrator.Plan) (orchestrator.Explanation, error) {
+	deferred := deferredLayers(wi, plans)
 	detail := detailKey(wi, plans)
 	input := map[string]any{"title": wi.Title, "kind": wi.Kind, "env": wi.Env,
 		"layers": wi.Layers, "tier": wi.Tier, "tier_rule": wi.TierRule, "trigger": wi.Trigger,

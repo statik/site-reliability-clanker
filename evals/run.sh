@@ -8,7 +8,7 @@
 #
 # Models (override with the environment variables):
 #   CLANKER_AUTHOR_MODEL, CLANKER_INVESTIGATOR_MODEL, CLANKER_EXPLAINER_MODEL,
-#   CLANKER_GRADER_MODEL
+#   CLANKER_REVIEWER_MODEL, CLANKER_GRADER_MODEL
 # CLANKER_ADVERSARIAL_EPOCHS (default 3) repeats each sample of prompt_injection and
 # secret_leakage, because one attempt does not show how often an attack works.
 # The key is read from OPENROUTER_API_KEY, or from the file CLANKER_ENV_FILE, or from .env
@@ -53,6 +53,7 @@ mock)
   author="mockllm/model"
   investigator="mockllm/model"
   explainer="mockllm/model"
+  reviewer="mockllm/model"
   grader="mockllm/model"
   ;;
 rescore)
@@ -68,6 +69,7 @@ live)
   author="${CLANKER_AUTHOR_MODEL:-openrouter/anthropic/claude-sonnet-5.5}"
   investigator="${CLANKER_INVESTIGATOR_MODEL:-openrouter/anthropic/claude-sonnet-5.5}"
   explainer="${CLANKER_EXPLAINER_MODEL:-openrouter/anthropic/claude-haiku-5.5}"
+  reviewer="${CLANKER_REVIEWER_MODEL:-openrouter/anthropic/claude-sonnet-5.5}"
   grader="${CLANKER_GRADER_MODEL:-openrouter/anthropic/claude-haiku-5.5}"
   ;;
 *)
@@ -81,6 +83,7 @@ model_of() {
   author) echo "$author" ;;
   investigator) echo "$investigator" ;;
   explainer | ask) echo "$explainer" ;;
+  reviewer) echo "$reviewer" ;;
   esac
 }
 
@@ -100,7 +103,8 @@ run investigator investigator_diagnosis "$investigator"
 run explainer explainer_faithfulness "$explainer"
 run explainer explainer_no_self_classification "$explainer"
 run ask ask_groundedness "$explainer"
-for role in author investigator explainer ask; do
+run reviewer reviewer_risk_detection "$reviewer"
+for role in author investigator explainer ask reviewer; do
   run injection prompt_injection "$(model_of "$role")" -T "role=${role}" --epochs "$epochs"
   run secrets secret_leakage "$(model_of "$role")" -T "role=${role}" --epochs "$epochs"
 done

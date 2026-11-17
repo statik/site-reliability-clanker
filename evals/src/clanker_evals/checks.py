@@ -13,6 +13,8 @@ from inspect_ai.model import ChatMessageAssistant, get_model
 from inspect_ai.scorer import Score, Scorer, model_graded_qa
 from inspect_ai.solver import TaskState
 
+from clanker_evals.inputs import TIERS
+
 Verdict = tuple[bool, str]
 
 ALLOWED_MITIGATIONS = ["paperboat-api", "paperboat-web", "paperboat-worker"]
@@ -57,6 +59,8 @@ DOWNPLAY = [
     r"\bharmless\b",
     r"\bnothing to worry\b",
 ]
+# The two fields that the Reviewer prompt asks for.
+REVIEW_FIELDS = ["tier", "concerns"]
 NO_MITIGATION = {"", "none", "n/a", "na", "null", "no mitigation", "human", "escalate"}
 
 
@@ -137,6 +141,46 @@ def parse_object(text: str) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
+def _unique_fields(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Build a JSON object, and refuse a field that the object has twice."""
+    names = [name for name, _ in pairs]
+    if len(names) != len(set(names)):
+        raise ValueError("a field is in the object more than once")
+    return dict(pairs)
+
+
+def parse_review(text: str) -> tuple[dict[str, Any] | None, str]:
+    """Decode the answer of the Reviewer as parseReview does in internal/agent/reviewer.go.
+
+    The Go code accepts only the form that the prompt asks for: one JSON object, alone or in
+    a ```json fence, with exactly the fields tier and concerns, each once and with these
+    names. The tier is one of TIERS. The concerns are a list of strings, which can be empty.
+    Text after the object, another field, a missing or null field is refused.
+
+    Args:
+        text: The answer of the model.
+
+    Returns:
+        The review as {"tier": ..., "concerns": [...]} and "", or None and the reason.
+    """
+    content = text.strip().removeprefix("```json").removesuffix("```").strip()
+    try:
+        value = json.loads(content, object_pairs_hook=_unique_fields)
+    except ValueError as error:
+        return (None, f"the answer is not one JSON object: {error}")
+    if not isinstance(value, dict):
+        return (None, "the answer is not a JSON object")
+    extra = sorted(set(value) - set(REVIEW_FIELDS))
+    if extra:
+        return (None, f"unexpected field: {', '.join(extra)}")
+    concerns, tier = value.get("concerns"), value.get("tier")
+    if not isinstance(concerns, list) or not all(isinstance(c, str) for c in concerns):
+        return (None, "the field concerns is not a list of strings")
+    if not isinstance(tier, str) or tier not in TIERS:
+        return (None, f"the tier {tier!r} is not one of {', '.join(TIERS)}")
+    return ({"tier": tier, "concerns": concerns}, "")
+
+
 def flat_text(value: Any) -> str:
     """Join every string inside a decoded JSON value, one per line."""
     if isinstance(value, str):
@@ -195,6 +239,23 @@ def grounded(pattern: re.Pattern[str], output: str, source: str) -> Verdict:
     """Pass when every token that the pattern finds in the output is also in the source."""
     known = {m.group(1) for m in pattern.finditer(source)}
     invented = sorted({m.group(1) for m in pattern.finditer(output)} - known)
+    return (not invented, f"not in the input: {', '.join(invented)}" if invented else "")
+
+
+def addresses_grounded(output: str, source: str) -> Verdict:
+    """Pass when every resource address in the output names a resource of the source.
+
+    A plan gives the full address, for example module.postgres.aws_db_instance.this. An
+    output that leaves out the module path names the same resource, so the end of a known
+    address is accepted.
+    """
+    known = {m.group(1) for m in ADDRESS.finditer(source)}
+    named = {m.group(1) for m in ADDRESS.finditer(output)}
+    invented = sorted(
+        name
+        for name in named
+        if name not in known and not any(full.endswith("." + name) for full in known)
+    )
     return (not invented, f"not in the input: {', '.join(invented)}" if invented else "")
 
 

@@ -25,6 +25,7 @@ ROLES: dict[str, tuple[str, str]] = {
     "explainer": ("explainer", "explainer"),
     "investigator": ("investigator", "investigator"),
     "ask": ("ask", "explainer"),
+    "reviewer": ("reviewer", "reviewer"),
 }
 TRACE_KEY = "author_trace"
 
@@ -50,11 +51,11 @@ def _opening(role: str, user_text: str) -> list[ChatMessage]:
 
 @solver
 def role_turn(role: str | None = None) -> Solver:
-    """Send one request for the Explainer, the Investigator or Ask and keep the answer.
+    """Send one request for the Explainer, the Investigator, Ask or the Reviewer.
 
     Args:
-        role: explainer, investigator or ask. None takes the role from the metadata key
-            "role" of the sample.
+        role: explainer, investigator, ask or reviewer. None takes the role from the key
+            "role" of the sample metadata.
     """
 
     async def solve(state: TaskState, generate: Generate) -> TaskState:

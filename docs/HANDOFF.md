@@ -14,12 +14,124 @@ run in short-lived runners; all state is in an external PostgreSQL; people sign 
 OIDC in the core itself (changed by the owner on 2026-11-17, issue #45); the wizard builds
 the machine image with `ops`.
 
-### State at the end of the second session of 2026-11-17
+### Work in flight (written 2026-11-17, late in the day, before a new session)
 
-Next steps 1 to 4 are merged, and of step 5 the sign-in for a browser and the device flow
-for git and scripts (#39, #42, #43, #44, #46, #47 and #48).
-The next work is the last part of step 5, the device flow in the iOS app. Step 6 comes
-after that.
+Read this section first. It names work that is on this machine only.
+
+**Merged today:** #38, #39, #42, #43, #44, #46, #47, #48, #50, #52. Next steps 1 to 4 are
+done. Of step 5, the sign-in for a browser and the device flow for git and scripts are done.
+The adversarial review and typed runbooks are also merged.
+
+**Branches that are not merged.** Each is local unless the text says that it is pushed.
+
+| Branch | Where | State | To finish |
+|---|---|---|---|
+| `reviewer-evals-checked` | the main checkout | The evals for the Reviewer, a strict parser for its answer, `deferred_layers` in its input, and the fix that keeps secrets out of its concerns. The live eval round ran (see `evals/RESULTS.md` on the branch). The full run on commit `6634911` passed: thirteen work items, the chain at 316 events, no error line, `sweep.py` and `stale_plan.py` as usual. All eight reviews completed and none failed. The Reviewer kept `WI-0005` at T2 with three concerns in this run; in two earlier runs of the same day it raised it to T3. A mirror test of the evals still looked for the mitigation list that typed runbooks removed from the Go code; it now reads the runbook definitions | Push, open a pull request, merge. This text is on this branch |
+| `reviewer-evals` | worktree `.claude/worktrees/agent-ad37772b47ed8d947` | The same commits before the move onto the main branch | Remove the worktree after the merge |
+| `site-video-intro` | worktree `.claude/worktrees/agent-ae36a6a2b9fad684f` | The new site and video. A subagent was at work on it when this was written. See "The site and the video" below | See below |
+| `chat-approval` | worktree `.claude/worktrees/agent-aa1afd77bc263132f` | Approval inside Slack and Teams (issue #49). A subagent was at work on it and had not reported. Nothing of it ran end to end | Read its commits and its tests. Move it onto the main branch. Run `fresh-run.sh`, `core-check.sh` and `nanos-check.sh`. The real Slack and Teams are not tested: the owner put that off |
+
+The worktrees of earlier sessions are removed. Only the three worktrees in the table are
+left in `.claude/worktrees`. The local branches of the removed worktrees still exist; all
+their work is on the main branch.
+
+The logs of every live eval round are in `evals/logs/` of the main checkout (`before`,
+`round2`, `round3`, `round4`, `live`, `repeats`, `repro`, `repro2`), which git does not
+track. Keep them: `report.py` needs those logs to write the whole of `RESULTS.md` (the
+command is in `evals/README.md`, "Compare two runs").
+
+**The site and the video** (branch `site-video-intro`). The owner asked for all of this:
+
+- No fish and no paper boat as a mark or a metaphor, anywhere on the site or in the video.
+  The demo application keeps its name Paperboat and its real screenshots.
+- The product is called "S.R.C." in the copy. Commands keep the name `clanker`.
+- Tagline: "Don't build a legacy product installer. Build an AI site reliability engineer
+  that installs, upgrades, patches, and monitors your product."
+- More lines of the owner: "The convenience of managed services without needing a 3rd party
+  contract." "Inference is now one of the core ingredients alongside storage, memory, and
+  compute." "Your product should get better and easier to manage automatically when new
+  models come out." "S.R.C. uses AI to understand and propose the change in deterministic
+  code, then uses adversarial review to classify the risk level and a strict policy engine
+  to determine which changes need to be escalated for human review and approval."
+- The problem heading: "Most of operations is maintenance, and most maintenance is
+  repetitive and tedious." (not "is late").
+- The video shows the flow: download the setup app, sign in to your cloud, start the
+  control plane, deploy the product, maintain it. The cloud sign-in is a drawing with the
+  label "AWS: in progress". The owner wants the label kept.
+- Sections on Slack and Teams, on cost control and runbooks, and on the evals. The copy
+  must not name Swamp. It must not say "approve in Slack" before chat approval is merged.
+- The colours of the owner's other project (the SuperComm palette): honey `#F0B53F`,
+  honeyDeep `#D98E2B`, cream `#F7ECD7`, sky `#8AA8C8`, seaMid `#3A6E8F`, seaDeep `#1B354A`,
+  dark `#1C1917`, darkWarm `#292524`, terracotta `#E07856`, sage `#8FBC8F`, red `#C65545`.
+  Dark theme only.
+- The icon: a person who directs aircraft with two handheld wands.
+- An architecture figure made with the `anatomy` skill, for the architecture page and the
+  video. The owner wants to see it when it is ready.
+- The full-screen video was cropped (`object-fit: cover`); the fix is on the branch.
+
+To finish the site and the video:
+
+1. Look at what the subagent left on the branch, and at the stills, before anything else.
+   The owner saw one complete draft (176 s, with the local voice) and wants to see the
+   anatomy figure and the next draft.
+2. The final build uses the ElevenLabs voice of the owner (approved by the owner; the keys
+   are `ELEVEN_LABS_API_KEY` and `ELEVEN_LABS_VOICE_ID` in `.env`). With the demo up and
+   clean: `cd site`, `node export-data.mjs`, `./build-video.sh` with `VIDEO_FOOTAGE` not
+   set. A new export gives the pipeline scene the record of the adversarial review.
+3. Do not upload the video to the release `site-video`, and do not publish the anatomy
+   figure to a gallery, before the owner approves the result.
+
+**Decisions of the owner in this session that are not in an issue**
+
+- The model can raise a risk tier and never lower one (the adversarial review, #50).
+- No Swamp. Typed runbooks in this repository (section 5.6 of the plan, #52).
+- The owner has a free Slack workspace as its admin. A test with the real Slack is possible
+  when `chat-approval` is ready: the owner creates the app from the manifest on that branch
+  and puts `CLANKER_SLACK_SIGNING_SECRET`, `CLANKER_SLACK_BOT_TOKEN` and
+  `CLANKER_SLACK_CHANNEL` in `.env`. It needs a public address (`ngrok` is installed; ask
+  the owner before traffic goes through it) and the sign-in switched on. Teams is put off:
+  the free developer tenant of Microsoft is only for some accounts.
+
+**Questions that wait for the owner**
+
+- Do the setup wizard, the iOS app and the dashboard also get the new colours and the new
+  icon? The recommendation was yes, the dashboard last, because it needs a Carbon theme
+  and new footage.
+- How is a pull request on the `runbooks` repository tiered and approved? Until that
+  exists, a runbook and the policy rules cannot change after the first seed.
+- Does the owner want a pass over the 101 functions that are over a cyclomatic complexity
+  of 8, and a check in CI? Only the functions of this session were brought under it.
+
+**The order of the work after the branches above are merged**
+
+1. The device flow in the iOS app (the last part of step 5).
+2. The new colours and icon for the wizard, the iOS app and the dashboard, if the owner
+   says yes.
+3. The pull request path for runbooks, when the owner decides how.
+4. Step 6: the cloud runner and broker. Issue #40 has the decision for the secrets
+   (Parameter Store with the AWS SDK for Go v2).
+5. Issue #51: scrub the input of the model roles before the JSON frame.
+
+**Things that cost time in this session**
+
+- The hook that guards pushes refuses any command line that has the push command and the
+  word for the default branch, also inside a branch name and beside `--base`. Give a
+  branch a name without that word, and run the push as its own command.
+- A safety check can misread a long Python heredoc with backslashes as a removal and
+  refuse it. Write the script to a file in the scratchpad and run the file.
+- `cd` into a worktree moves the session. Use `cd` back or `git -C`.
+- Do not switch the branch of the main checkout while `fresh-run.sh`, `core-check.sh` or
+  `nanos-check.sh` runs. The two core checks need a checkout with no change that is not
+  committed.
+- The full run ends at 316 or 317 audit events now, not 310 (see
+  `scripts/verify/README.md`).
+- `git fsck` right after a fetch can fail once because of background maintenance of git.
+- Measure complexity with
+  `go run github.com/fzipp/gocyclo/cmd/gocyclo@v0.6.0 -over 8 <files>`.
+- A subagent in a worktree cannot use the demo. Each branch of a subagent needs the full
+  run in the main checkout before its pull request.
+
+### State of the next steps
 
 Also built in that session, on the request of the owner: the adversarial review. After
 the policy engine sets the tier of a planned change, the Reviewer role (a second model call
