@@ -36,7 +36,6 @@ var localTools = []tool{
 	{"kubectl", "talks to the cluster", "brew install kubectl"},
 	{"helm", "installs the application chart", "brew install helm"},
 	{"kind", "creates the local cluster", "brew install kind"},
-	{"opa", "runs the risk policy", "brew install opa"},
 }
 
 var awsTools = []tool{
