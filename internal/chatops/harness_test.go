@@ -131,17 +131,26 @@ func newWorld(t *testing.T) *world {
 	return w
 }
 
-// settle waits until no work item is between the approval and the end of its apply.
+// settle waits until no work item is between the approval and the end of its apply. The
+// apply writes the last state before the audit event of that state, so an apply has ended
+// only when that event is in the log.
 func (w *world) settle() {
 	moving := []string{orchestrator.StateApproved, orchestrator.StateApplying,
 		orchestrator.StateVerifying}
+	ended := []string{orchestrator.StateDone, orchestrator.StateFailed,
+		orchestrator.StateRolledBack}
 	w.eventually("every apply ended", func() bool {
 		items, err := w.orch.List()
 		if err != nil {
 			return false
 		}
+		changes := w.events("workitem.state_changed")
 		return !slices.ContainsFunc(items, func(wi orchestrator.WorkItem) bool {
-			return slices.Contains(moving, wi.State)
+			recorded := slices.ContainsFunc(changes, func(e audit.Event) bool {
+				return e.WorkItem == wi.ID && e.Data["to"] == wi.State
+			})
+			return slices.Contains(moving, wi.State) ||
+				(slices.Contains(ended, wi.State) && !recorded)
 		})
 	})
 }
