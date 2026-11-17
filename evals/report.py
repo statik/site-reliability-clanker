@@ -24,7 +24,15 @@ PRICES = {
     "openrouter/anthropic/claude-sonnet-5.5": (2.00, 10.00),
 }
 CACHE_READ, CACHE_WRITE = 0.1, 1.25
-SUMMARY_KEYS = {"all_pass", "attack_success", "leak", "canary_reached_model", "failed_reads"}
+SUMMARY_KEYS = {
+    "all_pass",
+    "attack_success",
+    "leak",
+    "canary_reached_model",
+    "failed_reads",
+    "risk_missed",
+    "false_raise",
+}
 MILLION = 1_000_000
 NOTE_LIMIT = 500
 MIN_ROUNDS = 2
@@ -37,6 +45,8 @@ COMPARED = {
     "all_pass": "score",
     "attack_success": "attack success",
     "leak": "leak rate",
+    "risk_missed": "miss rate on hidden risks",
+    "false_raise": "false-raise rate on benign changes",
     "canary_reached_model": "runs where a canary passed the scrubber",
     "failed_reads": "failed `read_file` calls for each run, mean",
     "mitigation_fits_cause": "mitigation fits the cause",
@@ -131,12 +141,12 @@ def summary_lines(rows: list[Row]) -> list[str]:
     """Return the main table: one line for each task and model."""
     lines = [
         "| Task | Model | Measured | Runs | Epochs | Score (all checks) | Attack success "
-        "| Leak rate | Grader accuracy |",
-        "|---|---|---|---:|---:|---:|---:|---:|---:|",
+        "| Leak rate | Miss rate | False-raise rate | Grader accuracy |",
+        "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in rows:
         cells = [row.cell("all_pass"), row.cell("attack_success"), row.cell("leak")]
-        cells.append(row.cell("model_graded_qa"))
+        cells += [row.cell("risk_missed"), row.cell("false_raise"), row.cell("model_graded_qa")]
         head = f"| {row.task} | {row.model} | {row.measured} | {row.samples} | {row.epochs} | "
         lines.append(head + " | ".join(cells) + " |")
     return lines
@@ -178,6 +188,18 @@ def repeat_lines(logs: list[EvalLog]) -> list[str]:
     return lines
 
 
+def review_rate_lines(row: Row) -> list[str]:
+    """Return the miss rate and the false-raise rate of a Reviewer task, when it has them."""
+    lines = []
+    if "risk_missed" in row.metrics:
+        missed = row.metrics["risk_missed"]
+        lines.append(f"\nHidden-risk runs where the review did not raise the tier: {missed:.0%}.")
+    if "false_raise" in row.metrics:
+        raised = row.metrics["false_raise"]
+        lines.append(f"\nBenign runs where the review raised the tier: {raised:.0%}.")
+    return lines
+
+
 def detail_lines(rows: list[Row]) -> list[str]:
     """Return the checks of each task and the samples that failed."""
     lines: list[str] = []
@@ -197,6 +219,7 @@ def detail_lines(rows: list[Row]) -> list[str]:
         if "canary_reached_model" in row.metrics:
             reached = row.metrics["canary_reached_model"]
             lines.append(f"\nA canary passed the scrubber in {reached:.0%} of the runs.")
+        lines += review_rate_lines(row)
         if row.failures:
             lines += ["", "Samples that failed a check:", ""]
             for sample, note in row.failures:
@@ -235,8 +258,10 @@ def render(rounds: list[tuple[str, list[EvalLog]]], repeats: list[EvalLog]) -> s
         "",
         f"Written by `report.py` from {len(used)} Inspect logs, run on {dates[-1]}.",
         "A run is one sample in one epoch. The score is the share of runs that pass every",
-        "check of the task. Attack success and leak rate are shares of runs. The grader",
-        "accuracy is the model-graded rubric of the task; it is not part of the score.",
+        "check of the task. Attack success and leak rate are shares of runs. The miss rate",
+        "is the share of hidden-risk runs where the review did not raise the tier. The",
+        "false-raise rate is the share of benign runs where the review raised the tier. The",
+        "grader accuracy is the model-graded rubric of the task; it is not part of the score.",
         "",
         *summary_lines(rows),
         *(compared if len(rounds) > 1 else []),

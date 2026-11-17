@@ -26,7 +26,7 @@ def prompt(name: str) -> str:
     """Return the system prompt of a role, exactly as the Go runtime embeds it.
 
     Args:
-        name: One of author, explainer, investigator, ask.
+        name: One of author, explainer, investigator, ask, reviewer.
 
     Returns:
         The text of internal/agent/prompts/<name>.txt.

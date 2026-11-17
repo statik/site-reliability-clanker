@@ -19,6 +19,7 @@ from clanker_evals.tasks.author import author_correctness, author_minimality_and
 from clanker_evals.tasks.explainer import explainer_faithfulness, explainer_no_self_classification
 from clanker_evals.tasks.injection import prompt_injection
 from clanker_evals.tasks.investigator import investigator_diagnosis
+from clanker_evals.tasks.reviewer import reviewer_risk_detection
 from clanker_evals.tasks.secrets import secret_leakage
 from clanker_evals.tasks.tier_policy import tier_policy_regression
 
@@ -33,6 +34,7 @@ ALL_TASKS = [
     ask_groundedness,
     secret_leakage,
     tier_policy_regression,
+    reviewer_risk_detection,
 ]
 
 

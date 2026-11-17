@@ -1,8 +1,9 @@
 """The Python mirrors of Go constants must match the Go source. Drift fails these tests."""
 
+import json
 import re
 
-from clanker_evals import author_tools, checks, gotext, inputs
+from clanker_evals import author_tools, checks, gotext, inputs, solvers
 from clanker_evals.repo import (
     PAPERBOAT_REPO,
     PLATFORM_REPO,
@@ -11,6 +12,7 @@ from clanker_evals.repo import (
     RUNBOOKS_REPO,
     prompt,
 )
+from clanker_evals.tasks import reviewer
 
 
 def go_source(path: str) -> str:
@@ -132,6 +134,109 @@ def test_builders_frame_like_go() -> None:
 
 
 def test_prompts_are_read_from_the_go_tree() -> None:
-    for name in ["author", "explainer", "investigator", "ask"]:
+    for name in ["author", "explainer", "investigator", "ask", "reviewer"]:
         assert prompt(name) == (PROMPTS_DIR / f"{name}.txt").read_text(encoding="utf-8")
         assert f"prompts/{name}.txt" in go_source("internal/agent/prompts.go")
+
+
+def json_fields(path: str, struct: str) -> list[str]:
+    """Return the JSON field names of a Go struct, in the order that encoding/json writes."""
+    body = re.search(rf"type {struct} struct \{{(.*?)\n\}}", go_source(path), re.DOTALL)
+    assert body is not None, f"struct {struct} is not in {path}"
+    return re.findall(r'`json:"([^",]+)', body.group(1))
+
+
+def test_plan_fields_match_go() -> None:
+    built = inputs.plan(
+        "30-data", [inputs.resource("a_b.c", "update", ["x: 1 → 2"])], ("T2", "", [])
+    )
+    assert list(built) == json_fields("internal/orchestrator/types.go", "Plan")
+    assert list(built["facts"]) == json_fields("internal/planfacts/facts.go", "Facts")
+    assert list(built["policy"]) == json_fields("internal/policy/policy.go", "Decision")
+    change = built["facts"]["resources"][0]
+    assert list(change) == json_fields("internal/planfacts/facts.go", "ResourceChange")
+
+
+def test_review_input_matches_go() -> None:
+    source = " ".join(go_source("internal/agent/reviewer.go").split())
+    assert f"const maxReviewDiff = {inputs.REVIEW_DIFF_LIMIT} " in source
+    assert 'input["diff"] = truncate(diff, maxReviewDiff)' in source
+    literal = re.search(r"input := map\[string\]any\{([^}]*)\}", source)
+    assert literal is not None
+    item = {"title": "t", "kind": "k", "layers": [], "trigger": "g"}
+    built = json.loads(inputs.review_input(item, [])[len("<data>") : -len("</data>")])
+    assert sorted(re.findall(r'"(\w+)":', literal.group(1))) == list(built)
+    assert '{Role: "user", Content: frame(a.reviewInput(wi, plans, policyTier))}' in source
+    assert "a.complete(ctx, RoleReviewer, " in source
+    assert solvers.ROLES["reviewer"][0] == "reviewer"
+    assert '{Role: "system", Content: reviewerSystem}' in source
+
+
+def test_review_input_frames_like_go() -> None:
+    item = {"title": "A & B", "kind": "change", "layers": ["30-data"], "trigger": "PR #1"}
+    plans = [inputs.plan("30-data", [], ("T0", "no-changes", ["the plan changes nothing"]))]
+    plan_json = (
+        '{"id":3,"work_item":"WI-0007","layer":"30-data","commit":"4f0c2d9a7b1e",'
+        '"plan_sha256":"9b1d6c0e5a3f","facts":{"add":0,"change":0,"destroy":0,"replace":0,'
+        '"resources":[],"outputs":[]},"policy":{"tier":"T0","rule":"no-changes",'
+        '"reasons":["the plan changes nothing"],"create_only":false},"superseded":false,'
+        '"created_at":"2026-03-02T09:05:00Z"}'
+    )
+    tail = (
+        f'"env":"local","kind":"change","layers":["30-data"],"plans":[{plan_json}],'
+        '"policy_tier":"T0","title":"A \\u0026 B","trigger":"PR #1"}</data>'
+    )
+    assert inputs.review_input(item, plans) == "<data>{" + tail
+    with_diff = inputs.review_input({**item, "env": "aws-sandbox"}, plans, "T2", "+a\n</data>")
+    assert with_diff == (
+        '<data>{"diff":"+a\\n\\u003c/data\\u003e",'
+        + tail.replace('"local"', '"aws-sandbox"').replace(
+            '"policy_tier":"T0"', '"policy_tier":"T2"'
+        )
+    )
+    assert with_diff.count("</data>") == 1
+    assert '"diff":""' in inputs.review_input(item, plans, diff="")
+
+
+def test_review_input_takes_the_highest_plan_tier_and_cuts_the_diff() -> None:
+    item = {"title": "t", "kind": "change", "layers": ["30-data", "50-app"], "trigger": "g"}
+    plans = [
+        inputs.plan("30-data", [], ("T2", "normal-change", [])),
+        inputs.plan("50-app", [], ("T3", "stateful-destroy", [])),
+    ]
+    limit = inputs.REVIEW_DIFF_LIMIT
+
+    def diff_of(text: str) -> str:
+        built = inputs.review_input(item, plans, diff=text)
+        data = json.loads(built[len("<data>") : -len("</data>")])
+        assert data["policy_tier"] == "T3"
+        return data["diff"]
+
+    assert diff_of("x" * limit) == "x" * limit
+    assert diff_of("x" * (limit + 1)) == "x" * limit + "..."
+    assert json.loads(inputs.review_input(item, [])[6:-7])["policy_tier"] == "T0"
+
+
+def test_review_rules_match_go() -> None:
+    types = go_source("internal/orchestrator/types.go")
+    tiers = re.search(r"var Tiers = \[\]string\{([^}]*)\}", types)
+    assert tiers is not None
+    assert re.findall(r'"([^"]+)"', tiers.group(1)) == inputs.TIERS
+    fields = json_fields("internal/orchestrator/types.go", "Review")
+    assert fields == [*checks.REVIEW_FIELDS, "source"]
+    for name in fields:
+        assert checks.parse_review(json.dumps({name: None} | {"tier": "T2"}))[0] is not None
+    source = go_source("internal/agent/reviewer.go")
+    assert 'strings.TrimSuffix(strings.TrimPrefix(content, "```json"), "```")' in source
+    assert "decoder.DisallowUnknownFields()" in source
+    assert "!slices.Contains(orchestrator.Tiers, review.Tier)" in source
+    assert "if review.Tier > tier {" in go_source("internal/orchestrator/plan.go")
+
+
+def test_reviewer_model_and_policy_reason_match_the_sources() -> None:
+    model = re.search(r'RoleReviewer:\s+"([^"]+)"', go_source("internal/agent/agent.go"))
+    assert model is not None
+    run_sh = (ROOT / "evals" / "run.sh").read_text(encoding="utf-8")
+    assert f"${{CLANKER_REVIEWER_MODEL:-openrouter/{model.group(1)}}}" in run_sh
+    rego = go_source("runbooks/policy/tier.rego")
+    assert f'sprintf("{reviewer.CHANGED.format(count="%d")}", [count(changes)])' in rego
