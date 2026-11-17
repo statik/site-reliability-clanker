@@ -1,0 +1,260 @@
+// The colours of S.R.C. The website (site/css/site.css) is the source of truth: the same
+// eleven values and the same rule, that every colour is one of them or a mix of two of them.
+// This file has no Carbon in it, so that the contrast test can compile it alone.
+@use "sass:color";
+
+$honey: #f0b53f;
+$honey-deep: #d98e2b;
+$cream: #f7ecd7;
+$sky: #8aa8c8;
+$sea-mid: #3a6e8f;
+$sea-deep: #1b354a;
+$dark: #1c1917;
+$dark-warm: #292524;
+$terracotta: #e07856;
+$sage: #8fbc8f;
+$red: #c65545;
+
+// The same as `color-mix(in srgb, $colour $share, $ground)` on the website.
+@function blend($colour, $share, $ground) {
+  @return color.mix($colour, $ground, $share);
+}
+
+@function veil($colour, $alpha) {
+  @return color.change($colour, $alpha: $alpha);
+}
+
+$layer-01: $dark-warm;
+$layer-02: blend($cream, 10%, $dark-warm);
+$layer-03: blend($cream, 12%, $dark-warm);
+$layer-04: blend($cream, 16%, $dark-warm);
+$layer-05: blend($cream, 20%, $dark-warm);
+$border-subtle: blend($cream, 16%, $dark);
+$border-strong: blend($cream, 42%, $dark);
+$border-stronger: blend($cream, 64%, $dark);
+$text-secondary: blend($cream, 80%, $dark);
+$text-disabled: blend($cream, 40%, $dark);
+$error: blend($red, 62%, $cream);
+
+// Three text colours are lighter than on the website, where they stand on the ground or the
+// first layer only. Here they also stand on the second and third layers, and must keep 4.5:1.
+$text-helper: blend($cream, 70%, $dark);
+$text-error: blend($red, 50%, $cream);
+$link-hover: blend($honey, 60%, $cream);
+$tag-gray: $layer-02;
+
+// Carbon's theme tokens. One dark theme: a warm dark ground, cream text, honey as the accent
+// with dark text on it, cream for focus. Sky marks what the software wrote (the AI label).
+$theme: (
+  background: $dark,
+  background-active: veil($cream, 0.2),
+  background-brand: $honey,
+  background-hover: veil($cream, 0.1),
+  background-inverse: $cream,
+  background-inverse-hover: $text-secondary,
+  background-selected: veil($cream, 0.14),
+  background-selected-hover: veil($cream, 0.18),
+  layer-01: $layer-01,
+  layer-02: $layer-02,
+  layer-03: $layer-03,
+  layer-background-01: $dark,
+  layer-background-02: $layer-01,
+  layer-background-03: $layer-02,
+  layer-hover-01: blend($cream, 6%, $dark-warm),
+  layer-hover-02: $layer-03,
+  layer-hover-03: $layer-04,
+  layer-active-01: $layer-04,
+  layer-active-02: $layer-04,
+  layer-active-03: $layer-05,
+  layer-selected-01: $layer-02,
+  layer-selected-02: $layer-03,
+  layer-selected-03: $layer-04,
+  layer-selected-hover-01: $layer-03,
+  layer-selected-hover-02: $layer-04,
+  layer-selected-hover-03: $layer-05,
+  layer-selected-inverse: $cream,
+  layer-selected-disabled: $border-stronger,
+  layer-accent-01: $layer-02,
+  layer-accent-02: $layer-03,
+  layer-accent-03: $layer-04,
+  layer-accent-hover-01: $layer-03,
+  layer-accent-hover-02: $layer-04,
+  layer-accent-hover-03: $layer-05,
+  layer-accent-active-01: $border-strong,
+  layer-accent-active-02: $border-strong,
+  layer-accent-active-03: $layer-02,
+  field-01: $layer-01,
+  field-02: $layer-02,
+  field-03: $layer-03,
+  field-hover-01: blend($cream, 6%, $dark-warm),
+  field-hover-02: $layer-03,
+  field-hover-03: $layer-04,
+  border-subtle-00: $border-subtle,
+  border-subtle-01: $border-subtle,
+  border-subtle-02: blend($cream, 24%, $dark),
+  border-subtle-03: blend($cream, 24%, $dark),
+  border-subtle-selected-01: blend($cream, 24%, $dark),
+  border-subtle-selected-02: $border-strong,
+  border-subtle-selected-03: $border-strong,
+  border-strong-01: $border-strong,
+  border-strong-02: $border-stronger,
+  border-strong-03: $text-secondary,
+  border-tile-01: $border-subtle,
+  border-tile-02: blend($cream, 24%, $dark),
+  border-tile-03: $border-strong,
+  border-inverse: $cream,
+  border-interactive: $honey,
+  border-disabled: veil($cream, 0.3),
+  text-primary: $cream,
+  text-secondary: $text-secondary,
+  text-placeholder: $text-helper,
+  text-helper: $text-helper,
+  text-error: $text-error,
+  text-inverse: $dark,
+  text-on-color: $dark,
+  text-on-color-disabled: $text-helper,
+  text-disabled: $text-disabled,
+  link-primary: $honey,
+  link-primary-hover: $link-hover,
+  link-secondary: $honey,
+  link-visited: $link-hover,
+  link-inverse: $sea-deep,
+  link-inverse-active: $dark,
+  link-inverse-hover: $dark,
+  link-inverse-visited: $sea-mid,
+  icon-primary: $cream,
+  icon-secondary: $text-secondary,
+  icon-interactive: $honey,
+  icon-inverse: $dark,
+  icon-on-color: $dark,
+  icon-on-color-disabled: $text-helper,
+  icon-disabled: $text-disabled,
+  interactive: $honey,
+  focus: $cream,
+  focus-inset: $dark,
+  focus-inverse: $dark,
+  highlight: blend($honey, 30%, $dark),
+  overlay: veil($dark, 0.72),
+  shadow: veil($dark, 0.8),
+  toggle-off: $border-strong,
+  skeleton-background: blend($cream, 6%, $dark-warm),
+  skeleton-element: $layer-03,
+  support-error: $error,
+  support-success: $sage,
+  support-warning: $terracotta,
+  support-info: $sky,
+  support-caution-major: $terracotta,
+  support-caution-minor: $honey-deep,
+  support-caution-undefined: $sky,
+  support-error-inverse: $red,
+  support-success-inverse: $sea-mid,
+  support-warning-inverse: $honey-deep,
+  support-info-inverse: $sea-mid,
+  ai-aura-start: veil($sky, 0.1),
+  ai-aura-start-sm: veil($sky, 0.16),
+  ai-aura-end: veil($dark, 0),
+  ai-aura-hover-background: $layer-02,
+  ai-aura-hover-start: veil($sky, 0.4),
+  ai-aura-hover-end: veil($dark, 0),
+  ai-border-start: veil($sky, 0.36),
+  ai-border-end: $sky,
+  ai-border-strong: $sky,
+  ai-drop-shadow: veil($dark, 0.28),
+  ai-inner-shadow: veil($sky, 0.16),
+  ai-overlay: veil($dark, 0.5),
+  ai-popover-background: $dark,
+  ai-popover-caret-bottom: $sky,
+  ai-popover-caret-bottom-background: blend($sky, 34%, $dark),
+  ai-popover-caret-bottom-background-actions: blend($sky, 24%, $dark),
+  ai-popover-caret-center: blend($sky, 64%, $dark),
+  ai-popover-shadow-outer-01: veil($dark, 0.12),
+  ai-popover-shadow-outer-02: veil($dark, 0.08),
+  ai-skeleton-background: veil($sky, 0.5),
+  ai-skeleton-element-background: veil($sky, 0.3),
+);
+
+// Filled buttons carry dark text (`text-on-color`), so every fill is a light colour.
+$button: (
+  button-primary: $honey,
+  button-primary-hover: $honey-deep,
+  button-primary-active: blend($honey-deep, 80%, $dark),
+  button-secondary: $text-secondary,
+  button-secondary-hover: $cream,
+  button-secondary-active: $text-helper,
+  button-tertiary: $honey,
+  button-tertiary-hover: $honey,
+  button-tertiary-active: $honey-deep,
+  button-danger-primary: $error,
+  button-danger-secondary: $text-error,
+  button-danger-hover: blend($red, 40%, $cream),
+  button-danger-active: blend($red, 80%, $cream),
+  button-separator: $dark,
+  button-disabled: $layer-03,
+);
+
+// Tag fills. The hues are those of the website: T0 gray, T1 sea, T2 sky, T3 red; green sage,
+// purple honey. The website shows four tiers side by side; the dashboard shows thirteen states
+// too, so sky and sage are stronger mixes here, and two kinds are a full colour with dark
+// text: magenta is terracotta (the warning colour, apart from the red of a failure) and cyan
+// is sky. The three grays are one gray, as near to each other as they are in Carbon. Every
+// tag has an icon and a label: colour is the third signal.
+$tag-fill: (
+  "red": blend($red, 48%, $dark),
+  "magenta": $terracotta,
+  "purple": blend($honey, 30%, $dark),
+  "blue": blend($sky, 56%, $dark),
+  "cyan": $sky,
+  "teal": blend($sea-mid, 60%, $dark),
+  "green": blend($sage, 40%, $dark),
+  "gray": $tag-gray,
+  "cool-gray": $tag-gray,
+  "warm-gray": $tag-gray,
+);
+$tag-text: (
+  "red": $cream,
+  "magenta": $dark,
+  "purple": $cream,
+  "blue": $cream,
+  "cyan": $dark,
+  "teal": $cream,
+  "green": $cream,
+  "gray": $cream,
+  "cool-gray": $cream,
+  "warm-gray": $cream,
+);
+$tag-hue: (
+  "red": $red,
+  "magenta": $terracotta,
+  "purple": $honey,
+  "blue": $sky,
+  "cyan": $sky,
+  "teal": $sea-mid,
+  "green": $sage,
+  "gray": $cream,
+  "cool-gray": $cream,
+  "warm-gray": $cream,
+);
+
+// Low-contrast notifications sit on the first layer, as in Carbon's dark themes. The kind
+// shows in the icon, the title and the coloured edge.
+$notification: (
+  notification-background-error: $layer-01,
+  notification-background-success: $layer-01,
+  notification-background-info: $layer-01,
+  notification-background-warning: $layer-01,
+  notification-action-hover: $layer-02,
+  notification-action-tertiary-inverse: $dark,
+  notification-action-tertiary-inverse-active: $dark-warm,
+  notification-action-tertiary-inverse-hover: $dark-warm,
+  notification-action-tertiary-inverse-text: $cream,
+  notification-action-tertiary-inverse-text-on-color-disabled: $text-helper,
+);
+
+$content-switcher: (
+  content-switcher-background: veil($dark, 0),
+  content-switcher-background-hover: veil($cream, 0.1),
+  content-switcher-selected: veil($cream, 0.16),
+);
+
+// Series colours of the charts, in the order the chart gives them out.
+$series: ($honey, $sky, $sage, $terracotta, $cream);

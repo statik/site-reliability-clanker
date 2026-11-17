@@ -18,14 +18,12 @@ import {
 } from "@carbon/react";
 import {
   Activity,
-  Asleep,
   Catalog,
   ChartNetwork,
   Chat,
   Code,
   Dashboard,
   EventSchedule,
-  Light,
   Locked,
   Notification,
   PlayOutline,
@@ -34,6 +32,7 @@ import {
   UserAvatar,
 } from "@carbon/icons-react";
 import { signOut } from "@/api/client";
+import mark from "@/assets/icon.svg";
 import { AsOfBanner, AsOfControl } from "@/components/AsOf";
 import { ErrorNote } from "@/components/common";
 import { IconTag, StatusTag } from "@/components/status";
@@ -112,10 +111,9 @@ function UserPanel({ expanded, onPick }: { expanded: boolean; onPick: () => void
 }
 
 function GlobalBar() {
-  const { user, userName, signIn, theme, toggleTheme } = useSession();
+  const { user, userName, signIn } = useSession();
   const { connected } = useLive();
   const [panel, setPanel] = useState(false);
-  const dark = theme === "g100";
   return (
     <>
       <HeaderGlobalBar>
@@ -127,10 +125,6 @@ function GlobalBar() {
           </IconTag>
         </div>
         <AsOfControl />
-        <HeaderGlobalAction aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
-          onClick={toggleTheme}>
-          {dark ? <Light size={20} /> : <Asleep size={20} />}
-        </HeaderGlobalAction>
         <HeaderGlobalAction aria-label={signIn ? "Account" : "Switch user"} isActive={panel} tooltipAlignment="end"
           aria-expanded={panel} onClick={() => setPanel((open) => !open)}>
           <UserAvatar size={20} />
@@ -148,9 +142,13 @@ export function Shell({ children }: { children: ReactNode }) {
   const clockError = useClockError();
   return (
     <>
-      <Header aria-label="Site Reliability Clanker">
+      <Header aria-label="S.R.C. (Site Reliability Clanker)">
         <SkipToContent />
-        <HeaderName as={RouterLink} to="/" prefix="Site Reliability">Clanker</HeaderName>
+        <HeaderName as={RouterLink} to="/" prefix="" className="app-header-name">
+          <img className="app-mark" src={mark} alt="" width={24} height={24} />
+          S.R.C.
+          <span className="app-product-name">Site Reliability Clanker</span>
+        </HeaderName>
         <GlobalBar />
       </Header>
       <SideNav aria-label="Dashboard areas" isFixedNav expanded isChildOfHeader={false}>

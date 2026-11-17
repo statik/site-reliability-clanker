@@ -6,7 +6,6 @@ import type { Timeline } from "@/api/types";
 import { query, serverTime } from "@/api/urls";
 import { Empty, Loaded } from "@/components/common";
 import { anyEvent, useApi } from "@/hooks/useApi";
-import { useSession } from "@/state/session";
 
 const WINDOW_MS = 14 * 86_400_000;
 const HOUR_MS = 3_600_000;
@@ -19,7 +18,6 @@ interface Point {
 }
 
 function Chart({ timeline }: { timeline: Timeline }) {
-  const { theme } = useSession();
   const points = useMemo<Point[]>(() => Object.entries(timeline.health).flatMap(
     ([env, buckets]) => buckets.map((bucket) => ({
       group: env,
@@ -51,7 +49,7 @@ function Chart({ timeline }: { timeline: Timeline }) {
         includeZero: false },
     },
     height: "320px",
-    theme,
+    theme: "g100",
     points: { radius: 2 },
     toolbar: { enabled: false },
   };

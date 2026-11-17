@@ -1,0 +1,10 @@
+// Carbon's theme module, configured once with the S.R.C. palette. Every stylesheet of the
+// dashboard takes its colour tokens from here. Carbon's documented way to set a custom theme
+// is the `$theme` map with a `$fallback` for what the map leaves out (type and spacing).
+@use "@carbon/react/scss/themes";
+@use "./palette";
+
+@forward "@carbon/react/scss/theme" with (
+  $fallback: themes.$g100,
+  $theme: palette.$theme
+);

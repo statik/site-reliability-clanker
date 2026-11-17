@@ -54,7 +54,7 @@ function Message({ entry, source }: { entry: ChatEntry; source: string }) {
     <Tile className="app-chat-answer app-stack-tight" decorator={
       <AiMark source={source} what="answer" />
     }>
-      <p className="app-label">Clanker · {formatTime(entry.at)}</p>
+      <p className="app-label">S.R.C. · {formatTime(entry.at)}</p>
       <p className="app-prose">{entry.body}</p>
       <Citations citations={entry.citations ?? []} />
     </Tile>
@@ -126,7 +126,7 @@ export function AskPanel({ workItem, suggestions }: { workItem: string; suggesti
       }}>
         <div className="app-fill">
           <TextInput id={`ask-${workItem === "" ? "global" : workItem}`} value={question}
-            labelText={workItem === "" ? "Ask Clanker" : `Ask about ${workItem}`}
+            labelText={workItem === "" ? "Ask S.R.C." : `Ask about ${workItem}`}
             placeholder="Type a question" onChange={(event) => setQuestion(event.target.value)} />
         </div>
         <Button type="submit" renderIcon={Send}

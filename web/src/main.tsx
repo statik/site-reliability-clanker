@@ -5,8 +5,8 @@ import { App } from "@/App";
 import { ClockProvider } from "@/state/clock";
 import { LiveProvider } from "@/state/live";
 import { SessionProvider } from "@/state/session";
-import "@/styles/index.scss";
 import "@carbon/charts-react/styles.css";
+import "@/styles/index.scss";
 import "@/styles/timeline.scss";
 import "@/styles/topology.scss";
 
