@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -43,8 +44,12 @@ Common flags:
 
 // options are the settings shared by the commands.
 type options struct {
+	// dataDir and sourceDir are empty for the core on a cloud, which uses no directory.
 	dataDir   string
 	sourceDir string
+	// source holds the files of this repository: a checkout, or the files that a released
+	// binary carries.
+	source    fs.FS
 	addr      string
 	sinkAddr  string
 	env       string
@@ -54,29 +59,61 @@ type options struct {
 	noBrowser bool
 }
 
-func parse(args []string) (options, error) {
+func parse(command string, args []string) (options, error) {
 	var o options
-	fs := flag.NewFlagSet("clanker", flag.ContinueOnError)
-	fs.StringVar(&o.dataDir, "data", "", "data directory")
-	fs.StringVar(&o.sourceDir, "source", "", "checkout of this repository")
-	fs.StringVar(&o.setupAddr, "setup-addr", "127.0.0.1:7069", "listen address of the wizard")
-	fs.BoolVar(&o.noBrowser, "no-browser", false, "do not open the wizard in the browser")
-	fs.StringVar(&o.addr, "addr", "127.0.0.1:7070", "listen address of the control plane")
-	fs.StringVar(&o.sinkAddr, "sink-addr", "127.0.0.1:7071", "listen address of the sink")
-	fs.StringVar(&o.env, "env", "local", "environment name")
-	fs.StringVar(&o.cloud, "cloud", "local", "cloud of the environment")
-	fs.BoolVar(&o.demo, "demo", true, "demo mode: simulator, local mail and webhook sink")
-	if err := fs.Parse(args); err != nil {
+	flags := flag.NewFlagSet("clanker", flag.ContinueOnError)
+	flags.StringVar(&o.dataDir, "data", "", "data directory")
+	flags.StringVar(&o.sourceDir, "source", "", "checkout of this repository")
+	flags.StringVar(&o.setupAddr, "setup-addr", "127.0.0.1:7069", "listen address of the wizard")
+	flags.BoolVar(&o.noBrowser, "no-browser", false, "do not open the wizard in the browser")
+	flags.StringVar(&o.addr, "addr", "127.0.0.1:7070", "listen address of the control plane")
+	flags.StringVar(&o.sinkAddr, "sink-addr", "127.0.0.1:7071", "listen address of the sink")
+	flags.StringVar(&o.env, "env", "local", "environment name")
+	flags.StringVar(&o.cloud, "cloud", "local", "cloud of the environment")
+	flags.BoolVar(&o.demo, "demo", true, "demo mode: simulator, local mail and webhook sink")
+	if err := flags.Parse(args); err != nil {
 		return options{}, err
 	}
-	if err := locate(&o); err != nil {
+	locator := locate
+	if command == "up" && o.cloud != "local" {
+		locator = locateCore
+	}
+	if err := locator(&o); err != nil {
 		return options{}, err
 	}
-	if _, err := os.Stat(filepath.Join(o.sourceDir, "platform", "CONTRACT.md")); err != nil {
-		return options{}, fmt.Errorf("%s is not a checkout of this repository: run clanker "+
+	if _, err := fs.Stat(o.source, "platform/CONTRACT.md"); err != nil {
+		return options{}, fmt.Errorf("the files of this repository are not at %q: run clanker "+
 			"from the repository root or set --source", o.sourceDir)
 	}
 	return o, nil
+}
+
+// locateCore fills in the source files of the core on a cloud. That core has no disk to
+// write on: a released binary reads the files that it carries from memory, and there is no
+// data directory.
+func locateCore(o *options) error {
+	if o.dataDir != "" {
+		return fmt.Errorf("the control plane on %s keeps no file: remove --data", o.cloud)
+	}
+	if o.sourceDir == "" && bundle.Present() {
+		var err error
+		o.source, err = bundle.FS()
+		return err
+	}
+	return locateCheckout(o)
+}
+
+// locateCheckout fills in the source directory from --source or the current directory.
+func locateCheckout(o *options) error {
+	if o.sourceDir == "" {
+		o.sourceDir = "."
+	}
+	var err error
+	if o.sourceDir, err = filepath.Abs(o.sourceDir); err != nil {
+		return fmt.Errorf("resolve source directory: %w", err)
+	}
+	o.source = os.DirFS(o.sourceDir)
+	return nil
 }
 
 // locate fills in the data directory and the source directory. A released binary carries
@@ -102,16 +139,13 @@ func locate(o *options) error {
 		if err := os.MkdirAll(o.dataDir, 0o755); err != nil {
 			return fmt.Errorf("create data directory %s: %w", o.dataDir, err)
 		}
-		o.sourceDir, err = bundle.Extract(o.dataDir)
-		return err
+		if o.sourceDir, err = bundle.Extract(o.dataDir); err != nil {
+			return err
+		}
+		o.source = os.DirFS(o.sourceDir)
+		return nil
 	}
-	if o.sourceDir == "" {
-		o.sourceDir = "."
-	}
-	if o.sourceDir, err = filepath.Abs(o.sourceDir); err != nil {
-		return fmt.Errorf("resolve source directory: %w", err)
-	}
-	return nil
+	return locateCheckout(o)
 }
 
 // loadDotEnv reads KEY=VALUE lines from .env in the source directory. A variable that is
@@ -253,15 +287,19 @@ func run() error {
 		defer stop()
 		return runRunner(ctx, args[1:])
 	}
-	o, err := parse(args[1:])
+	o, err := parse(command, args[1:])
 	if err != nil {
 		return err
 	}
-	if err := loadDotEnv(o.sourceDir); err != nil {
-		return err
+	if o.sourceDir != "" {
+		if err := loadDotEnv(o.sourceDir); err != nil {
+			return err
+		}
 	}
-	if err := loadEnvFile(filepath.Join(o.dataDir, "secrets.env")); err != nil {
-		return err
+	if o.dataDir != "" {
+		if err := loadEnvFile(filepath.Join(o.dataDir, "secrets.env")); err != nil {
+			return err
+		}
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

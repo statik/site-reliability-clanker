@@ -6,9 +6,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"net/http"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/audit"
@@ -32,8 +31,8 @@ type Simulator struct {
 	Orch     *orchestrator.Orchestrator
 	Monitor  *monitor.Monitor
 	Notifier *notify.Notifier
-	// SourceDir is the checkout of this repository. Release notes are published from it.
-	SourceDir string
+	// Source holds the files of this repository. Release notes are published from it.
+	Source fs.FS
 	// AdminToken is the fault-injection token of the application.
 	AdminToken string
 	// ManualChange changes the environment outside the pipeline, as a person would. The
@@ -143,15 +142,21 @@ func (s *Simulator) Advance(ctx context.Context, d time.Duration) error {
 	return err
 }
 
-func (s *Simulator) publishRelease(ctx context.Context, version string) error {
-	path := filepath.Join(s.SourceDir, "apps", "paperboat", "releases", version+".md")
-	note, err := os.ReadFile(path)
+// commitRelease puts the release note of a version into the repository of the application.
+func (s *Simulator) commitRelease(version string) error {
+	path := "apps/paperboat/releases/" + version + ".md"
+	note, err := fs.ReadFile(s.Source, path)
 	if err != nil {
 		return fmt.Errorf("read release note %s: %w", path, err)
 	}
-	if _, err := s.Forge.Commit(forge.CommitRequest{Repo: detect.PaperboatRepo, Branch: "main",
+	_, err = s.Forge.Commit(forge.CommitRequest{Repo: detect.PaperboatRepo, Branch: "main",
 		Base: "main", Author: "paperboat-release-bot", Message: "Release " + version,
-		Files: map[string]string{"releases/" + version + ".md": string(note)}}); err != nil {
+		Files: map[string]string{"releases/" + version + ".md": string(note)}})
+	return err
+}
+
+func (s *Simulator) publishRelease(ctx context.Context, version string) error {
+	if err := s.commitRelease(version); err != nil {
 		return err
 	}
 	s.emit("sim.release_published", "Paperboat "+version+" is published",
@@ -206,14 +211,7 @@ func (s *Simulator) cve(ctx context.Context) error {
 	if err := s.Advance(ctx, 5*24*time.Hour); err != nil {
 		return err
 	}
-	note := filepath.Join(s.SourceDir, "apps", "paperboat", "releases", "1.1.1.md")
-	content, err := os.ReadFile(note)
-	if err != nil {
-		return fmt.Errorf("read release note %s: %w", note, err)
-	}
-	if _, err := s.Forge.Commit(forge.CommitRequest{Repo: detect.PaperboatRepo, Branch: "main",
-		Base: "main", Author: "paperboat-release-bot", Message: "Release 1.1.1",
-		Files: map[string]string{"releases/1.1.1.md": string(content)}}); err != nil {
+	if err := s.commitRelease("1.1.1"); err != nil {
 		return err
 	}
 	return s.addAdvisory(ctx, detect.Advisory{ID: "PB-2026-014", Kind: "base-image-cve",

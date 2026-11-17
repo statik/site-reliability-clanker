@@ -225,7 +225,11 @@ func (s *Server) getJobLog(r *http.Request) (any, error) {
 // hidePaths replaces the data directory and the home directory in a log with placeholders,
 // so a job log does not show where the control plane runs on its host.
 func (s *Server) hidePaths(text string) string {
-	text = strings.ReplaceAll(text, s.Orch.DataDir, "<data>")
+	// A core on a cloud has no data directory, and an empty text to replace would match
+	// between every two characters.
+	if s.Orch.DataDir != "" {
+		text = strings.ReplaceAll(text, s.Orch.DataDir, "<data>")
+	}
 	if home, err := os.UserHomeDir(); err == nil && home != "" {
 		text = strings.ReplaceAll(text, home, "~")
 	}

@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -60,6 +61,46 @@ func TestExtractWritesFilesAndKeepsTheExecutableBit(t *testing.T) {
 	}
 	if info.Mode()&0o100 == 0 {
 		t.Fatalf("build.sh lost its executable bit: %v", info.Mode())
+	}
+}
+
+func TestMemoryHoldsTheFilesAndKeepsTheExecutableBit(t *testing.T) {
+	data := pack(t, []entry{
+		{name: "platform/CONTRACT.md", body: "contract", mode: 0o644},
+		{name: "apps/paperboat/build.sh", body: "#!/bin/sh\n", mode: 0o755},
+	})
+	files, err := memory(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := fs.ReadFile(files, "platform/CONTRACT.md")
+	if err != nil || string(body) != "contract" {
+		t.Fatalf("CONTRACT.md = %q, %v", body, err)
+	}
+	script, err := fs.Stat(files, "apps/paperboat/build.sh")
+	if err != nil || script.Mode().Perm()&0o100 == 0 {
+		t.Fatalf("build.sh lost its executable bit: %v, %v", script, err)
+	}
+	plain, err := fs.Stat(files, "platform/CONTRACT.md")
+	if err != nil || plain.Mode().Perm()&0o111 != 0 {
+		t.Fatalf("CONTRACT.md is executable: %v, %v", plain, err)
+	}
+	entries, err := fs.ReadDir(files, "apps")
+	if err != nil || len(entries) != 1 || entries[0].Name() != "paperboat" {
+		t.Fatalf("the directory apps = %v, %v", entries, err)
+	}
+}
+
+func TestMemoryRefusesAnEntryOutsideTheDirectory(t *testing.T) {
+	data := pack(t, []entry{{name: "../escape.txt", body: "x", mode: 0o644}})
+	if _, err := memory(data); err == nil || !strings.Contains(err.Error(), "outside its directory") {
+		t.Fatalf("error = %v, want a refusal", err)
+	}
+}
+
+func TestMemoryRefusesDataThatIsNotAnArchive(t *testing.T) {
+	if _, err := memory([]byte("not gzip")); err == nil {
+		t.Fatal("no error for data that is not a gzip archive")
 	}
 }
 

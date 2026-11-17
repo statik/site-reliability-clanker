@@ -41,10 +41,13 @@ func (f *fakeIssuer) Withdraw(_ context.Context, g broker.Grant) error {
 
 func newBrokerWith(t *testing.T, issuer broker.Issuer) (*broker.Broker, *testClock) {
 	t.Helper()
-	dir := t.TempDir()
+	key, err := broker.NewKey()
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := storetest.Open(t)
 	clock := &testClock{time.Date(2026, 11, 21, 2, 0, 0, 0, time.UTC)}
-	b, err := broker.New(db, clock, dir, issuer)
+	b, err := broker.New(db, clock, key, issuer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,6 +292,13 @@ func TestExpireOverdueMarksGrants(t *testing.T) {
 	err = b.Check(g, broker.Presentation{Commit: "9f3c1e7", PlanSHA256: "5b1d"})
 	if err == nil || !strings.Contains(err.Error(), "status is expired") {
 		t.Fatalf("an expired grant must stay refused, got %v", err)
+	}
+}
+
+func TestNewRefusesAKeyOfTheWrongSize(t *testing.T) {
+	_, err := broker.New(storetest.Open(t), &testClock{}, []byte("short"), nil)
+	if err == nil || !strings.Contains(err.Error(), "has 5 bytes") {
+		t.Fatalf("want an error that gives the size of the key, got %v", err)
 	}
 }
 

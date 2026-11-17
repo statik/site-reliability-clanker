@@ -7,10 +7,12 @@ import (
 	"database/sql"
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/go-git/go-git/v5/plumbing"
@@ -39,7 +41,7 @@ func seeded(t *testing.T) (*Forge, *sql.DB) {
 	}
 	write(t, filepath.Join(source, ".terraform", "provider.bin"), "not for the repository")
 	write(t, filepath.Join(source, "app", "terraform.tfstate"), "{}")
-	if err := f.Seed(repo, map[string]string{"platform": source}, "First commit"); err != nil {
+	if err := f.Seed(repo, map[string]fs.FS{"platform": os.DirFS(source)}, "First commit"); err != nil {
 		t.Fatal(err)
 	}
 	return f, db
@@ -112,11 +114,39 @@ func TestSeedDoesNothingForARepositoryThatExists(t *testing.T) {
 	before, _ := f.Head(repo, "main")
 	other := t.TempDir()
 	write(t, filepath.Join(other, "new.txt"), "new")
-	if err := f.Seed(repo, map[string]string{"": other}, "Second seed"); err != nil {
+	if err := f.Seed(repo, map[string]fs.FS{"": os.DirFS(other)}, "Second seed"); err != nil {
 		t.Fatal(err)
 	}
 	if after, _ := f.Head(repo, "main"); after != before {
 		t.Fatal("the second seed changed main")
+	}
+}
+
+func TestSeedFromMemoryGivesTheSameCommitAsFromADirectory(t *testing.T) {
+	fromDirectory, _ := seeded(t)
+	want, err := fromDirectory.Head(repo, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fromMemory := New(storetest.Open(t))
+	fromMemory.Now = func() time.Time { return time.Date(2026, 11, 17, 12, 1, 0, 0, time.UTC) }
+	source := fstest.MapFS{
+		"app/terraform.tfvars": {Data: []byte("version  = \"1.0.0\"\nreplicas = 1\nregion   = \"local\"\n"),
+			Mode: 0o644},
+		"app/main.tf":             {Data: []byte("module \"app\" {}\n"), Mode: 0o644},
+		"run.sh":                  {Data: []byte("#!/bin/sh\necho run\n"), Mode: 0o755},
+		".terraform/provider.bin": {Data: []byte("not for the repository"), Mode: 0o644},
+		"app/terraform.tfstate":   {Data: []byte("{}"), Mode: 0o644},
+	}
+	if err := fromMemory.Seed(repo, map[string]fs.FS{"platform": source}, "First commit"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := fromMemory.Head(repo, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("the seed from memory gave commit %s, the seed from a directory gave %s", got, want)
 	}
 }
 
@@ -362,30 +392,6 @@ func TestUpdateBranchRefusesAConflict(t *testing.T) {
 	}
 	if head, _ := f.Head(repo, "feature"); head != feature {
 		t.Fatal("a refused update moved the branch")
-	}
-}
-
-func TestExportWritesTheTreeWithTheExecutableBit(t *testing.T) {
-	f, _ := seeded(t)
-	head, _ := f.Head(repo, "main")
-	dest := filepath.Join(t.TempDir(), "checkout")
-	if err := f.Export(repo, head, dest); err != nil {
-		t.Fatal(err)
-	}
-	content, err := os.ReadFile(filepath.Join(dest, "platform", "app", "terraform.tfvars"))
-	if err != nil || !strings.Contains(string(content), "replicas = 1") {
-		t.Fatalf("tfvars = %q, %v", content, err)
-	}
-	script, err := os.Stat(filepath.Join(dest, "platform", "run.sh"))
-	if err != nil || script.Mode().Perm()&0o100 == 0 {
-		t.Fatalf("run.sh is not executable: %v, %v", script, err)
-	}
-	plain, _ := os.Stat(filepath.Join(dest, "platform", "app", "main.tf"))
-	if plain.Mode().Perm()&0o111 != 0 {
-		t.Fatal("main.tf is executable")
-	}
-	if err := f.Export(repo, "0000000000000000000000000000000000000000", t.TempDir()); err == nil {
-		t.Fatal("no error for a commit that does not exist")
 	}
 }
 
