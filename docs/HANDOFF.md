@@ -61,6 +61,16 @@ group. Section 12 of the plan records the five decisions that follow from the la
   only by fast-forward. The control plane still keeps plans, logs, OpenTofu state and its
   signing key as files in the data directory; these must move before the unikernel can
   hold no state.
+- **Nanos boot test (2026-11-17, a throwaway probe, on a laptop):** a Go program as a Nanos
+  0.1.56 image read its environment from the image configuration, made an outbound HTTPS
+  request, connected to PostgreSQL 18 and inserted a row, and answered HTTP from the host.
+  A subprocess was refused (`function not implemented`). It ran under QEMU with software
+  emulation; `ops run` with hardware acceleration failed on this machine (`HVF does not
+  support GICv2 emulation`, QEMU 11.1). A file write failed with `no space left on device`,
+  because the image has no free space unless the configuration asks for it.
+- **PostgreSQL (2026-11-17):** from an empty data directory, the first deployment and the ten
+  scenes of the scripted month ran on PostgreSQL with the live model. The thirteen work
+  items ended in the expected states and the audit chain verified at 310 events.
 - On a cloud, `clanker up` starts in a standby mode: it serves the dashboard and proposes
   no deployment.
 
