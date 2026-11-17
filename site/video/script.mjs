@@ -24,7 +24,8 @@ export const CAPTION_LINE = 42;
 export const CAPTION_LINES = 2;
 export const CAPTION_MIN_SECONDS = 1;
 
-// A space that a caption does not break at. The duration stays on one caption line.
+// A space that a caption does not break at. The duration stays on one caption line, and
+// so do two words with a ~ between them in narration.md.
 const TIE = "\u00A0";
 
 function heldInWords(totalSeconds) {
@@ -103,7 +104,7 @@ export function readScript() {
     if (!line.startsWith("- ")) continue;
     const sentence = line.match(/^- \[([\w-]+)\]\s+(.+)$/);
     if (!sentence) throw new Error(`narration.md: this sentence has no [cue] for its picture: ${line}`);
-    const marked = fill(sentence[2].trim(), values);
+    const marked = fill(sentence[2].trim(), values).replaceAll("~", TIE);
     const text = marked.replace(/\s*\|\s*/g, " ").replaceAll(TIE, " ");
     part.sentences.push({ cue: sentence[1], text, captions: captionsOf(marked) });
   }

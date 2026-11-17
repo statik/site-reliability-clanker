@@ -22,7 +22,8 @@ Format:
 - A caption has at most two lines of 42 characters and stays for at least one second. The
   build stops if a caption does not fit. In a sentence that is too long for one caption, a
   `|` shows where the next caption starts. The voice still says it as one sentence, and
-  the `|` is not sent to the voice, so you can move it at no cost.
+  the `|` is not sent to the voice, so you can move it at no cost. A `~` between two words
+  is a space where a caption line does not break; the voice gets a plain space.
 - Each sentence is sent to ElevenLabs one time and then kept in `out/cache/speech/`. A
   sentence with a changed word is sent again.
 
@@ -49,7 +50,7 @@ hold: 1.5
 pause: 0.9
 hold: 1.4
 
-- [download] Setup is one download. A wizard starts the control plane.
+- [download] Setup is a single download, | which walks you through logging~in to your cloud provider | and sets up the control plane.
 - [deploy] The control plane then deploys your product, layer by layer.
 
 ## step-one
