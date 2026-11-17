@@ -718,6 +718,7 @@ Defaults are chosen so work can start; each is cheap to change before the milest
 | Slack integration depth | Incoming webhook | Slack app, for threading and richer interaction | M2 |
 | Forge | **Chosen 2026-11-16:** a small forge built into the control plane (bare repositories, the `git` CLI, pull requests in the control-plane database). It makes bootstrap simplest | Forgejo, Gitea, or an external GitHub/GitLab | M2 |
 | Control-plane database | **Chosen 2026-11-16:** embedded SQLite, so the control plane is one binary. Sections 5 and 5.4 say Postgres; read them as SQLite | Postgres | M2 |
+| First deployment | **Chosen 2026-11-16:** one approval for the blank-slate work item. A layer that cannot be planned before the layer below it exists is planned at apply time and runs only if its plan creates resources and changes or destroys nothing | One approval for each layer | M3 |
 | Workload name | Paperboat, kept after the change from document sharing to fish rental | A fish-themed name | M7 |
 | Where the control plane runs | Docker Compose on one machine | Small dedicated management cluster | M3 |
 | Broker trust for the prototype | One scoped credential per cloud | Workload identity federation from day one | M3 |

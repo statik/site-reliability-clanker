@@ -1,0 +1,94 @@
+{
+  "_note": "Hand-written for tests. No live work item destroys or replaces a resource or has a deferred layer.",
+  "work_item": {
+    "id": "WI-9001",
+    "title": "Move Postgres to version 18",
+    "kind": "postgres-major",
+    "env": "local",
+    "layers": ["30-data", "40-platform", "50-app"],
+    "state": "AwaitingApproval",
+    "tier": "T3",
+    "tier_rule": "stateful-replace",
+    "trigger": "Advisory PG-18",
+    "pr_id": 9,
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "base_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "summary": "Replace the Postgres instance with version 18.",
+    "explanation": {
+      "sentence": "Replace the Postgres instance with version 18.",
+      "why": "Version 17 leaves support.",
+      "downtime": "About ten minutes.",
+      "user_effect": "Rentals cannot be booked during the change.",
+      "cost_change": "None.",
+      "duration": "About thirty minutes.",
+      "pre_checks": ["A backup from today exists."],
+      "backup": "A backup is taken first.",
+      "rollback": "Restore the backup into a version 17 instance.",
+      "verification": "The canary rents one fish.",
+      "if_deferred": "Version 17 gets no security fixes after January.",
+      "source": "template"
+    },
+    "scheduled_for": "",
+    "rollback_of": "",
+    "created_at": "2026-12-16T02:00:00.000Z",
+    "updated_at": "2026-12-16T02:00:10.000Z",
+    "field_from_a_future_version": {"anything": [1, 2, 3]}
+  },
+  "plans": [
+    {
+      "id": 90,
+      "work_item": "WI-9001",
+      "layer": "30-data",
+      "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "plan_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "facts": {
+        "add": 1,
+        "change": 1,
+        "destroy": 1,
+        "replace": 1,
+        "resources": [
+          {"address": "module.data.kubernetes_config_map.settings", "type": "kubernetes_config_map", "name": "settings", "action": "update", "details": ["data.max_connections: 100 → 200"]},
+          {"address": "module.data.kubernetes_job.migrate", "type": "kubernetes_job", "name": "migrate", "action": "create", "details": []},
+          {"address": "module.data.kubernetes_stateful_set.postgres", "type": "kubernetes_stateful_set", "name": "postgres", "action": "replace", "details": ["spec.template.spec.container.image: postgres:17.12 → postgres:18.1"]},
+          {"address": "module.data.kubernetes_persistent_volume_claim.scratch", "type": "kubernetes_persistent_volume_claim", "name": "scratch", "action": "destroy", "details": []}
+        ],
+        "outputs": ["postgres_version"]
+      },
+      "policy": {
+        "tier": "T3",
+        "rule": "stateful-replace",
+        "reasons": ["the plan replaces or destroys a stateful resource"],
+        "create_only": false
+      },
+      "superseded": false,
+      "created_at": "2026-12-16T02:00:05.000Z"
+    }
+  ],
+  "approvals": [
+    {
+      "id": 70,
+      "work_item": "WI-9001",
+      "approver": "alice",
+      "decision": "approve",
+      "comment": "Backup checked",
+      "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "plan_hashes": {"30-data": "1111111111111111111111111111111111111111111111111111111111111111"},
+      "at": "2026-12-16T02:01:00.000Z"
+    },
+    {
+      "id": 71,
+      "work_item": "WI-9001",
+      "approver": "alice",
+      "decision": "approve",
+      "comment": "Second tap",
+      "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "plan_hashes": {"30-data": "1111111111111111111111111111111111111111111111111111111111111111"},
+      "at": "2026-12-16T02:01:30.000Z"
+    }
+  ],
+  "jobs": [],
+  "events": [],
+  "approvers_required": 2,
+  "deferred_layers": ["40-platform", "50-app"],
+  "grants": null
+}

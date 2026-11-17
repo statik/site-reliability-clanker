@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -33,6 +34,16 @@ const (
 	StateFailed           = "Failed"
 	StateRolledBack       = "RolledBack"
 	StateRejected         = "Rejected"
+)
+
+// Errors that the API maps to HTTP status codes.
+var (
+	// ErrForbidden means that the user may not do this.
+	ErrForbidden = errors.New("not permitted")
+	// ErrConflict means that the work item is not in a state that allows this.
+	ErrConflict = errors.New("wrong state")
+	// ErrInvalid means that the request is not valid.
+	ErrInvalid = errors.New("invalid request")
 )
 
 // Layers lists the layers in apply order.
@@ -302,10 +313,27 @@ func (o *Orchestrator) setState(wi *WorkItem, state, actor, reason string) error
 	if err := o.save(*wi); err != nil {
 		return err
 	}
+	if err := o.closeFindings(*wi); err != nil {
+		return err
+	}
 	o.emit(audit.Event{Type: "workitem.state_changed", Actor: actor, Env: wi.Env,
 		WorkItem: wi.ID, Summary: fmt.Sprintf("%s: %s → %s", wi.Title, from, state),
 		Data: map[string]any{"from": from, "to": state, "reason": reason, "tier": wi.Tier,
 			"kind": wi.Kind, "title": wi.Title}})
+	return nil
+}
+
+// closeFindings marks the findings of a work item when the work item ends.
+func (o *Orchestrator) closeFindings(wi WorkItem) error {
+	outcome := map[string]string{StateDone: "resolved", StateRolledBack: "rolled back",
+		StateFailed: "failed", StateRejected: "rejected"}[wi.State]
+	if outcome == "" {
+		return nil
+	}
+	if _, err := o.DB.Exec(`UPDATE findings SET state = ? WHERE work_item = ?`, outcome,
+		wi.ID); err != nil {
+		return fmt.Errorf("close findings of %s: %w", wi.ID, err)
+	}
 	return nil
 }
 

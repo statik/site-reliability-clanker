@@ -98,6 +98,16 @@ func (a *Agent) complete(ctx context.Context, role, workItem string, req Request
 	return resp, nil
 }
 
+// frame wraps untrusted input for a model. json.Marshal writes < and > as escapes, so no
+// text inside the value can close the <data> element.
+func frame(value any) string {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		raw = []byte(`"input could not be encoded"`)
+	}
+	return "<data>" + string(raw) + "</data>"
+}
+
 func (a *Agent) emit(e audit.Event) {
 	if _, err := a.Audit.Append(e); err != nil {
 		panic(fmt.Sprintf("audit log is not writable, stopping: %v", err))
@@ -193,7 +203,6 @@ func (a *Agent) Explain(ctx context.Context, wi orchestrator.WorkItem,
 	if note, err := a.Forge.ReadFile("paperboat", "main", "releases/"+detail+".md"); err == nil {
 		input["release_note"] = truncate(note, 4000)
 	}
-	facts, _ := json.Marshal(input)
 	key := "explain_" + wi.Kind
 	if detail != "" {
 		key += "_" + detail
@@ -201,7 +210,7 @@ func (a *Agent) Explain(ctx context.Context, wi orchestrator.WorkItem,
 	resp, err := a.complete(ctx, RoleExplainer, wi.ID, Request{ReplayKey: key,
 		Messages: []ChatMessage{
 			{Role: "system", Content: explainerSystem},
-			{Role: "user", Content: "<data>" + string(facts) + "</data>"},
+			{Role: "user", Content: frame(input)},
 		}})
 	if errors.Is(err, ErrNoRecording) {
 		return orchestrator.TemplateExplanation(wi, plans), nil

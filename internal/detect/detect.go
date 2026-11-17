@@ -134,7 +134,8 @@ func versionOrder(v string) [3]int {
 	return out
 }
 
-func newer(a, b string) bool {
+// Newer reports whether version a is newer than version b.
+func Newer(a, b string) bool {
 	va, vb := versionOrder(a), versionOrder(b)
 	for i := range va {
 		if va[i] != vb[i] {
@@ -167,14 +168,14 @@ func (d *Detector) CheckReleases(ctx context.Context, env string) error {
 	versions := []string{}
 	for _, e := range entries {
 		v := strings.TrimSuffix(e.Name, ".md")
-		if newer(v, running) {
+		if Newer(v, running) {
 			versions = append(versions, v)
 		}
 	}
 	if len(versions) == 0 {
 		return nil
 	}
-	sort.Slice(versions, func(i, j int) bool { return newer(versions[j], versions[i]) })
+	sort.Slice(versions, func(i, j int) bool { return Newer(versions[j], versions[i]) })
 	target := versions[len(versions)-1]
 	covered, err := d.hasFindingFor(env, "paperboat_version", target)
 	if err != nil || covered {
@@ -226,7 +227,7 @@ func (d *Detector) CheckAdvisories(ctx context.Context, env string) error {
 			continue
 		}
 		running := d.runningVersion(env, adv.Layer, adv.Variable)
-		if running == "" || running == adv.Value || newer(running, adv.Value) {
+		if running == "" || running == adv.Value || Newer(running, adv.Value) {
 			continue
 		}
 		kind := map[string]string{"base-image-cve": "app-upgrade",

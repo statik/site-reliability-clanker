@@ -10,17 +10,21 @@ type rule struct {
 }
 
 var rules = []rule{
-	{regexp.MustCompile(`(?i)([a-z][a-z0-9+.-]*://[^:/\s@]+):[^@/\s]+@`), "$1:[REDACTED]@"},
+	// A password inside a URL. The password can contain a slash.
+	{regexp.MustCompile(`(?i)([a-z][a-z0-9+.-]*://[^:/\s@]*):[^@\s]+@`), "$1:[REDACTED]@"},
 	{regexp.MustCompile(`eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}`),
 		"[REDACTED-TOKEN]"},
 	{regexp.MustCompile(`\b(AKIA|ASIA)[A-Z0-9]{16}\b`), "[REDACTED-AWS-KEY]"},
 	{regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{16,}\b`), "[REDACTED-API-KEY]"},
-	{regexp.MustCompile(`https://hooks\.slack\.com/services/[A-Za-z0-9/]+`),
-		"[REDACTED-WEBHOOK]"},
-	{regexp.MustCompile(`https://discord(app)?\.com/api/webhooks/[A-Za-z0-9/_-]+`),
-		"[REDACTED-WEBHOOK]"},
-	{regexp.MustCompile(`(?i)\b(password|passwd|secret|token|api[_-]?key)(\s*[=:]\s*)("?)[^\s",}]+`),
-		"$1$2$3[REDACTED]"},
+	{regexp.MustCompile(`\b(ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{20,}`),
+		"[REDACTED-TOKEN]"},
+	{regexp.MustCompile(`(?i)((?:bearer|basic)\s+)[A-Za-z0-9._~+/=-]{8,}`), "$1[REDACTED]"},
+	// Any URL with "webhook" or "hooks" in it. The path of a webhook URL is the secret.
+	{regexp.MustCompile(`(?i)https?://[^\s"']*(webhook|hooks)[^\s"']*`), "[REDACTED-WEBHOOK]"},
+	// A name that says it holds a secret, then = or :, then the value. The name can have a
+	// prefix or suffix (ADMIN_TOKEN, SMTP_PASS, PGPASSWORD, ADMIN_KEY, Pwd) and JSON quotes.
+	{regexp.MustCompile(`(?i)([a-z0-9_.-]*(?:password|passwd|_pass|pwd|secret|token|api[_-]?key|_key)` +
+		`[a-z0-9_.-]*"?\s*[=:]\s*"?)[^\s",}]+`), "$1[REDACTED]"},
 	{regexp.MustCompile(`-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----`),
 		"[REDACTED-PRIVATE-KEY]"},
 }

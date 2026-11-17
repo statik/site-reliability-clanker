@@ -1,0 +1,262 @@
+// Carbon styles, with IBM Plex bundled from the @ibm/plex package instead of a font CDN.
+@use "@carbon/react/scss/config" with (
+  $font-path: "@ibm/plex"
+);
+@use "@carbon/react";
+@use "@carbon/react/scss/themes";
+@use "@carbon/react/scss/theme";
+@use "@carbon/react/scss/spacing";
+@use "@carbon/react/scss/type";
+@use "@carbon/react/scss/breakpoint";
+
+:root,
+[data-carbon-theme="g10"] {
+  @include theme.theme(themes.$g10);
+
+  color-scheme: light;
+}
+
+[data-carbon-theme="g100"] {
+  @include theme.theme(themes.$g100);
+
+  color-scheme: dark;
+}
+
+body {
+  background: theme.$background;
+  color: theme.$text-primary;
+}
+
+// Layout only from here on. Colour, spacing and type come from Carbon tokens.
+.app-content {
+  min-block-size: 100vh;
+  padding: spacing.$spacing-07 spacing.$spacing-07 spacing.$spacing-10;
+  margin-inline-start: 16rem;
+}
+
+.app-header-status {
+  display: flex;
+  align-items: center;
+  gap: spacing.$spacing-02;
+  padding-inline: spacing.$spacing-03;
+}
+
+.app-panel-note {
+  @include type.type-style("helper-text-01");
+
+  padding: spacing.$spacing-05;
+  color: theme.$text-secondary;
+}
+
+.app-asof-banner,
+.app-note {
+  max-inline-size: none;
+  margin-block-end: spacing.$spacing-05;
+}
+
+.app-page-header {
+  margin-block-end: spacing.$spacing-06;
+
+  h1 {
+    @include type.type-style("heading-05");
+  }
+
+  p {
+    @include type.type-style("body-01");
+
+    max-inline-size: 70ch;
+    margin-block-start: spacing.$spacing-03;
+    color: theme.$text-secondary;
+  }
+}
+
+.app-section {
+  margin-block-end: spacing.$spacing-07;
+
+  h2 {
+    @include type.type-style("heading-03");
+  }
+}
+
+.app-section-title {
+  display: flex;
+  align-items: center;
+  gap: spacing.$spacing-03;
+  margin-block-end: spacing.$spacing-04;
+}
+
+.app-empty {
+  display: flex;
+  align-items: center;
+  gap: spacing.$spacing-05;
+  color: theme.$text-secondary;
+}
+
+.app-label {
+  @include type.type-style("label-01");
+
+  color: theme.$text-secondary;
+}
+
+.app-heading {
+  @include type.type-style("heading-02");
+}
+
+.app-big {
+  @include type.type-style("heading-04");
+}
+
+.app-prose {
+  @include type.type-style("body-02");
+
+  max-inline-size: 75ch;
+}
+
+.app-secondary {
+  color: theme.$text-secondary;
+}
+
+.app-mono {
+  @include type.type-style("code-01");
+
+  overflow-wrap: anywhere;
+}
+
+.app-ai-content {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-03;
+  padding: spacing.$spacing-05;
+  max-inline-size: 20rem;
+}
+
+.app-ai-writer {
+  @include type.type-style("heading-02");
+}
+
+.app-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: spacing.$spacing-02;
+}
+
+.app-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: spacing.$spacing-03;
+}
+
+.app-row-top {
+  align-items: flex-start;
+}
+
+.app-row-end {
+  align-items: flex-end;
+}
+
+.app-spread {
+  justify-content: space-between;
+}
+
+.app-stack {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-05;
+}
+
+.app-stack-tight {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-03;
+}
+
+.app-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: spacing.$spacing-05;
+}
+
+.app-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: spacing.$spacing-05;
+}
+
+.app-two-col {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: spacing.$spacing-06;
+  align-items: start;
+}
+
+.app-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: spacing.$spacing-06;
+  align-items: start;
+}
+
+.app-code-layout {
+  display: grid;
+  grid-template-columns: 18rem minmax(0, 1fr);
+  gap: spacing.$spacing-06;
+  align-items: start;
+}
+
+.app-narrow {
+  max-inline-size: 64rem;
+}
+
+.app-scroll {
+  overflow: auto;
+  max-block-size: 28rem;
+}
+
+.app-full,
+.app-full.cds--snippet {
+  inline-size: 100%;
+  max-inline-size: none;
+}
+
+.app-chat {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-04;
+}
+
+.app-chat-user {
+  align-self: flex-end;
+  max-inline-size: 75%;
+}
+
+.app-chat-answer {
+  align-self: flex-start;
+  max-inline-size: 85%;
+  white-space: pre-wrap;
+}
+
+.app-fill {
+  flex: 1 1 auto;
+}
+
+.app-progress {
+  overflow-x: auto;
+  padding-block: spacing.$spacing-03 spacing.$spacing-07;
+  margin-block-end: spacing.$spacing-05;
+}
+
+@include breakpoint.breakpoint-down("lg") {
+  .app-two-col,
+  .app-split,
+  .app-code-layout,
+  .app-grid-4 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+// A tile with a decorator puts the AI label in its top corner. Keep the text clear of it.
+.cds--tile--decorator .app-big,
+.cds--tile--decorator .app-prose {
+  padding-inline-end: var(--cds-spacing-09);
+}

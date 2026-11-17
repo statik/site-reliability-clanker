@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "import", "unicorn", "react", "jsx-a11y"],
+  "categories": { "correctness": "error", "suspicious": "error" },
+  "rules": {
+    "react/react-in-jsx-scope": "off",
+    "max-lines-per-function": ["error", { "max": 100, "skipBlankLines": true }],
+    "import/no-relative-parent-imports": "error",
+    "import/no-unassigned-import": ["error", { "allow": ["**/*.scss", "**/*.css"] }],
+    "react/no-unstable-nested-components": ["error", { "allowAsProps": true }],
+    "jsx-a11y/prefer-tag-over-role": "off"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts"],
+      "rules": { "max-lines-per-function": "off" }
+    }
+  ],
+  "ignorePatterns": ["dist", "node_modules"]
+}

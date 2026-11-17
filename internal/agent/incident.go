@@ -24,7 +24,6 @@ type diagnosis struct {
 
 func (a *Agent) diagnose(ctx context.Context, wi orchestrator.WorkItem, f detect.Finding,
 	transcript string) (diagnosis, string, error) {
-	alert, _ := json.Marshal(f)
 	history, err := a.recentChanges(wi.Env)
 	if err != nil {
 		return diagnosis{}, "", err
@@ -33,9 +32,9 @@ func (a *Agent) diagnose(ctx context.Context, wi orchestrator.WorkItem, f detect
 		ReplayKey: "investigate_incident",
 		Messages: []ChatMessage{
 			{Role: "system", Content: investigatorSystem},
-			{Role: "user", Content: "<data>alert: " + string(alert) +
-				"\n\nchange history, newest first:\n" + history + "\n\ndebug session:\n" +
-				truncate(transcript, 8000) + "</data>"},
+			{Role: "user", Content: frame(map[string]any{"alert": f,
+				"change_history": strings.Split(history, "\n"),
+				"debug_session":  truncate(transcript, 14000)})},
 		}})
 	if errors.Is(err, ErrNoRecording) {
 		return diagnosis{Diagnosis: "No model diagnosis is available in replay mode.",

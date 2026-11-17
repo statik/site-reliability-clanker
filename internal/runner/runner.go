@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 // ErrStalePlan means that the state changed after the plan was saved.
@@ -217,21 +218,30 @@ func (r *Runner) ApplyDirect(ctx context.Context, j Job) error {
 // gives an empty map.
 func (r *Runner) Outputs(env, layer string) (map[string]any, error) {
 	path := filepath.Join(r.StateDir(env), layer+".tfstate")
-	raw, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return map[string]any{}, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("read state of %s/%s: %w", env, layer, err)
-	}
 	var state struct {
 		Outputs map[string]struct {
 			Value     any  `json:"value"`
 			Sensitive bool `json:"sensitive"`
 		} `json:"outputs"`
 	}
-	if err := json.Unmarshal(raw, &state); err != nil {
-		return nil, fmt.Errorf("decode state of %s/%s: %w", env, layer, err)
+	// OpenTofu rewrites the state file during an apply. A read at that moment can see a
+	// partial file, so a decode failure is tried again before it is an error.
+	var decodeErr error
+	for attempt := 0; attempt < 5; attempt++ {
+		raw, err := os.ReadFile(path)
+		if errors.Is(err, os.ErrNotExist) {
+			return map[string]any{}, nil
+		}
+		if err != nil {
+			return nil, fmt.Errorf("read state of %s/%s: %w", env, layer, err)
+		}
+		if decodeErr = json.Unmarshal(raw, &state); decodeErr == nil {
+			break
+		}
+		time.Sleep(150 * time.Millisecond)
+	}
+	if decodeErr != nil {
+		return nil, fmt.Errorf("decode state of %s/%s: %w", env, layer, decodeErr)
 	}
 	outputs := map[string]any{}
 	for name, o := range state.Outputs {

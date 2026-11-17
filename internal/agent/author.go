@@ -158,10 +158,10 @@ func (a *Agent) runAuthorTool(d *draft, call ToolCall) string {
 func (a *Agent) Draft(ctx context.Context, f detect.Finding) (orchestrator.WorkItem, error) {
 	d := &draft{finding: f, cloud: a.Orch.Envs[f.Env].Cloud,
 		branch: "agent/" + strings.Trim(slugChars.ReplaceAllString(strings.ToLower(f.Key), "-"), "-")}
-	findingJSON, _ := json.Marshal(f)
 	messages := []ChatMessage{
 		{Role: "system", Content: authorSystem},
-		{Role: "user", Content: "<data>" + string(findingJSON) + "</data>"},
+		{Role: "user", Content: frame(map[string]any{"finding": f, "cloud": d.cloud,
+			"tfvars_path": "platform/stacks/" + d.cloud + "/<layer>/terraform.tfvars"})},
 	}
 	for step := range 8 {
 		resp, err := a.complete(ctx, RoleAuthor, "", Request{ReplayKey: "author_" + f.Key,

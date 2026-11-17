@@ -8,6 +8,7 @@ import (
 	"maps"
 	"os"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/audit"
@@ -45,6 +46,9 @@ func planHashes(plans []Plan) map[string]string {
 	return hashes
 }
 
+// ValidApprovers returns the people whose approval covers the current commit and plans.
+func (o *Orchestrator) ValidApprovers(wi WorkItem) ([]string, error) { return o.validApprovers(wi) }
+
 // validApprovers returns the distinct people whose approval covers the current commit and
 // the current plan hashes. An approval of an older commit or plan does not count.
 func (o *Orchestrator) validApprovers(wi WorkItem) ([]string, error) {
@@ -79,23 +83,54 @@ type Decision struct {
 }
 
 // Decide records a decision of a human on a work item that waits for approval. The decision
-// is bound to the commit and to the hash of each saved plan.
+// is bound to the commit and to the hash of each saved plan. A refused decision is recorded
+// in the audit log.
 func (o *Orchestrator) Decide(ctx context.Context, id string, d Decision) (WorkItem, error) {
+	wi, err := o.decide(ctx, id, d)
+	if err != nil && (errors.Is(err, ErrForbidden) || errors.Is(err, ErrConflict) ||
+		errors.Is(err, ErrInvalid)) {
+		o.emit(audit.Event{Type: "approval.refused", Actor: d.User, WorkItem: id,
+			Summary: "Decision refused: " + err.Error(),
+			Data:    map[string]any{"decision": d.Decision, "reason": err.Error()}})
+	}
+	return wi, err
+}
+
+func (o *Orchestrator) decide(ctx context.Context, id string, d Decision) (WorkItem, error) {
 	wi, err := o.Get(id)
 	if err != nil {
 		return WorkItem{}, err
 	}
 	user, err := o.GetUser(d.User)
 	if err != nil {
-		return WorkItem{}, err
+		return WorkItem{}, fmt.Errorf("%w: %v", ErrForbidden, err)
 	}
 	if user.Role != "approver" && user.Role != "admin" {
-		return WorkItem{}, fmt.Errorf("%s has role %s and cannot decide on %s: an approver or "+
-			"admin must decide", user.Name, user.Role, id)
+		return WorkItem{}, fmt.Errorf("%w: %s has role %s and cannot decide on %s: an approver "+
+			"or admin must decide", ErrForbidden, user.Name, user.Role, id)
+	}
+	if !slices.Contains([]string{"approve", "reject", "request_changes"}, d.Decision) {
+		return WorkItem{}, fmt.Errorf("%w: decision %q is not one of approve, reject, "+
+			"request_changes", ErrInvalid, d.Decision)
+	}
+	if d.Decision != "approve" && strings.TrimSpace(d.Comment) == "" {
+		return WorkItem{}, fmt.Errorf("%w: a comment is required to reject or to request "+
+			"changes", ErrInvalid)
+	}
+	if d.ScheduledFor != "" {
+		when := store.ParseTime(d.ScheduledFor)
+		if when.IsZero() {
+			return WorkItem{}, fmt.Errorf("%w: scheduled_for %q is not an RFC 3339 time",
+				ErrInvalid, d.ScheduledFor)
+		}
+		if when.Before(o.Clock.Now()) {
+			return WorkItem{}, fmt.Errorf("%w: scheduled_for %s is in the past; the control "+
+				"plane time is %s", ErrInvalid, d.ScheduledFor, o.now())
+		}
 	}
 	if wi.State != StateAwaitingApproval {
-		return WorkItem{}, fmt.Errorf("%s is in state %s and does not wait for approval", id,
-			wi.State)
+		return WorkItem{}, fmt.Errorf("%w: %s is in state %s and does not wait for approval",
+			ErrConflict, id, wi.State)
 	}
 	plans, err := o.Plans(wi.ID, false)
 	if err != nil {
@@ -122,11 +157,15 @@ func (o *Orchestrator) Decide(ctx context.Context, id string, d Decision) (WorkI
 		return wi, o.setState(&wi, StateRejected, user.Name, d.Comment)
 	case "request_changes":
 		return wi, o.setState(&wi, StateChangesRequested, user.Name, d.Comment)
-	case "approve":
-		return o.afterApproval(ctx, wi, d)
 	default:
-		return WorkItem{}, fmt.Errorf("decision %q is not one of approve, reject, "+
-			"request_changes", d.Decision)
+		// A window from any approver is kept, also when this approval is not the last one.
+		if d.ScheduledFor != "" {
+			wi.ScheduledFor = store.FormatTime(store.ParseTime(d.ScheduledFor))
+			if err := o.save(wi); err != nil {
+				return WorkItem{}, err
+			}
+		}
+		return o.afterApproval(ctx, wi, d)
 	}
 }
 
@@ -138,9 +177,6 @@ func (o *Orchestrator) afterApproval(ctx context.Context, wi WorkItem, d Decisio
 	need := policy.ApproversRequired(wi.Tier)
 	if len(approvers) < need {
 		return wi, nil
-	}
-	if d.ScheduledFor != "" {
-		wi.ScheduledFor = d.ScheduledFor
 	}
 	if err := o.setState(&wi, StateApproved, d.User,
 		fmt.Sprintf("%d of %d approvers", len(approvers), need)); err != nil {

@@ -115,7 +115,7 @@ decision := {"tier": "T3", "rule": rule, "reasons": texts} if {
 decision := {"tier": "T2", "rule": "normal-change", "reasons": [text]} if {
 	count(t3_reasons) == 0
 	count(changes) > 0
-	text := sprintf("the plan changes %d resources and none of them is stateful or an identity", [count(changes)])
+	text := sprintf("resources changed: %d. None is stateful or an identity", [count(changes)])
 }
 
 # A plan is inside the create-only envelope when it only creates resources. The layers of a
