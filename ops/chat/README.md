@@ -48,6 +48,10 @@ a reason, reject on the dashboard.
 With these three settings the app takes the place of `CLANKER_SLACK_WEBHOOK`: every Slack
 notification goes through the app.
 
+`CLANKER_SLACK_API_URL` is the address of the Slack Web API. Set it only for a check with a
+stand-in for Slack (`scripts/verify/chat_check.py`). Without it the app calls the real
+Slack.
+
 Limits: the app must be installed in one workspace. An installation for a whole Enterprise
 Grid organization is refused.
 

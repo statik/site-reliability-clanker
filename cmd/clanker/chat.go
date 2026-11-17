@@ -25,9 +25,12 @@ const (
 	slackSigningSecretEnv = "CLANKER_SLACK_SIGNING_SECRET"
 	slackBotTokenEnv      = "CLANKER_SLACK_BOT_TOKEN"
 	slackChannelEnv       = "CLANKER_SLACK_CHANNEL"
-	teamsAppIDEnv         = "CLANKER_TEAMS_APP_ID"
-	teamsAppSecretEnv     = "CLANKER_TEAMS_APP_SECRET"
-	teamsTenantIDEnv      = "CLANKER_TEAMS_TENANT_ID"
+	// slackAPIURLEnv is the address of the Slack Web API. It is for a check with a stand-in
+	// for Slack. Empty selects the real Slack.
+	slackAPIURLEnv    = "CLANKER_SLACK_API_URL"
+	teamsAppIDEnv     = "CLANKER_TEAMS_APP_ID"
+	teamsAppSecretEnv = "CLANKER_TEAMS_APP_SECRET"
+	teamsTenantIDEnv  = "CLANKER_TEAMS_TENANT_ID"
 )
 
 // chatApps holds the shared part of the chat approval and the adapter of each platform
@@ -76,6 +79,9 @@ func buildChat(c *components, o options) (*chatApps, error) {
 	if slack == nil && teams == nil {
 		return nil, nil
 	}
+	if slack != nil {
+		slack[slackAPIURLEnv] = strings.TrimSuffix(strings.TrimSpace(os.Getenv(slackAPIURLEnv)), "/")
+	}
 	signIn, err := loadSignIn(o)
 	if err != nil {
 		return nil, err
@@ -96,7 +102,7 @@ func newChatApps(service *chatops.Service, slack, teams map[string]string) (*cha
 	if slack != nil {
 		apps.slack, err = chatops.NewSlack(service, chatops.SlackConfig{
 			SigningSecret: slack[slackSigningSecretEnv], BotToken: slack[slackBotTokenEnv],
-			Channel: slack[slackChannelEnv]})
+			Channel: slack[slackChannelEnv], APIURL: slack[slackAPIURLEnv]})
 		if err != nil {
 			return nil, err
 		}

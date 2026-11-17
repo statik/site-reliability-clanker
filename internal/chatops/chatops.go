@@ -197,6 +197,11 @@ func (s *Service) Decide(ctx context.Context, c Click) Answer {
 		return s.refuse(c, user.Name, fmt.Sprintf("%s has tier %s. A change of this tier is "+
 			"decided on the page that shows the whole plan.", wi.ID, wi.Tier))
 	}
+	// The orchestrator does not compare an empty binding, which is how the dashboard decides.
+	if c.Binding == "" {
+		return s.refuse(c, user.Name, "This message does not say which plan it shows. Decide "+
+			"on the page that shows the whole plan.")
+	}
 	return s.record(ctx, c, user)
 }
 

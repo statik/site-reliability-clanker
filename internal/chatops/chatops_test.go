@@ -144,6 +144,21 @@ func TestChatRefusesWhatOnlyTheDashboardDecides(t *testing.T) {
 	}
 }
 
+func TestAClickWithNoBindingDecidesNothing(t *testing.T) {
+	w := newWorld(t)
+	w.workItem("WI-0001", "T2")
+	w.announce(w.slack, "WI-0001")
+	w.link(w.slack, "alice", "WI-0001")
+	before := len(w.decisions("WI-0001"))
+	answer := w.service.Decide(context.Background(), Click{WorkItem: "WI-0001",
+		Decision: "approve", Account: Account{Platform: "slack", Workspace: "T0ACME",
+			ID: "UALICE", Name: "alice"}})
+	check(t, !answer.Decided && has(answer.Text, "does not say which plan"),
+		"the answer to a click with no binding: %+v", answer)
+	check(t, len(w.decisions("WI-0001")) == before, "a click with no binding was recorded")
+	check(t, len(w.events("chat.refused")) == 1, "the refusal left no audit event")
+}
+
 func TestTwoClicksAtTheSameMomentDecideOnce(t *testing.T) {
 	each(t, func(t *testing.T, w *world, c chat) {
 		w.workItem("WI-0001", "T2")
