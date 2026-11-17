@@ -15,7 +15,7 @@ struct HomeView: View {
           }
         }
     }
-    .navigationTitle("Paperboat")
+    .navigationTitle("S.R.C.")
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) { AccountButton() }
     }

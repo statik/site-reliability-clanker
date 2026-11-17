@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import PaperboatManager
+@testable import SRC
 
 @Suite("Decoding of the fixtures captured from the live servers")
 struct DecodingTests {

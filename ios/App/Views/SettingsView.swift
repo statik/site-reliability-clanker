@@ -53,8 +53,8 @@ struct SettingsView: View {
           HStack(spacing: 12) {
             ProductMark(size: 44)
             Text(
-              "Paperboat Manager shows how the fish rental business runs and lets you decide "
-                + "on the work that S.R.C. (Site Reliability Clanker) proposes.")
+              "This app shows how Paperboat, the fish rental business, runs and lets you "
+                + "decide on the work that S.R.C. (Site Reliability Clanker) proposes.")
             .font(.callout)
           }
         }

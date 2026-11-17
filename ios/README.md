@@ -1,8 +1,14 @@
-# Paperboat Manager (iOS)
+# S.R.C. (iOS)
 
-Paperboat Manager is a native SwiftUI app for the manager of Paperboat, the fish rental
+S.R.C. for iOS is a native SwiftUI app for the manager of Paperboat, the fish rental
 business. It shows how the business application runs. It also lets the manager approve,
 schedule, send back or reject the work that S.R.C. (Site Reliability Clanker) proposes.
+
+The name under the icon is "S.R.C.". The Xcode target is `SRC` and the bundle identifier
+is `dev.clanker.src`. Earlier builds had the name "Paperboat" and the identifier
+`dev.clanker.paperboat-manager`. iOS installs the new identifier as a different app, and
+the new app cannot read the Keychain of the old one. Thus, after the update, remove the
+old app and sign in again.
 
 The app uses only the HTTP API of the control plane (`docs/API.md`) and three endpoints of
 Paperboat (`/api/stats`, `/api/version`, `/api/healthz`). It has no third-party dependencies.
@@ -23,7 +29,7 @@ ios/build.sh
 
 The script does these steps:
 
-1. It generates `PaperboatManager.xcodeproj` from `project.yml`.
+1. It generates `SRC.xcodeproj` from `project.yml`.
 2. It builds the app and the test bundle for the simulator. Warnings are errors.
 3. It boots the simulator and runs the unit tests in it.
 
@@ -86,8 +92,11 @@ Four more pictures show a large text size. It uses the live servers. All its req
 exception: it sends one `request_changes` decision as the viewer `dave`. The control plane
 refuses that decision with status 403, and the screenshot shows the refusal.
 
-The script opens the approval page of `WI-0020`. If the demo has no work item with that
-name, change the name in the script. The pictures in `ios/screenshots` show `WI-0016`.
+The script asks the control plane which work items exist and selects them by state and
+kind. For the approval page it uses the newest work item that waits for a decision. If no
+work item waits, it uses the newest one that is done. The pictures in `ios/screenshots`
+show `WI-0016`, which was done. Set `CONTROL_PLANE` if the control plane is not on
+`http://127.0.0.1:7070`.
 
 ## Colours and icon
 

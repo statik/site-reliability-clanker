@@ -96,7 +96,7 @@ Stop a running control plane before you start `make demo` again: `pkill -f "clan
 | `runbooks/` | Runbook jobs, the risk tier policy (Rego) and the notification routes |
 | `evals/` | Inspect AI evaluations for the agent roles. Results: `evals/RESULTS.md` |
 | `site/` | The concept website and the build of the explainer video |
-| `ios/` | Paperboat Manager, an iOS app to review and approve work from a phone |
+| `ios/` | S.R.C. for iOS, an app to review and approve work from a phone |
 
 ## Website, video, evals and iOS app
 
