@@ -710,7 +710,7 @@ html:not(.js) .chip { border: 0; background: none; padding: 0; cursor: default; 
 .how { display: grid; gap: 1px; margin-top: var(--s-8); list-style: none; padding: 0;
   background: var(--border-subtle); border: 1px solid var(--border-subtle); counter-reset: how; }
 @media (min-width: 42rem) { .how { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 82rem) { .how { grid-template-columns: repeat(7, 1fr); } }
+@media (min-width: 66rem) { .how { grid-template-columns: repeat(4, 1fr); } }
 .how li { position: relative; padding: var(--s-5) var(--s-5) var(--s-7); background: var(--background);
   counter-increment: how; }
 .how li::before { content: counter(how); display: block; font-size: 2rem; font-weight: 300;
@@ -722,7 +722,6 @@ html:not(.js) .chip { border: 0; background: none; padding: 0; cursor: default; 
 .how-code { background: var(--tag-sea-bg); color: var(--tag-text); }
 .how-model { background: var(--tag-sky-bg); color: var(--tag-text); }
 .how-human { background: var(--tag-honey-bg); color: var(--tag-text); }
-@media (min-width: 42rem) and (max-width: 81.98rem) { .how li:last-child { grid-column: 1 / -1; } }
 
 .video-title { margin-top: var(--s-10); font-size: clamp(1.5rem, 1.4vw + 1rem, 2rem); font-weight: 300;
   line-height: 1.25; max-width: 28ch; }
