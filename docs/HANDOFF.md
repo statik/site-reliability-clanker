@@ -23,11 +23,7 @@ the strict form of its answer), #54 to #57 and #59 (the site), #58 (approval in 
 Teams), #60 (the number of T3 approvers is a setting), #62 (the device flow in the iOS
 app). Step 5 of the next steps is done. No pull request is open.
 
-**One branch is not merged.**
-
-| Branch | Where | State | To finish |
-|---|---|---|---|
-| `video-one-idea` | worktree `.claude/worktrees/agent-ae36a6a2b9fad684f`, not pushed | The explainer video, built again on one idea with a script that the owner approved line by line (`site/narration.md` on the branch). 93.7 s, the ElevenLabs voice of the owner, drawn scenes only: the build needs no running demo. The owner heard crackling in the build before this one. This build removes three possible causes (see "The video" below). The owner did not hear this build yet | The owner listens. Then merge, upload `site/out/explainer.mp4` to the release `site-video`, replace `site/img/video-poster.png` (a frame of the old video), change the heading "The whole idea in one short video" if needed, and start the Pages workflow |
+**No branch waits.** The explainer video on one idea is merged and published (see "The video" below).
 
 Worktrees that can be removed, because their work is on the main branch:
 `agent-aa1afd77bc263132f` (branch `chat-approval`, locked), `overview-one-idea`,
@@ -79,13 +75,18 @@ by the Pages workflow; a merge that touches `site/` deploys it). What the owner 
   `ELEVEN_LABS_VOICE_ID` are in `.env` of the main checkout; a worktree has no `.env`.
   Each sentence is synthesized once and kept in `site/out/cache/speech/`.
 - Do not upload a video to the release `site-video` before the owner approves it by ear.
-- The video on the public site now is the build of the old script (137 s, the voice of the
-  owner). A copy is in `~/Movies/src-explainer/`.
-- The crackling: the measurements showed no clipped sample and no click between the voice
-  clips. The build on the branch removes a layer of filtered noise from the music, holds
-  the music at one low level (no sidechain compressor), and gives the voice one gain to a
-  peak of -3 dB with no limiting. Nobody confirmed by ear that this was the cause.
-  `~/Movies/src-explainer/` has the voice alone and the music alone for a comparison.
+- The video on the public site is the build on one idea: 99.2 s, the script in
+  `site/narration.md`, which the owner approved line by line and by ear. Its scenes are
+  drawn pages that read `site/data/month.json`, so the build needs no running demo. A copy
+  of each build that the owner heard is in `~/Movies/src-explainer/`.
+- The script describes the product as designed. The owner decided that the site and the
+  video do not say "in progress": the line about the setup says that it walks you through
+  logging in to your cloud provider, and the wizard sets up only the local target today.
+- The crackling that the owner heard in one build is gone, and the owner confirmed it by
+  ear. The cause was in the mix, not in the voice clips: the music had a layer of filtered
+  noise and rose in each pause (a sidechain compressor), and the voice was raised and
+  limited. Now the music has no noise layer and one low level, and the voice gets one
+  gain to a peak of -3 dB with no limiting. Keep this mix.
 
 **Decisions of the owner in this session that are not in an issue**
 
@@ -133,7 +134,8 @@ by the Pages workflow; a merge that touches `site/` deploys it). What the owner 
 
 **The order of the work now**
 
-1. The video, when the owner approves it (the table above).
+1. Make the dashboard screenshots of the site again after the dashboard has the new colours
+   (`site/capture.mjs`; it did not run since the click-through tours were removed).
 2. The new colours and icon for the wizard, the iOS app and the dashboard, if the owner
    says yes.
 3. The pull request path for runbooks, when the owner decides how.
