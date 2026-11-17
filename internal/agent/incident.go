@@ -11,6 +11,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/audit"
 	"github.com/statik/site-reliability-clanker/internal/detect"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/store"
 )
 
 type diagnosis struct {
@@ -24,11 +25,16 @@ type diagnosis struct {
 func (a *Agent) diagnose(ctx context.Context, wi orchestrator.WorkItem, f detect.Finding,
 	transcript string) (diagnosis, string, error) {
 	alert, _ := json.Marshal(f)
+	history, err := a.recentChanges(wi.Env)
+	if err != nil {
+		return diagnosis{}, "", err
+	}
 	resp, err := a.complete(ctx, RoleInvestigator, wi.ID, Request{
 		ReplayKey: "investigate_incident",
 		Messages: []ChatMessage{
 			{Role: "system", Content: investigatorSystem},
-			{Role: "user", Content: "<data>alert: " + string(alert) + "\n\ndebug session:\n" +
+			{Role: "user", Content: "<data>alert: " + string(alert) +
+				"\n\nchange history, newest first:\n" + history + "\n\ndebug session:\n" +
 				truncate(transcript, 8000) + "</data>"},
 		}})
 	if errors.Is(err, ErrNoRecording) {
@@ -47,6 +53,30 @@ func (a *Agent) diagnose(ctx context.Context, wi orchestrator.WorkItem, f detect
 			err)
 	}
 	return d, resp.Model, nil
+}
+
+// recentChanges lists the last finished changes of an environment with their age, so the
+// Investigator can tell a fresh release from one that ran for weeks.
+func (a *Agent) recentChanges(env string) (string, error) {
+	items, err := a.Orch.List()
+	if err != nil {
+		return "", err
+	}
+	var lines []string
+	for _, wi := range items {
+		if wi.Env != env || wi.Kind == "incident" || wi.Tier == "" || wi.Tier == "T0" {
+			continue
+		}
+		age := a.Clock.Now().Sub(store.ParseTime(wi.UpdatedAt)).Round(time.Minute)
+		lines = append(lines, fmt.Sprintf("%s %s: %s, %s ago", wi.ID, wi.Title, wi.State, age))
+		if len(lines) == 8 {
+			break
+		}
+	}
+	if len(lines) == 0 {
+		return "no change is on record", nil
+	}
+	return strings.Join(lines, "\n"), nil
 }
 
 // allowedMitigations are the deployments that the restart runbook may target after an
@@ -104,6 +134,15 @@ func (a *Agent) HandleIncident(ctx context.Context, f detect.Finding) error {
 		Data: map[string]any{"evidence": d.Evidence, "proposed_runbook": d.ProposedRunbook,
 			"deployment": d.Deployment, "model": model}})
 	if d.ProposedRunbook != "restart-deployment" || !allowedMitigations[d.Deployment] {
+		a.emit(audit.Event{Type: "incident.escalated", Actor: RoleInvestigator, Env: f.Env,
+			WorkItem: wi.ID, Summary: "Incident needs a human: " + d.Diagnosis,
+			Data: map[string]any{"proposed_runbook": d.ProposedRunbook, "evidence": d.Evidence}})
+		explanation := orchestrator.Explanation{Sentence: d.Diagnosis, Why: d.WriteUp,
+			UserEffect: f.Title, IfDeferred: "Evidence: " + d.Evidence, Source: model,
+			Rollback: "No routine mitigation applies. A human must decide the next step."}
+		if err := a.Orch.SetExplanation(wi.ID, explanation); err != nil {
+			return err
+		}
 		return a.failIncident(wi, fmt.Errorf("the proposed mitigation %q on %q is not a "+
 			"routine runbook; a human must decide", d.ProposedRunbook, d.Deployment))
 	}

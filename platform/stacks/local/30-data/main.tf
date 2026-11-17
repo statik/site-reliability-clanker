@@ -213,7 +213,7 @@ resource "kubernetes_job_v1" "prepare_shared" {
 
         container {
           name    = "chmod"
-          image   = "postgres:${var.postgres_version}-alpine"
+          image   = "busybox:1.38.0"
           command = ["sh", "-c", "chmod 0777 /shared"]
 
           volume_mount {

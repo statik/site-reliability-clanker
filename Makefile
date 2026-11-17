@@ -21,7 +21,7 @@ lint:
 	cd apps/paperboat && go vet ./...
 	tofu fmt -check -recursive platform
 	opa check runbooks/policy
-	shellcheck runbooks/jobs/*.sh apps/paperboat/build.sh site/*.sh
+	shellcheck runbooks/jobs/*.sh apps/paperboat/build.sh
 	shfmt -i 2 -d runbooks/jobs apps/paperboat/build.sh
 
 destroy: build

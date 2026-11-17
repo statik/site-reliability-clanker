@@ -16,7 +16,7 @@
     },
     {
       "name": "Incident",
-      "types": ["incident.opened", "incident.resolved"],
+      "types": ["incident.opened", "incident.escalated", "incident.resolved"],
       "channels": ["email", "slack", "teams", "discord"],
       "audience": "operators",
       "urgency": "immediate"

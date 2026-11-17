@@ -321,7 +321,9 @@ func (d *Detector) CheckHealth(ctx context.Context, env string) error {
 	}
 	last := samples[len(samples)-1]
 	return d.open(ctx, Finding{Detector: "health", Env: env,
-		Key: fmt.Sprintf("incident:%s:%s", env, last.TS),
+		// One incident for each environment and hour, so an incident that waits for a human
+		// does not open again on every check.
+		Key: fmt.Sprintf("incident:%s:%s", env, last.TS[:13]),
 		Title: fmt.Sprintf("Paperboat in %s fails %d of %d inventory requests", env,
 			last.Total-last.OK, last.Total),
 		Detail: map[string]any{"kind": "incident", "ok": last.OK, "total": last.Total,
