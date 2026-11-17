@@ -104,10 +104,9 @@ To finish the site and the video:
 
 **The order of the work after the branches above are merged**
 
-1. The device flow in the iOS app (the last part of step 5).
-2. The new colours and icon for the wizard, the iOS app and the dashboard, if the owner
+1. The new colours and icon for the wizard, the iOS app and the dashboard, if the owner
    says yes.
-3. The pull request path for runbooks, when the owner decides how.
+2. The pull request path for runbooks, when the owner decides how.
 4. Step 6: the cloud runner and broker. Issue #40 has the decision for the secrets
    (Parameter Store with the AWS SDK for Go v2).
 5. Issue #51: scrub the input of the model roles before the JSON frame.
@@ -314,8 +313,28 @@ What ran on the build of commit `376617b`, the last change to the Go code:
      audit event. A tier T3 change needs two approvers, and a control plane on a cloud
      has only the first admin until somebody adds a row to the users table. The request
      for a code is open to everybody and is not slowed down.
-   - Not built: the iOS app does not use the device flow yet, and still sends the user
-     header, which only the demo reads. There is no page to add a user or change a role: a
+   - **Done: the device flow in the iOS app.** When the control plane answers 401, the
+     app shows a code and the address of the page, asks for its token at the interval of
+     the server, and keeps the token in the Keychain, one for each server address. Every
+     request to the control plane, also the event stream, sends it as a bearer token. A
+     later 401 removes the token and shows the sign-in again with a message. Settings
+     shows the person from `GET /api/v1/me` and has a sign-out, which only forgets the
+     token on the phone. A control plane without a sign-in gets the user header as before.
+     `GET /api/v1/auth` is behind the gate: a control plane with a sign-in answers it with
+     401 to a caller it does not know, so the 401 is how the app learns that people sign in.
+   - Ran: `ios/build.sh` (105 tests pass). In the simulator against a control plane in
+     standby mode with the fake identity provider: the app showed a code, the admin
+     approved it with a browser session (curl), the app showed the admin and loaded the
+     data, and the token was still there after a restart of the app. After the removal of
+     the token row in the database and a restart of the app, the app showed the sign-in
+     with the message.
+   - Not run for the iOS app: a real phone, the button that opens the browser, the wait
+     while the browser is in front, a 401 in a session that runs, a refusal or the end of
+     a code against a real server, and the demo path against a live demo. Unit tests
+     cover all of these but the button. The Keychain needs a signed app: the
+     simulator build is now signed "to run locally", and without that signature the
+     Keychain answered with status -34018.
+   - Not built: there is no page to add a user or change a role: a
      user other than the first admin needs a row in the users table. There is no list of
      tokens and no way to end one token before its twelve hours. The core does not slow
      down a program that asks for its token too often.
@@ -428,7 +447,7 @@ Everything in this section was run on the local target (kind on Docker, macOS ar
 | Dashboard | Carbon dashboard served by the control plane at http://127.0.0.1:7070. Build, lint, types and 30 tests pass |
 | Evals | Inspect AI suite in `evals/`. Three live rounds; see `evals/RESULTS.md` |
 | Website and video | `site/`. The video renders from one command with real dashboard footage |
-| iOS app | `ios/`. Builds, 71 tests pass, runs in the simulator against the control plane |
+| iOS app | `ios/`. Builds, 105 tests pass, runs in the simulator against the control plane, signs in with the device flow |
 | Fresh clone | A fresh clone built and ran the blank-slate deployment and the scripted month |
 
 ## The setup wizard (added 2026-11-17)
@@ -546,7 +565,7 @@ Limits:
 - A pull request for a change to a runbook: the main branch of the `runbooks` repository
   cannot change after it is seeded. Section 5.6 of the plan has the open decision.
 - Use cases 7, 8, 12 and 23 on a real target. Use case 7 is a forecast on the timeline.
-- The device flow in the iOS app, a page to manage users, and a way to end one token.
+- A page to manage users, and a way to end one token.
 - A "defer" decision, and enforcement of a maintenance window for tier T3.
 - Quiet hours, escalation and threading for notifications.
 - A test of the approval in chat against the real Slack and the real Teams (issue #49).
