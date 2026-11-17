@@ -86,6 +86,7 @@ function finish(timeline, pictures) {
     ...inputs, "-filter_complex", graph.join(";"), "-map", `[${previous}]`, "-map", "[a]",
     "-t", timeline.duration.toFixed(3),
     "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-pix_fmt", "yuv420p", "-r", String(FPS),
+    "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709",
     "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", output,
   ]);
   return output;
