@@ -1,0 +1,75 @@
+{{- $ctx := dict "root" . "component" "api" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paperboat-api
+  labels:
+    {{- include "paperboat.labels" $ctx | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  {{- include "paperboat.strategy" . | nindent 2 }}
+  selector:
+    matchLabels:
+      {{- include "paperboat.selector" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "paperboat.labels" $ctx | nindent 8 }}
+      annotations:
+        checksum/admin-token: {{ .Values.adminToken | sha256sum }}
+    spec:
+      terminationGracePeriodSeconds: 15
+      {{- include "paperboat.podSecurity" . | nindent 6 }}
+      containers:
+        - name: api
+          image: {{ include "paperboat.image" . }}
+          args: ["api"]
+          ports:
+            - name: http
+              containerPort: 8081
+          env:
+            {{- include "paperboat.databaseEnv" . | nindent 12 }}
+            - name: DATA_DIR
+              value: /data
+            {{- if .Values.adminToken }}
+            - name: ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: paperboat-admin
+                  key: ADMIN_TOKEN
+            {{- end }}
+          {{- include "paperboat.probes" "http" | nindent 10 }}
+          {{- include "paperboat.resources" . | nindent 10 }}
+          {{- include "paperboat.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        {{- include "paperboat.sharedVolume" . | nindent 8 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: paperboat-api
+  labels:
+    {{- include "paperboat.labels" $ctx | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "paperboat.selector" $ctx | nindent 4 }}
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http
+{{- if .Values.adminToken }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: paperboat-admin
+  labels:
+    {{- include "paperboat.labels" $ctx | nindent 4 }}
+type: Opaque
+stringData:
+  ADMIN_TOKEN: {{ .Values.adminToken | quote }}
+{{- end }}

@@ -1,0 +1,74 @@
+{{define "content"}}
+<div class="split">
+<aside class="panel">
+  <h2>Rent out a fish</h2>
+  {{if .Data.FishError}}
+  <p class="form-error">
+    The list of fish did not load: {{.Data.FishError}}. Reload the page to try again.
+  </p>
+  {{end}}
+  <form data-api-form="/api/rentals">
+    <label>Customer
+      <select name="customer_id" data-number required>
+        {{range .Data.Customers}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+      </select>
+    </label>
+    <label>Fish
+      <select name="fish_id" data-number required>
+        {{range .Data.Available}}
+        <option value="{{.ID}}">{{.Name}}, {{.Species}} ({{.Tank}})</option>
+        {{end}}
+      </select>
+    </label>
+    <label>Days
+      <input type="number" name="days" data-number min="1" max="90" value="3" required>
+    </label>
+    <button type="submit">Reserve fish</button>
+    <p class="hint">The fish is reserved at once and a delivery is scheduled.</p>
+  </form>
+</aside>
+<section>
+  <div id="live" data-refresh="5">
+  {{if .LoadError}}
+  <section class="load-error" data-load-error>
+    <h1>The rentals did not load</h1>
+    <p>{{.LoadError}}</p>
+    <p class="hint">This page tries again every few seconds.</p>
+  </section>
+  {{else}}
+  <h1>Rentals</h1>
+  <table class="ledger">
+    <thead>
+      <tr>
+        <th>No.</th><th>Customer</th><th>Fish</th><th>Period</th><th class="num">Price</th>
+        <th>Status</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {{range .Data.Rentals}}
+    <tr>
+      <td class="num">{{.ID}}</td>
+      <td>{{.Customer}}</td>
+      <td><strong>{{.Fish}}</strong> <span class="quiet">{{.Species}}</span></td>
+      <td>{{day .StartsAt}} to {{day .EndsAt}}</td>
+      <td class="num">{{money .PriceCents}}</td>
+      <td><span class="chip" data-rental="{{.Status}}">{{statusLabel .Status}}</span></td>
+      <td class="actions">
+        {{if eq .Status "active"}}
+        <button type="button" class="small"
+                data-post="/api/rentals/{{.ID}}/return">Collect fish</button>
+        {{end}}
+      </td>
+    </tr>
+    {{else}}
+    <tr>
+      <td colspan="7" class="empty">No rentals yet. Reserve a fish to start the first one.</td>
+    </tr>
+    {{end}}
+    </tbody>
+  </table>
+  {{end}}
+  </div>
+</section>
+</div>
+{{end}}

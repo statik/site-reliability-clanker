@@ -1,0 +1,35 @@
+{{- $ctx := dict "root" . "component" "worker" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paperboat-worker
+  labels:
+    {{- include "paperboat.labels" $ctx | nindent 4 }}
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  {{- include "paperboat.strategy" . | nindent 2 }}
+  selector:
+    matchLabels:
+      {{- include "paperboat.selector" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "paperboat.labels" $ctx | nindent 8 }}
+    spec:
+      terminationGracePeriodSeconds: 15
+      {{- include "paperboat.podSecurity" . | nindent 6 }}
+      containers:
+        - name: worker
+          image: {{ include "paperboat.image" . }}
+          args: ["worker"]
+          env:
+            {{- include "paperboat.databaseEnv" . | nindent 12 }}
+            - name: DATA_DIR
+              value: /data
+          {{- include "paperboat.resources" . | nindent 10 }}
+          {{- include "paperboat.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        {{- include "paperboat.sharedVolume" . | nindent 8 }}

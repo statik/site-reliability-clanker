@@ -1,0 +1,5 @@
+[
+  {
+    "content": "{\"sentence\": \"Something changed this environment outside the pipeline. Applying this plan sets it back to what the code on main says.\", \"why\": \"The nightly drift check planned every layer and found a difference between the environment and the code.\", \"downtime\": \"None expected.\", \"user_effect\": \"Capacity returns to the reviewed value.\", \"cost_change\": \"None.\", \"duration\": \"About 1 minute.\", \"pre_checks\": [\"The plan lists each resource that differs and the attribute that differs\"], \"backup\": \"Not needed. No data changes.\", \"rollback\": \"If the manual change was intended, reject this and open a pull request that records it in code.\", \"verification\": \"Health check and 40 canary requests.\", \"if_deferred\": \"The environment keeps a configuration that nobody reviewed, and the next apply of this layer will revert it anyway.\"}"
+  }
+]

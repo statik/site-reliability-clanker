@@ -1,0 +1,36 @@
+# The runner supplies the cluster credential in KUBE_CONFIG_PATH. The access broker issues it.
+provider "kubernetes" {}
+provider "helm" {}
+
+data "terraform_remote_state" "data" {
+  backend = "local"
+  config  = { path = "${var.state_location}/30-data.tfstate" }
+}
+
+locals {
+  data_outputs = data.terraform_remote_state.data.outputs
+  admin_ref    = split("/", local.data_outputs.postgres_admin_secret_ref)
+}
+
+data "kubernetes_secret_v1" "postgres_admin" {
+  metadata {
+    namespace = local.admin_ref[0]
+    name      = local.admin_ref[1]
+  }
+}
+
+module "platform" {
+  source = "../../../modules/shared/platform"
+
+  env_name                = var.env_name
+  app_namespace           = var.app_namespace
+  public_port             = var.public_port
+  postgres_host           = local.data_outputs.postgres_host
+  postgres_port           = local.data_outputs.postgres_port
+  postgres_database       = local.data_outputs.postgres_database
+  postgres_admin_password = data.kubernetes_secret_v1.postgres_admin.data["password"]
+  rwx_storage_class       = local.data_outputs.rwx_storage_class
+  shared_fs_capacity_gb   = var.shared_fs_claim_gb
+  gateway_class           = "nodeport"
+  public_address          = "localhost:${var.public_port}"
+}

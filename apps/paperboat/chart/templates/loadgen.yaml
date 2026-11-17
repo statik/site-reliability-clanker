@@ -1,0 +1,31 @@
+{{- if .Values.loadgen.enabled }}
+{{- $ctx := dict "root" . "component" "loadgen" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paperboat-loadgen
+  labels:
+    {{- include "paperboat.labels" $ctx | nindent 4 }}
+spec:
+  replicas: 1
+  {{- include "paperboat.strategy" . | nindent 2 }}
+  selector:
+    matchLabels:
+      {{- include "paperboat.selector" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "paperboat.labels" $ctx | nindent 8 }}
+    spec:
+      terminationGracePeriodSeconds: 5
+      {{- include "paperboat.podSecurity" . | nindent 6 }}
+      containers:
+        - name: loadgen
+          image: {{ include "paperboat.image" . }}
+          args: ["loadgen"]
+          env:
+            - name: API_URL
+              value: http://paperboat-web:8080
+          {{- include "paperboat.resources" . | nindent 10 }}
+          {{- include "paperboat.containerSecurity" . | nindent 10 }}
+{{- end }}

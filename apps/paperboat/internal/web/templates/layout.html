@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} | Paperboat</title>
+<link rel="icon" href="/static/boat.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/app.css?v={{.Version}}">
+<script src="/static/app.js?v={{.Version}}" defer></script>
+</head>
+<body data-page="{{.Active}}">
+<svg width="0" height="0" class="sprite" aria-hidden="true">
+  <symbol id="fish" viewBox="0 0 32 18">
+    <path d="M1 9C5 2.5 12 .8 18.5 3.6c2.6 1.1 4.7 2.9 6.3 4.6L31 3v12l-6.2-5.2
+             c-1.6 1.7-3.7 3.5-6.3 4.6C12 17.2 5 15.5 1 9z"/>
+    <circle cx="8" cy="7.6" r="1.3" fill="#fff"/>
+  </symbol>
+  <symbol id="boat" viewBox="0 0 40 30">
+    <path d="M20 1l9 15H11z" opacity=".85"/>
+    <path d="M20 1v15h9z" opacity=".55"/>
+    <path d="M2 17h36l-7 11H9z"/>
+  </symbol>
+</svg>
+<header class="masthead">
+  <a class="brand" href="/">
+    <svg class="brand-mark" aria-hidden="true"><use href="#boat"/></svg>
+    <span class="brand-name">Paperboat</span>
+    <span class="brand-line">Fish rental</span>
+  </a>
+  <nav aria-label="Sections">
+    <a href="/" {{if eq .Active "board"}}aria-current="page"{{end}}>Inventory</a>
+    <a href="/rentals" {{if eq .Active "rentals"}}aria-current="page"{{end}}>Rentals</a>
+    <a href="/deliveries" {{if eq .Active "deliveries"}}aria-current="page"{{end}}>Deliveries</a>
+    <a href="/support" {{if eq .Active "support"}}aria-current="page"{{end}}>Support desk</a>
+  </nav>
+  <span class="pulse" id="pulse" data-state="idle">
+    <i></i><span id="pulse-text">Connecting</span>
+  </span>
+</header>
+<main>
+{{template "content" .}}
+</main>
+<footer class="colophon">
+  <span>Paperboat <strong id="app-version">{{.Version}}</strong></span>
+  {{if .API}}
+  {{if ne .API.Version .Version}}<span>API {{.API.Version}}</span>{{end}}
+  <span>Schema {{.API.SchemaVersion}}</span>
+  <span class="base-image" title="{{.API.BaseImage}}">Base image {{.API.BaseImage}}</span>
+  {{else}}
+  <span class="warn">The API does not answer</span>
+  {{end}}
+</footer>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

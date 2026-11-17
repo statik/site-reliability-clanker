@@ -1,0 +1,64 @@
+{{define "content"}}
+<div class="split">
+<aside class="panel">
+  <h2>Add to this ticket</h2>
+  <form data-api-form="/api/tickets/{{.Data.Ticket.ID}}/interactions">
+    <label>Your name
+      <input type="text" name="author" value="Support desk" required>
+    </label>
+    <label>Message or call note
+      <textarea name="body" rows="4" required></textarea>
+    </label>
+    <div class="pair">
+      <label>Channel
+        <select name="channel">
+          <option>phone</option><option selected>email</option><option>chat</option>
+        </select>
+      </label>
+      <label>Ticket status
+        <select name="status">
+          <option value="">No change</option>
+          <option value="waiting">Waiting for customer</option>
+          <option value="open">Open</option>
+          <option value="resolved">Resolved</option>
+        </select>
+      </label>
+    </div>
+    <button type="submit">Add to ticket</button>
+  </form>
+</aside>
+<section>
+  <div id="live" data-refresh="5">
+  {{if .LoadError}}
+  <section class="load-error" data-load-error>
+    <h1>The ticket did not load</h1>
+    <p>{{.LoadError}}</p>
+    <p class="hint">This page tries again every few seconds.</p>
+  </section>
+  {{else}}
+  {{with .Data.Ticket}}
+  <p class="crumb"><a href="/support">Support desk</a></p>
+  <h1>{{.Subject}}</h1>
+  <p class="lede">
+    <span class="priority" data-priority="{{.Priority}}">{{.Priority}}</span>
+    <span class="chip" data-ticket-status="{{.Status}}">{{statusLabel .Status}}</span>
+    {{.Customer}}, opened {{ago .CreatedAt}}
+    {{- if .RentalID}}, rental {{.RentalID}}{{end}}
+    {{- if .DeliveryID}}, delivery {{.DeliveryID}}{{end}}
+  </p>
+  {{end}}
+  <ol class="thread">
+    {{range .Data.Interactions}}
+    <li {{if eq .Author "Support desk"}}class="staff"{{end}}>
+      <p class="who"><strong>{{.Author}}</strong> by {{.Channel}}, {{ago .CreatedAt}}</p>
+      <p>{{.Body}}</p>
+    </li>
+    {{else}}
+    <li class="empty">Nothing on this ticket yet. Add the first note.</li>
+    {{end}}
+  </ol>
+  {{end}}
+  </div>
+</section>
+</div>
+{{end}}

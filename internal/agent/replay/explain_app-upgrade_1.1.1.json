@@ -1,0 +1,5 @@
+[
+  {
+    "content": "{\"sentence\": \"Patch Paperboat from 1.1.0 to 1.1.1 to pick up a security fix in the base image. The application code does not change.\", \"why\": \"Advisory PB-2026-014 reports a vulnerability in the base image that 1.1.0 uses.\", \"downtime\": \"None expected. Pods are replaced one at a time.\", \"user_effect\": \"None. No feature changes.\", \"cost_change\": \"None.\", \"duration\": \"About 2 minutes.\", \"pre_checks\": [\"The plan changes one resource: the Helm release of Paperboat\", \"No schema migration\"], \"backup\": \"Not needed. No data changes.\", \"rollback\": \"Automatic if the canary check fails. Both releases use schema version 2.\", \"verification\": \"Health check, the running version must be 1.1.1, and 40 canary requests.\", \"if_deferred\": \"The vulnerable base image stays in production.\"}"
+  }
+]
