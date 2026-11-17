@@ -13,32 +13,26 @@ the wizard (`clanker setup`). The decisions of the owner are in section 12 of
 run in short-lived runners; all state is in an external PostgreSQL; the dashboard is behind
 a load balancer with OIDC sign-in; the wizard builds the machine image with `ops`.
 
-### Work that is not merged
+### The core and runner split (verified 2026-11-17)
 
-Branch `runner-process` (pushed) holds the core and runner split. It has no pull request
-yet. It contains two steps:
+The split has two steps:
 
 1. The core holds no file path (plans, plan JSON, job logs and layer outputs are rows in
    PostgreSQL; policy rules and runbook scripts come from the forge).
 2. Each job runs in a `clanker runner` process that gets its one job from the core over
    HTTP with a token.
 
-All Go tests and `make lint` pass on the branch. The full run (`scripts/verify/fresh-run.sh`)
-was started on this build and had passed the first deployment and the first scene when the
-session ended. **It was not seen to finish.**
+What ran on the build of commit `376617b`, the last change to the Go code:
 
-To finish this work:
-
-1. Look at the live demo: `curl -s http://127.0.0.1:7070/api/v1/work-items`. A complete run
-   has thirteen work items, twelve in `Done` and `WI-0005` in `RolledBack`, and
-   `curl -s http://127.0.0.1:7070/api/v1/audit/verify` says `ok`. If the run is not complete
-   or the control plane is down, run `scripts/verify/fresh-run.sh` again (about 40 minutes).
-2. Run `python3 scripts/verify/sweep.py` and
-   `python3 scripts/verify/stale_plan.py <new directory>`.
-3. Check that the data directory `.clanker` has no `plans`, `creds` or `repos` directory.
-   (`logs` holds only the log of the local image build.)
-4. Open one pull request from `runner-process`, say what ran, and merge it when the checks
-   pass. The branch `core-without-files` is the first step alone; delete it after the merge.
+- The full run from an empty data directory, with the live model: thirteen work items,
+  twelve in `Done` and `WI-0005` in `RolledBack`. The audit chain verified at 310 events.
+  The log of the control plane had no error line. The run used the script that became
+  `scripts/verify/fresh-run.sh`; the committed file itself was not run.
+- `scripts/verify/sweep.py`: only `GET /topology` without `env` answered other than 2xx,
+  which is correct.
+- `scripts/verify/stale_plan.py`: the stale plan was refused, planned again and approved
+  again. Both changes are on `main` of the forge and the objects pass `git fsck`.
+- The data directory had no `plans`, `creds` or `repos` directory after the run.
 
 ### Next steps, in order
 

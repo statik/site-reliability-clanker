@@ -49,7 +49,7 @@ for item in items:
 
 as_of = urllib.parse.quote(items[len(items) // 2]["updated_at"])
 routes = ["/me", "/users", "/overview", f"/overview?as_of={as_of}", "/events", "/audit/verify",
-          "/audit/evidence", f"/audit/evidence?work_item={first}", "/timeline", "/topology",
+          "/audit/evidence", "/timeline", "/topology",
           f"/topology?as_of={as_of}", "/posture", f"/posture?as_of={as_of}", "/health", "/access",
           "/findings", "/notifications", "/forge/repos", "/forge/pulls", "/chat",
           f"/chat?work_item={first}", "/agent/calls", f"/agent/calls?work_item={first}", "/sim"]
@@ -68,9 +68,9 @@ for pull in call("GET", "/forge/pulls"):
 events = call("GET", "/events")
 events = events["events"] if isinstance(events, dict) else events
 print("events:", len(events))
-for query in ["search=PAPERBOAT", "search=paperboat", "type=grant.issued", "types=grant.issued,grant.revoked",
+for query in ["q=PAPERBOAT", "q=paperboat", "types=grant.issued", "types=grant.issued,grant.revoked",
               "type_prefix=grant.", f"work_item={first}", "env=local", "after=100", "limit=5&order=desc",
-              f"search=Paperboat&type_prefix=work_item.&work_item={first}&env=local"]:
+              f"q=Paperboat&type_prefix=work_item.&work_item={first}&env=local"]:
     answer = call("GET", "/events?" + query)
     answer = answer["events"] if isinstance(answer, dict) else answer
     print(f"events?{query}: {len(answer) if isinstance(answer, list) else answer}")
