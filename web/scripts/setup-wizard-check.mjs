@@ -38,7 +38,7 @@ await page.goto(address);
 if (new URL(page.url()).search !== "") problems.push("the token stayed in the address bar");
 await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
 const first = await page.getByRole("heading", { level: 1 }).first().textContent();
-if (first === "Where do you want Clanker to run?") {
+if (first === "Where do you want S.R.C. to run?") {
   await shoot("target");
   await page.getByText("This machine", { exact: true }).click();
   await press("Continue");
@@ -47,7 +47,7 @@ if (first === "Where do you want Clanker to run?") {
   await shoot("checks");
   await press("Continue");
 
-  await heading("Give Clanker a language model.");
+  await heading("Give S.R.C. a language model.");
   await shoot("key");
   await press("Continue without a key");
 

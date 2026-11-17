@@ -146,8 +146,8 @@ function choice(value, title, text, disabledNote) {
 function drawTarget() {
   const awsNote = view.aws_enabled ? null : "not yet";
   return [
-    el("h1", {}, "Where do you want Clanker to run?"),
-    el("p", { class: "lead" }, "Clanker has two parts: the control plane, which finds the work and " +
+    el("h1", {}, "Where do you want S.R.C. to run?"),
+    el("p", { class: "lead" }, "S.R.C. has two parts: the control plane, which finds the work and " +
       "asks you, and the environment that it looks after. This wizard creates the home of the " +
       "control plane. The control plane then proposes the first deployment, and you approve it."),
     el("div", { class: "choices", role: "radiogroup", "aria-label": "Target" },
@@ -220,9 +220,9 @@ function drawKey() {
       "Only the control plane can read it. It is not written to a file here."
     : "The wizard saves it in the data directory on this machine, readable only by you.";
   return [
-    el("h1", {}, "Give Clanker a language model."),
+    el("h1", {}, "Give S.R.C. a language model."),
     el("p", { class: "lead" }, "The model drafts changes and writes the summaries. It gets no cloud " +
-      "credential. Clanker uses OpenRouter, and stops at 5 USD each day."),
+      "credential. S.R.C. uses OpenRouter, and stops at 5 USD each day."),
     el("label", { class: "field" }, "OpenRouter API key",
       el("input", { type: "password", autocomplete: "off", spellcheck: "false", placeholder: "sk-or-…",
         value: form.key, oninput: (event) => { form.key = event.target.value; } }),
@@ -232,7 +232,7 @@ function drawKey() {
       button("Back", "secondary", () => go("checks")),
       button("Continue without a key", "secondary", () => saveKey("")),
       button("Save the key and continue", "primary", () => saveKey(form.key))),
-    el("p", { class: "help" }, "Without a key, Clanker uses recorded answers. They fit the example " +
+    el("p", { class: "help" }, "Without a key, S.R.C. uses recorded answers. They fit the example " +
       "application only."),
   ];
 }
