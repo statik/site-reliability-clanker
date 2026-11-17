@@ -319,6 +319,9 @@ func (s *Server) getNotifications(*http.Request) (any, error) {
 }
 
 func (s *Server) postDigest(r *http.Request) (any, error) {
+	if err := s.roleWhenSignedIn(r, "admin"); err != nil {
+		return nil, err
+	}
 	return map[string]int{"events": s.Notifier.FlushDigest(r.Context())}, nil
 }
 
@@ -394,6 +397,9 @@ func (s *Server) getPull(r *http.Request) (any, error) {
 // postPull opens a pull request for a branch that a human pushed, and puts it through the
 // same pipeline as a change from the agent.
 func (s *Server) postPull(r *http.Request) (any, error) {
+	if err := s.roleWhenSignedIn(r, "approver", "admin"); err != nil {
+		return nil, err
+	}
 	user, err := s.currentUser(r)
 	if err != nil {
 		return nil, err
@@ -468,6 +474,9 @@ func (s *Server) getAgentCalls(r *http.Request) (any, error) {
 func (s *Server) getSim(*http.Request) (any, error) { return s.Sim.State() }
 
 func (s *Server) postSimAdvance(r *http.Request) (any, error) {
+	if err := s.roleWhenSignedIn(r, "admin"); err != nil {
+		return nil, err
+	}
 	var body struct {
 		Hours int `json:"hours"`
 	}
@@ -484,6 +493,9 @@ func (s *Server) postSimAdvance(r *http.Request) (any, error) {
 }
 
 func (s *Server) postSimScene(r *http.Request) (any, error) {
+	if err := s.roleWhenSignedIn(r, "admin"); err != nil {
+		return nil, err
+	}
 	name := r.PathValue("name")
 	go s.background("scene "+name, func(ctx context.Context) error {
 		return s.Sim.RunScene(ctx, name)
@@ -501,6 +513,16 @@ func (s *Server) requireRole(r *http.Request, roles ...string) (orchestrator.Use
 			"one of: %s", user.Name, user.Role, strings.Join(roles, ", ")))
 	}
 	return user, nil
+}
+
+// roleWhenSignedIn guards an action that the demo leaves open to every user of its user
+// switcher. With a sign-in, the action needs one of the roles.
+func (s *Server) roleWhenSignedIn(r *http.Request, roles ...string) error {
+	if s.Identify == nil {
+		return nil
+	}
+	_, err := s.requireRole(r, roles...)
+	return err
 }
 
 func (s *Server) postRunbook(r *http.Request) (any, error) {

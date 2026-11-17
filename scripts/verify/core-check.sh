@@ -15,11 +15,17 @@ repo="$(cd "$(dirname "$0")/../.." && pwd)"
 work="$(mktemp -d)"
 database="clanker-core-check-$$"
 port=7170
+base="http://127.0.0.1:${port}"
+idp_port=7190
+idp="http://127.0.0.1:${idp_port}"
+jar="${work}/cookies"
 core=""
+provider=""
 failures=0
 
 cleanup() {
   if [ -n "${core}" ]; then kill "${core}" 2>/dev/null || true; fi
+  if [ -n "${provider}" ]; then kill "${provider}" 2>/dev/null || true; fi
   docker rm -f "${database}" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -27,6 +33,19 @@ trap cleanup EXIT
 fail() {
   echo "FAILED: $1"
   failures=$((failures + 1))
+}
+
+# status prints the HTTP status of a request. The other arguments go to curl.
+status() {
+  curl -s -o /dev/null -w '%{http_code}' "$@"
+}
+
+# sign_in signs the browser of this check in as $1. $2 is "false" for an email address that
+# the provider did not confirm. It prints the status of the last answer.
+sign_in() {
+  rm -f "${jar}"
+  curl -fs -X POST "${idp}/person?email=$1&verified=${2:-true}"
+  status -L -c "${jar}" -b "${jar}" "${base}/auth/login"
 }
 
 # refused runs the core with the given arguments, which must stop with the given message.
@@ -49,6 +68,7 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 make bundle >"${work}/bundle.log" 2>&1
 CGO_ENABLED=0 go build -tags bundle -trimpath -o "${work}/clanker" ./cmd/clanker
+go build -o "${work}/fakeidp" ./scripts/verify/fakeidp
 
 echo "== start a database"
 docker run -d --name "${database}" -p 127.0.0.1::5432 -e POSTGRES_PASSWORD=check \
@@ -64,37 +84,71 @@ cd "${work}/cwd"
 export HOME="${work}/home-that-does-not-exist"
 export TMPDIR="${work}/tmp"
 export CLANKER_DATABASE_URL="postgres://postgres:check@${address}/clanker?sslmode=disable"
-unset OPENROUTER_API_KEY CLANKER_SIGNING_KEY
+unset OPENROUTER_API_KEY CLANKER_SIGNING_KEY CLANKER_OIDC_ISSUER CLANKER_OIDC_CLIENT_ID \
+  CLANKER_OIDC_CLIENT_SECRET CLANKER_PUBLIC_URL CLANKER_ADMIN_EMAIL
 
-echo "== the core refuses a start without its key, with a bad key, and with --data"
+echo "== the core refuses a start without its key, with a bad key, with --data, without a sign-in"
 refused "needs the signing key"
 CLANKER_SIGNING_KEY="$(printf short | base64)" refused "has 5 bytes"
 CLANKER_SIGNING_KEY="x" refused "remove --data" --data ./data
-
-echo "== start the core"
 CLANKER_SIGNING_KEY="$(head -c 64 /dev/urandom | base64 | tr -d '\n')"
 export CLANKER_SIGNING_KEY
+refused "people must sign in"
+
+echo "== start a fake identity provider and the core"
+"${work}/fakeidp" --addr "127.0.0.1:${idp_port}" >"${work}/idp.log" 2>&1 &
+provider=$!
+for _ in $(seq 1 30); do
+  if curl -fs -o /dev/null "${idp}/.well-known/openid-configuration"; then break; fi
+  sleep 1
+done
+export CLANKER_OIDC_ISSUER="${idp}" CLANKER_OIDC_CLIENT_ID=clanker CLANKER_OIDC_CLIENT_SECRET=check \
+  CLANKER_PUBLIC_URL="${base}" CLANKER_ADMIN_EMAIL=admin@example.com
 "${work}/clanker" up --cloud aws --env prod --demo=false --addr "127.0.0.1:${port}" \
   >"${work}/up.log" 2>&1 &
 core=$!
 for _ in $(seq 1 30); do
-  if curl -fs -o /dev/null "http://127.0.0.1:${port}/api/v1/work-items"; then break; fi
+  if curl -fs -o /dev/null "${base}/healthz"; then break; fi
   sleep 1
 done
 
-page="$(curl -fs "http://127.0.0.1:${port}/" || true)"
+echo "== nobody gets in without a sign-in"
+for path in /api/v1/work-items /api/v1/events/stream "/git/runbooks.git/info/refs?service=git-upload-pack"; do
+  if [ "$(status -m 5 -H 'X-Clanker-User: carol' "${base}${path}")" != 401 ]; then
+    fail "${path} did not answer 401 to a request with no sign-in and a user header"
+  fi
+done
+if [ "$(status "${base}/")" != 302 ]; then fail "the dashboard did not send a browser to the sign-in"; fi
+if [ "$(sign_in mallory@example.com false)" != 403 ]; then
+  fail "a person with an email address that is not confirmed signed in"
+fi
+sign_in stranger@example.com >/dev/null
+if [ "$(status -b "${jar}" "${base}/api/v1/work-items")" != 403 ]; then
+  fail "a signed-in person with no user did not get 403"
+fi
+
+echo "== the first admin signs in"
+if [ "$(sign_in admin@example.com)" != 200 ]; then fail "the first admin could not sign in"; fi
+if [[ "$(curl -fs -b "${jar}" "${base}/api/v1/me")" != *'"role":"admin"'* ]]; then
+  fail "the signed-in person is not the admin"
+fi
+if [[ "$(curl -fs -b "${jar}" "${base}/api/v1/users")" == *alice* ]]; then
+  fail "the core on a cloud has the demo users"
+fi
+page="$(curl -fs -b "${jar}" "${base}/" || true)"
 script="$(grep -o '/assets/[^"]*\.js' <<<"${page}" | head -n 1 || true)"
-if [ -z "${script}" ] || ! curl -fs -o /dev/null "http://127.0.0.1:${port}${script}"; then
+if [ -z "${script}" ] || ! curl -fs -b "${jar}" -o /dev/null "${base}${script}"; then
   fail "the dashboard and its script do not answer"
 fi
-if [ "$(curl -fs "http://127.0.0.1:${port}/api/v1/work-items")" != "[]" ]; then
+if [ "$(curl -fs -b "${jar}" "${base}/api/v1/work-items")" != "[]" ]; then
   fail "the core on a cloud proposed a work item"
 fi
 
 echo "== compare the seeded repositories with the checkout"
 unset HOME
-git clone -q "http://127.0.0.1:${port}/git/runbooks.git" "${work}/runbooks" 2>>"${work}/clone.log"
-git clone -q "http://127.0.0.1:${port}/git/platform-live.git" "${work}/platform-live" 2>>"${work}/clone.log"
+# git sends the session of the admin. A sign-in for git itself is not built yet.
+git -c http.cookieFile="${jar}" clone -q "${base}/git/runbooks.git" "${work}/runbooks" 2>>"${work}/clone.log"
+git -c http.cookieFile="${jar}" clone -q "${base}/git/platform-live.git" "${work}/platform-live" 2>>"${work}/clone.log"
 git -C "${work}/runbooks" fsck --strict --no-dangling >/dev/null || fail "fsck of runbooks"
 git -C "${work}/platform-live" fsck --strict --no-dangling >/dev/null || fail "fsck of platform-live"
 if [ "$(git -C "${work}/runbooks" rev-parse 'HEAD^{tree}')" != "$(git -C "${repo}" rev-parse 'HEAD:runbooks')" ]; then
@@ -102,6 +156,11 @@ if [ "$(git -C "${work}/runbooks" rev-parse 'HEAD^{tree}')" != "$(git -C "${repo
 fi
 if [ "$(git -C "${work}/platform-live" rev-parse 'HEAD:platform')" != "$(git -C "${repo}" rev-parse 'HEAD:platform')" ]; then
   fail "platform/ in the platform-live repository is not platform/ in the checkout"
+fi
+
+if [ "$(status -X POST -b "${jar}" "${base}/auth/logout")" != 204 ] ||
+  [ "$(status -b "${jar}" "${base}/api/v1/work-items")" != 401 ]; then
+  fail "the session did not end at the logout"
 fi
 
 kill "${core}"
@@ -120,4 +179,4 @@ if [ "${failures}" -ne 0 ]; then
   echo "RESULT: ${failures} checks failed. The files are in ${work}"
   exit 1
 fi
-echo "RESULT: the core served the dashboard, seeded the forge from memory and left no file"
+echo "RESULT: the core asked for a sign-in, served the admin, seeded the forge from memory and left no file"

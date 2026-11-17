@@ -3,9 +3,12 @@ module github.com/statik/site-reliability-clanker
 go 1.27.3
 
 require (
+	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/go-git/go-git/v5 v5.19.3
+	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/jackc/pgx/v5 v5.13.0
 	github.com/open-policy-agent/opa v1.22.4
+	golang.org/x/oauth2 v0.38.0
 )
 
 require (

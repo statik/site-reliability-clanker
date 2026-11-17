@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -39,7 +40,16 @@ type Server struct {
 	// Runners serves the runners of the jobs, below /runner/v1/. Each request carries the
 	// token of one job. The user header means nothing there.
 	Runners http.Handler
+	// Identify returns the user behind a request, or ErrNotSignedIn. When it is set, every
+	// route needs a user except the health path, the sign-in and the runner path. Nil is
+	// the demo: the dashboard names its user in a header, which is not authentication.
+	Identify func(r *http.Request) (orchestrator.User, error)
+	// SignIn serves the sign-in below /auth/. It is set together with Identify.
+	SignIn http.Handler
 }
+
+// ErrNotSignedIn means that a request carries no valid sign-in.
+var ErrNotSignedIn = errors.New("not signed in")
 
 // statusError carries an HTTP status with an error.
 type statusError struct {
@@ -56,6 +66,9 @@ func badRequest(format string, args ...any) error {
 func notFound(err error) error { return statusError{http.StatusNotFound, err} }
 
 func forbidden(err error) error { return statusError{http.StatusForbidden, err} }
+
+// Forbidden marks err as the answer to a person who is known and may not do this.
+func Forbidden(err error) error { return forbidden(err) }
 
 type handler func(r *http.Request) (any, error)
 
@@ -77,6 +90,8 @@ func wrap(h handler) http.HandlerFunc {
 			switch {
 			case errors.As(err, &se):
 				status = se.status
+			case errors.Is(err, ErrNotSignedIn):
+				status = http.StatusUnauthorized
 			case errors.Is(err, orchestrator.ErrForbidden):
 				status = http.StatusForbidden
 			case errors.Is(err, orchestrator.ErrConflict):
@@ -110,9 +125,13 @@ func intParam(r *http.Request, name string, fallback int) int {
 	return value
 }
 
-// currentUser names the signed-in user. The prototype trusts the X-Clanker-User header that
-// the dashboard sets from its user switcher. It is not authentication.
+// currentUser names the user behind a request. With a sign-in it is the signed-in person,
+// and the X-Clanker-User header means nothing. In the demo it is the user that the
+// dashboard names in that header from its user switcher, which is not authentication.
 func (s *Server) currentUser(r *http.Request) (orchestrator.User, error) {
+	if s.Identify != nil {
+		return s.Identify(r)
+	}
 	name := r.Header.Get("X-Clanker-User")
 	if name == "" {
 		name = "dave"
@@ -128,6 +147,7 @@ func (s *Server) currentUser(r *http.Request) (orchestrator.User, error) {
 func (s *Server) Handler() (http.Handler, error) {
 	mux := http.NewServeMux()
 	routes := map[string]handler{
+		"GET /api/v1/auth":                            s.getAuth,
 		"GET /api/v1/me":                              s.getMe,
 		"POST /api/v1/me/seen":                        s.postSeen,
 		"GET /api/v1/users":                           s.getUsers,
@@ -181,7 +201,60 @@ func (s *Server) Handler() (http.Handler, error) {
 	if s.Web != nil {
 		mux.Handle("/", spaHandler(s.Web))
 	}
-	return mux, nil
+	// A load balancer asks this path whether the control plane is up.
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprintln(w, "ok")
+	})
+	if s.Identify == nil {
+		return mux, nil
+	}
+	if s.SignIn == nil {
+		return nil, errors.New("the API has a way to identify a user and no sign-in")
+	}
+	mux.Handle("/auth/", s.SignIn)
+	return s.gate(mux), nil
+}
+
+// getAuth tells the dashboard whether people sign in or the demo names the user.
+func (s *Server) getAuth(*http.Request) (any, error) {
+	return map[string]bool{"sign_in": s.Identify != nil}, nil
+}
+
+// open reports whether a path needs no signed-in user: the health path, the sign-in, and
+// the runner path, where each request carries the token of one job.
+func open(path string) bool {
+	return path == "/healthz" || strings.HasPrefix(path, "/auth/") ||
+		strings.HasPrefix(path, "/runner/v1/")
+}
+
+// gate lets a request through only when a known user is signed in. A browser that opens a
+// page goes to the sign-in. Every other request gets an error and no content.
+func (s *Server) gate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if open(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		_, err := s.Identify(r)
+		var se statusError
+		switch {
+		case err == nil:
+			next.ServeHTTP(w, r)
+		case errors.Is(err, ErrNotSignedIn):
+			page := r.Method == http.MethodGet && !strings.HasPrefix(r.URL.Path, "/api/") &&
+				!strings.HasPrefix(r.URL.Path, "/git/")
+			if page {
+				http.Redirect(w, r, "/auth/login?return="+url.QueryEscape(r.URL.RequestURI()),
+					http.StatusFound)
+				return
+			}
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "not signed in"})
+		case errors.As(err, &se):
+			writeJSON(w, se.status, map[string]string{"error": err.Error()})
+		default:
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		}
+	})
 }
 
 // spaHandler serves the dashboard files and falls back to index.html for client routes.

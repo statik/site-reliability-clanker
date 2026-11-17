@@ -37,6 +37,19 @@ func (o *Orchestrator) GetUser(name string) (User, error) {
 	return u, nil
 }
 
+// GetUserByEmail returns the user with this email address. Upper and lower case are the
+// same.
+func (o *Orchestrator) GetUserByEmail(email string) (User, error) {
+	var u User
+	err := o.DB.QueryRow(`SELECT name, display, role, email, last_seen FROM users
+		WHERE lower(email) = lower($1)`, email).Scan(&u.Name, &u.Display, &u.Role, &u.Email,
+		&u.LastSeen)
+	if err != nil {
+		return User{}, fmt.Errorf("no user has the email address %q: %w", email, err)
+	}
+	return u, nil
+}
+
 func planHashes(plans []Plan) map[string]string {
 	hashes := map[string]string{}
 	for _, p := range plans {
