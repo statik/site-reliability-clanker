@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/ed25519"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -51,6 +52,10 @@ func localSigningKey(dataDir string) ([]byte, error) {
 	path := filepath.Join(dataDir, "broker.key")
 	key, err := os.ReadFile(path)
 	if err == nil {
+		if len(key) != ed25519.PrivateKeySize {
+			return nil, fmt.Errorf("broker signing key %s has %d bytes, want %d: delete it to "+
+				"create a new key", path, len(key), ed25519.PrivateKeySize)
+		}
 		return key, nil
 	}
 	if !errors.Is(err, os.ErrNotExist) {
