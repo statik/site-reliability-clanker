@@ -1,146 +1,71 @@
 # Handoff
 
-State of the work as of 2026-11-17, written so a fresh session on a better-equipped machine can
-start building without re-deriving anything.
+State of the work on 2026-11-17. A new session can continue from this file and from the
+issues with the label `needs-owner-review`.
 
-## Where things stand
+## What runs now
 
-- **The repository contains the plan and nothing else.** No code, no flake, no modules.
-  [`docs/PLAN.md`](PLAN.md) is the source of truth for architecture, use cases, permissions and
-  build order.
-- A build was started on a cloud sandbox and stopped during environment setup, before any code
-  was written, because that machine cannot run the local target (details below).
-- Next action: milestone M0 in section 9 of the plan.
+Everything in this section was run on the local target (kind on Docker, macOS arm64).
 
-## Decisions already made
-
-These came from the project owner and should not be reopened.
-
-| Topic | Decision |
+| Capability | Result |
 |---|---|
-| Clouds | AWS, Google Cloud and Azure from the first milestone, plus a local target |
-| Infrastructure as code | OpenTofu, explicitly (the `tofu` CLI), not Terraform |
-| UI | IBM Carbon Design System for every UI element; Carbon Charts for charts |
-| Orientation | A strong visualisation system with a historical time view (plan section 7.4) |
-| Notifications | Email, Slack, Microsoft Teams and Discord |
-| Inference | OpenRouter, using OpenRouter keys |
-| Toolchain | Nix for the runner image and the developer/CI shell only (plan section 5.5) |
-| Unikernels | Try packaging the services as Nanos unikernels (plan section 3.1) |
-| Swamp | Fold [swamp-club.com](https://swamp-club.com) into the architecture (plan section 5.6) |
-| Outreach | A full website with an animated walkthrough and an explainer video (plan section 7.6) |
-| Pull requests | Merge them when ready, without asking |
-| Working style | Build as much as possible autonomously |
+| First start | `make demo` builds and starts the control plane. `clanker preflight` lists missing tools first |
+| Blank-slate deployment | One tier T3 work item. Two approvers. Six layers applied one after the other, each under its own grant. Verification passed |
+| Application upgrade with migration | Paperboat 1.0.0 to 1.1.0. The agent noticed the release, opened the pull request and explained it |
+| Security patch | Advisory to 1.1.1 |
+| Failed canary and rollback | 1.2.0 failed the canary check. A revert pull request was planned and applied automatically |
+| Postgres minor patch | 17.11 to 17.12 |
+| Runbooks under a standing approval | Restart, backup, restore drill, database maintenance |
+| Drift | A manual `kubectl` change was found by the drift check and reconciled after approval |
+| Incident | Alert, read-only debug session under a debug grant, diagnosis, mitigation or escalation |
+| Stale plan | A saved plan that went stale was refused. The branch was updated, planned again, and the old approval did not count |
+| Hand-written change | Clone and send a branch over HTTP, open a pull request through the API, same pipeline |
+| Notifications | Email (Mailpit) and Slack, Teams, Discord payloads (local webhook sink) for each approval request |
+| Audit | Hash-chained log. The chain verified after more than 450 events |
+| Live model | OpenRouter with `claude-haiku-5.5` and `claude-sonnet-5.5`. Replay mode works without a key |
 
-## Decisions still open
+## What is validated only
 
-Listed in plan section 12 with defaults. Three matter before code is written:
+| Item | State |
+|---|---|
+| AWS, Google Cloud, Azure stacks | 18 root modules pass `tofu validate`. Nothing was planned or applied. No cloud account was used |
+| Nix flake | Written. Not evaluated, because Nix is not installed on the build machine |
 
-1. **Forge.** The plan's default is bundled Forgejo. During setup an alternative looked
-   attractive: a small forge built into the control plane (bare repositories on disk, the `git`
-   CLI for history, diff and merge, `git http-backend` for clone and push, pull requests stored
-   in the control-plane database, browsing rendered in the Carbon UI). It removes a service from
-   bootstrap and gives one consistent UI. Forgejo gives a complete, familiar forge for free.
-   This was not decided.
-2. **Control-plane database.** The plan says Postgres. Embedded SQLite would make
-   `clanker up` a single binary with no dependencies. Not decided.
-3. **Swamp dependency depth.** The plan keeps a plain subprocess executor next to the Swamp
-   executor until the M0 spike answers the questions in section 5.6.
+## What is not built
 
-## What the sandbox could and could not do
+- The access broker paths for the three clouds (STS, service account impersonation, Entra).
+- Swamp integration and the Nanos unikernel track. Both spikes need input from the owner.
+- Use cases 7, 8, 12 and 23 on a real target. Use case 7 is a forecast on the timeline.
+- Real authentication. The dashboard sends a user name in a header.
+- Quiet hours, escalation and threading for notifications.
+- The move of the control plane into a cloud (bootstrap and pivot).
 
-Recorded so nobody repeats the same hour.
+## Decisions made in this build
 
-| Capability | Result on the sandbox | Consequence |
+| Topic | Decision | Issue |
 |---|---|---|
-| Docker | Installed; daemon had to be started by hand (`dockerd &`); image pulls from Docker Hub worked | Fine |
-| kind | **Failed.** Control-plane pods never start: `runc create failed: unable to start container process: can't get final child's PID from pipe: EOF` (nested containers on a Firecracker guest with cgroup v1) | No local Kubernetes, so the local target cannot be verified there |
-| KVM | `/dev/kvm` absent | Nanos under QEMU would run in slow emulation only; not attempted |
-| GitHub release downloads | Blocked for repositories other than this one | `tofu` could not be installed from releases |
-| OpenTofu | Built from source via the Go module cache as a workaround (v1.10.7) | Works, but not how it should be installed; use the Nix flake |
-| kubectl, Helm | Installed from `dl.k8s.io` and `get.helm.sh` | Fine |
-| Go, Node, npm, Playwright with Chromium, ffmpeg | Present | Fine |
-| Go module proxy, npm registry, OpenTofu registry, OpenRouter API | Reachable | Fine |
-| Nix | Not installed; not attempted | Flake cannot be verified there |
-| OpenRouter key | None in the environment | Live inference untested |
-| Cloud credentials | Not provided for this project; nothing was provisioned in any cloud | AWS, Google Cloud and Azure modules can be validated but not applied |
+| Workload | Paperboat is a fish rental app: inventory, aging, delivery, customer support | #17 |
+| Forge | Built into the control plane | #6 |
+| Control-plane database | Embedded SQLite | #7 |
+| First deployment | One approval. Later layers must stay inside a create-only envelope | #8 |
+| Inference | OpenRouter, confirmed by the owner on 2026-11-16 | #15 |
+| Merges | Merge a pull request when its checks pass and the change was run. See `CLAUDE.md` | — |
 
-## What the next machine needs
+## How to continue
 
-| Requirement | Why |
+1. Read the open issues with the label `needs-owner-review`. Each one states the default, what
+   was run, what was not, and the question for the owner.
+2. Do not apply anything in a cloud account before the owner approves the cost (issue #10).
+3. To run the demo again from nothing: `make destroy`, `make clean-data`, `make demo`.
+4. To repeat the scripted month without a model: set `CLANKER_AGENT_MODE=replay`.
+
+## Things that cost time, so nobody repeats them
+
+| Problem | Cause and fix |
 |---|---|
-| Linux (or macOS) host with Docker and cgroup v2 | kind for the local target |
-| Hardware virtualisation exposed (`/dev/kvm` on Linux) | Nanos images under QEMU |
-| 8 or more cores, 32 GB memory, 100 GB disk | kind cluster, control plane, image builds and browser tests at once |
-| Unrestricted access to GitHub releases, container registries, `swamp-club.com` | Tool installs, Swamp install and registry |
-| Nix with flakes enabled | Dev shell and runner image |
-| OpenRouter API key | Live agent; without it only replay mode can be exercised |
-| Sandbox accounts with billing on AWS, Google Cloud and Azure, and an administrator credential for each | `clanker bootstrap` and milestone M1; without them, the three cloud targets stop at `tofu validate` |
-| A swamp-club.com account and a collective token | Swamp spike and CI |
-| Webhook URLs for a test Slack channel, Teams channel and Discord channel; an SMTP relay or Mailpit | Notification adapters end to end |
-
-Before provisioning anything in a cloud account, confirm the spend with the owner and make sure
-every environment has a TTL.
-
-## Recommended way to run the build
-
-M0 first, by one author, because it fixes the interfaces everything else depends on:
-
-1. `flake.nix` with the dev shell (tofu, kubectl, helm, kind, Go, Node, policy tools) and the
-   runner image.
-2. `platform/CONTRACT.md`: the exact input and output names for each layer, taken from plan
-   section 4.1, so four implementations can be written against it independently.
-3. The control-plane HTTP API and event schema, written down before the dashboard is started.
-4. Paperboat 1.0.0, its chart, and the local target bringing it up on kind.
-
-After M0 the work splits into streams that touch separate directories and can run in parallel:
-
-| Stream | Directory | Depends on | Verify with |
-|---|---|---|---|
-| Local platform | `platform/modules/local`, `platform/stacks/local` | Contract | `tofu apply` on kind, conformance suite |
-| AWS platform | `platform/modules/aws`, `platform/stacks/aws` | Contract | `tofu validate`, then apply in the sandbox account |
-| Google Cloud platform | `platform/modules/gcp`, `platform/stacks/gcp` | Contract | Same |
-| Azure platform | `platform/modules/azure`, `platform/stacks/azure` | Contract | Same |
-| Paperboat releases | `apps/paperboat` | Nothing | Unit tests, chart install on kind |
-| Control-plane core | `internal/*`, `cmd/clanker` | API and event schema | Go tests; a hand-written change through plan, approve, apply on the local target |
-| Dashboard | `web` | API and event schema | Playwright screenshots in both Carbon themes |
-| Notifier adapters | `internal/notify` | Event schema | Recorded-payload tests, then real channels |
-| Swamp spike | `runbooks`, `extensions` | Account and token | The questions in plan section 5.6 answered in writing |
-| Nanos spike | `apps/paperboat/unikernel` | KVM | `api` boots under QEMU and serves a request |
-| Website and video | `site` | A running demo to capture | Site builds; video renders from one command |
-
-Keep the control-plane core with a single author; it is the part where coherence matters most.
-
-Suggested implementation shortcuts that keep the prototype small without changing its shape:
-
-- Shell out to `tofu`, `kubectl`, `helm` and `git` from the runner instead of linking their
-  libraries. It keeps the Go dependency set small and matches what an operator would run.
-- Keep the notifier and the OpenRouter client on the Go standard library.
-- Per-cloud stacks are separate root modules under `platform/stacks/<cloud>/<layer>`; the
-  cloud-agnostic layers (`40-platform`, `50-app`) are shared modules that only use the
-  Kubernetes and Helm providers, configured by each cloud's root module.
-- On the local target: official Postgres image in-cluster, a statically provisioned
-  read-write-many volume, and a port mapping in place of a cloud load balancer are enough to
-  satisfy the contract.
-
-## Definition of done for the first working slice
-
-The smallest thing worth showing, and the order to aim for:
-
-1. `clanker bootstrap --cloud local` then `clanker up` on a clean machine.
-2. The dashboard opens with one work item: blank-slate deployment.
-3. Approving it runs OpenTofu layer by layer and Paperboat answers on localhost.
-4. Publishing Paperboat 1.1.0 produces a new work item with an accurate approval page.
-5. Approving that upgrades the app; both changes are on the timeline with logs, diff and plan.
-6. An approver was notified on at least one channel for each approval.
-
-Everything after that is breadth: the other three clouds, the remaining use cases, the agent,
-and the access broker.
-
-## Starting prompt for the next session
-
-> Read `docs/PLAN.md` and `docs/HANDOFF.md` in this repository. Build milestone M0, then
-> continue through the build sequence as far as you can, autonomously. Verify each milestone
-> by running it, not by inspection. Merge pull requests when they are ready. Before creating
-> anything in a cloud account, tell me the expected cost and wait for a go-ahead. Raise the
-> three open decisions in the handoff only if one blocks you; otherwise choose the option that
-> makes bootstrap simplest and record the choice in the plan.
+| `tofu init` hangs for minutes | Several large provider downloads at once. Set `TF_PLUGIN_CACHE_DIR`. The runner does this |
+| A cloud root fails `tofu init` in CI | The lock file has hashes for one platform. Run `tofu providers lock` for `linux_amd64`, `linux_arm64` and `darwin_arm64` |
+| kind cluster cannot pull Paperboat images | The registry of the local target is created in layer `10-network`. The demo pushes the images after that layer |
+| A tfvars change to the Postgres version replaced a helper job | The job used the Postgres image. It now uses a fixed `busybox` image |
+| The Investigator blamed an old release | It had no change history. The prompt now includes it |
+| An incident opened again every 20 seconds | The finding key used the sample time. It now uses the environment and the hour |
