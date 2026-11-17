@@ -6,6 +6,7 @@ import type { Topology, TopologyEdge } from "@/api/types";
 import { IconTag, StatusTag } from "@/components/status";
 import { COMPACT, FULL, layoutTopology } from "@/lib/topologyLayout";
 import type { Dimensions, PlacedNode, TopologyLayout } from "@/lib/topologyLayout";
+import { ScrollRegion } from "@/components/common";
 
 type Point = [number, number];
 
@@ -84,7 +85,7 @@ export function TopologyDiagram({ topology, changes, compact = false }: {
   const size = compact ? COMPACT : FULL;
   const layout = layoutTopology(topology.layers, topology.nodes, size);
   return (
-    <div className="topo-scroll">
+    <ScrollRegion label="Topology diagram" className="topo-scroll">
       <div className="topo-canvas" role="group" aria-label={`Topology of ${topology.env}`}
         style={{ width: layout.width, height: layout.height, marginBlockStart: LABEL_SPACE }}>
         <svg className="topo-edges" width={layout.width} height={layout.height}
@@ -107,6 +108,6 @@ export function TopologyDiagram({ topology, changes, compact = false }: {
             changes={changes?.get(placed.node.id)} />
         ))}
       </div>
-    </div>
+    </ScrollRegion>
   );
 }

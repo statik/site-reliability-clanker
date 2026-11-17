@@ -132,7 +132,45 @@ body {
 .app-content {
   min-block-size: 100vh;
   padding: spacing.$spacing-07 spacing.$spacing-07 spacing.$spacing-10;
-  margin-inline-start: 16rem;
+}
+
+// Carbon sets the margin of the content for a navigation rail. This navigation is 16rem wide
+// on a wide window and lies over the content on a narrow one.
+.cds--side-nav.cds--side-nav--ux ~ .app-content {
+  margin-inline-start: 0;
+
+  @include breakpoint.breakpoint("lg") {
+    margin-inline-start: 16rem;
+  }
+}
+
+// Below Carbon's "lg" breakpoint the side navigation is a drawer that the menu button opens.
+// Its links and the buttons of the header are 44 pixels high or more for a finger.
+@include breakpoint.breakpoint-down("lg") {
+  .cds--side-nav__navigation .cds--side-nav__link {
+    min-block-size: 2.75rem;
+  }
+}
+
+@include breakpoint.breakpoint-down("md") {
+  .app-content {
+    padding: spacing.$spacing-05 spacing.$spacing-05 spacing.$spacing-09;
+  }
+
+  .app-header-user {
+    display: none;
+  }
+
+  // The search and the filters of a table go on lines of their own when one line is too short.
+  .cds--table-toolbar,
+  .cds--toolbar-content {
+    block-size: auto;
+    flex-wrap: wrap;
+  }
+
+  .cds--toolbar-content .cds--toolbar-search-container-persistent {
+    flex: 1 0 100%;
+  }
 }
 
 .app-header-name {
@@ -362,8 +400,23 @@ body {
   flex: 1 1 auto;
 }
 
-.app-progress {
+// A region that scrolls sideways in place of the page. A Carbon table brings a scroller of its
+// own that cannot take focus, so the region does the scrolling for it.
+.app-scroll-x {
   overflow-x: auto;
+  max-inline-size: 100%;
+
+  &:focus-visible {
+    outline: 2px solid theme.$focus;
+    outline-offset: -2px;
+  }
+
+  .cds--data-table-content {
+    overflow-x: visible;
+  }
+}
+
+.app-progress {
   padding-block: spacing.$spacing-03 spacing.$spacing-07;
   margin-block-end: spacing.$spacing-05;
 }

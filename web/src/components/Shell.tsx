@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 import { Link as RouterLink, useLocation } from "react-router-dom";
 import {
@@ -6,6 +6,7 @@ import {
   Header,
   HeaderGlobalAction,
   HeaderGlobalBar,
+  HeaderMenuButton,
   HeaderName,
   HeaderPanel,
   SideNav,
@@ -120,9 +121,11 @@ function GlobalBar() {
         <div className="app-header-status">
           <StatusTag status={connected ? "ok" : "failed"} size="sm"
             label={connected ? "Live" : "Reconnecting"} />
-          <IconTag type="outline" size="sm" icon={UserAvatar}>
-            {user?.display ?? userName} · {user?.role ?? "unknown role"}
-          </IconTag>
+          <span className="app-header-user">
+            <IconTag type="outline" size="sm" icon={UserAvatar}>
+              {user?.display ?? userName} · {user?.role ?? "unknown role"}
+            </IconTag>
+          </span>
         </div>
         <AsOfControl />
         <HeaderGlobalAction aria-label={signIn ? "Account" : "Switch user"} isActive={panel} tooltipAlignment="end"
@@ -135,15 +138,63 @@ function GlobalBar() {
   );
 }
 
+// Carbon's side navigation is always open from its "lg" breakpoint up. Below it the navigation
+// is a drawer over the page, and the menu button of the header opens it.
+const WIDE = "(min-width: 66rem)";
+
+/**
+ * The open state of the navigation drawer of a narrow window. Focus goes into the navigation
+ * when it opens and back to the menu button when it closes. Escape closes it, and so does a
+ * window that becomes wide.
+ */
+function useDrawer() {
+  const [open, setOpen] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
+  const navigation = useRef<HTMLElement>(null);
+  const wasOpen = useRef(false);
+  const close = useCallback(() => setOpen(false), []);
+  useEffect(() => {
+    if (open) {
+      navigation.current?.focus();
+    } else if (wasOpen.current) {
+      button.current?.focus();
+    }
+    wasOpen.current = open;
+  }, [open]);
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        close();
+      }
+    };
+    const wide = window.matchMedia(WIDE);
+    window.addEventListener("keydown", onKey);
+    wide.addEventListener("change", close);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      wide.removeEventListener("change", close);
+    };
+  }, [open, close]);
+  return { open, close, toggle: () => setOpen((now) => !now), button, navigation };
+}
+
 /** The application frame: header, side navigation, as-of banner and the page. */
 export function Shell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const { usersError } = useSession();
   const clockError = useClockError();
+  const { open, close, toggle, button, navigation } = useDrawer();
   return (
     <>
       <Header aria-label="S.R.C. (Site Reliability Clanker)">
         <SkipToContent />
+        <HeaderMenuButton ref={button} isActive={open} aria-expanded={open}
+          aria-controls="app-navigation"
+          aria-label={open ? "Close the navigation" : "Open the navigation"}
+          onClick={toggle} />
         <HeaderName as={RouterLink} to="/" prefix="" className="app-header-name">
           <img className="app-mark" src={mark} alt="" width={24} height={24} />
           S.R.C.
@@ -151,17 +202,18 @@ export function Shell({ children }: { children: ReactNode }) {
         </HeaderName>
         <GlobalBar />
       </Header>
-      <SideNav aria-label="Dashboard areas" isFixedNav expanded isChildOfHeader={false}>
+      <SideNav id="app-navigation" ref={navigation} aria-label="Dashboard areas"
+        expanded={open} onOverlayClick={close}>
         <SideNavItems>
           {NAV.map((entry) => (
             <SideNavLink key={entry.to} as={RouterLink} to={entry.to} renderIcon={entry.icon}
-              isActive={isActive(pathname, entry.to)}>
+              isActive={isActive(pathname, entry.to)} onClick={close}>
               {entry.label}
             </SideNavLink>
           ))}
         </SideNavItems>
       </SideNav>
-      <Content id="main-content" className="app-content">
+      <Content id="main-content" className="app-content" inert={open}>
         <AsOfBanner />
         {usersError !== null && (
           <ErrorNote title="Could not load the users." message={usersError} />

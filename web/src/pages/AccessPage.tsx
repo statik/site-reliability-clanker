@@ -9,7 +9,8 @@ import {
 } from "@carbon/react";
 import { Locked } from "@carbon/icons-react";
 import type { Access, Grant } from "@/api/types";
-import { Empty, Loaded, PageHeader, Section, WorkItemLink } from "@/components/common";
+import { Empty, Loaded, PageHeader,
+  ScrollRegion, Section, WorkItemLink } from "@/components/common";
 import { SimpleTable } from "@/components/SimpleTable";
 import type { Column } from "@/components/SimpleTable";
 import { StatusTag } from "@/components/status";
@@ -76,34 +77,36 @@ function Body({ access }: { access: Access }) {
           identities={access.identities.map((identity) => identity.name)} />
       </Section>
       <Section title="Identities and standing access">
-        <StructuredListWrapper isCondensed aria-label="Identities">
-          <StructuredListHead>
-            <StructuredListRow head>
-              <StructuredListCell head>Identity</StructuredListCell>
-              <StructuredListCell head>Standing access</StructuredListCell>
-              <StructuredListCell head>Elevation</StructuredListCell>
-              <StructuredListCell head>Now</StructuredListCell>
-            </StructuredListRow>
-          </StructuredListHead>
-          <StructuredListBody>
-            {access.identities.map((identity) => {
-              const held = access.active.some((grant) => grant.identity === identity.name);
-              return (
-                <StructuredListRow key={identity.name}>
-                  <StructuredListCell noWrap>
-                    <span className="app-mono">{identity.name}</span>
-                  </StructuredListCell>
-                  <StructuredListCell>{identity.standing}</StructuredListCell>
-                  <StructuredListCell>{identity.elevation}</StructuredListCell>
-                  <StructuredListCell noWrap>
-                    <StatusTag status={held ? "active" : "used"} size="sm"
-                      label={held ? "Grant active" : "No grant"} />
-                  </StructuredListCell>
-                </StructuredListRow>
-              );
-            })}
-          </StructuredListBody>
-        </StructuredListWrapper>
+        <ScrollRegion label="Identities">
+          <StructuredListWrapper isCondensed aria-label="Identities">
+            <StructuredListHead>
+              <StructuredListRow head>
+                <StructuredListCell head>Identity</StructuredListCell>
+                <StructuredListCell head>Standing access</StructuredListCell>
+                <StructuredListCell head>Elevation</StructuredListCell>
+                <StructuredListCell head>Now</StructuredListCell>
+              </StructuredListRow>
+            </StructuredListHead>
+            <StructuredListBody>
+              {access.identities.map((identity) => {
+                const held = access.active.some((grant) => grant.identity === identity.name);
+                return (
+                  <StructuredListRow key={identity.name}>
+                    <StructuredListCell noWrap>
+                      <span className="app-mono">{identity.name}</span>
+                    </StructuredListCell>
+                    <StructuredListCell>{identity.standing}</StructuredListCell>
+                    <StructuredListCell>{identity.elevation}</StructuredListCell>
+                    <StructuredListCell noWrap>
+                      <StatusTag status={held ? "active" : "used"} size="sm"
+                        label={held ? "Grant active" : "No grant"} />
+                    </StructuredListCell>
+                  </StructuredListRow>
+                );
+              })}
+            </StructuredListBody>
+          </StructuredListWrapper>
+        </ScrollRegion>
       </Section>
       <Section title="Grant history">
         <SimpleTable title="Grants"

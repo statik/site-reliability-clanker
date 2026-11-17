@@ -14,7 +14,7 @@ import { SkipForward, Play } from "@carbon/icons-react";
 import { apiPost, errorMessage } from "@/api/client";
 import type { SimState } from "@/api/types";
 import { AskPanel } from "@/components/AskPanel";
-import { ErrorNote, Loaded, PageHeader, Section } from "@/components/common";
+import { ErrorNote, Loaded, PageHeader, ScrollRegion, Section } from "@/components/common";
 import { StatusTag } from "@/components/status";
 import { anyEvent, useApi } from "@/hooks/useApi";
 import { formatDuration, formatTime } from "@/lib/time";
@@ -95,38 +95,40 @@ function Simulator({ sim, reload }: { sim: SimState; reload: () => void }) {
         </Tile>
       </Section>
       <Section title="Scenes">
-        <StructuredListWrapper aria-label="Scenes">
-          <StructuredListHead>
-            <StructuredListRow head>
-              <StructuredListCell head>Scene</StructuredListCell>
-              <StructuredListCell head>What it injects</StructuredListCell>
-              <StructuredListCell head>Use case</StructuredListCell>
-              <StructuredListCell head>Status</StructuredListCell>
-              <StructuredListCell head>Run</StructuredListCell>
-            </StructuredListRow>
-          </StructuredListHead>
-          <StructuredListBody>
-            {sim.scenes.map((scene) => (
-              <StructuredListRow key={scene.name}>
-                <StructuredListCell>{scene.title}</StructuredListCell>
-                <StructuredListCell>{scene.detail}</StructuredListCell>
-                <StructuredListCell noWrap>{scene.use_case}</StructuredListCell>
-                <StructuredListCell noWrap>
-                  <StatusTag size="sm" status={scene.done ? "succeeded" : "open"}
-                    label={scene.done ? "Done" : scene.name === sim.next ? "Next" : "Not run"} />
-                </StructuredListCell>
-                <StructuredListCell>
-                  <Button size="sm" kind={scene.name === sim.next ? "primary" : "tertiary"}
-                    renderIcon={Play} disabled={action.busy !== null}
-                    onClick={() => action.run(scene.name, `/sim/scenes/${scene.name}`, {},
-                      `Scene "${scene.title}" started.`)}>
-                    Run
-                  </Button>
-                </StructuredListCell>
+        <ScrollRegion label="Scenes">
+          <StructuredListWrapper aria-label="Scenes">
+            <StructuredListHead>
+              <StructuredListRow head>
+                <StructuredListCell head>Scene</StructuredListCell>
+                <StructuredListCell head>What it injects</StructuredListCell>
+                <StructuredListCell head>Use case</StructuredListCell>
+                <StructuredListCell head>Status</StructuredListCell>
+                <StructuredListCell head>Run</StructuredListCell>
               </StructuredListRow>
-            ))}
-          </StructuredListBody>
-        </StructuredListWrapper>
+            </StructuredListHead>
+            <StructuredListBody>
+              {sim.scenes.map((scene) => (
+                <StructuredListRow key={scene.name}>
+                  <StructuredListCell>{scene.title}</StructuredListCell>
+                  <StructuredListCell>{scene.detail}</StructuredListCell>
+                  <StructuredListCell noWrap>{scene.use_case}</StructuredListCell>
+                  <StructuredListCell noWrap>
+                    <StatusTag size="sm" status={scene.done ? "succeeded" : "open"}
+                      label={scene.done ? "Done" : scene.name === sim.next ? "Next" : "Not run"} />
+                  </StructuredListCell>
+                  <StructuredListCell>
+                    <Button size="sm" kind={scene.name === sim.next ? "primary" : "tertiary"}
+                      renderIcon={Play} disabled={action.busy !== null}
+                      onClick={() => action.run(scene.name, `/sim/scenes/${scene.name}`, {},
+                        `Scene "${scene.title}" started.`)}>
+                      Run
+                    </Button>
+                  </StructuredListCell>
+                </StructuredListRow>
+              ))}
+            </StructuredListBody>
+          </StructuredListWrapper>
+        </ScrollRegion>
       </Section>
     </div>
   );

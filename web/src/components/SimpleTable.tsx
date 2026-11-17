@@ -18,6 +18,7 @@ import {
   TableToolbarSearch,
 } from "@carbon/react";
 import { defined } from "@/lib/props";
+import { ScrollRegion } from "@/components/common";
 
 export interface Column<T> {
   key: string;
@@ -91,49 +92,51 @@ export function SimpleTable<T>(props: Props<T>) {
                 {props.toolbar}
               </TableToolbarContent>
             </TableToolbar>
-            <Table {...getTableProps()} aria-label={props.title}>
-              <TableHead>
-                <TableRow>
-                  {expand !== undefined && <TableExpandHeader {...getExpandHeaderProps()} />}
-                  {heads.map((header) => {
-                    const { key, ...rest } = defined(getHeaderProps({ header }));
-                    return <TableHeader key={key} {...rest}>{header.header}</TableHeader>;
-                  })}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {visible.length === 0 && (
-                  <TableRow><TableCell colSpan={span}>{props.empty}</TableCell></TableRow>
-                )}
-                {visible.map((row) => {
-                  const record = byId.get(row.id);
-                  const cells = row.cells.map((cell) => {
-                    const render = renderers.get(cell.info.header);
-                    return (
-                      <TableCell key={cell.id}>
-                        {render !== undefined && record !== undefined
-                          ? render(record) : String(cell.value ?? "")}
-                      </TableCell>
-                    );
-                  });
-                  if (expand === undefined) {
+            <ScrollRegion label={props.title}>
+              <Table {...getTableProps()} aria-label={props.title}>
+                <TableHead>
+                  <TableRow>
+                    {expand !== undefined && <TableExpandHeader {...getExpandHeaderProps()} />}
+                    {heads.map((header) => {
+                      const { key, ...rest } = defined(getHeaderProps({ header }));
+                      return <TableHeader key={key} {...rest}>{header.header}</TableHeader>;
+                    })}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {visible.length === 0 && (
+                    <TableRow><TableCell colSpan={span}>{props.empty}</TableCell></TableRow>
+                  )}
+                  {visible.map((row) => {
+                    const record = byId.get(row.id);
+                    const cells = row.cells.map((cell) => {
+                      const render = renderers.get(cell.info.header);
+                      return (
+                        <TableCell key={cell.id}>
+                          {render !== undefined && record !== undefined
+                            ? render(record) : String(cell.value ?? "")}
+                        </TableCell>
+                      );
+                    });
+                    if (expand === undefined) {
+                      const { key, ...rest } = getRowProps({ row });
+                      return <TableRow key={key} {...rest}>{cells}</TableRow>;
+                    }
                     const { key, ...rest } = getRowProps({ row });
-                    return <TableRow key={key} {...rest}>{cells}</TableRow>;
-                  }
-                  const { key, ...rest } = getRowProps({ row });
-                  return (
-                    <Fragment key={key}>
-                      <TableExpandRow {...rest}>{cells}</TableExpandRow>
-                      {row.isExpanded && record !== undefined && (
-                        <TableExpandedRow colSpan={span} {...getExpandedRowProps({ row })}>
-                          {expand(record)}
-                        </TableExpandedRow>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                    return (
+                      <Fragment key={key}>
+                        <TableExpandRow {...rest}>{cells}</TableExpandRow>
+                        {row.isExpanded && record !== undefined && (
+                          <TableExpandedRow colSpan={span} {...getExpandedRowProps({ row })}>
+                            {expand(record)}
+                          </TableExpandedRow>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </ScrollRegion>
             {shown.length > pageSize && (
               <Pagination page={page.page} pageSize={page.pageSize} totalItems={shown.length}
                 pageSizes={[pageSize, pageSize * 2, pageSize * 4]}
