@@ -1,5 +1,8 @@
 """Drive the scripted month through the HTTP API: run a scene, approve what waits, wait for the end."""
-import json, sys, time, urllib.request
+import json
+import sys
+import time
+import urllib.request
 
 BASE = "http://127.0.0.1:7070/api/v1"
 TERMINAL = {"Done", "Failed", "RolledBack", "Rejected"}

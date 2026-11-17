@@ -11,7 +11,7 @@ set -uo pipefail
 
 repo="$(cd "$(dirname "$0")/../.." && pwd)"
 keep="$(mktemp -d)"
-cd "${repo}"
+cd "${repo}" || exit 1
 
 pkill -f "clanker up" || true
 pkill -f "clanker setup" || true
