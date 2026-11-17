@@ -98,7 +98,7 @@ async function captureDashboard(browser) {
         }
         await shoot(page, `dashboard-${view.slug}-${theme}.png`, {
           group, theme, title: view.title, note: view.note,
-          alt: `The ${view.title} view of the Clanker dashboard, ${theme} theme.`,
+          alt: `The ${view.title} view of the S.R.C. dashboard, ${theme} theme.`,
         }, view.slug === "approval");
       } catch (error) {
         console.log(`skip: dashboard ${view.title} (${theme}): ${error.message.split("\n")[0]}`);
@@ -150,8 +150,8 @@ async function captureNotifications(browser) {
     await page.goto(MAIL, { waitUntil: "load" });
     await page.getByText("Approval needed").first().waitFor({ state: "visible", timeout: 8000 }).catch(() => {});
     await shoot(page, "mail-inbox-light.png", {
-      group, theme: "light", title: "Mail inbox", note: "The emails that Clanker sent to the approvers during the month.",
-      alt: "A mail inbox with the notification emails from Clanker, most of them requests for approval.",
+      group, theme: "light", title: "Mail inbox", note: "The emails that S.R.C. sent to the approvers during the month.",
+      alt: "A mail inbox with the notification emails from S.R.C., most of them requests for approval.",
     });
     const message = page.getByText("Approval needed").first();
     if (await message.isVisible().catch(() => false)) {
@@ -159,7 +159,7 @@ async function captureNotifications(browser) {
       await page.waitForTimeout(2000);
       await shoot(page, "mail-approval-light.png", {
         group, theme: "light", title: "An approval email", note: "What an approver receives: the change in one sentence, and a link to decide.",
-        alt: "One notification email from Clanker that asks for an approval.",
+        alt: "One notification email from S.R.C. that asks for an approval.",
       });
     }
   } else {
@@ -171,7 +171,7 @@ async function captureNotifications(browser) {
     await page.waitForTimeout(800);
     const details = {
       group, theme: "light", title: "Webhook sink", note: "A local stand-in for Slack, Microsoft Teams and Discord, with the real payloads.",
-      alt: "The webhook sink page: a list of the chat notifications that Clanker sent.",
+      alt: "The webhook sink page: a list of the chat notifications that S.R.C. sent.",
     };
     // The sink keeps its payloads in memory. After a restart it is empty, and an empty
     // page is not worth a picture, so an earlier picture stays.

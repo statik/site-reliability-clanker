@@ -3,17 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Architecture: how Site Reliability Clanker is built</title>
+  <title>Architecture: how S.R.C. (Site Reliability Clanker) is built</title>
   <meta name="description" content="A change travelling from detection to verified apply, the life of a work item, a grant that appears and expires, and the line between what the model proposes and what code decides.">
   <meta name="color-scheme" content="light dark">
-  <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="img/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/site.css">
   <script src="js/boot.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
   <header class="shell">
-    <a class="shell-name" href="index.html"><span class="shell-prefix">Site Reliability</span> Clanker</a>
+    <a class="shell-name" href="index.html"><img class="shell-logo" src="img/icon.svg" alt="" width="24" height="24">S.R.C. <span class="shell-full">Site Reliability Clanker</span></a>
     <nav aria-label="Site">
       <ul>
         <li><a href="index.html">Overview</a></li>
@@ -34,7 +34,7 @@
       <p class="kicker reveal">Architecture</p>
       <h1 class="reveal">Three separate pieces, and one road for every change.</h1>
       <p class="section-lead reveal">Paperboat is the workload. The platform is the infrastructure
-        as code that the agent edits. Clanker is the control plane: a dashboard, an agent, a
+        as code that the agent edits. S.R.C. is the control plane: a dashboard, an agent, a
         policy engine, a runner, an access broker, a git forge and an audit log. A simulator
         makes a month pass in minutes.</p>
     </div>
@@ -60,7 +60,7 @@ with short-lived credentials from the broker.</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9"
 markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="arrow-head" d="M0 0 L10 5 L0 10 z"/></marker></defs>
 <rect class="group" x="170" y="40" width="560" height="460"/>
-<text class="group-label" x="186" y="64">Clanker control plane</text>
+<text class="group-label" x="186" y="64">S.R.C. control plane</text>
 <rect class="group" x="830" y="170" width="210" height="350" data-node="environment"/>
 <text class="group-label" x="846" y="194">One environment per cloud</text>
 <path class="edge" d="M140.0 110.0 L195.0 110.0" marker-end="url(#arrow)"/><path class="edge" d="M345.0 110.0 L375.0 110.0" marker-end="url(#arrow)"/><path class="edge" d="M525.0 110.0 L555.0 110.0" marker-end="url(#arrow)"/><path class="edge" d="M705.0 97.7 L860.0 72.3" marker-end="url(#arrow)"/><path class="edge" d="M630.0 132.0 L630.0 208.0" marker-end="url(#arrow)"/><path class="edge" d="M597.0 208.0 L483.0 132.0" marker-end="url(#arrow)"/><path class="edge" d="M417.0 132.0 L303.0 208.0" marker-end="url(#arrow)"/><path class="edge" d="M286.5 328.0 L433.5 132.0" marker-end="url(#arrow)"/><path class="edge" d="M466.5 132.0 L613.5 328.0" marker-end="url(#arrow)"/><path class="edge" d="M555.0 350.0 L525.0 350.0" marker-end="url(#arrow)"/><path class="edge" d="M450.0 372.0 L450.0 440.0" marker-end="url(#arrow)"/><path class="edge" d="M594.6 372.0 L485.4 440.0" marker-end="url(#arrow)"/>

@@ -22,8 +22,6 @@ import { readWav, writeWav } from "./wav.mjs";
 
 const VOICE = process.env.NARRATION_VOICE ?? "Daniel";
 const RATE_WORDS_PER_MINUTE = "172";
-// The Blender title clip has a fixed length, so its segment is never shorter than this.
-const MINIMUM_SECONDS = { "blender:title": 8 };
 
 const ELEVENLABS_MODEL = "eleven_multilingual_v2";
 const SPEECH_CACHE = join(OUT, "cache", "speech");
@@ -103,10 +101,8 @@ async function main() {
       clips.push({ at: caption.start, samples: audio.samples });
       offset += length + GAP;
     }
-    const spokenLength = offset - GAP + TAIL;
-    segment.duration = Math.max(spokenLength, MINIMUM_SECONDS[segment.source] ?? 0);
     // Whole frames, so that the video segments and the audio stay in step.
-    segment.duration = Math.ceil(segment.duration * 30) / 30;
+    segment.duration = Math.ceil((offset - GAP + TAIL) * 30) / 30;
     cursor += segment.duration;
   }
 

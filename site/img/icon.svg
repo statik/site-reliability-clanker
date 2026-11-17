@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="S.R.C.: an aircraft marshaller with two wands">
+  <rect width="64" height="64" rx="10" fill="#1B354A"/>
+  <g fill="#F0B53F" stroke="#F0B53F" stroke-width="2" stroke-linejoin="round">
+    <path d="M6.5 22 L16.5 19.6 L9.4 2.8 L7.6 3.2 Z"/>
+    <path d="M57.5 22 L47.5 19.6 L54.6 2.8 L56.4 3.2 Z"/>
+  </g>
+  <path d="M25 31 L12 23.5 M39 31 L52 23.5" fill="none" stroke="#F7ECD7" stroke-width="6" stroke-linecap="round"/>
+  <g fill="#F7ECD7">
+    <circle cx="32" cy="17" r="6.5"/>
+    <path d="M23.5 30 a4 4 0 0 1 4 -4 h9 a4 4 0 0 1 4 4 V45 H23.5 Z"/>
+    <path d="M23.5 43 h7.5 v15 a2 2 0 0 1 -2 2 h-3.5 a2 2 0 0 1 -2 -2 Z M33 43 h7.5 v15 a2 2 0 0 1 -2 2 h-3.5 a2 2 0 0 1 -2 -2 Z"/>
+  </g>
+</svg>

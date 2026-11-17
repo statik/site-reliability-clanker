@@ -19,7 +19,7 @@ import {
   renderFlowSteps, renderGrantCard, renderGrantLanes, renderRefusal, renderStatePaths,
   renderStateSvg, renderSystemSvg,
 } from "./lib/render-architecture.mjs";
-import { renderApproval, renderPrinciples, renderStats } from "./lib/render-landing.mjs";
+import { renderApproval, renderNotice, renderPrinciples, renderStats } from "./lib/render-landing.mjs";
 import { renderGallery } from "./lib/render-screens.mjs";
 import { renderRail, renderSteps } from "./lib/render-walkthrough.mjs";
 
@@ -58,6 +58,7 @@ function fragments() {
       stats: renderStats(monthTotals),
       principles: renderPrinciples(month, monthTotals),
       approval: renderApproval(month),
+      notice: renderNotice(month),
       period,
     },
     "walkthrough.html": {

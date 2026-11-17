@@ -17,14 +17,14 @@ site to GitHub Pages (see "Publish the site").
 | `check.mjs` | Opens every page in a browser and fails on the problems listed below |
 | `narration.md` | The script of the video: narration, captions, and what each segment shows |
 | `build-video.sh` | Builds `out/explainer.mp4` and `out/explainer.srt` |
-| `lib/`, `video/` | The code behind the scripts above |
-| `css/`, `js/`, `fonts/`, `img/` | The assets of the site |
+| `lib/`, `video/` | The code behind the scripts above, and the drawn scenes of the video |
+| `css/`, `js/`, `fonts/`, `img/` | The assets of the site. `css/site.css` defines the colours. `img/icon.svg` is the icon |
 | `out/` | Build output. Git ignores it |
 
 ## Set up
 
-You need Node 22 or later and pnpm. The video build also needs ffmpeg, the macOS `say`
-command and, for the 3D title, Blender.
+You need Node 22 or later and pnpm. The video build also needs ffmpeg and the macOS `say`
+command.
 
 ```
 cd site
@@ -135,24 +135,30 @@ is not 120 to 180 seconds long.
 | 1 | `build.mjs` | Makes the pages from the data |
 | 2 | `video/narrate.mjs` | Speaks each sentence of `narration.md` with `say`, measures it, and writes the timeline, the narration track and the `.srt` file |
 | 2 | `video/music.mjs` | Synthesizes the music bed from the notes in `js/score.mjs` |
-| 3 | `video/title.py` | Blender builds and renders the 3D title: a paper boat sails through the gates Plan, Approval, Grant and Apply |
-| 4 | `video/record.mjs` | Playwright records each segment for as long as its narration, and draws the caption pictures |
-| 5 | `video/assemble.mjs` | ffmpeg cuts and joins the segments, lays the captions over them, and mixes the voice over the music |
+| 3 | `video/record.mjs` | Playwright records each segment for as long as its narration, and draws the caption pictures |
+| 4 | `video/assemble.mjs` | ffmpeg cuts and joins the segments, puts a frame around the recordings of the running applications, lays the captions over them, and mixes the voice over the music |
 
 Things to know:
 
 - To change the video, edit `narration.md`. The top of that file explains the format.
 - A segment with `source: dashboard:...` shows the real dashboard when it is up at
   `http://127.0.0.1:7070`. If it is not up, the segment shows its `fallback`.
-- If Blender is not installed, the build prints a message, skips the 3D title and shows
-  the fallback of that segment. Set `BLENDER=/path/to/Blender` for another location.
+- Three segments are drawn scenes, not recordings: `video/opening.html` (the layers of the
+  platform on each target), `video/setup.html` (from the download to a product that is
+  looked after) and `video/pipeline.html` (one change through its checkpoints). The
+  narration moves them with `[beat:N]` cues. Their numbers come from `data/month.json`.
+  The step "Sign in to your cloud" of the setup scene is a drawing and says so, because
+  the wizard does not set up a cloud yet. `video/wizard/` holds the two real screenshots
+  of the setup wizard that the scene shows.
+- `VIDEO_FOOTAGE=<directory> ./build-video.sh` builds the video while the demo is not
+  available. The build then does not contact the running applications. It takes the
+  picture of each `tour:` and `dashboard:` segment from `<directory>/<segment>.mp4`, a clip
+  that you kept from an earlier recording, and stops if a clip is not as long as its segment.
 - Playwright records a 1440 x 810 window, so that the text is large enough to read, and
   ffmpeg scales it to 1920 x 1080.
 - A sentence in `narration.md` can depend on the data, with `(if event.type)`. A new run
   of the month that has no stale plan, for example, gets a video without that sentence.
 - The build deletes its large intermediate files when it succeeds.
-- The rendered title is kept in `out/cache/`. It is rendered again only when
-  `video/title.py` changes.
 - `NARRATION_VOICE=Samantha ./build-video.sh` uses another voice.
 - To use a voice from ElevenLabs, put `ELEVEN_LABS_API_KEY` and `ELEVEN_LABS_VOICE_ID` in
   the `.env` file of the repository. The build then sends each sentence of `narration.md`
@@ -177,5 +183,15 @@ gh workflow run Pages
 
 `fonts/` holds four IBM Plex files (Sans Light, Regular and SemiBold; Mono Regular) from
 the npm packages `@ibm/plex-sans` 1.1.0 and `@ibm/plex-mono` 1.1.0, under the SIL Open
-Font License (`fonts/LICENSE.txt`). The colours, spacing and type follow the IBM Carbon
-Design System (the white and g100 themes), written by hand in `css/site.css`.
+Font License (`fonts/LICENSE.txt`). The spacing and type follow the IBM Carbon Design
+System, written by hand in `css/site.css`.
+
+## Colours and icon
+
+The palette is eleven colours, defined once at the top of `css/site.css` (`--honey`,
+`--cream`, `--dark` and the others). Every other colour of the site and of the drawn
+scenes is one of them or a mix of two. The site has a light and a dark theme from the same
+palette. The recordings of the dashboard and of Paperboat keep their own colours.
+
+`img/icon.svg` is the icon: an aircraft marshaller with two wands. It is the favicon, the
+mark in the header and the mark of the video.

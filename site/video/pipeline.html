@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <title>Pipeline scene of the explainer video</title>
+  <link rel="stylesheet" href="../css/site.css">
+  <link rel="stylesheet" href="scene.css">
+</head>
+<body>
+  <!-- narration.md, segment "change". One real change of the month passes eight
+       checkpoints. pipeline.js fills the elements with data-fill from data/month.json. -->
+  <main class="scene">
+    <div class="change appear">
+      <span class="change-id" data-fill="id"></span>
+      <span class="change-title" data-fill="title"></span>
+      <span class="change-tags">
+        <span class="tag change-tier" data-fill="tier" id="change-tier"></span>
+        <span class="tag tag-gray" id="change-state">Not yet detected</span>
+      </span>
+    </div>
+
+    <ol class="stages appear" id="stages">
+      <li class="stage">
+        <div class="stage-mark"><span class="stage-dot">1</span></div>
+        <h2 class="stage-name">Detect</h2>
+        <p class="stage-who">Detector · code</p>
+        <div class="stage-body">
+          <p data-fill="trigger"></p>
+          <p class="quiet">A finding opens a work item.</p>
+        </div>
+        <p class="stage-state"><span class="tag tag-gray">Detected</span></p>
+        <p class="stage-guard">Detectors only read. Tier T0.</p>
+        <p class="stage-record" data-fill="record-detect"></p>
+      </li>
+      <li class="stage">
+        <div class="stage-mark"><span class="stage-dot">2</span></div>
+        <h2 class="stage-name">Plan</h2>
+        <p class="stage-who">Author · model</p>
+        <div class="stage-body">
+          <p data-fill="pull"></p>
+          <p class="quiet" data-fill="plan"></p>
+          <p class="mono" data-fill="plan-hash"></p>
+        </div>
+        <p class="stage-state"><span class="tag tag-gray">Planned</span></p>
+        <p class="stage-guard">The model has no tool that applies a change.</p>
+        <p class="stage-record" data-fill="record-plan"></p>
+      </li>
+      <li class="stage">
+        <div class="stage-mark"><span class="stage-dot">3</span></div>
+        <h2 class="stage-name">Policy tier</h2>
+        <p class="stage-who">Policy engine · code</p>
+        <div class="stage-body">
+          <ul class="tiers" id="tiers"><li>T0</li><li>T1</li><li>T2</li><li>T3</li></ul>
+          <p data-fill="rule"></p>
+          <p class="quiet" data-fill="approvers-required"></p>
+        </div>
+        <p class="stage-state"><span class="tag tag-gray">AwaitingApproval</span></p>
+        <p class="stage-guard">T3 needs two approvers and a maintenance window.</p>
+        <p class="stage-record" data-fill="record-policy"></p>
+      </li>
+      <li class="stage">
+        <div class="stage-mark"><span class="stage-dot">4</span></div>
+        <h2 class="stage-name">Approval</h2>
+        <p class="stage-who is-person">Approver · person</p>
+        <div class="stage-body">
+          <div class="person">
+            <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4a5 5 0 1 1-5 5 5 5 0 0 1 5-5m0-2a7 7 0 1 0 7 7 7 7 0 0 0-7-7ZM26 30h-2v-5a5 5 0 0 0-5-5h-6a5 5 0 0 0-5 5v5H6v-5a7 7 0 0 1 7-7h6a7 7 0 0 1 7 7Z"/></svg>
+            <p class="person-name" data-fill="approver"></p>
+          </div>
+          <p class="when-waiting quiet">Email, Slack and Teams link to the approval page.</p>
+          <p class="when-decided ok" data-fill="decision"></p>
+          <p class="when-decided quiet" data-fill="decided-at"></p>
+        </div>
+        <p class="stage-state"><span class="tag tag-gray">Approved</span></p>
+        <p class="stage-guard">Or: Rejected, ChangesRequested.</p>
+        <p class="stage-record" data-fill="record-approval"></p>
+      </li>
+      <li class="stage" id="stage-grant">
+        <div class="stage-mark"><span class="stage-dot">5</span></div>
+        <h2 class="stage-name">Grant</h2>
+        <p class="stage-who">Access broker · code</p>
+        <div class="stage-body">
+          <p class="mono" data-fill="grant-id"></p>
+          <p data-fill="grant-scope"></p>
+          <div class="window"><div class="window-left"></div></div>
+          <p class="when-held quiet" data-fill="grant-window"></p>
+          <p class="when-ended ok" data-fill="grant-held"></p>
+        </div>
+        <p class="stage-state"><span class="tag tag-gray">Signed</span></p>
+        <p class="stage-guard">The broker checks signature, approvals, window and plan hash.</p>
+        <p class="stage-record" data-fill="record-grant"></p>
+      </li>
+      <li class="stage">
+        <div class="stage-mark"><span class="stage-dot">6</span></div>
+        <h2 class="stage-name">Apply</h2>
+        <p class="stage-who">Runner · code</p>
+        <div class="stage-body">
+          <p>The saved plan, not a new one.</p>
+          <p class="mono" data-fill="apply-hash"></p>
+          <p class="ok">Same hash as approved</p>
+        </div>
+        <p class="stage-state"><span class="tag tag-gray">Applying</span></p>
+        <p class="stage-guard">A stale plan is refused.</p>
+        <p class="stage-record" data-fill="record-apply"></p>
+      </li>
+      <li class="stage">
+        <div class="stage-mark"><span class="stage-dot">7</span></div>
+        <h2 class="stage-name">Verify</h2>
+        <p class="stage-who">Verifier · code</p>
+        <div class="stage-body" id="checks"></div>
+        <p class="stage-state"><span class="tag tag-gray">Verifying</span></p>
+        <p class="stage-guard">A failed canary: RolledBack.</p>
+        <p class="stage-record" data-fill="record-verify"></p>
+      </li>
+      <li class="stage">
+        <div class="stage-mark"><span class="stage-dot">8</span></div>
+        <h2 class="stage-name">Audit record</h2>
+        <p class="stage-who">Audit log · code</p>
+        <div class="stage-body">
+          <p data-fill="records"></p>
+          <p class="quiet">Each record holds the hash of the record before it.</p>
+          <p class="mono" data-fill="last-hash"></p>
+        </div>
+        <p class="stage-state"><span class="tag tag-green">Done</span></p>
+        <p class="stage-guard">A changed record breaks the chain.</p>
+      </li>
+    </ol>
+  </main>
+  <script type="module" src="pipeline.js"></script>
+</body>
+</html>

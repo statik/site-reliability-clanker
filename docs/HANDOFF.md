@@ -356,6 +356,11 @@ What ran on the build of commit `376617b`, the last change to the Go code:
 - The site and the video were made from an earlier run with 323 audit records. The demo
   now has 310. To refresh them: `node export-data.mjs`, `node build.mjs`,
   `./build-video.sh` in `site/`, then upload the video to the release `site-video`.
+- The video on the branch `site-video-intro` is a draft. It has the local `say` voice, and
+  its four recordings of the dashboard and of Paperboat are cuts of earlier recordings
+  (`VIDEO_FOOTAGE`, see `site/README.md`), because the demo was in use. The final build
+  needs the ElevenLabs key in `.env` and the running demo. The setup step "Sign in to your
+  cloud" in the video is a drawing: the wizard does not set up a cloud yet.
 
 ## What runs now
 

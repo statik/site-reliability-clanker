@@ -5,24 +5,21 @@
 #   ./build-video.sh
 #
 # Everything is made again from narration.md, data/month.json, the pages of this site and
-# video/title.py. The steps are small Node scripts in video/; this script runs them in
-# order and checks the result.
+# the drawn scenes in video/. The steps are small Node scripts in video/; this script runs
+# them in order and checks the result.
 #
-#   BLENDER=/path/to/Blender   use another Blender binary
 #   NARRATION_VOICE=Daniel     use another voice of the macOS `say` command
+#   VIDEO_FOOTAGE=<directory>  do not contact the running demo; take the pictures of the
+#                              `tour:` and `dashboard:` segments from kept clips (README.md)
 set -euo pipefail
 
 cd "$(dirname "$0")"
 
-BLENDER="${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender}"
 WORK="out/build"
-CACHE="out/cache"
-TITLE_FRAMES=240
-FPS=30
 MIN_SECONDS=120
 MAX_SECONDS=180
 
-for tool in node pnpm ffmpeg ffprobe say shasum; do
+for tool in node pnpm ffmpeg ffprobe say; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "build-video: '$tool' is not installed or not on the PATH." >&2
     exit 1
@@ -35,48 +32,21 @@ if [ ! -d node_modules/playwright ]; then
 fi
 pnpm exec playwright install chromium >/dev/null
 
-mkdir -p "$WORK" "$CACHE"
-# Old recordings and segments must not leak into this build. The title cache stays.
+mkdir -p "$WORK"
+# Old recordings and segments must not leak into this build.
 find "$WORK" -maxdepth 1 -type f \( -name '*.webm' -o -name '*.mp4' -o -name '*.png' \) -delete
 
-echo "build-video: 1/5 the pages, from the data"
+echo "build-video: 1/4 the pages, from the data"
 node build.mjs
 
-echo "build-video: 2/5 narration, captions and music"
+echo "build-video: 2/4 narration, captions and music"
 node video/narrate.mjs
 node video/music.mjs
 
-echo "build-video: 3/5 the 3D title sequence"
-if [ -x "$BLENDER" ]; then
-  title_hash="$(shasum -a 256 video/title.py | cut -c1-16)"
-  title_cache="$CACHE/title-$title_hash-$TITLE_FRAMES.mp4"
-  if [ ! -f "$title_cache" ]; then
-    frames_dir="$PWD/$WORK/title-frames"
-    mkdir -p "$frames_dir"
-    find "$frames_dir" -type f -name '*.png' -delete
-    echo "build-video: rendering $TITLE_FRAMES frames with Blender (a few minutes, then cached)"
-    "$BLENDER" -b -P video/title.py -- --out "$frames_dir" --frames "$TITLE_FRAMES" --fps "$FPS" \
-      >"$WORK/blender.log" 2>&1 || {
-      echo "build-video: Blender failed. The end of $WORK/blender.log:" >&2
-      tail -n 20 "$WORK/blender.log" >&2
-      exit 1
-    }
-    ffmpeg -v error -y -framerate "$FPS" -i "$frames_dir/frame-%04d.png" \
-      -c:v libx264 -preset medium -crf 16 -pix_fmt yuv420p "$title_cache"
-    find "$frames_dir" -type f -name '*.png' -delete
-  else
-    echo "build-video: the title is in the cache ($title_cache)"
-  fi
-  cp "$title_cache" "$WORK/title.mp4"
-else
-  echo "build-video: SKIP the 3D title. Blender is not at $BLENDER (set BLENDER=...)."
-  echo "build-video: the title segment shows its fallback from narration.md."
-fi
-
-echo "build-video: 4/5 recording the pictures"
+echo "build-video: 3/4 recording the pictures"
 node video/record.mjs
 
-echo "build-video: 5/5 assembling"
+echo "build-video: 4/4 assembling"
 node video/assemble.mjs
 
 output="out/explainer.mp4"
@@ -103,8 +73,8 @@ if [ "$whole" -lt "$MIN_SECONDS" ] || [ "$whole" -gt "$MAX_SECONDS" ]; then
   echo "build-video: the video is ${duration} s; it must be $MIN_SECONDS to $MAX_SECONDS s. Edit narration.md." >&2
   exit 1
 fi
-# The intermediate files are large. The cached title and the final files stay.
+# The intermediate files are large. The final files stay.
 find "$WORK" -maxdepth 1 -type f \( -name '*.webm' -o -name 'segment-*.mp4' -o -name 'pictures.mp4' \
-  -o -name 'title.mp4' -o -name '*.wav' -o -name '*.png' \) -delete
+  -o -name '*.wav' -o -name '*.png' \) -delete
 find "$WORK/speech" -type f -delete
 echo "build-video: done. Captions: out/explainer.srt"

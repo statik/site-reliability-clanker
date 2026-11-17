@@ -100,7 +100,7 @@ export function renderSystemSvg() {
     <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9"
       markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="arrow-head" d="M0 0 L10 5 L0 10 z"/></marker></defs>
     <rect class="group" x="170" y="40" width="560" height="460"/>
-    <text class="group-label" x="186" y="64">Clanker control plane</text>
+    <text class="group-label" x="186" y="64">S.R.C. control plane</text>
     <rect class="group" x="830" y="170" width="210" height="350" data-node="environment"/>
     <text class="group-label" x="846" y="194">One environment per cloud</text>
     ${edges}

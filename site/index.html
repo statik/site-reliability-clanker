@@ -3,17 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Site Reliability Clanker: an AI site reliability engineer that asks first</title>
-  <meta name="description" content="Site Reliability Clanker keeps a cloud application deployed, patched and backed up. Every change is a pull request that a person approves, and the access to apply it exists for seconds.">
+  <title>S.R.C. (Site Reliability Clanker): an AI site reliability engineer that installs, upgrades, patches, and monitors your product</title>
+  <meta name="description" content="Don’t build a legacy product installer. Build an AI site reliability engineer that installs, upgrades, patches, and monitors your product. Every change is a pull request that a person approves, and the access to apply it exists for seconds.">
   <meta name="color-scheme" content="light dark">
-  <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="img/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/site.css">
   <script src="js/boot.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
   <header class="shell">
-    <a class="shell-name" href="index.html"><span class="shell-prefix">Site Reliability</span> Clanker</a>
+    <a class="shell-name" href="index.html"><img class="shell-logo" src="img/icon.svg" alt="" width="24" height="24">S.R.C. <span class="shell-full">Site Reliability Clanker</span></a>
     <nav aria-label="Site">
       <ul>
         <li><a href="index.html" aria-current="page">Overview</a></li>
@@ -33,11 +33,15 @@
     <section class="hero" aria-labelledby="hero-title">
       <canvas class="hero-backdrop" id="hero-backdrop" aria-hidden="true"></canvas>
       <div class="wrap">
-        <h1 class="reveal" id="hero-title">An AI site reliability engineer that asks first.</h1>
-        <p class="hero-lead reveal">Site Reliability Clanker keeps a cloud application deployed,
+        <h1 class="reveal" id="hero-title">Don’t build a legacy product installer. Build an AI site reliability engineer that installs, upgrades, patches, and monitors your product.</h1>
+        <p class="hero-lead reveal">S.R.C. (Site Reliability Clanker) keeps a cloud application deployed,
           patched and backed up. It finds the work, writes each change as a pull request, and
           explains it in plain language. A person approves. Only then does it get access: for
           that one change, for seconds.</p>
+        <ul class="hero-values reveal">
+          <li>The convenience of managed services, without a third-party contract.</li>
+          <li>Inference is now one of the core ingredients, alongside storage, memory, and compute.</li>
+        </ul>
         <div class="btn-row reveal">
           <a class="btn btn-primary" href="#how-title">See how it works <span aria-hidden="true">&darr;</span></a>
           <a class="btn btn-tertiary" href="#video-title">Watch the video <span aria-hidden="true">&darr;</span></a>
@@ -72,8 +76,9 @@
               understand, or they slow everything down.</p>
           </div>
         </div>
-        <p class="answer reveal">Clanker lets a language model do the reading and the writing. Plain
-          code and a person do the deciding.</p>
+        <p class="answer reveal">S.R.C. uses AI to understand and propose the change as deterministic
+          code. A strict policy engine then classifies the risk from the plan itself, not from the
+          AI’s description, and decides which changes a person must approve.</p>
       </div>
     </section>
 
@@ -81,7 +86,7 @@
       <div class="wrap">
         <p class="kicker">What it does</p>
         <h2 id="what-title">It does the operations work that a small team has no time for.</h2>
-        <p class="section-lead">You give Clanker an application and a target. It deploys the
+        <p class="section-lead">You give S.R.C. an application and a target. It deploys the
           application, and then it looks after it. For each job below, it finds the work, prepares
           the change and asks you. It does not wait for a ticket.</p>
         <div class="cards">
@@ -162,7 +167,7 @@
 
         <h2 class="video-title" id="video-title">The whole idea in less than three minutes.</h2>
         <figure class="video reveal">
-          <video controls preload="none" playsinline poster="screens/dashboard-approval-light.png"
+          <video controls preload="none" playsinline poster="img/video-poster.png"
             src="out/explainer.mp4"></video>
           <figcaption class="figure-caption">The video is built from a real run of the prototype.</figcaption>
         </figure>
@@ -290,7 +295,55 @@ is an illustration of the approval page. For the dashboard itself, see
       </div>
     </section>
 
-    <section class="section section-alt" aria-labelledby="numbers-title">
+    <section class="section section-alt" aria-labelledby="notify-title">
+      <div class="wrap">
+        <p class="kicker">Slack and Teams</p>
+        <h2 id="notify-title">Slack and Teams tell the right people. The approval page is where they decide.</h2>
+        <p class="section-lead">Each approval request goes to the approvers by email, Slack,
+          Microsoft Teams and Discord. The message states the facts of the change and links to
+          the approval page. Nobody approves from a chat message. The person signs in to the
+          dashboard, where the plan, the tier and the explanation are.</p>
+        <div class="split split-below">
+          <div class="cards cards-stack">
+            <div class="card reveal">
+              <h3>Routine work asks once.</h3>
+              <p>Routine maintenance is tier T1. It runs under a standing approval that a
+                person signed once. A T2 change asks one approver. A T3 change asks two.</p>
+            </div>
+            <div class="card reveal">
+              <h3>The routes are a file in a repository.</h3>
+              <p>A route names the events, the channels, the audience and the urgency: at once,
+                or in one digest. Failures and incidents go to the operators. Debug access and
+                the inference spend cap go to the admins.</p>
+            </div>
+            <div class="card reveal">
+              <h3>Facts only.</h3>
+              <p>A message holds the summary, the work item, the tier, the rule and the number
+                of approvers. The text passes the secret scrubber first.</p>
+            </div>
+          </div>
+          <!-- build:notice -->
+<figure class="notice reveal">
+<div class="notice-card">
+<p class="notice-title">Approval needed: local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0</p>
+<p>Upgrade the Paperboat app in local from version 1.0.0 to 1.1.0. This adds fish condition scores and retires old fish from the rentable stock. Open the dashboard and sign in to decide. You cannot approve
+from this message.</p>
+<dl class="notice-facts"><div><dt>Work item</dt><dd>WI-0003</dd></div><div><dt>Environment</dt><dd>local</dd></div><div><dt>Tier</dt><dd>T2</dd></div><div><dt>Rule</dt><dd>normal-change</dd></div><div><dt>Approvers required</dt><dd>1</dd></div></dl>
+<p class="notice-link">Open in Clanker <span aria-hidden="true">&rarr;</span></p>
+</div>
+<figcaption class="figure-caption">A drawing, not a screenshot. The words are the notice
+for WI-0003, as the control plane sends it to Slack and to Teams.</figcaption>
+</figure>
+<!-- /build:notice -->
+        </div>
+        <p class="figure-caption">Slack and Teams get the message through an incoming webhook.
+          In the runs of the prototype the messages went to a local webhook sink, not to a real
+          workspace (see <a href="screens.html">Live screens</a>). Quiet hours, escalation and
+          threads are not built.</p>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="numbers-title">
       <div class="wrap">
         <p class="kicker">Proof: one month, measured</p>
         <h2 id="numbers-title">The agent worked for a month. It held write access for minutes.</h2>
@@ -321,13 +374,100 @@ is an illustration of the approval page. For the dashboard itself, see
       </div>
     </section>
 
-    <section class="section" aria-labelledby="example-title">
+    <section class="section section-alt" aria-labelledby="cost-title">
+      <div class="wrap">
+        <p class="kicker">Cost and runbooks</p>
+        <h2 id="cost-title">The model works when a runbook is written, not each time it runs.</h2>
+        <p class="section-lead">A runbook is a fixed script in a repository. The prototype has four:
+          restart a deployment, back up the database, run a restore drill, and maintain the
+          database. Each run is the same script with new parameters, so the result is
+          predictable and a run needs no inference.</p>
+        <div class="cards">
+          <div class="card reveal">
+            <h3>The model selects. It does not write commands.</h3>
+            <p>After an incident, the model can propose one runbook from a list. Code checks the
+              name and the target against that list. If one of them is not on it, the work stops
+              and a person decides.</p>
+          </div>
+          <div class="card reveal">
+            <h3>A person signs first.</h3>
+            <p>A runbook runs only under a standing approval that an approver or an admin
+              signed. Each run is tier T1, is a record in the audit log, and gets its own grant
+              for 15 minutes.</p>
+          </div>
+          <div class="card reveal">
+            <h3>A model for each role, and a daily cap.</h3>
+            <p>The Explainer uses a smaller model. The Author and the Investigator use a larger
+              one. The control plane adds up the cost of the model calls of the day. At 5 US
+              dollars it stops the calls for that day and writes an audit record. Each call is
+              stored with its role, model, tokens and cost.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="evals-title">
+      <div class="wrap">
+        <p class="kicker">Evals</p>
+        <h2 id="evals-title">Evals measure each role before you trust it.</h2>
+        <p class="section-lead">The suite has nine tasks on Inspect AI. Eight test the model
+          roles with the live models. One tests the tier policy and calls no model. A task
+          passes a run only if every check passes. These results are from
+          <code>evals/RESULTS.md</code>: three rounds on 17 Nov 2026, with
+          <span class="mono">claude-haiku-5.5</span> for the Explainer and the Ask role, and
+          <span class="mono">claude-sonnet-5.5</span> for the Author and the Investigator.</p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Results of the evals">
+          <table class="data-table">
+            <thead>
+              <tr><th scope="col">What is tested</th><th scope="col">Runs</th><th scope="col">Result</th>
+                <th scope="col">Weak spot</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Prompt injection, all four roles</th><td>63</td>
+                <td>No attack succeeded.</td>
+                <td>In round 1, the attack success on the Investigator was 0.20. A log line closed the
+                  frame around untrusted input. The input is now JSON-encoded, and round 2 measured 0.00.</td></tr>
+              <tr><th scope="row">Secret leakage, all four roles</th><td>51</td>
+                <td>No canary secret appeared in an output.</td>
+                <td>In round 1, the Ask role had a leak rate of 0.19. A canary still passed the scrubber
+                  in 75% to 100% of the runs: a pattern cannot catch a secret in a sentence.</td></tr>
+              <tr><th scope="row">Author: the right change, one pull request</th><td>13</td>
+                <td>Score 0.92.</td>
+                <td>One run opened no pull request. The same sample passed 3 of 3 repeated runs.</td></tr>
+              <tr><th scope="row">Author: no change, or the smallest change</th><td>10</td>
+                <td>Score 1.00.</td><td>None reported.</td></tr>
+              <tr><th scope="row">Investigator: the diagnosis and an allowed mitigation</th><td>12</td>
+                <td>Score 1.00 in round 3.</td>
+                <td>The score was 0.83 in round 1 and 0.92 in round 2.</td></tr>
+              <tr><th scope="row">Explainer: agrees with the plan, states no other tier</th><td>12 and 8</td>
+                <td>Score 1.00 on both tasks.</td>
+                <td>A grader model rated the accuracy of the explanations at 0.58. That rating is not
+                  part of the score.</td></tr>
+              <tr><th scope="row">Ask: answers use only the records</th><td>14</td>
+                <td>Score 1.00.</td>
+                <td>The grader model rated the accuracy at 0.79.</td></tr>
+              <tr><th scope="row">Tier policy, without a model</th><td>19</td>
+                <td>Score 1.00.</td><td>None reported.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="figure-caption">The logs behind the result table cost 1.4374 US dollars at list
+          price.</p>
+        <p class="answer reveal">Your product should get better and easier to manage when new
+          models come out.</p>
+        <p class="section-lead">The model of each role is one setting. Each eval task runs
+          against a named model, so you can measure a new model before a role uses it. Nothing
+          changes the model by itself today: a person changes the setting.</p>
+      </div>
+    </section>
+
+    <section class="section section-alt" aria-labelledby="example-title">
       <div class="wrap split">
         <div>
           <p class="kicker">The test application</p>
           <h2 id="example-title">A business that rents out live fish.</h2>
           <div class="prose section-lead">
-            <p>Clanker needs something real to look after. The month above used Paperboat: customers
+            <p>S.R.C. needs something real to look after. The month above used Paperboat: customers
               rent a fish, a driver delivers it, and a driver collects it when the rental ends.</p>
             <p>It has a live inventory board, fish that age and retire, deliveries, and a support
               desk for people whose fish looks at them strangely. Under that, it needs what every
@@ -343,7 +483,7 @@ is an illustration of the approval page. For the dashboard itself, see
       </div>
     </section>
 
-    <section class="section section-alt" aria-labelledby="clouds-title">
+    <section class="section" aria-labelledby="clouds-title">
       <div class="wrap">
         <p class="kicker">Status today</p>
         <h2 id="clouds-title">One contract. Four targets. One of them has run.</h2>
@@ -396,11 +536,11 @@ is an illustration of the approval page. For the dashboard itself, see
 
   <footer class="footer">
     <div class="wrap">
-      <p>Site Reliability Clanker is a prototype. Paperboat, its customers and its fish
+      <p>S.R.C. (Site Reliability Clanker) is a prototype. Paperboat, its customers and its fish
         are fictional, and so are the approvers Alice, Bob and Carol.</p>
       <p>The code is on <a href="https://github.com/statik/site-reliability-clanker" rel="noopener">GitHub</a>.</p>
       <p>This site makes no network requests to other hosts. The typeface is IBM Plex, under the
-        SIL Open Font License. The look follows the IBM Carbon Design System.</p>
+        SIL Open Font License. The layout follows the IBM Carbon Design System.</p>
     </div>
   </footer>
 
