@@ -1,6 +1,5 @@
-// Scripted click-throughs of the live applications. capture.mjs records them as they
-// are; the video build records them paced to the narration. Each tour takes the page
-// and the number of seconds that it must fill, and only navigates and scrolls.
+// Scripted click-throughs of the live applications, for capture.mjs. Each tour takes the
+// page and the number of seconds that it must fill, and only navigates and scrolls.
 
 export const DASHBOARD = "http://127.0.0.1:7070";
 export const PAPERBOAT = "http://localhost:8088";
@@ -112,36 +111,30 @@ export const TOURS = {
     await wait(page, seconds * 0.15);
   },
 
-  // Overview, then the month on the Timeline, then the work items that the narration
-  // talks about: the change that was rolled back, an incident, and the change whose
-  // approval is asked again. Each is found through the API, not by a fixed number. With
-  // captions, each page opens when its sentence starts (the cue of the caption), and a
-  // work item that no sentence tells of is not opened.
-  async "dashboard-timeline"(page, seconds, captions = []) {
+  // Overview, then the month on the Timeline, then three work items: the change that was
+  // rolled back, an incident, and the change whose approval is asked again. Each is found
+  // through the API, not by a fixed number.
+  async "dashboard-timeline"(page, seconds) {
     const began = Date.now();
-    const at = (cue, share) => captions.find((caption) => caption.cue === cue)?.offset ?? seconds * share;
-    const told = (cue) => captions.length === 0 || captions.some((caption) => caption.cue === cue);
-    const until = (offset) => page.waitForTimeout(Math.max(0, began + offset * 1000 - Date.now()));
+    const until = (share) => page.waitForTimeout(Math.max(0, began + seconds * share * 1000 - Date.now()));
     const items = await workItems();
-    const show = async (offset, item) => {
+    const show = async (share, item) => {
       if (!item) return;
-      await until(offset - 0.3);
+      await until(share);
       await page.goto(`${DASHBOARD}/work/${item.id}`, { waitUntil: "load" });
       await page.getByRole("heading").first().waitFor({ state: "visible", timeout: NAV_TIMEOUT_MS });
     };
     await page.goto(`${DASHBOARD}/`, { waitUntil: "load" });
     await dashboardNav(page).waitFor({ state: "visible", timeout: NAV_TIMEOUT_MS });
-    await until(at("#blank-slate", 0.05) + 1.5);
+    await until(0.05);
     await openDashboard(page, "Timeline");
     await optional(() => page.getByRole("button", { name: "60 days", exact: true }).click({ timeout: 2000 }));
-    await until(at("#feature-release", 0.2));
+    await until(0.2);
     await optional(() => page.getByRole("button", { name: /local/i }).first().click({ timeout: 2000 }));
-    await show(at("#bad-release", 0.4), items.find((item) => item.state === "RolledBack"));
-    if (told("#incident")) await show(at("#incident", 0.6), items.findLast((item) => item.kind === "incident"));
-    if (told("#stale-plan")) {
-      await show(at("#stale-plan", 0.8), items.find((item) => item.state === "AwaitingApproval"));
-    }
-    await until(seconds);
+    await show(0.4, items.find((item) => item.state === "RolledBack"));
+    await show(0.6, items.findLast((item) => item.kind === "incident"));
+    await show(0.8, items.find((item) => item.state === "AwaitingApproval"));
+    await until(1);
   },
 
   async "dashboard-access"(page, seconds) {

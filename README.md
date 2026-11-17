@@ -103,14 +103,16 @@ Stop a running control plane before you start `make demo` again: `pkill -f "clan
 | Task | Command |
 |---|---|
 | Preview the website | `cd site && python3 -m http.server 4173`, then open http://127.0.0.1:4173 |
-| Export the data, capture the screens, render the video | `cd site && node export-data.mjs && node capture.mjs --video && ./build-video.sh` |
+| Export the data and capture the screens | `cd site && node export-data.mjs && node capture.mjs` |
+| Render the video | `cd site && ./build-video.sh` |
 | Run the evals without a model | `cd evals && ./run.sh mock` |
 | Run the evals with the live model (costs about 2 USD) | `cd evals && ./run.sh live` |
 | Build and test the iOS app | `ios/build.sh` |
 | Run the iOS app in the simulator | `ios/run.sh` |
 
-The video is written to `site/out/explainer.mp4`. The capture and the video need the demo to
-run.
+The video is written to `site/out/explainer.mp4`. The export and the capture need the demo to
+run. The video needs only `site/data/month.json` and the ElevenLabs voice (see
+`site/README.md`).
 
 ## Tests
 

@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 // Step 1 of the video build: speak the narration and fix the timing.
 //
-// Each caption in narration.md is spoken into its own file, so the length of every
-// sentence is measured, not estimated. The voice is ElevenLabs when ELEVEN_LABS_API_KEY and
-// ELEVEN_LABS_VOICE_ID are set (in the environment or in the .env file of the repository),
-// and the macOS `say` command if not. From those lengths this script writes:
-//   out/build/timeline.json   every segment and caption with its start and end time
+// Each sentence in narration.md is spoken into its own file by the ElevenLabs voice, so
+// the length of every sentence is measured, not estimated. The voice needs
+// ELEVEN_LABS_API_KEY and ELEVEN_LABS_VOICE_ID, in the environment or in the .env file of
+// the repository. There is no other voice. The request holds the sentence and the name of
+// the model, and nothing else. From the lengths this script writes:
+//   out/build/timeline.json   every part, sentence and caption with its start and end time
 //   out/build/narration.wav   the whole narration track
 //   out/explainer.srt         the captions as a sidecar file
+//
+//   node video/narrate.mjs --check   read narration.md and check the captions; speak nothing
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -16,21 +19,25 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  GAP, LEAD, OUT, SAMPLE_RATE, TAIL, TIMELINE, WORK, readScript,
+  CAPTION_LINE, CAPTION_LINES, CAPTION_MIN_SECONDS, FPS, LEAD, OUT, SAMPLE_RATE, TIMELINE, WORK,
+  readScript, wordCount,
 } from "./script.mjs";
 import { readWav, writeWav } from "./wav.mjs";
 
-const VOICE = process.env.NARRATION_VOICE ?? "Daniel";
-const RATE_WORDS_PER_MINUTE = "172";
-
 const ELEVENLABS_MODEL = "eleven_multilingual_v2";
 const SPEECH_CACHE = join(OUT, "cache", "speech");
-
 const ENV_FILE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".env");
-if (existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE);
-const ELEVENLABS_KEY = process.env.ELEVEN_LABS_API_KEY;
-const ELEVENLABS_VOICE = process.env.ELEVEN_LABS_VOICE_ID;
-const CLONED = Boolean(ELEVENLABS_KEY && ELEVENLABS_VOICE);
+
+function voiceSettings() {
+  if (existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE);
+  const key = process.env.ELEVEN_LABS_API_KEY;
+  const voice = process.env.ELEVEN_LABS_VOICE_ID;
+  if (!key || !voice) {
+    throw new Error("the narration needs the ElevenLabs voice. Put ELEVEN_LABS_API_KEY and " +
+      "ELEVEN_LABS_VOICE_ID in the .env file at the root of the repository, or in the environment");
+  }
+  return { key, voice };
+}
 
 function toWav(source, wav) {
   execFileSync("ffmpeg", [
@@ -39,21 +46,15 @@ function toWav(source, wav) {
   return readWav(wav);
 }
 
-function speakLocal(text, base) {
-  const aiff = `${base}.aiff`;
-  execFileSync("say", ["-v", VOICE, "-r", RATE_WORDS_PER_MINUTE, "-o", aiff, text]);
-  return toWav(aiff, `${base}.wav`);
-}
-
 // A sentence that was spoken before comes from the cache, so a rebuild costs nothing.
-async function speakCloned(text, base) {
-  const key = createHash("sha256").update(`${ELEVENLABS_VOICE}\n${ELEVENLABS_MODEL}\n${text}`).digest("hex");
+async function speak(text, base, settings) {
+  const key = createHash("sha256").update(`${settings.voice}\n${ELEVENLABS_MODEL}\n${text}`).digest("hex");
   const mp3 = join(SPEECH_CACHE, `${key.slice(0, 24)}.mp3`);
   if (!existsSync(mp3)) {
-    const url = `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE}?output_format=mp3_44100_128`;
+    const url = `https://api.elevenlabs.io/v1/text-to-speech/${settings.voice}?output_format=mp3_44100_128`;
     const response = await fetch(url, {
       method: "POST",
-      headers: { "xi-api-key": ELEVENLABS_KEY, "Content-Type": "application/json", "User-Agent": "clanker-video-build" },
+      headers: { "xi-api-key": settings.key, "Content-Type": "application/json", "User-Agent": "video-build" },
       body: JSON.stringify({ text, model_id: ELEVENLABS_MODEL }),
     });
     if (!response.ok) {
@@ -71,39 +72,73 @@ function stamp(totalSeconds) {
     `${pad(Math.floor(millis / 1000) % 60)},${pad(millis % 1000, 3)}`;
 }
 
-async function main() {
-  if (!CLONED) {
-    const voices = execFileSync("say", ["-v", "?"], { encoding: "utf8" });
-    if (!voices.split("\n").some((line) => line.startsWith(`${VOICE} `))) {
-      throw new Error(`the voice "${VOICE}" is not installed. Set NARRATION_VOICE to one from: say -v '?'`);
+function checkCaptionText(parts) {
+  for (const sentence of parts.flatMap((part) => part.sentences)) {
+    for (const lines of sentence.captions) {
+      const tooLong = lines.length > CAPTION_LINES || lines.some((line) => line.length > CAPTION_LINE);
+      if (tooLong) {
+        throw new Error(`a caption of "${sentence.text}" does not fit ${CAPTION_LINES} lines of ` +
+          `${CAPTION_LINE} characters: ${lines.join(" / ")}`);
+      }
     }
   }
-  const voiceName = CLONED ? "ElevenLabs" : VOICE;
+}
+
+// A sentence with two captions shares its time between them by their number of characters.
+function timeCaptions(sentence, pause, numberFrom) {
+  const shownUntil = sentence.end + pause * 0.5;
+  const characters = sentence.captions.reduce((sum, lines) => sum + lines.join(" ").length, 0);
+  let start = sentence.start;
+  return sentence.captions.map((lines, index) => {
+    const last = index === sentence.captions.length - 1;
+    const share = lines.join(" ").length / characters;
+    const end = last ? shownUntil : start + (sentence.end - sentence.start) * share;
+    if (end - start < CAPTION_MIN_SECONDS) {
+      throw new Error(`the caption "${lines.join(" / ")}" would stay ${(end - start).toFixed(2)} s; ` +
+        `the least is ${CAPTION_MIN_SECONDS} s. Give its part a longer pause in narration.md`);
+    }
+    const caption = { number: numberFrom + index, lines, start, end };
+    start = end;
+    return caption;
+  });
+}
+
+async function main() {
+  const parts = readScript();
+  checkCaptionText(parts);
+  if (process.argv.includes("--check")) {
+    console.log(`narrate: ${parts.flatMap((part) => part.sentences).length} sentences; every caption fits`);
+    return;
+  }
+  const settings = voiceSettings();
   mkdirSync(join(WORK, "speech"), { recursive: true });
   mkdirSync(SPEECH_CACHE, { recursive: true });
-  const segments = readScript();
   const clips = [];
+  const captions = [];
   let cursor = 0;
-  let number = 0;
-  for (const segment of segments) {
-    segment.start = cursor;
+  let spoken = 0;
+  let count = 0;
+  for (const part of parts) {
+    part.start = cursor;
     let offset = LEAD;
-    for (const caption of segment.captions) {
-      number += 1;
-      const base = join(WORK, "speech", `caption-${String(number).padStart(2, "0")}`);
-      // The spoken form spells out words for `say`. The cloned voice reads the caption as written.
-      const audio = CLONED ? await speakCloned(caption.text, base) : speakLocal(caption.spoken, base);
+    for (const sentence of part.sentences) {
+      count += 1;
+      const base = join(WORK, "speech", `sentence-${String(count).padStart(2, "0")}`);
+      const audio = await speak(sentence.text, base, settings);
       const length = audio.samples.length / audio.sampleRate;
-      caption.number = number;
-      caption.offset = offset;
-      caption.start = segment.start + offset;
-      caption.end = caption.start + length;
-      clips.push({ at: caption.start, samples: audio.samples });
-      offset += length + GAP;
+      spoken += length;
+      sentence.offset = offset;
+      sentence.length = length;
+      sentence.start = part.start + offset;
+      sentence.end = sentence.start + length;
+      clips.push({ at: sentence.start, samples: audio.samples });
+      sentence.captions = timeCaptions(sentence, part.pause, captions.length + 1);
+      captions.push(...sentence.captions);
+      offset += length + part.pause;
     }
-    // Whole frames, so that the video segments and the audio stay in step.
-    segment.duration = Math.ceil((offset - GAP + TAIL) * 30) / 30;
-    cursor += segment.duration;
+    // Whole frames, so that the pictures and the sound stay in step.
+    part.duration = Math.ceil((offset - part.pause + part.hold) * FPS) / FPS;
+    cursor += part.duration;
   }
 
   const track = new Float32Array(Math.ceil(cursor * SAMPLE_RATE));
@@ -113,13 +148,15 @@ async function main() {
   }
   writeWav(join(WORK, "narration.wav"), [track], SAMPLE_RATE);
 
-  const srt = segments.flatMap((segment) => segment.captions).map((caption) =>
-    `${caption.number}\n${stamp(caption.start)} --> ${stamp(caption.end + GAP * 0.5)}\n${caption.text}\n`);
+  const srt = captions.map((caption) =>
+    `${caption.number}\n${stamp(caption.start)} --> ${stamp(caption.end)}\n${caption.lines.join("\n")}\n`);
   writeFileSync(join(OUT, "explainer.srt"), `${srt.join("\n")}`);
-  writeFileSync(TIMELINE, `${JSON.stringify({ voice: voiceName, duration: cursor, segments }, null, 1)}\n`);
-  console.log(`narrate: ${number} sentences, ${segments.length} segments, ${cursor.toFixed(1)} s (voice ${voiceName})`);
-  for (const segment of segments) {
-    console.log(`  ${segment.start.toFixed(1).padStart(6)} s  ${segment.id.padEnd(10)} ${segment.duration.toFixed(1)} s`);
+  const words = wordCount(parts);
+  writeFileSync(TIMELINE, `${JSON.stringify({ duration: cursor, words, parts }, null, 1)}\n`);
+  console.log(`narrate: ${count} sentences, ${words} words, ${cursor.toFixed(1)} s: ` +
+    `${(words / cursor).toFixed(2)} words a second over the video, ${(words / spoken).toFixed(2)} while the voice speaks`);
+  for (const part of parts) {
+    console.log(`  ${part.start.toFixed(1).padStart(6)} s  ${part.id.padEnd(10)} ${part.duration.toFixed(1)} s`);
   }
 }
 

@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pictures of the explainer video</title>
+  <link rel="stylesheet" href="../css/site.css">
+  <link rel="stylesheet" href="scene.css">
+</head>
+<body>
+  <!-- One picture (class "pic") for each sentence or group of sentences of narration.md.
+       data-cues lists the cues that show the picture. A part with data-at appears when
+       its cue starts; --at is the share of the sentence that passes first. -->
+  <main class="scene">
+    <!-- The number of the step, for the pictures that have data-step. -->
+    <p class="step-number" id="step-number"></p>
+
+    <!-- problem -->
+    <section class="pic" data-cues="sell">
+      <div class="sell">
+        <p class="box box-own">Your software</p>
+        <ul class="sell-customers">
+          <li class="box part" data-at="sell" style="--at: 0.45">Customer</li>
+          <li class="box part" data-at="sell" style="--at: 0.55">Customer</li>
+          <li class="box part" data-at="sell" style="--at: 0.65">Customer</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="pic" data-cues="build">
+      <ul class="words">
+        <li class="word part" data-at="build" style="--at: 0.2">Installer</li>
+        <li class="word part" data-at="build" style="--at: 0.6">Upgrades</li>
+        <li class="word part" data-at="build" style="--at: 0.82">Patches</li>
+      </ul>
+    </section>
+
+    <section class="pic" data-cues="late">
+      <div class="tracks">
+        <p class="release-row-head"><span>Releases</span><span class="release-row-latest">Latest</span></p>
+        <div class="release-row" style="--runs: 3"><p class="release-row-name">Customer</p>
+          <div class="release-row-line"><i></i><i></i><i></i><i></i><i></i><i></i><b class="part" data-at="late" style="--at: 0.3"></b></div></div>
+        <div class="release-row" style="--runs: 4"><p class="release-row-name">Customer</p>
+          <div class="release-row-line"><i></i><i></i><i></i><i></i><i></i><i></i><b class="part" data-at="late" style="--at: 0.4"></b></div></div>
+        <div class="release-row" style="--runs: 1"><p class="release-row-name">Customer</p>
+          <div class="release-row-line"><i></i><i></i><i></i><i></i><i></i><i></i><b class="part" data-at="late" style="--at: 0.5"></b></div></div>
+      </div>
+    </section>
+
+    <section class="pic" data-cues="incidents">
+      <div class="turns">
+        <p class="word">Late patch</p>
+        <p class="turns-arrow" aria-hidden="true"></p>
+        <ul class="turns-into">
+          <li class="word word-bad part" data-at="incidents" style="--at: 0.45">Outage</li>
+          <li class="word word-bad part" data-at="incidents" style="--at: 0.7">Security incident</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- solution -->
+    <section class="pic" data-cues="dont">
+      <p class="struck"><span class="word">Installer</span><i class="part" data-at="dont" style="--at: 0.25"></i></p>
+    </section>
+
+    <section class="pic" data-cues="ship does">
+      <div class="lockup">
+        <img class="lockup-mark" src="../img/icon.svg" alt="" width="132" height="132">
+        <div>
+          <p class="lockup-name">S.R.C.</p>
+          <p class="lockup-full">Site Reliability Clanker</p>
+        </div>
+      </div>
+      <p class="lockup-line">An AI site reliability engineer, shipped with your product</p>
+      <ul class="does">
+        <li class="box part" data-at="does" style="--at: 0.12">Installs</li>
+        <li class="box part" data-at="does" style="--at: 0.3">Upgrades</li>
+        <li class="box part" data-at="does" style="--at: 0.48">Patches</li>
+        <li class="box part" data-at="does" style="--at: 0.68">Monitors</li>
+      </ul>
+    </section>
+
+    <!-- setup -->
+    <section class="pic" data-cues="download deploy">
+      <ol class="setup-path">
+        <li class="box part" data-at="download" style="--at: 0.1">Download</li>
+        <li class="box part" data-at="download" style="--at: 0.5">Wizard</li>
+        <li class="box box-own part" data-at="download" style="--at: 0.75">Control plane</li>
+      </ol>
+      <p class="setup-path-down part" data-at="deploy" style="--at: 0.1" aria-hidden="true"></p>
+      <ol class="layers" id="layers"></ol>
+    </section>
+
+    <!-- how -->
+    <section class="pic pic-step" data-cues="find" data-step="1">
+      <ul class="rows">
+        <li class="row part" data-at="find" style="--at: 0.52">A new release</li>
+        <li class="row part" data-at="find" style="--at: 0.7">A security fix</li>
+        <li class="row part" data-at="find" style="--at: 0.88">Drift</li>
+      </ul>
+    </section>
+
+    <section class="pic pic-step" data-cues="write" data-step="1">
+      <div class="panel">
+        <p class="panel-label">Pull request, written by the model</p>
+        <p class="panel-code" id="pull-path"></p>
+        <p class="panel-plan" id="pull-plan"></p>
+      </div>
+    </section>
+
+    <section class="pic pic-step" data-cues="rate" data-step="2">
+      <div class="rate">
+        <div class="rate-sources">
+          <p class="box box-own">Policy rules, in code</p>
+          <p class="box box-off part" data-at="rate" style="--at: 0.55">The model</p>
+        </div>
+        <div class="rate-arrows" aria-hidden="true"><i></i><b class="part" data-at="rate" style="--at: 0.55"></b></div>
+        <div>
+          <p class="panel-label">Risk tier</p>
+          <ol class="tiers" id="tiers"></ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="pic pic-step" data-cues="approve" data-step="2">
+      <div class="panel">
+        <p class="panel-label">Summary for the approver</p>
+        <p class="summary" id="summary"></p>
+        <p class="approver part" data-at="approve" style="--at: 0.75">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 12c5.5 0 10 3.4 10 8v4H6v-4c0-4.6 4.5-8 10-8z"/></svg>
+          <span id="approver"></span>
+        </p>
+      </div>
+    </section>
+
+    <section class="pic pic-step" data-cues="grant revoke" data-step="3">
+      <div class="panel">
+        <p class="panel-label">One grant</p>
+        <dl class="access">
+          <dt>Scope</dt><dd id="access-scope"></dd>
+          <dt>Issued</dt><dd id="access-issued"></dd>
+          <dt class="part" data-at="revoke" style="--at: 0.1">Revoked</dt>
+          <dd class="part" data-at="revoke" style="--at: 0.1" id="access-revoked"></dd>
+        </dl>
+        <p class="access-held part" data-at="revoke" style="--at: 0.45">Held for <strong id="access-held"></strong></p>
+      </div>
+    </section>
+
+    <section class="pic pic-step" data-cues="verify" data-step="3">
+      <ul class="rows rows-pair">
+        <li class="row part" data-at="verify" style="--at: 0.1"><span>Check passes</span><span class="row-ok">Done</span></li>
+        <li class="row part" data-at="verify" style="--at: 0.5"><span>Check fails</span><span class="row-bad">Rolled back</span></li>
+      </ul>
+    </section>
+
+    <!-- payoff -->
+    <section class="pic" data-cues="demo">
+      <p class="demo-title">One demo app</p>
+      <ol class="layers layers-shown" id="demo-layers"></ol>
+      <p class="demo-count part" data-at="demo" style="--at: 0.6"><strong id="demo-items"></strong> work items</p>
+    </section>
+
+    <section class="pic" data-cues="held">
+      <ul class="big-numbers">
+        <li><p class="big-number" id="figure-days"></p><p class="big-number-name">days</p></li>
+        <li class="part" data-at="held" style="--at: 0.35"><p class="big-number big-number-accent" id="figure-held"></p>
+          <p class="big-number-name">of access, in total</p></li>
+      </ul>
+    </section>
+
+    <section class="pic" data-cues="audit">
+      <ul class="big-numbers">
+        <li><p class="big-number" id="figure-events"></p><p class="big-number-name">records in the audit log</p></li>
+      </ul>
+    </section>
+
+    <!-- next -->
+    <section class="pic" data-cues="try">
+      <div class="lockup">
+        <img class="lockup-mark" src="../img/icon.svg" alt="" width="132" height="132">
+        <div>
+          <p class="lockup-name">S.R.C.</p>
+          <p class="lockup-full">Site Reliability Clanker</p>
+        </div>
+      </div>
+      <p class="terminal"><span>$</span> make demo</p>
+      <p class="address">statik.github.io/site-reliability-clanker</p>
+    </section>
+  </main>
+  <script type="module" src="explainer.js"></script>
+</body>
+</html>

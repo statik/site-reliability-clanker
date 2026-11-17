@@ -1,195 +1,149 @@
-/* The drawn scenes of the explainer video (opening.html and pipeline.html).
-   video/record.mjs records them in a 1440 x 810 window and sets data-beat on the root
-   element when a sentence of the narration starts; scene.js turns that into the classes
-   beat-1, beat-2 and so on, and they stay. The captions cover the picture below 640px,
-   so each scene keeps its content above that line. */
+/* The pictures of the explainer video (explainer.html). video/record.mjs records them in a
+   1440 x 810 window; the video is 1920 x 1080, so 17px here is about 22px there, and no
+   text is smaller. The captions cover the picture below 640px, so each picture stays
+   above that line.
+
+   Every picture enters and leaves in the same way, with the one easing curve --ease:
+   it fades in and rises 8px after the picture before it fades out. The parts inside a
+   picture enter in that way too, when the voice names them. */
 
 html, body { width: 1440px; height: 810px; margin: 0; overflow: hidden; }
 body { background: var(--background); color: var(--text-primary); font-family: var(--font-sans); }
-.scene { position: relative; width: 1440px; height: 810px; padding: 30px 48px 0; }
-.scene :where(p, h1, h2, ol, ul, figure) { margin: 0; padding: 0; }
+.scene { position: relative; width: 1440px; height: 810px; }
+.scene :where(p, ol, ul, dl, dd, li) { margin: 0; padding: 0; }
 .scene :where(ol, ul) { list-style: none; }
+.scene :where(i, b, strong) { font-style: normal; font-weight: inherit; }
 
-.appear { opacity: 0; transform: translateY(8px);
-  transition: opacity 0.5s var(--ease-enter), transform 0.5s var(--ease-enter); }
+.pic { position: absolute; left: 96px; right: 96px; top: 40px; height: 580px;
+  display: flex; flex-direction: column; justify-content: center; gap: 36px;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.25s var(--ease), transform 0s linear 0.25s; }
+.pic.is-active { opacity: 1; transform: none;
+  transition: opacity 0.5s var(--ease) 0.25s, transform 0.5s var(--ease) 0.25s; }
+.part { opacity: 0; transform: translateY(8px); }
+.part.is-shown { opacity: 1; transform: none;
+  transition: opacity 0.5s var(--ease) calc(var(--say, 0s) * var(--at, 0)),
+    transform 0.5s var(--ease) calc(var(--say, 0s) * var(--at, 0)); }
 
-/* ------------------------------------------------------------------ opening */
+/* ------------------------------------------------------------------ shared marks */
 
-/* The smallest text of a scene is 17px here, which is about 22px in the 1080p video. */
+.box { display: flex; align-items: center; justify-content: center; height: 120px; padding: 0 36px;
+  background: var(--layer-01); border: 2px solid var(--border-strong); font-size: 40px; white-space: nowrap; }
+.box-own { border-color: var(--honey); }
+.box-off { color: var(--text-helper); border-style: dashed; }
+.word { font-size: 84px; font-weight: 300; line-height: 1.1; white-space: nowrap; }
+.word-bad { color: var(--terracotta); }
+.panel { padding: 32px 40px; background: var(--layer-01); border-top: 2px solid var(--honey); }
+.panel-label { font-size: 24px; color: var(--text-helper); }
 
-.opening-head { display: flex; justify-content: space-between; align-items: flex-start; height: 126px; }
-.lockup { display: flex; align-items: center; gap: 18px; }
-.lockup-mark { display: block; width: 60px; height: 60px; }
-.lockup-name { font-size: 60px; font-weight: 300; line-height: 1; letter-spacing: 0.02em; }
-.lockup-full { font-size: 24px; color: var(--text-secondary); align-self: flex-end; padding-bottom: 6px; }
-.lockup-line { max-width: 640px; margin-top: 14px; font-size: 19px; font-weight: 300; line-height: 1.3;
-  color: var(--text-secondary); }
-.beat-1 .lockup, .beat-2 .lockup-line { opacity: 1; transform: none; }
+/* ------------------------------------------------------------------ problem */
 
-.ingredients { width: 620px; }
-.ingredients-title { font-size: 17px; color: var(--text-helper); }
-.scene .ingredients ul { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
-.ingredient { display: flex; align-items: center; height: 64px; padding: 0 16px; background: var(--layer-01);
-  border-top: 2px solid var(--border-strong); }
-.ingredient-name { font-size: 22px; }
-.ingredient-inference { border-top-color: var(--honey);
-  background: color-mix(in srgb, var(--honey) 14%, var(--layer-01)); }
-.beat-2 .ingredients-title { opacity: 1; transform: none; }
-.beat-2 .ingredient:not(.ingredient-inference) { opacity: 1; transform: none;
-  transition-delay: calc(4.2s + var(--i) * 0.25s); }
-.beat-3 .ingredient-inference { opacity: 1; transform: none; transition-delay: 0.9s; }
+.sell { display: grid; grid-template-columns: 400px 360px; justify-content: space-between; align-items: center; }
+.sell-customers { display: grid; gap: 28px; }
+/* The line from your software to this customer. */
+.sell-customers li { position: relative; }
+.sell-customers li::before { content: ""; position: absolute; right: 100%; top: 50%; width: 488px;
+  margin-right: 2px; border-top: 2px solid var(--border-strong); }
 
-.matrix { display: grid; grid-template-columns: 228px repeat(4, 1fr); column-gap: 8px; margin-top: 8px; }
-.matrix-corner, .target { height: 56px; }
-.matrix-corner { font-size: 17px; color: var(--text-helper); align-self: end; padding-bottom: 8px; }
-.target { padding: 2px 14px 0; border-bottom: 1px solid var(--border-strong); }
-.target-name { font-size: 21px; font-weight: 600; line-height: 1.2; }
-.target-status { font-size: 17px; line-height: 1.2; color: var(--text-helper); }
-.beat-1 .matrix-corner, .beat-1 .target { opacity: 1; transform: none;
-  transition-delay: calc(0.5s + var(--col, 0) * 0.1s); }
+.words { display: grid; gap: 20px; justify-items: start; padding-left: 160px; }
 
-.layer, .cell { position: relative; height: 60px; margin-top: 8px; padding: 7px 14px; }
-.layer { border-left: 2px solid var(--border-strong); }
-.layer-name { font-family: var(--font-mono); font-size: 19px; line-height: 1.2; }
-.layer-note { font-size: 17px; line-height: 1.3; color: var(--text-helper); white-space: nowrap; }
-.layer-flag { position: absolute; left: 14px; top: 31px; padding: 0 8px; font-size: 17px; line-height: 1.35;
-  white-space: nowrap; background: var(--terracotta); color: var(--dark); opacity: 0;
-  transition: opacity 0.4s var(--ease-enter); }
-.cell { background: var(--layer-01); border-left: 2px solid var(--sea-mid);
-  transition: opacity 0.5s var(--ease-enter), transform 0.5s var(--ease-enter),
-    border-color 0.4s var(--ease), background-color 0.4s var(--ease); }
-.cell-main { font-size: 18px; line-height: 1.25; white-space: nowrap; }
-.cell-rest { font-size: 17px; line-height: 1.3; color: var(--text-helper); white-space: nowrap; }
-/* The line from a layer to the layer that it depends on, one row down. */
-.cell::after { content: ""; position: absolute; left: 26px; bottom: -8px; width: 1px; height: 8px;
-  background: var(--sea-mid); }
-.cell[data-row="0"]::after { display: none; }
-/* The stack assembles from 00-bootstrap up: each layer needs the one under it. */
-.beat-1 .layer, .beat-1 .cell { opacity: 1; transform: none;
-  transition-delay: calc(1.2s + var(--row) * 0.95s + var(--col, 0) * 0.07s); }
+.tracks { display: grid; gap: 40px; }
+.release-row-head { display: flex; justify-content: space-between; margin-left: 260px; font-size: 24px;
+  color: var(--text-helper); }
+.release-row-latest { color: var(--honey); }
+.release-row { display: grid; grid-template-columns: 260px 1fr; align-items: center; }
+.release-row-name { font-size: 36px; }
+.release-row-line { position: relative; display: flex; justify-content: space-between; height: 44px;
+  border-bottom: 2px solid var(--border-strong); }
+.release-row-line i { width: 2px; height: 22px; align-self: flex-end; background: var(--border-strong); }
+.release-row-line i:last-of-type { height: 44px; background: var(--honey); }
+/* The release that this customer runs: one of the six marks, counted from the left. */
+.release-row-line b { position: absolute; left: calc(var(--runs) * 20%); bottom: -13px; width: 28px; height: 28px;
+  margin-left: -14px; background: var(--cream); }
 
-.beat-4 .layer-note { opacity: 0; transition: opacity 0.4s var(--ease); }
-.beat-5 .layer-flag { opacity: 1; transition-delay: var(--flag-at); }
-.beat-5 .is-flagged { border-left-color: var(--support-warning);
-  background: color-mix(in srgb, var(--terracotta) 16%, var(--layer-01)); transition-delay: var(--flag-at); }
+.turns { display: grid; grid-template-columns: auto 200px 1fr; align-items: center; }
+.turns-arrow { margin: 0 40px; border-top: 2px solid var(--border-strong); }
+.turns-into { display: grid; gap: 28px; }
 
-/* ------------------------------------------------------------------ pipeline */
+/* ------------------------------------------------------------------ solution and the end */
 
-.change { display: flex; align-items: center; gap: 16px; height: 64px; padding: 0 20px;
-  background: var(--layer-01); border-left: 4px solid var(--interactive); }
-.change-id { font-family: var(--font-mono); font-size: 19px; }
-.change-title { font-size: 23px; font-weight: 300; }
-.change-tags { display: flex; gap: 8px; margin-left: auto; }
-.scene .tag { min-height: 30px; padding: 0 14px; font-size: 17px; }
-.change-tier { opacity: 0; transition: opacity 0.4s var(--ease-enter); }
-.beat-1 .change, .beat-2 .change { opacity: 1; transform: none; }
+.struck { position: relative; align-self: center; }
+.struck .word { font-size: 132px; color: var(--text-secondary); }
+.struck i { position: absolute; left: -24px; right: -24px; top: 54%; height: 8px; background: var(--terracotta); }
 
-/* The figure of the system on the left, and the stop that the narration is at beside it. */
-.machine-row { display: grid; grid-template-columns: 880px 1fr; gap: 28px; margin-top: 18px; }
-.beat-1 .machine-row, .beat-2 .machine-row { opacity: 1; transform: none; transition-delay: 0.3s; }
-.machine-stage { height: 495px; background: var(--dark); border: 1px solid var(--border-strong); }
-.machine-stage svg { display: block; width: 100%; height: 100%; }
-.machine-count { height: 34px; font-family: var(--font-mono); font-size: 18px; color: var(--honey); }
+.lockup { display: flex; align-items: center; gap: 32px; }
+.lockup-mark { display: block; flex: none; width: 132px; height: 132px; max-width: none; }
+.lockup-name { font-size: 96px; font-weight: 300; line-height: 1; letter-spacing: 0.02em; }
+.lockup-full { margin-top: 8px; font-size: 29px; color: var(--text-secondary); white-space: nowrap; }
+.lockup-line { font-size: 44px; font-weight: 300; line-height: 1.2; }
+.does { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
 
-/* The panel of the stop that the narration tells of. */
-.details { position: relative; height: 461px; }
-.detail { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between;
-  padding: 22px 24px; background: var(--layer-01); border-top: 2px solid var(--interactive);
-  font-size: 20px; line-height: 1.4; opacity: 0; transition: opacity 0.5s var(--ease); }
-.detail.is-active { opacity: 1; }
-.detail-title { margin-bottom: 14px; font-size: 29px; font-weight: 300; line-height: 1.2; }
-.detail p + p, .detail .tiers + p, .detail .person + p, .detail .window + p { margin-top: 10px; }
-.detail .mono { font-size: 18px; }
-.detail .quiet { color: var(--text-helper); }
-.detail .detail-small { font-size: 17px; line-height: 1.35; }
-.detail .ok { color: var(--support-success); }
-.detail aside { padding-top: 14px; border-top: 1px solid var(--border-strong); }
-.detail-label { font-size: 17px; color: var(--text-helper); }
-.detail-record { font-family: var(--font-mono); font-size: 17px; color: var(--text-helper); }
-
-.scene .tiers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
-.tiers li { padding: 6px 0; text-align: center; font-family: var(--font-mono); font-size: 20px;
-  background: var(--layer-02); color: var(--text-helper); }
-.tiers .is-set { background: var(--honey); color: var(--dark); }
-
-.person { display: flex; align-items: center; gap: 12px; }
-.person svg { width: 44px; height: 44px; flex: none; fill: var(--person); transition: fill 0.3s var(--ease); }
-.person-name { font-size: 24px; font-weight: 600; }
-.detail .when-decided { display: none; }
-.is-decided .when-decided { display: block; }
-.is-decided .when-waiting { display: none; }
-.is-decided .person svg { fill: var(--support-success); }
-
-.window { height: 8px; margin-top: 14px; background: var(--layer-02); }
-.window-left { height: 100%; width: 100%; background: var(--interactive); transform-origin: left; }
-.detail.is-active .window-left { animation: drain 8s linear forwards; }
-@keyframes drain { from { transform: scaleX(1); } to { transform: scaleX(0.7); } }
+.terminal { align-self: flex-start; padding: 24px 40px; background: var(--layer-01);
+  border: 2px solid var(--honey); font-family: var(--font-mono); font-size: 54px; }
+.terminal span { color: var(--text-helper); }
+.address { font-family: var(--font-mono); font-size: 36px; color: var(--honey); }
 
 /* ------------------------------------------------------------------ setup */
 
-.scene .steps { display: grid; grid-template-columns: repeat(5, 1fr); }
-/* The track: a line through all steps, and a mark on each one. */
-.stage-mark { position: relative; height: 30px; }
-.stage-mark::before { content: ""; position: absolute; left: 0; right: 0; top: 14px; height: 2px;
-  background: var(--border-strong); }
-.stage-mark::after { content: ""; position: absolute; left: 0; top: 14px; height: 2px; width: 0;
-  background: var(--support-success); transition: width 0.6s var(--ease); }
-.stage-dot { position: absolute; left: 0; top: 0; z-index: 1; width: 30px; height: 30px; box-sizing: border-box;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--background); border: 2px solid var(--border-strong);
-  font-family: var(--font-mono); font-size: 17px; color: var(--text-secondary);
-  transition: border-color 0.3s var(--ease), background-color 0.3s var(--ease), color 0.3s var(--ease); }
-.setup-step { position: relative; opacity: 0.4; transition: opacity 0.4s var(--ease); }
-.setup-step.is-active, .setup-step.is-passed { opacity: 1; }
-.setup-step:last-child .stage-mark::before { right: auto; width: 15px; }
-.setup-step.is-passed .stage-mark::after { width: 100%; }
-.setup-step.is-active .stage-dot { border-color: var(--interactive); background: var(--interactive);
-  color: var(--text-on-interactive); }
-.setup-step.is-passed .stage-dot { border-color: var(--support-success); color: var(--support-success); }
-.setup-step-name { margin-top: 10px; font-size: 21px; font-weight: 600; line-height: 1.25; }
-.setup-step-kind { font-size: 17px; line-height: 1.35; color: var(--text-helper); }
-.beat-1 .steps { opacity: 1; transform: none; }
+.setup-path { display: grid; grid-template-columns: repeat(3, 1fr); gap: 72px; }
+.setup-path li { position: relative; }
+.setup-path li + li::before { content: ""; position: absolute; left: -62px; top: 50%; width: 50px;
+  border-top: 2px solid var(--border-strong); }
+/* A line from the control plane down to a rail over all the layers. */
+.setup-path-down { position: relative; height: 40px; margin: -36px 0; border-bottom: 2px solid var(--honey); }
+.setup-path-down::before { content: ""; position: absolute; top: 0; bottom: 0; right: calc((100% - 144px) / 6);
+  border-left: 2px solid var(--honey); }
+.layers { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 12px; }
+.layers li { display: flex; align-items: center; justify-content: center; height: 96px;
+  background: var(--layer-01); border-bottom: 2px solid var(--sage); font-family: var(--font-mono); font-size: 24px; }
 
-.panels { position: relative; height: 476px; margin-top: 28px; }
-.panel { position: absolute; inset: 0; display: grid; grid-template-columns: 440px 1fr; gap: 40px; align-items: center;
-  opacity: 0; transition: opacity 0.5s var(--ease); }
-.panel.is-active { opacity: 1; }
-.panel-title { font-size: 36px; font-weight: 300; line-height: 1.2; }
-.panel-text { margin-top: 18px; font-size: 22px; line-height: 1.4; color: var(--text-secondary); }
-.panel-text + .panel-text { margin-top: 10px; }
-.panel .tag { margin-bottom: 14px; }
-.terminal { margin-top: 20px; padding: 16px 20px; background: var(--dark); border: 1px solid var(--border-strong);
-  font-family: var(--font-mono); font-size: 21px; }
-.terminal span { color: var(--text-helper); }
+/* ------------------------------------------------------------------ how */
 
-/* A real screenshot of the wizard: the part of the page that matters, in a frame. */
-.wizard-shot { padding: 12px 12px 8px; background: var(--layer-01); border: 1px solid var(--honey);
-  border-radius: 10px; min-width: 0; }
-.wizard-crop { height: 434px; overflow: hidden; border-radius: 6px; background: var(--cream); }
-.wizard-crop img { display: block; max-width: none; height: auto; }
-.wizard-target { width: 1229px; margin: -92px 0 0 -326px; }
-.wizard-handover { width: 1775px; margin: -133px 0 0 -494px; }
-.wizard-shot figcaption { margin-top: 8px; font-size: 17px; color: var(--text-helper); }
+.step-number { position: absolute; left: 96px; top: 210px; width: 180px; font-size: 240px; font-weight: 300;
+  line-height: 1; color: var(--honey); opacity: 0; transition: opacity 0.25s var(--ease); }
+.step-number.is-active { opacity: 1; transition: opacity 0.5s var(--ease); }
+.pic-step { left: 320px; }
 
-.sketch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
-.sketch-step { position: relative; height: 220px; padding: 18px 20px; border: 1px dashed var(--border-strong); }
-.sketch-step + .sketch-step::before { content: ""; position: absolute; left: -29px; top: 110px; width: 28px;
-  border-top: 1px dashed var(--border-strong); }
-.sketch-number { font-family: var(--font-mono); font-size: 17px; color: var(--text-helper); }
-.sketch-name { margin-top: 14px; font-size: 26px; line-height: 1.25; }
-.sketch-note { grid-column: 1 / -1; font-size: 19px; color: var(--text-helper); }
+.rows { display: grid; gap: 20px; }
+.row { display: flex; align-items: center; justify-content: space-between; height: 120px; padding: 0 40px;
+  background: var(--layer-01); border-left: 4px solid var(--honey); font-size: 54px; font-weight: 300; }
+.row-ok { color: var(--sage); }
+.row-bad { color: var(--terracotta); }
 
-.scene .ladder { display: grid; gap: 10px; }
-.rung { display: grid; grid-template-columns: 170px 250px 1fr 90px; align-items: center; height: 64px;
-  padding: 0 18px; background: var(--layer-01); border-left: 2px solid var(--support-success);
-  font-family: var(--font-mono); font-size: 19px; opacity: 0; transform: translateY(8px);
-  transition: opacity 0.5s var(--ease-enter), transform 0.5s var(--ease-enter); }
-.rung-identity { color: var(--text-helper); font-size: 17px; }
-.rung-what { font-family: var(--font-sans); font-size: 18px; color: var(--text-secondary); }
-.rung-held { text-align: right; color: var(--support-success); }
-.panel.is-active .rung { opacity: 1; transform: none; transition-delay: calc(0.8s + var(--row) * 0.9s); }
+.panel-code { margin-top: 24px; font-family: var(--font-mono); font-size: 32px; overflow-wrap: anywhere; }
+.panel-plan { margin-top: 24px; font-size: 36px; font-weight: 300; }
 
-.scene .kinds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.kind { height: 180px; padding: 16px 20px; background: var(--layer-01); border-top: 2px solid var(--border-strong); }
-.kind-count { font-size: 64px; font-weight: 300; line-height: 1; }
-.kind-name { margin-top: 16px; font-size: 23px; color: var(--text-secondary); }
+.rate { display: grid; grid-template-columns: 420px 120px 1fr; align-items: start; }
+.rate-sources { display: grid; gap: 28px; }
+.rate-arrows { position: relative; height: 268px; }
+.rate-arrows i { position: absolute; left: 0; right: 0; top: 59px; border-top: 2px solid var(--honey); }
+/* The model has no line to the tier: its line stops at a bar. */
+.rate-arrows b { position: absolute; left: 0; top: 207px; width: 44px; border-top: 2px dashed var(--border-strong); }
+.rate-arrows b::after { content: ""; position: absolute; right: -4px; top: -20px; height: 38px;
+  border-left: 4px solid var(--terracotta); }
+.tiers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+.tiers li { padding: 14px 0; text-align: center; font-family: var(--font-mono); font-size: 40px;
+  background: var(--layer-02); color: var(--text-helper); }
+.tiers .is-set { background: var(--honey); color: var(--dark); }
+
+.summary { margin-top: 20px; font-size: 44px; font-weight: 300; line-height: 1.25; }
+.approver { display: flex; align-items: center; gap: 16px; margin-top: 28px; font-size: 29px; }
+.approver svg { width: 48px; height: 48px; fill: var(--person); }
+
+.access { display: grid; grid-template-columns: 220px 1fr; row-gap: 16px; margin-top: 20px; font-size: 40px;
+  font-weight: 300; }
+.access dt { color: var(--text-helper); }
+.access-held { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border-strong);
+  font-size: 44px; font-weight: 300; }
+.access-held strong { color: var(--honey); font-size: 72px; }
+
+/* ------------------------------------------------------------------ payoff */
+
+.demo-title { font-size: 72px; font-weight: 300; line-height: 1; }
+.demo-count { font-size: 44px; font-weight: 300; }
+.demo-count strong { color: var(--honey); }
+
+.big-numbers { display: flex; gap: 96px; align-items: flex-end; }
+.big-number { font-size: 160px; font-weight: 300; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.big-number-accent { color: var(--honey); }
+.big-number-name { margin-top: 12px; font-size: 40px; color: var(--text-secondary); }

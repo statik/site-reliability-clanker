@@ -1,11 +1,10 @@
-// Read narration.md into segments and captions, and keep the shared paths and timing
-// constants of the video build.
+// Read narration.md into parts and sentences, wrap the captions, and keep the shared paths
+// and timing constants of the video build.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { duration as spokenDuration, numberWord } from "../lib/html.mjs";
-import { seconds, totals } from "../lib/month.mjs";
+import { totals } from "../lib/month.mjs";
 import { SITE_DIR } from "../lib/serve.mjs";
 
 export const OUT = join(SITE_DIR, "out");
@@ -14,44 +13,29 @@ export const TIMELINE = join(WORK, "timeline.json");
 export const FPS = 30;
 export const SAMPLE_RATE = 48000;
 
-// Seconds of quiet before the first sentence of a segment, between sentences, and after
-// the last one.
-export const LEAD = 0.6;
-export const GAP = 0.4;
-export const TAIL = 0.9;
+// Seconds of quiet before the first sentence of a part. `pause:` and `hold:` in
+// narration.md replace the other two for one part.
+export const LEAD = 0.5;
+const PAUSE = 0.5;
+const HOLD = 0.7;
 
-// How the voice says words that the captions spell another way.
-const SPOKEN = [
-  [/\bAI\b/g, "A.I."],
-  [/\bAWS\b/g, "A.W.S."],
-  [/\bS\.R\.C\./g, "S R C"],
-];
+// What a caption may be: two lines of 42 characters, on the screen for one second or more.
+export const CAPTION_LINE = 42;
+export const CAPTION_LINES = 2;
+export const CAPTION_MIN_SECONDS = 1;
 
-function minutesInWords(totalSeconds) {
+function heldInWords(totalSeconds) {
   const minutes = Math.floor(totalSeconds / 60);
   const rest = Math.round(totalSeconds - minutes * 60);
-  if (minutes === 0) return `${rest} seconds`;
-  return `${numberWord(minutes)} ${minutes === 1 ? "minute" : "minutes"} and ${rest} seconds`;
+  const secondsPart = `${rest} ${rest === 1 ? "second" : "seconds"}`;
+  if (minutes === 0) return secondsPart;
+  return `${minutes} ${minutes === 1 ? "minute" : "minutes"} and ${secondsPart}`;
 }
 
-function readMonth() {
-  return JSON.parse(readFileSync(join(SITE_DIR, "data", "month.json"), "utf8"));
-}
-
-function placeholders(month) {
+function placeholders() {
+  const month = JSON.parse(readFileSync(join(SITE_DIR, "data", "month.json"), "utf8"));
   const sums = totals(month);
-  const failed = month.events.find((event) => event.type === "verify.failed");
-  const recovered = month.events.find(
-    (event) => event.type === "verify.passed" && failed && event.seq > failed.seq,
-  );
-  return {
-    days: String(sums.days),
-    grants: String(sums.grants),
-    events: String(sums.events),
-    held: minutesInWords(sums.held_seconds),
-    held_short: spokenDuration(sums.held_seconds),
-    rollback_seconds: failed && recovered ? String(Math.round(seconds(failed.ts, recovered.ts))) : "a few",
-  };
+  return { days: String(sums.days), held: heldInWords(sums.held_seconds) };
 }
 
 function fill(text, values) {
@@ -61,45 +45,85 @@ function fill(text, values) {
   });
 }
 
-function spoken(text) {
-  return SPOKEN.reduce((result, [pattern, replacement]) => result.replace(pattern, replacement), text);
+function greedyLines(words) {
+  const lines = [];
+  for (const word of words) {
+    if (word.length > CAPTION_LINE) {
+      throw new Error(`narration.md: the word "${word}" is longer than a caption line (${CAPTION_LINE} characters)`);
+    }
+    const last = lines.at(-1);
+    if (last !== undefined && `${last} ${word}`.length <= CAPTION_LINE) lines[lines.length - 1] = `${last} ${word}`;
+    else lines.push(word);
+  }
+  return lines;
+}
+
+// Two lines of about the same length read better than a full line and a short one.
+function balanced(words) {
+  let best = null;
+  for (let cut = 1; cut < words.length; cut += 1) {
+    const pair = [words.slice(0, cut).join(" "), words.slice(cut).join(" ")];
+    if (pair.some((line) => line.length > CAPTION_LINE)) continue;
+    const difference = Math.abs(pair[0].length - pair[1].length);
+    if (best === null || difference < best.difference) best = { pair, difference };
+  }
+  return best?.pair ?? null;
+}
+
+// The captions of one sentence: each is one or two lines. Most sentences are one caption.
+export function captionsOf(text) {
+  if (text.length <= CAPTION_LINE) return [[text]];
+  const words = text.split(/\s+/);
+  const two = balanced(words);
+  if (two) return [two];
+  const lines = greedyLines(words);
+  const captions = [];
+  for (let index = 0; index < lines.length; index += CAPTION_LINES) {
+    const part = lines.slice(index, index + CAPTION_LINES).join(" ");
+    captions.push(part.length <= CAPTION_LINE ? [part] : balanced(part.split(" ")));
+  }
+  return captions;
+}
+
+function number(value, name, part) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`narration.md: "${name}: ${value}" in the part "${part}" is not a number of seconds`);
+  }
+  return parsed;
 }
 
 export function readScript() {
-  const month = readMonth();
-  const values = placeholders(month);
-  const happened = new Set(month.events.map((event) => event.type));
+  const values = placeholders();
   const lines = readFileSync(join(SITE_DIR, "narration.md"), "utf8").split("\n");
-  const segments = [];
+  const parts = [];
   for (const line of lines) {
     const heading = line.match(/^## (\S+)\s*$/);
     if (heading) {
-      segments.push({ id: heading[1], source: "", fallback: "", captions: [] });
+      parts.push({ id: heading[1], pause: PAUSE, hold: HOLD, sentences: [] });
       continue;
     }
-    const segment = segments.at(-1);
-    if (!segment) continue;
-    const setting = line.match(/^(source|fallback):\s*(\S+)\s*$/);
+    const part = parts.at(-1);
+    if (!part) continue;
+    const setting = line.match(/^(pause|hold):\s*(\S+)\s*$/);
     if (setting) {
-      segment[setting[1]] = setting[2];
+      part[setting[1]] = number(setting[2], setting[1], part.id);
       continue;
     }
-    const caption = line.match(/^- (?:\((if|unless) ([\w.]+)\)\s*)?(?:\[([^\]]+)\]\s*)?(.+)$/);
-    if (caption) {
-      const [, condition, eventType, cue, words] = caption;
-      // A sentence about something that this run did not do is left out.
-      if (condition === "if" && !happened.has(eventType)) continue;
-      if (condition === "unless" && happened.has(eventType)) continue;
-      const text = fill(words.trim(), values);
-      segment.captions.push({ cue: cue ?? "", text, spoken: spoken(text) });
-    }
+    if (!line.startsWith("- ")) continue;
+    const sentence = line.match(/^- \[([\w-]+)\]\s+(.+)$/);
+    if (!sentence) throw new Error(`narration.md: this sentence has no [cue] for its picture: ${line}`);
+    const text = fill(sentence[2].trim(), values);
+    part.sentences.push({ cue: sentence[1], text, captions: captionsOf(text) });
   }
-  for (const segment of segments) {
-    if (!segment.source) throw new Error(`narration.md: the segment "${segment.id}" has no source`);
-    if (segment.captions.length === 0) {
-      throw new Error(`narration.md: the segment "${segment.id}" has no sentences`);
-    }
+  if (parts.length === 0) throw new Error("narration.md has no parts");
+  for (const part of parts) {
+    if (part.sentences.length === 0) throw new Error(`narration.md: the part "${part.id}" has no sentences`);
   }
-  if (segments.length === 0) throw new Error("narration.md has no segments");
-  return segments;
+  return parts;
+}
+
+export function wordCount(parts) {
+  return parts.flatMap((part) => part.sentences)
+    .reduce((sum, sentence) => sum + sentence.text.split(/\s+/).length, 0);
 }
