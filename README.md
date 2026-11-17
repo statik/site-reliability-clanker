@@ -4,4 +4,4 @@ Prototype of an AI site reliability engineer: a dashboard and agent that deploys
 multi-service application on AWS, Google Cloud and Azure, with every change made through
 OpenTofu, explained in plain language, approved by a human and applied with just-in-time access.
 
-Start with the [prototype plan](docs/PLAN.md).
+Start with the [prototype plan](docs/PLAN.md). Current status and how to continue the build are in the [handoff](docs/HANDOFF.md).

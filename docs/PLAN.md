@@ -102,6 +102,39 @@ Releases are pre-built so upgrade scenarios are repeatable:
 Packaged as a Helm chart, deployed through OpenTofu so the app follows the same
 plan-approve-apply path as the infrastructure.
 
+### 3.1 Unikernel packaging with Nanos (experimental track)
+
+Every Paperboat service is a statically linked Go binary, so each can be packaged two ways from
+the same build:
+
+| Packaging | Runs on | Status in the plan |
+|---|---|---|
+| OCI image | Kubernetes on every target | Baseline; everything else in this plan assumes it |
+| Nanos unikernel image, built with `ops` | QEMU locally; a native VM image on AWS, Google Cloud and Azure | Experimental track, one service first |
+
+The track answers one question: does an AI SRE get an easier job when services are single-purpose
+unikernel VMs (no shell, no package set to patch, small attack surface, image is the unit of
+change) and what does it lose (no `exec`, different debugging, different rollout mechanics)?
+
+Sequence:
+
+1. Build `api` as a Nanos image and boot it under QEMU against the local Postgres. Requires KVM
+   to be usable at reasonable speed.
+2. Add a `compute-unikernel` variant of the app layer per cloud: instance group of unikernel
+   VMs behind the same load balancer, same Postgres and file system, provisioned by OpenTofu.
+   The contract gains a `workload_runtime` input (`kubernetes` or `unikernel`).
+3. Run the upgrade, security-patch and rollback use cases against it and compare: an
+   application patch becomes "build a new image and roll the instance group", and node OS
+   patching disappears for those services.
+4. Evaluate running the unikernel images inside the cluster (for example under KubeVirt) so
+   both runtimes share one scheduler. Decide after step 3 whether this is worth doing.
+
+Known constraints to design around: the shared file system must be reachable from a unikernel
+(network file system client support needs checking per cloud), there is no in-guest debug
+session so the Investigator role relies on logs, metrics and crash dumps only, and image builds
+need to be reproducible so the runner can record their digests the same way it does for the
+runner image.
+
 ## 4. Multi-cloud platform
 
 ### 4.1 The contract
@@ -298,6 +331,59 @@ What Nix is not used for:
 - **Running the demo.** `docker compose up` with published images remains the only requirement
   to try the prototype. Nix is needed to build and contribute, not to evaluate.
 
+### 5.6 Swamp as the automation substrate
+
+[Swamp](https://swamp-club.com) is a CLI and registry for building automation out of typed,
+reusable **behaviors** connected into **workflows**, designed to be authored by a coding agent
+and then run without one. Its stated position is the same as principle 1 of this plan: use the
+model at build time to encode intent, not at run time to decide what to do. That makes it a
+natural fit for the layer between "the agent wrote something" and "the runner executed it".
+
+How Swamp's concepts map onto Clanker:
+
+| Swamp concept | What it is | Role in Clanker |
+|---|---|---|
+| Behavior | Typed unit with validated inputs and outputs that produces versioned data | Each operational action: `tofu plan`, `tofu apply`, backup, restore drill, conformance check, database maintenance, detector |
+| Workflow | DAG of behavior steps with dependencies, `forEach`, triggers and guards | Each runbook and each use case in section 8 |
+| Definitions in Git | Behaviors, workflows and vault definitions are YAML files in a repository | The `runbooks` repo in the forge; changing a runbook is a pull request like any other change |
+| `manual_approval` step | Pauses a workflow until a human approves or rejects with a reason | Mid-run gates such as "canary healthy, continue?". The approval of the change itself stays in Clanker |
+| Vault | Credential source that injects secrets only when needed and redacts them from output | Fronts each cloud's secret store; also where the access broker's short-lived credentials are delivered to a step |
+| Datastore | Immutable, versioned, tagged data from every run, on a filesystem or object storage | Source for the history store and point-in-time view; lives in each environment's bucket |
+| Audit trail | Every command and session recorded, exportable over OpenTelemetry | One of the inputs to Clanker's hash-chained audit log |
+| `swamp serve` and workers | Long-running orchestrator with cron and webhook triggers; workers execute steps | Scheduling for detectors and maintenance; one worker per environment, running inside that cloud |
+| Extensions and registry | Published packs of behaviors, vaults, datastores and skills | Reuse existing AWS, Azure, Google Cloud and Kubernetes extensions; publish Clanker's own pack |
+| Agent skills | Instructions Swamp installs for a coding agent | What teaches the Author role to write behaviors and workflows correctly |
+
+What changes in the architecture:
+
+- **The runner executes Swamp workflows.** A job is "run workflow X at commit Y with grant Z".
+  The plan-then-apply pipeline is itself a workflow whose steps are behaviors.
+- **An OpenTofu behavior is ours to write.** The registry lists a Terraform extension; nothing
+  on the site mentions OpenTofu. Clanker ships a small extension with `plan`, `show` and
+  `apply` methods that emits the saved plan, its hash and the plan JSON as versioned data.
+- **The Author role writes Swamp definitions as well as OpenTofu.** Operational knowledge
+  accumulates as reviewed, versioned behaviors instead of living in prompts.
+- **Detectors become scheduled workflows** that write findings as data; triage reads the data.
+- **Clanker stays the system of record** for work items, risk tiers, approvals bound to a plan
+  hash, grants and the audit chain. Swamp does not replace the policy engine or the broker.
+
+What stays independent of Swamp: the runner has an executor interface with two
+implementations, Swamp and plain subprocess. The demo and replay mode must run with the
+subprocess executor alone.
+
+Things to verify hands-on before committing (none of this has been tested yet; it comes from
+reading the site):
+
+| Question | Why it matters |
+|---|---|
+| Almost every command needs a swamp-club.com account; CI and containers use collective tokens | Adds an external dependency to bootstrap and to every runner; check behaviour offline |
+| The software is described as AGPLv3 and also as distributed under a separate licence agreement | Needs a licence review before the control plane depends on it or ships it in the runner image |
+| The licence agreement makes the customer solely responsible for agent operations | Consistent with this design, where a human approves every change, but worth stating to adopters |
+| Telemetry is on by default | Disable it in the runner image |
+| Third-party extensions require explicit trust | Pin versions, allow only named collectives, and vendor what the runner uses |
+| How a short-lived credential reaches a step | Decide between a broker-backed vault extension and environment injection per worker |
+| Whether the Author role should run inside a Swamp-supported harness | Several supported harnesses can use OpenRouter; the alternative is Clanker's own loop following Swamp's skills |
+
 ## 6. Permissions and just-in-time access
 
 ### 6.1 Identities
@@ -483,6 +569,22 @@ label, in line with Carbon's accessibility guidance.
 
 Notification emails use the same visual language where email clients allow it.
 
+### 7.6 Concept website, animated walkthrough and explainer video
+
+A public-facing site that explains the concept to someone who will never install anything.
+
+| Part | Content | How it is made |
+|---|---|---|
+| Landing page | The problem, the five principles, what an approver sees, supported clouds | Static site in `/site`, Carbon styling to match the dashboard |
+| Animated walkthrough | The scripted month, step by step: blank slate, deploy, release, CVE, bad release and rollback, Kubernetes upgrade, restore drill, 2am incident, audit | Scroll- and step-driven animation built from the same scripted event data the demo mode replays, so it never drifts from the product |
+| Architecture page | The diagrams in this plan, animated: a change travelling from detection to verified apply, and a grant appearing and expiring | Inline SVG with motion |
+| Live screens | Real dashboard views, not mock-ups | Captured by Playwright from the running demo |
+| Explainer video | Two to three minutes: the problem, one change end to end, the timeline, the access model | Rendered programmatically: Playwright records a scripted run of the walkthrough and dashboard, `ffmpeg` assembles it with captions. Narration is added from a written script |
+
+The video and screenshots are regenerated by one command, so they are rebuilt whenever the
+dashboard changes instead of going stale. The site respects reduced-motion settings and works
+without JavaScript for the text content.
+
 ## 8. Use cases
 
 The prototype scripts the ones marked ●. The rest are covered by the design and listed so the
@@ -525,14 +627,14 @@ cloud and ported later.
 
 | # | Milestone | Delivers | Done when |
 |---|---|---|---|
-| M0 | Foundations | Repo layout, Nix flake (dev shell and runner image), module contract, Paperboat 1.0.0 and chart, CI running inside the flake | Paperboat runs on the local target from one command; the runner image builds to the same digest on two machines |
+| M0 | Foundations | Repo layout, Nix flake (dev shell and runner image), module contract, Paperboat 1.0.0 and chart, CI running inside the flake. Spikes: Swamp (account, offline behaviour, OpenTofu behavior) and one Nanos image booted under QEMU | Paperboat runs on the local target from one command; the runner image builds to the same digest on two machines |
 | M1 | Blank slate everywhere | Per-cloud modules for all layers, bootstrap command, conformance suite | `tofu apply` from empty reaches a passing conformance run on AWS, GCP, Azure and local; teardown leaves nothing behind |
-| M2 | Change pipeline | Forge, orchestrator, runner, policy tiers, audit log, history store. Carbon UI shell, approval page, first version of the timeline. Notifier with all four channel adapters. No LLM yet | A hand-written PR goes plan → tier → approve → apply → verify through the dashboard, with logs and diff visible; the approver is notified on email, Slack, Teams and Discord; the change appears on the timeline |
+| M2 | Change pipeline | Forge, orchestrator, runner, policy tiers, audit log, history store. Carbon UI shell, approval page, first version of the timeline. Notifier with all four channel adapters. Runner with subprocess and Swamp executors; plan-and-apply expressed as a Swamp workflow. No LLM yet | A hand-written PR goes plan → tier → approve → apply → verify through the dashboard, with logs and diff visible; the approver is notified on email, Slack, Teams and Discord; the change appears on the timeline |
 | M3 | Just-in-time access | Broker, grants, per-layer appliers, standing approvals, access view | Appliers have zero standing permissions; an apply without a valid grant, or with a stale plan, is refused on every cloud |
-| M4 | The agent | OpenRouter client, roles and tools, detectors, plan explanations, Ask, replay mode | The agent notices a new release unprompted, opens the PR, and the approval page explains it accurately |
-| M5 | Lifecycle | Simulator and use cases 4–16. Full timeline with forecasts, point-in-time view, topology, version posture matrix, digests and escalation | The scripted month runs end to end on each cloud, and scrubbing back through it shows the correct state at each step |
+| M4 | The agent | OpenRouter client, roles and tools, Author role writing Swamp behaviors and workflows, detectors as scheduled workflows, plan explanations, Ask, replay mode | The agent notices a new release unprompted, opens the PR, and the approval page explains it accurately |
+| M5 | Lifecycle | Simulator and use cases 4–16 as Swamp workflows. Unikernel variant of the app layer on each cloud. Full timeline with forecasts, point-in-time view, topology, version posture matrix, digests and escalation | The scripted month runs end to end on each cloud, and scrubbing back through it shows the correct state at each step |
 | M6 | Incidents and audit | Investigator role, debug grants, incident write-ups, evidence export | Use cases 17, 18, 21 pass; the evidence pack reconciles against the cloud's own audit trail |
-| M7 | Demo polish | Guided demo mode, seeded history, documentation | A newcomer can go from clone to full local demo in under 15 minutes |
+| M7 | Demo polish | Guided demo mode, seeded history, documentation, concept website with animated walkthrough, explainer video | A newcomer can go from clone to full local demo in under 15 minutes |
 
 Ordering notes:
 
@@ -564,11 +666,13 @@ Ordering notes:
 /platform/modules       contract plus aws, gcp, azure, local
 /platform/stacks        00-bootstrap … 50-app
 /apps/paperboat         services, chart, releases
-/runbooks               parameterised jobs
+/runbooks               Swamp behaviors, workflows and vault definitions
+/extensions             Clanker's Swamp extension pack (OpenTofu behavior, broker vault)
 /conformance            cross-cloud test suite
 /deploy                 compose file and control-plane chart
 /flake.nix, /flake.lock pinned toolchain: dev shell and runner image
-/docs                   this plan, ADRs, demo script
+/site                   concept website, walkthrough and video build
+/docs                   this plan, handoff, ADRs, demo script
 ```
 
 `/platform`, `/apps/paperboat` and `/runbooks` are seeded into the forge at bootstrap; from then
@@ -588,6 +692,8 @@ on the forge copies are the source of truth for the running system.
 | The demo depends on a live model | Replay mode |
 | Carbon has no timeline or topology component | Two custom D3 components restricted to Carbon tokens; everything else stays stock Carbon |
 | Notification fatigue makes approvers ignore messages | Digest by default, immediate only for decisions and failures, de-duplication, per-person subscriptions |
+| Swamp adds an account dependency and has unsettled licence terms | Executor interface keeps a subprocess path; M0 spike and licence review before M2 depends on it |
+| Unikernels cannot mount the shared file system or be debugged the usual way | Start with one service; keep Kubernetes as the baseline; decide after measured comparison |
 | Chat webhooks leak operational detail to broad channels | Scrubbed, fact-only messages; routing rules reviewed as code; sensitive detail stays behind the dashboard link |
 
 ## 12. Decisions to confirm
@@ -603,3 +709,7 @@ Defaults are chosen so work can start; each is cheap to change before the milest
 | Where the control plane runs | Docker Compose on one machine | Small dedicated management cluster | M3 |
 | Broker trust for the prototype | One scoped credential per cloud | Workload identity federation from day one | M3 |
 | Models per role | Configurable, set at bootstrap | Single model for everything | M4 |
+| Automation substrate | Swamp for runbooks and detectors, behind an executor interface | Plain subprocess jobs only | M0 spike, settle by M2 |
+| Author role harness | Clanker's own loop following Swamp's skills | A Swamp-supported coding agent pointed at OpenRouter | M4 |
+| Unikernel runtime | Experimental track alongside Kubernetes | Promote to a first-class runtime, or drop | After M5 comparison |
+| Website hosting | Static site published from this repository | Separate hosting | M7 |
