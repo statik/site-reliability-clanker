@@ -1,16 +1,17 @@
-// Loads every page of the dashboard in both themes and saves screenshots.
-// Usage: start `pnpm preview`, then `pnpm screenshots`. BASE_URL overrides the address.
-// It never changes server state: every write is blocked or answered by a mock.
+// Loads every page of the dashboard and saves screenshots.
+// Usage: start `pnpm preview`, then `pnpm screenshots`. BASE_URL overrides the address and OUT
+// the directory. It never changes server state: every request that is not a GET is blocked or
+// answered by a mock.
 import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import { chromium } from "playwright";
 
 const BASE = process.env.BASE_URL ?? "http://127.0.0.1:4173";
-const OUT = new URL("../screenshots/", import.meta.url).pathname;
-const THEMES = [["light", "light"], ["dark", "dark"]];
+const OUT = process.env.OUT ?? new URL("../screenshots/", import.meta.url).pathname;
 const problems = [];
 
 async function guard(context) {
-  await context.route("**/api/v1/**", async (route) => {
+  await context.route("**/*", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
     if (request.method() === "GET") {
@@ -38,20 +39,20 @@ async function api(page, path) {
   return response.ok() ? response.json() : null;
 }
 
-async function shot(page, theme, name) {
+async function shot(page, name) {
   await page.waitForLoadState("networkidle").catch(() => undefined);
   await page.waitForTimeout(700);
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.screenshot({ path: `${OUT}${name}-${theme}.png`, fullPage: true });
-  console.log(`saved ${name}-${theme}.png`);
+  await page.screenshot({ path: join(OUT, `${name}.png`), fullPage: true });
+  console.log(`saved ${name}.png`);
 }
 
-async function visit(page, theme, name, path) {
+async function visit(page, name, path) {
   await page.goto(`${BASE}${path}`);
-  await shot(page, theme, name);
+  await shot(page, name);
 }
 
-async function workItemShots(page, theme, items) {
+async function workItemShots(page, items) {
   const waiting = items.find((item) => item.state === "AwaitingApproval");
   const withPull = items.find((item) => item.pr_id !== 0 && item.state === "Done");
   const incident = items.find((item) => item.kind === "incident");
@@ -60,39 +61,39 @@ async function workItemShots(page, theme, items) {
   if (target === undefined) {
     return;
   }
-  await visit(page, theme, "work-item", `/work/${target.id}`);
+  await visit(page, "work-item", `/work/${target.id}`);
   await page.getByRole("button", { name: "Request changes" }).click();
-  await shot(page, theme, "work-item-comment-required");
+  await shot(page, "work-item-comment-required");
   await page.getByRole("button", { name: "Approve", exact: true }).click();
   await page.getByRole("dialog").waitFor();
-  await shot(page, theme, "work-item-confirm");
+  await shot(page, "work-item-confirm");
   await page.getByRole("dialog").getByRole("button", { name: "Approve" }).click();
-  await shot(page, theme, "work-item-refused");
+  await shot(page, "work-item-refused");
   await page.getByRole("tab", { name: /Jobs and logs/ }).click();
   const job = page.locator(".cds--accordion__heading", { hasText: /^.*Job \d+/ }).first();
   if (await job.count() > 0) {
     await job.click();
   }
-  await shot(page, theme, "work-item-jobs");
+  await shot(page, "work-item-jobs");
   await page.getByRole("tab", { name: /Events/ }).click();
-  await shot(page, theme, "work-item-events");
+  await shot(page, "work-item-events");
   if (withPull !== undefined && withPull.id !== target.id) {
-    await visit(page, theme, "work-item-done", `/work/${withPull.id}`);
+    await visit(page, "work-item-done", `/work/${withPull.id}`);
   }
   if (incident !== undefined) {
-    await visit(page, theme, "work-item-incident", `/work/${incident.id}`);
+    await visit(page, "work-item-incident", `/work/${incident.id}`);
   }
   if (rolledBack !== undefined) {
-    await visit(page, theme, "work-item-rolled-back", `/work/${rolledBack.id}`);
+    await visit(page, "work-item-rolled-back", `/work/${rolledBack.id}`);
   }
 }
 
-async function timelineShots(page, theme) {
-  await visit(page, theme, "timeline", "/timeline");
+async function timelineShots(page) {
+  await visit(page, "timeline", "/timeline");
   await page.getByRole("button", { name: /Expand the layers/ }).first().click();
-  await shot(page, theme, "timeline-expanded");
+  await shot(page, "timeline-expanded");
   await page.getByRole("button", { name: "7 days" }).click();
-  await shot(page, theme, "timeline-7-days");
+  await shot(page, "timeline-7-days");
   await page.getByRole("button", { name: "60 days" }).click();
   const scrubber = page.getByRole("slider", { name: /scrubber/ });
   await scrubber.focus();
@@ -100,15 +101,15 @@ async function timelineShots(page, theme) {
     await page.keyboard.press("Shift+ArrowLeft");
   }
   await page.getByRole("button", { name: "View the dashboard as of the scrubber" }).click();
-  await shot(page, theme, "timeline-as-of");
+  await shot(page, "timeline-as-of");
   await page.getByRole("link", { name: "Topology" }).click();
-  await shot(page, theme, "topology-as-of");
+  await shot(page, "topology-as-of");
   await page.locator("#topology-compare").click({ force: true });
-  await shot(page, theme, "topology-compare");
+  await shot(page, "topology-compare");
   await page.getByRole("link", { name: "Overview" }).click();
-  await shot(page, theme, "overview-as-of");
+  await shot(page, "overview-as-of");
   await page.getByRole("link", { name: "Activity" }).click();
-  await shot(page, theme, "activity-as-of");
+  await shot(page, "activity-as-of");
 }
 
 function check(condition, message) {
@@ -131,7 +132,7 @@ async function dragAcross(page, box, fromRatio, toRatio) {
 }
 
 /** Exercises the pointer paths of the timeline: wheel zoom, drag pan, brush and markers. */
-async function timelineChecks(page, theme) {
+async function timelineChecks(page) {
   await page.goto(`${BASE}/timeline`);
   await page.locator(".tl-marker").first().waitFor();
   const box = await page.locator(".tl-svg").boundingBox();
@@ -148,7 +149,7 @@ async function timelineChecks(page, theme) {
   await dragAcross(page, box, 0.45, 0.75);
   const selected = await page.getByText(/events$/).first().textContent().catch(() => null);
   check(selected !== null, `a brush selects a range (${selected})`);
-  await shot(page, theme, "timeline-range");
+  await shot(page, "timeline-range");
   await page.getByRole("button", { name: "Clear" }).click();
   await page.locator("#tl-select").click({ force: true });
   const single = page.locator(".tl-svg .tl-marker:has(.tl-outcome-Done)");
@@ -157,14 +158,14 @@ async function timelineChecks(page, theme) {
   // A cluster zooms in until its markers come apart. A cluster of one work item opens it.
   for (let step = 0; step < 12 && !onWorkItem() && await single.count() === 0; step += 1) {
     before = await axisText(page);
-    await shot(page, theme, "timeline-zoomed");
+    await shot(page, "timeline-zoomed");
     await page.locator(".tl-svg .tl-marker:has(.tl-cluster)").last().click();
     await page.waitForTimeout(300);
     zoomed ||= !onWorkItem() && await axisText(page) !== before;
   }
   check(zoomed, "a click on a cluster zooms in");
   if (!onWorkItem()) {
-    await shot(page, theme, "timeline-zoomed");
+    await shot(page, "timeline-zoomed");
     // On a short history every finished change can stay inside a cluster.
     if (await single.count() > 0) {
       await single.first().click();
@@ -175,7 +176,7 @@ async function timelineChecks(page, theme) {
 }
 
 /** Checks that an event on the stream makes a view load again, and the evidence controls. */
-async function liveAndEvidenceChecks(context, page, theme, items) {
+async function liveAndEvidenceChecks(context, page, items) {
   const live = await context.newPage();
   const event = { seq: 1, ts: new Date().toISOString(), type: "workitem.state_changed",
     actor: "harness", summary: "synthetic", data: {} };
@@ -201,7 +202,7 @@ async function liveAndEvidenceChecks(context, page, theme, items) {
     await page.getByRole("button", { name: /Raw plan JSON/ }).first().click();
     await page.getByLabel(/Raw plan JSON of/).first().waitFor();
     check(await page.getByLabel(/^Diff of /).count() > 0, "the pull request diff opens");
-    await shot(page, theme, "work-item-evidence");
+    await shot(page, "work-item-evidence");
   }
   await page.goto(`${BASE}/audit`);
   const download = page.waitForEvent("download", { timeout: 20_000 }).catch(() => null);
@@ -211,71 +212,86 @@ async function liveAndEvidenceChecks(context, page, theme, items) {
     "the evidence pack downloads as JSON");
 }
 
-async function run(theme, colorScheme) {
+/** The states that no page shows by itself: a modal, a control with focus, an error. */
+async function stateShots(context, page) {
+  await page.goto(`${BASE}/`);
+  await page.getByRole("button", { name: "View as of a past time" }).click();
+  await page.getByRole("dialog").waitFor();
+  await shot(page, "as-of-modal");
+  await page.keyboard.press("Escape");
+  await page.goto(`${BASE}/approvals`);
+  await page.getByRole("heading", { level: 1 }).waitFor();
+  for (let step = 0; step < 3; step += 1) {
+    await page.keyboard.press("Tab");
+  }
+  await shot(page, "focus");
+  const broken = await context.newPage();
+  await broken.route("**/api/v1/work-items*", (route) => route.fulfill({ status: 500,
+    json: { error: "the screenshot script answered this request with an error" } }));
+  await broken.goto(`${BASE}/activity`);
+  await shot(broken, "error");
+  await broken.close();
+}
+
+async function run() {
   const browser = await chromium.launch({ channel: "chromium" });
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 },
-    colorScheme });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   await guard(context);
   const page = await context.newPage();
   page.on("console", (message) => {
     // The mocked refusal of a decision is an expected 403.
     if (message.type() === "error" && !message.text().includes("status of 403")) {
-      problems.push(`[${theme}] console: ${message.text().slice(0, 300)}`);
+      problems.push(`console: ${message.text().slice(0, 300)}`);
     }
   });
-  page.on("pageerror", (error) => problems.push(`[${theme}] page error: ${error.message}`));
+  page.on("pageerror", (error) => problems.push(`page error: ${error.message}`));
   const items = (await api(page, "/work-items")) ?? [];
   const pulls = (await api(page, "/forge/pulls")) ?? [];
 
-  await visit(page, theme, "overview", "/");
-  await timelineShots(page, theme);
-  await visit(page, theme, "topology", "/topology");
-  await visit(page, theme, "upcoming", "/upcoming");
-  await visit(page, theme, "approvals", "/approvals");
-  await workItemShots(page, theme, items);
-  await visit(page, theme, "activity", "/activity");
+  await visit(page, "overview", "/");
+  await timelineShots(page);
+  await visit(page, "topology", "/topology");
+  await visit(page, "upcoming", "/upcoming");
+  await visit(page, "approvals", "/approvals");
+  await workItemShots(page, items);
+  await visit(page, "activity", "/activity");
   await page.getByRole("button", { name: /expand current row/i }).first().click();
-  await shot(page, theme, "activity-expanded");
-  await visit(page, theme, "code", "/code");
-  await visit(page, theme, "code-repo",
+  await shot(page, "activity-expanded");
+  await visit(page, "code", "/code");
+  await visit(page, "code-repo",
     "/code/runbooks?ref=main&path=notifications/routes.json&file=1");
   if (pulls[0] !== undefined) {
-    await visit(page, theme, "code-pull", `/code/pulls/${pulls[0].id}`);
+    await visit(page, "code-pull", `/code/pulls/${pulls[0].id}`);
   }
-  await visit(page, theme, "access", "/access");
-  await visit(page, theme, "audit", "/audit");
+  await visit(page, "access", "/access");
+  await visit(page, "audit", "/audit");
   await page.getByRole("searchbox").fill("grant");
-  await shot(page, theme, "audit-search");
-  await visit(page, theme, "notifications", "/notifications");
-  await visit(page, theme, "ask", "/ask");
-  if (process.env.ASK === theme) {
+  await shot(page, "audit-search");
+  await visit(page, "notifications", "/notifications");
+  await visit(page, "ask", "/ask");
+  if (process.env.ASK !== undefined) {
     // One real question. The answer is written by the server's model, so this is opt-in.
     await page.getByRole("button", { name: /have access to right now/ }).click();
     await page.locator(".app-chat-answer").first().waitFor({ timeout: 120_000 });
-    await shot(page, theme, "ask");
+    await shot(page, "ask");
   }
   const aiLabel = page.locator(".app-chat-answer .cds--ai-label button").first();
   if (await aiLabel.count() > 0) {
     await aiLabel.click();
     await page.waitForTimeout(500);
-    await page.screenshot({ path: `${OUT}ask-ai-label-${theme}.png` });
+    await page.screenshot({ path: join(OUT, `ask-ai-label.png`) });
   }
-  await visit(page, theme, "demo", "/demo");
+  await visit(page, "demo", "/demo");
   await page.getByRole("button", { name: "Switch user" }).click();
-  await page.screenshot({ path: `${OUT}user-switcher-${theme}.png` });
-  if (theme === "light") {
-    await timelineChecks(page, theme);
-    await liveAndEvidenceChecks(context, page, theme, items);
-  }
+  await page.screenshot({ path: join(OUT, `user-switcher.png`) });
+  await stateShots(context, page);
+  await timelineChecks(page);
+  await liveAndEvidenceChecks(context, page, items);
   await browser.close();
 }
 
 await mkdir(OUT, { recursive: true });
-for (const [theme, colorScheme] of THEMES) {
-  if (process.env.THEME === undefined || process.env.THEME === theme) {
-    await run(theme, colorScheme);
-  }
-}
+await run();
 if (problems.length > 0) {
   console.log(`\n${problems.length} problems:`);
   for (const problem of new Set(problems)) {

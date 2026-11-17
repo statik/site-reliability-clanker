@@ -1,25 +1,126 @@
-// Carbon styles, with IBM Plex bundled from the @ibm/plex package instead of a font CDN.
+// Carbon styles in the S.R.C. colours, with IBM Plex bundled from the @ibm/plex package
+// instead of a font CDN. The theme tokens are set in _theme.scss. Carbon keeps the tokens of
+// buttons, tags, notifications and the content switcher in modules of their own, and each
+// takes its values here, before Carbon's components load.
+@use "sass:list";
+@use "sass:map";
 @use "@carbon/react/scss/config" with (
   $font-path: "@ibm/plex"
 );
+@use "./palette";
+@use "./theme";
+@use "@carbon/react/scss/components/button/tokens" as button-tokens with (
+  $button-primary: map.get(palette.$button, button-primary),
+  $button-primary-hover: map.get(palette.$button, button-primary-hover),
+  $button-primary-active: map.get(palette.$button, button-primary-active),
+  $button-secondary: map.get(palette.$button, button-secondary),
+  $button-secondary-hover: map.get(palette.$button, button-secondary-hover),
+  $button-secondary-active: map.get(palette.$button, button-secondary-active),
+  $button-tertiary: map.get(palette.$button, button-tertiary),
+  $button-tertiary-hover: map.get(palette.$button, button-tertiary-hover),
+  $button-tertiary-active: map.get(palette.$button, button-tertiary-active),
+  $button-danger-primary: map.get(palette.$button, button-danger-primary),
+  $button-danger-secondary: map.get(palette.$button, button-danger-secondary),
+  $button-danger-hover: map.get(palette.$button, button-danger-hover),
+  $button-danger-active: map.get(palette.$button, button-danger-active),
+  $button-separator: map.get(palette.$button, button-separator),
+  $button-disabled: map.get(palette.$button, button-disabled)
+);
+@use "@carbon/react/scss/components/tag/tokens" as tag-tokens with (
+  $tag-background-red: map.get(palette.$tag-fill, "red"),
+  $tag-color-red: palette.$tag-text,
+  $tag-hover-red: map.get(palette.$tag-fill, "red"),
+  $tag-border-red: map.get(palette.$tag-hue, "red"),
+  $tag-background-magenta: map.get(palette.$tag-fill, "magenta"),
+  $tag-color-magenta: palette.$tag-text,
+  $tag-hover-magenta: map.get(palette.$tag-fill, "magenta"),
+  $tag-border-magenta: map.get(palette.$tag-hue, "magenta"),
+  $tag-background-purple: map.get(palette.$tag-fill, "purple"),
+  $tag-color-purple: palette.$tag-text,
+  $tag-hover-purple: map.get(palette.$tag-fill, "purple"),
+  $tag-border-purple: map.get(palette.$tag-hue, "purple"),
+  $tag-background-blue: map.get(palette.$tag-fill, "blue"),
+  $tag-color-blue: palette.$tag-text,
+  $tag-hover-blue: map.get(palette.$tag-fill, "blue"),
+  $tag-border-blue: map.get(palette.$tag-hue, "blue"),
+  $tag-background-cyan: map.get(palette.$tag-fill, "cyan"),
+  $tag-color-cyan: palette.$tag-text,
+  $tag-hover-cyan: map.get(palette.$tag-fill, "cyan"),
+  $tag-border-cyan: map.get(palette.$tag-hue, "cyan"),
+  $tag-background-teal: map.get(palette.$tag-fill, "teal"),
+  $tag-color-teal: palette.$tag-text,
+  $tag-hover-teal: map.get(palette.$tag-fill, "teal"),
+  $tag-border-teal: map.get(palette.$tag-hue, "teal"),
+  $tag-background-green: map.get(palette.$tag-fill, "green"),
+  $tag-color-green: palette.$tag-text,
+  $tag-hover-green: map.get(palette.$tag-fill, "green"),
+  $tag-border-green: map.get(palette.$tag-hue, "green"),
+  $tag-background-gray: map.get(palette.$tag-fill, "gray"),
+  $tag-color-gray: palette.$tag-text,
+  $tag-hover-gray: map.get(palette.$tag-fill, "gray"),
+  $tag-border-gray: map.get(palette.$tag-hue, "gray"),
+  $tag-background-cool-gray: map.get(palette.$tag-fill, "cool-gray"),
+  $tag-color-cool-gray: palette.$tag-text,
+  $tag-hover-cool-gray: map.get(palette.$tag-fill, "cool-gray"),
+  $tag-border-cool-gray: map.get(palette.$tag-hue, "cool-gray"),
+  $tag-background-warm-gray: map.get(palette.$tag-fill, "warm-gray"),
+  $tag-color-warm-gray: palette.$tag-text,
+  $tag-hover-warm-gray: map.get(palette.$tag-fill, "warm-gray"),
+  $tag-border-warm-gray: map.get(palette.$tag-hue, "warm-gray")
+);
+@use "@carbon/react/scss/components/notification/tokens" as notification-tokens with (
+  $notification-background-error: map.get(palette.$notification, notification-background-error),
+  $notification-background-success: map.get(palette.$notification, notification-background-success),
+  $notification-background-info: map.get(palette.$notification, notification-background-info),
+  $notification-background-warning: map.get(palette.$notification, notification-background-warning),
+  $notification-action-hover: map.get(palette.$notification, notification-action-hover),
+  $notification-action-tertiary-inverse: map.get(palette.$notification, notification-action-tertiary-inverse),
+  $notification-action-tertiary-inverse-active: map.get(palette.$notification, notification-action-tertiary-inverse-active),
+  $notification-action-tertiary-inverse-hover: map.get(palette.$notification, notification-action-tertiary-inverse-hover),
+  $notification-action-tertiary-inverse-text: map.get(palette.$notification, notification-action-tertiary-inverse-text),
+  $notification-action-tertiary-inverse-text-on-color-disabled: map.get(palette.$notification, notification-action-tertiary-inverse-text-on-color-disabled)
+);
+@use "@carbon/react/scss/components/content-switcher/tokens" as content-switcher-tokens with (
+  $content-switcher-background: map.get(palette.$content-switcher, content-switcher-background),
+  $content-switcher-background-hover: map.get(palette.$content-switcher, content-switcher-background-hover),
+  $content-switcher-selected: map.get(palette.$content-switcher, content-switcher-selected)
+);
 @use "@carbon/react";
-@use "@carbon/react/scss/themes";
-@use "@carbon/react/scss/theme";
 @use "@carbon/react/scss/spacing";
 @use "@carbon/react/scss/type";
 @use "@carbon/react/scss/breakpoint";
 
+// The charts carry Carbon's own themes on their holder. The same tokens go there again, with
+// the series colours. Five series cover the environments; a chart of more repeats them.
 :root,
-[data-carbon-theme="g10"] {
-  @include theme.theme(themes.$g10);
-
-  color-scheme: light;
+.cds--chart-holder[data-carbon-theme] {
+  @include theme.theme();
 }
 
-[data-carbon-theme="g100"] {
-  @include theme.theme(themes.$g100);
+.cds--chart-holder[data-carbon-theme] {
+  --cds-grid-bg: #{palette.$layer-01};
+  --cds-tooltip-line-border: #{palette.$border-strong};
 
-  color-scheme: dark;
+  @for $count from 1 through 5 {
+    @for $option from 1 through 5 {
+      @for $index from 1 through $count {
+        --cds-charts-#{$count}-#{$option}-#{$index}: #{list.nth(palette.$series, $index)};
+        --cds-charts-#{$count}-#{$option}-#{$index}-hovered: #{palette.$cream};
+      }
+    }
+  }
+
+  @for $index from 1 through 14 {
+    $colour: list.nth(palette.$series, ($index - 1) % 5 + 1);
+
+    --cds-charts-14-1-#{$index}: #{$colour};
+    --cds-charts-14-1-#{$index}-hovered: #{palette.$cream};
+  }
+}
+
+// The charts draw the line of a change or an incident in a red of their own.
+.cds--cc--threshold line.threshold-line {
+  stroke: theme.$support-error;
 }
 
 body {
@@ -32,6 +133,16 @@ body {
   min-block-size: 100vh;
   padding: spacing.$spacing-07 spacing.$spacing-07 spacing.$spacing-10;
   margin-inline-start: 16rem;
+}
+
+.app-mark {
+  margin-inline-end: spacing.$spacing-03;
+}
+
+.app-product-name {
+  margin-inline-start: spacing.$spacing-03;
+  color: theme.$text-secondary;
+  font-weight: 400;
 }
 
 .app-header-status {
