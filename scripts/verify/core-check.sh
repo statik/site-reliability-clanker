@@ -93,8 +93,8 @@ fi
 
 echo "== compare the seeded repositories with the checkout"
 unset HOME
-git clone -q "http://127.0.0.1:${port}/git/runbooks.git" "${work}/runbooks"
-git clone -q "http://127.0.0.1:${port}/git/platform-live.git" "${work}/platform-live"
+git clone -q "http://127.0.0.1:${port}/git/runbooks.git" "${work}/runbooks" 2>>"${work}/clone.log"
+git clone -q "http://127.0.0.1:${port}/git/platform-live.git" "${work}/platform-live" 2>>"${work}/clone.log"
 git -C "${work}/runbooks" fsck --strict --no-dangling >/dev/null || fail "fsck of runbooks"
 git -C "${work}/platform-live" fsck --strict --no-dangling >/dev/null || fail "fsck of platform-live"
 if [ "$(git -C "${work}/runbooks" rev-parse 'HEAD^{tree}')" != "$(git -C "${repo}" rev-parse 'HEAD:runbooks')" ]; then
