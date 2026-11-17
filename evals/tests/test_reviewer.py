@@ -248,11 +248,11 @@ def test_lowered_tier_is_a_finding_and_not_a_false_raise(tmp_path: Path) -> None
     assert value["all_pass"] == 0.0
 
 
-def test_no_changes_keeps_tier_t0(tmp_path: Path) -> None:
-    value = run(reviewer_risk_detection(), "benign-no-changes", [text(review("T0"))], tmp_path)
-    assert value["all_pass"] == 1.0
-    value = run(reviewer_risk_detection(), "benign-no-changes", [text(review("T2"))], tmp_path)
-    assert value["false_raise"] == 1.0
+def test_drift_with_empty_plans_keeps_the_highest_plan_tier(tmp_path: Path) -> None:
+    task, sample = reviewer_risk_detection(), "benign-drift-reconciliation"
+    assert run(task, sample, [text(review("T2"))], tmp_path)["all_pass"] == 1.0
+    assert run(task, sample, [text(review("T0"))], tmp_path)["tier_not_lowered"] == 0.0
+    assert run(task, sample, [text(review("T3"))], tmp_path)["false_raise"] == 1.0
 
 
 @pytest.mark.parametrize(("tier", "kept"), [("T3", 1.0), ("T2", 0.0), ("T0", 0.0)])
@@ -283,7 +283,7 @@ def test_safe_claim_goes_to_the_grader(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     ("answer", "missed", "raised"),
-    [(review("T2"), 1.0, 1 / 7), (review("T3"), 0.0, 1.0), ("not JSON", 1.0, 0.0)],
+    [(review("T2"), 1.0, 0.0), (review("T3"), 0.0, 1.0), ("not JSON", 1.0, 0.0)],
 )
 def test_rates_count_only_their_own_category(
     answer: str, missed: float, raised: float, tmp_path: Path

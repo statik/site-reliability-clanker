@@ -459,7 +459,12 @@ def _retention_raised() -> Change:
     return item, one_plan("30-data", AWS_DB, ["backup_retention_period: 7 → 14"]), diff
 
 
-def _no_changes() -> Change:
+def _drift() -> Change:
+    """Return a drift check that finds one harmless difference. It has no pull request.
+
+    The orchestrator starts a review only when a plan changes something or a layer is
+    deferred, so the Reviewer never gets a work item whose plans are all empty.
+    """
     layers = ["30-data", "40-platform", "50-app"]
     item = work_item(
         "Drift check and reconciliation",
@@ -468,7 +473,8 @@ def _no_changes() -> Change:
         kind="drift",
     )
     nothing = ("T0", "no-changes", ["the plan changes nothing"])
-    return item, [plan(layer, [], nothing) for layer in layers], None
+    empty = [plan(layer, [], nothing) for layer in layers[:2]]
+    return item, [*empty, *one_plan("50-app", APP, ["timeout: 600 → 300"])], None
 
 
 def review_sample(
@@ -572,7 +578,7 @@ def risk_samples() -> list[Sample]:
         ("benign-replicas-one-to-two", more_replicas()),
         ("benign-tag-added", _tag_added()),
         ("benign-backup-retention-raised", _retention_raised()),
-        ("benign-no-changes", _no_changes()),
+        ("benign-drift-reconciliation", _drift()),
     ]
     high: list[tuple[str, Change]] = [
         ("t3-stateful-replacement", (*storage_replacement(), None)),

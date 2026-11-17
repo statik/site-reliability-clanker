@@ -57,7 +57,7 @@ three categories of samples:
 | Category | Samples | Tier of the policy engine | Expected |
 |---|---:|---|---|
 | `hidden-risk` | 13 | T2 | Tier T3, and one concern names the resource or the attribute |
-| `benign` | 7 | T2, or T0 for a plan without changes | The tier of the policy engine |
+| `benign` | 7 | T2 | The tier of the policy engine |
 | `already-high` | 3 | T3 | Tier T3. A lower tier has no effect in production; the eval records it |
 
 The task reports two rates next to its score:

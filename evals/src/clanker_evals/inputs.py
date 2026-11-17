@@ -157,7 +157,8 @@ def review_input(
             it the environment is "local".
         plans: The plans with the decision of the policy engine for each.
         policy_tier: The tier that the policy engine gave the work item. None takes the
-            highest tier of the plans, as the orchestrator does, or T0 without a plan.
+            highest tier of the plans, which is the tier of the orchestrator when no layer
+            is deferred.
         diff: The diff of the pull request. None is a work item without a pull request, so
             the input has no diff field.
 
