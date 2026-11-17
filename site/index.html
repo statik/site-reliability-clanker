@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Site Reliability Clanker: an AI site reliability engineer that asks first</title>
-  <meta name="description" content="A concept prototype: an AI site reliability engineer that deploys and looks after an application through pull requests, human approval and just-in-time access.">
+  <meta name="description" content="Site Reliability Clanker keeps a cloud application deployed, patched and backed up. Every change is a pull request that a person approves, and the access to apply it exists for seconds.">
   <meta name="color-scheme" content="light dark">
   <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/site.css">
@@ -16,7 +16,7 @@
     <a class="shell-name" href="index.html"><span class="shell-prefix">Site Reliability</span> Clanker</a>
     <nav aria-label="Site">
       <ul>
-        <li><a href="index.html" aria-current="page">Concept</a></li>
+        <li><a href="index.html" aria-current="page">Overview</a></li>
         <li><a href="walkthrough.html">Walkthrough</a></li>
         <li><a href="architecture.html">Architecture</a></li>
         <li><a href="screens.html">Live screens</a></li>
@@ -32,19 +32,17 @@
     <section class="hero" aria-labelledby="hero-title">
       <canvas class="hero-backdrop" id="hero-backdrop" aria-hidden="true"></canvas>
       <div class="wrap">
-        <p class="kicker reveal">Concept prototype</p>
         <h1 class="reveal" id="hero-title">An AI site reliability engineer that asks first.</h1>
-        <p class="hero-lead reveal">Clanker deploys an application and then looks after it: releases,
-          security patches, backups, restore drills, incidents. Every change is a pull request.
-          A person approves it. The access to apply it exists for seconds.</p>
+        <p class="hero-lead reveal">Site Reliability Clanker keeps a cloud application deployed,
+          patched and backed up. It finds the work, writes each change as a pull request, and
+          explains it in plain language. A person approves. Only then does it get access: for
+          that one change, for seconds.</p>
         <div class="btn-row reveal">
-          <a class="btn btn-primary" href="walkthrough.html">Walk through one month <span aria-hidden="true">&rarr;</span></a>
-          <a class="btn btn-tertiary" href="architecture.html">See how it works <span aria-hidden="true">&rarr;</span></a>
+          <a class="btn btn-primary" href="#how-title">See how it works <span aria-hidden="true">&darr;</span></a>
+          <a class="btn btn-tertiary" href="#video-title">Watch the video <span aria-hidden="true">&darr;</span></a>
         </div>
-        <p class="hero-hint reveal">Everything on this site comes from one real run of the prototype &middot;
-          <!-- build:period -->
-17 Nov 2026 to 16 Dec 2026
-<!-- /build:period --></p>
+        <p class="hero-hint reveal">A working prototype. It runs end to end on a local cluster
+          today.</p>
       </div>
       <button type="button" class="btn btn-ghost motion-toggle js-only" aria-pressed="false">Pause motion</button>
     </section>
@@ -78,59 +76,103 @@
       </div>
     </section>
 
-    <section class="section section-alt" aria-labelledby="example-title">
-      <div class="wrap split">
-        <div>
-          <p class="kicker">The example</p>
-          <h2 id="example-title">A business that rents out live fish.</h2>
-          <div class="prose section-lead">
-            <p>Clanker needs something real to look after. The prototype uses Paperboat: customers
-              rent a fish, a driver delivers it, and a driver collects it when the rental ends.</p>
-            <p>It has a live inventory board, fish that age and retire, deliveries, and a support
-              desk for people whose fish looks at them strangely. Under that, it needs what every
-              business application needs: a database, a shared file system, a load balancer, and
-              releases that sometimes go wrong.</p>
+    <section class="section section-alt" aria-labelledby="what-title">
+      <div class="wrap">
+        <p class="kicker">What it does</p>
+        <h2 id="what-title">It does the operations work that a small team has no time for.</h2>
+        <p class="section-lead">You give Clanker an application and a target. It deploys the
+          application, and then it looks after it. For each job below, it finds the work, prepares
+          the change and asks you. It does not wait for a ticket.</p>
+        <div class="cards">
+          <div class="card reveal">
+            <h3>Deploys from a blank slate</h3>
+            <p>It builds the network, the Kubernetes cluster, the database, the storage and the
+              application, layer by layer, from OpenTofu code in your repository.</p>
+          </div>
+          <div class="card reveal">
+            <h3>Ships releases</h3>
+            <p>It sees a new release, opens the pull request and applies it after approval. A
+              canary check then tests the result. If the check fails, it rolls the release back.</p>
+          </div>
+          <div class="card reveal">
+            <h3>Keeps you patched</h3>
+            <p>It watches for security fixes, database patches and Kubernetes versions that come
+              to their end of support, and proposes each upgrade before it is late.</p>
+          </div>
+          <div class="card reveal">
+            <h3>Protects the data</h3>
+            <p>It runs backups and database maintenance on a schedule. It also runs restore
+              drills, so you know that the backups can be restored.</p>
+          </div>
+          <div class="card reveal">
+            <h3>Finds drift</h3>
+            <p>If somebody changes production by hand, it finds the difference and opens a pull
+              request to put it right.</p>
+          </div>
+          <div class="card reveal">
+            <h3>Responds to incidents</h3>
+            <p>It reads the logs and the recent changes, writes a diagnosis and proposes a
+              runbook. Policy code decides if that runbook can run without a person.</p>
           </div>
         </div>
-        <figure class="reveal">
-          <a href="screens.html"><img src="screens/paperboat-inventory-light.png" width="1440" height="900"
-            alt="The Paperboat inventory board: fish grouped by tank, each with its status, age and condition."></a>
-          <figcaption>The real Paperboat inventory board, captured from the running application.</figcaption>
-        </figure>
       </div>
     </section>
 
-    <section class="section" aria-labelledby="numbers-title">
+    <section class="section" aria-labelledby="how-title">
       <div class="wrap">
-        <p class="kicker">One month, measured</p>
-        <h2 id="numbers-title">The agent worked for a month. It held write access for minutes.</h2>
-        <p class="section-lead">The prototype ran a scripted month on the local target: a first
-          deployment, three releases, a rollback, patches, backups, a restore drill, drift and an
-          incident at 02:00. These numbers are counted from its audit log.</p>
-        <!-- build:stats -->
-<dl class="stats"><div class="stat reveal">
-<dt>days of operation</dt><dd><span class="stat-value">29</span>
-<span class="stat-note">one scripted month on the local target</span></dd></div><div class="stat reveal">
-<dt>audit records</dt><dd><span class="stat-value">323</span>
-<span class="stat-note">hash chain verified</span></dd></div><div class="stat reveal">
-<dt>human approvals</dt><dd><span class="stat-value">7</span>
-<span class="stat-note">for 14 work items</span></dd></div><div class="stat reveal">
-<dt>grants issued</dt><dd><span class="stat-value">18</span>
-<span class="stat-note">18 already revoked</span></dd></div><div class="stat reveal">
-<dt>of write or debug access</dt><dd><span class="stat-value">3 min 27 s</span>
-<span class="stat-note">in 29 days, in total</span></dd></div><div class="stat reveal">
-<dt>automatic rollback</dt><dd><span class="stat-value">1</span>
-<span class="stat-note">caught by the canary check</span></dd></div></dl>
-<!-- /build:stats -->
+        <p class="kicker">How it works</p>
+        <h2 id="how-title">Every change takes the same seven steps.</h2>
+        <p class="section-lead">The language model does the reading and the writing. It has no
+          credential and no tool that applies a change. Plain code and a person make each
+          decision.</p>
+        <ol class="how">
+          <li class="reveal"><span class="how-who how-code">Code</span>
+            <h3>Detect</h3>
+            <p>Detectors watch for new releases, security fixes, versions near their end of
+              support, schedules, drift and failing requests.</p></li>
+          <li class="reveal"><span class="how-who how-model">Model</span>
+            <h3>Draft</h3>
+            <p>The model writes the change as a pull request in your infrastructure repository.
+              That is all it can do.</p></li>
+          <li class="reveal"><span class="how-who how-code">Code</span>
+            <h3>Plan and rate</h3>
+            <p>The runner makes an OpenTofu plan. Policy rules read the plan and set the risk
+              tier, T0 to T3. The model does not rate its own work.</p></li>
+          <li class="reveal"><span class="how-who how-model">Model</span>
+            <h3>Explain</h3>
+            <p>The model writes the approval page in plain language. The counts, the names and
+              the tier come from the plan, and the model cannot change them.</p></li>
+          <li class="reveal"><span class="how-who how-human">Person</span>
+            <h3>Approve</h3>
+            <p>A notice goes out by email and chat. A person decides in the dashboard or the
+              phone app. The riskiest changes need two people.</p></li>
+          <li class="reveal"><span class="how-who how-code">Code</span>
+            <h3>Apply</h3>
+            <p>The access broker issues a signed grant for one layer. The runner applies exactly
+              the plan that was approved. The grant is revoked when the job ends.</p></li>
+          <li class="reveal"><span class="how-who how-code">Code</span>
+            <h3>Verify</h3>
+            <p>A canary check tests the result and rolls back on failure. Each step is a record
+              in a hash-chained audit log.</p></li>
+        </ol>
         <div class="btn-row">
-          <a class="btn btn-tertiary" href="walkthrough.html">See each step with its real events <span aria-hidden="true">&rarr;</span></a>
+          <a class="btn btn-tertiary" href="architecture.html">See the architecture <span aria-hidden="true">&rarr;</span></a>
         </div>
+
+        <h2 class="video-title" id="video-title">The whole idea in less than three minutes.</h2>
+        <figure class="video reveal">
+          <video controls preload="none" playsinline poster="screens/dashboard-approval-light.png"
+            src="out/explainer.mp4"></video>
+          <figcaption class="figure-caption">The video is built from a real run of the prototype.
+            If it does not play, build it with <code>./build-video.sh</code> in the
+            <code>site</code> directory.</figcaption>
+        </figure>
       </div>
     </section>
 
     <section class="section section-alt" aria-labelledby="principles-title">
       <div class="wrap">
-        <p class="kicker">Five principles</p>
+        <p class="kicker">Why you can trust it</p>
         <h2 id="principles-title">Five rules decide almost everything else.</h2>
         <p class="section-lead">Each rule is short. Under each one is what it did in the scripted
           month.</p>
@@ -249,9 +291,62 @@ is an illustration of the approval page. For the dashboard itself, see
       </div>
     </section>
 
+    <section class="section section-alt" aria-labelledby="numbers-title">
+      <div class="wrap">
+        <p class="kicker">Proof: one month, measured</p>
+        <h2 id="numbers-title">The agent worked for a month. It held write access for minutes.</h2>
+        <p class="section-lead">The prototype looked after a test application for one scripted month on the local target: a first
+          deployment, three releases, a rollback, patches, backups, a restore drill, drift and an
+          incident at 02:00. These numbers are counted from its audit log.
+          The month: <!-- build:period -->
+17 Nov 2026 to 16 Dec 2026
+<!-- /build:period -->.</p>
+        <!-- build:stats -->
+<dl class="stats"><div class="stat reveal">
+<dt>days of operation</dt><dd><span class="stat-value">29</span>
+<span class="stat-note">one scripted month on the local target</span></dd></div><div class="stat reveal">
+<dt>audit records</dt><dd><span class="stat-value">323</span>
+<span class="stat-note">hash chain verified</span></dd></div><div class="stat reveal">
+<dt>human approvals</dt><dd><span class="stat-value">7</span>
+<span class="stat-note">for 14 work items</span></dd></div><div class="stat reveal">
+<dt>grants issued</dt><dd><span class="stat-value">18</span>
+<span class="stat-note">18 already revoked</span></dd></div><div class="stat reveal">
+<dt>of write or debug access</dt><dd><span class="stat-value">3 min 27 s</span>
+<span class="stat-note">in 29 days, in total</span></dd></div><div class="stat reveal">
+<dt>automatic rollback</dt><dd><span class="stat-value">1</span>
+<span class="stat-note">caught by the canary check</span></dd></div></dl>
+<!-- /build:stats -->
+        <div class="btn-row">
+          <a class="btn btn-tertiary" href="walkthrough.html">See each step with its real events <span aria-hidden="true">&rarr;</span></a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="example-title">
+      <div class="wrap split">
+        <div>
+          <p class="kicker">The test application</p>
+          <h2 id="example-title">A business that rents out live fish.</h2>
+          <div class="prose section-lead">
+            <p>Clanker needs something real to look after. The month above used Paperboat: customers
+              rent a fish, a driver delivers it, and a driver collects it when the rental ends.</p>
+            <p>It has a live inventory board, fish that age and retire, deliveries, and a support
+              desk for people whose fish looks at them strangely. Under that, it needs what every
+              business application needs: a database, a shared file system, a load balancer, and
+              releases that sometimes go wrong.</p>
+          </div>
+        </div>
+        <figure class="reveal">
+          <a href="screens.html"><img src="screens/paperboat-inventory-light.png" width="1440" height="900"
+            alt="The Paperboat inventory board: fish grouped by tank, each with its status, age and condition."></a>
+          <figcaption>The real Paperboat inventory board, captured from the running application.</figcaption>
+        </figure>
+      </div>
+    </section>
+
     <section class="section section-alt" aria-labelledby="clouds-title">
       <div class="wrap">
-        <p class="kicker">Supported clouds</p>
+        <p class="kicker">Status today</p>
         <h2 id="clouds-title">One contract. Four targets. One of them has run.</h2>
         <p class="section-lead">Each cloud implements the same module interface, so the stacks above
           it and the control plane do not change. This is the honest status of the prototype
@@ -285,11 +380,13 @@ is an illustration of the approval page. For the dashboard itself, see
 
     <section class="section closing" aria-labelledby="closing-title">
       <div class="wrap">
-        <h2 id="closing-title">Follow one month, one change at a time.</h2>
-        <p class="section-lead">Each step shows the real events: who did what, when, at
-          which risk tier, who approved it, and how long the access lasted.</p>
+        <h2 id="closing-title">Run it on your own laptop.</h2>
+        <p class="section-lead">The local target needs Docker and no cloud account. One command
+          builds the control plane and the dashboard, and starts them. Then approve the first
+          deployment, and follow the month.</p>
+        <pre class="command"><code>make demo</code></pre>
         <div class="btn-row">
-          <a class="btn btn-primary" href="walkthrough.html">Start the walkthrough <span aria-hidden="true">&rarr;</span></a>
+          <a class="btn btn-primary" href="walkthrough.html">Walk through one month <span aria-hidden="true">&rarr;</span></a>
           <a class="btn btn-tertiary" href="architecture.html">Architecture <span aria-hidden="true">&rarr;</span></a>
           <a class="btn btn-tertiary" href="screens.html">Live screens <span aria-hidden="true">&rarr;</span></a>
         </div>
@@ -299,7 +396,7 @@ is an illustration of the approval page. For the dashboard itself, see
 
   <footer class="footer">
     <div class="wrap">
-      <p>Site Reliability Clanker is a concept prototype. Paperboat, its customers and its fish
+      <p>Site Reliability Clanker is a prototype. Paperboat, its customers and its fish
         are fictional, and so are the approvers Alice, Bob and Carol.</p>
       <p>This site makes no network requests to other hosts. The typeface is IBM Plex, under the
         SIL Open Font License. The look follows the IBM Carbon Design System.</p>

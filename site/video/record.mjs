@@ -46,7 +46,7 @@ function choose(segment, available) {
 async function doCue(page, cue, base) {
   if (!cue) return;
   if (cue.startsWith("page:")) {
-    await page.goto(`${base}/${cue.slice(5)}?theme=dark`, { waitUntil: "load" });
+    await page.goto(`${base}/${cue.slice(5)}?theme=light`, { waitUntil: "load" });
   } else if (cue.startsWith("flow:")) {
     // A click from inside the page, so that the browser does not scroll to the list item.
     await page.evaluate((index) => {
@@ -63,7 +63,7 @@ async function doCue(page, cue, base) {
 }
 
 async function playSite(page, segment, name, base) {
-  await page.goto(`${base}/${name}?theme=dark`, { waitUntil: "load" });
+  await page.goto(`${base}/${name}?theme=light`, { waitUntil: "load" });
   await page.evaluate(() => document.fonts.ready);
   // The narration drives the system diagram, so stop its own autoplay.
   const play = page.locator(".flow-play[aria-pressed='true']");
@@ -82,13 +82,13 @@ async function playSite(page, segment, name, base) {
 
 async function record(browser, segment, chosen, base) {
   const context = await browser.newContext({
-    viewport: VIEWPORT, colorScheme: "dark", recordVideo: { dir: WORK, size: VIEWPORT },
+    viewport: VIEWPORT, colorScheme: "light", recordVideo: { dir: WORK, size: VIEWPORT },
   });
   await makeReadOnly(context);
   if (chosen.kind === "dashboard") {
     await context.addInitScript((user) => {
       window.localStorage.setItem("clanker.user", user);
-      window.localStorage.setItem("clanker.theme", "g100");
+      window.localStorage.setItem("clanker.theme", "g10");
     }, DASHBOARD_USER);
   }
   const created = Date.now();

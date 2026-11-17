@@ -775,3 +775,32 @@ html:not(.js) .chip { border: 0; background: none; padding: 0; cursor: default; 
   .shell, .rail, .motion-toggle, .figure-controls { position: static; }
   .js .reveal { opacity: 1 !important; animation: none !important; }
 }
+
+/* ------------------------------------------------------------------ landing: how it works */
+
+.how { display: grid; gap: 1px; margin-top: var(--s-8); list-style: none; padding: 0;
+  background: var(--border-subtle); border: 1px solid var(--border-subtle); counter-reset: how; }
+@media (min-width: 42rem) { .how { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 82rem) { .how { grid-template-columns: repeat(7, 1fr); } }
+.how li { position: relative; padding: var(--s-5) var(--s-5) var(--s-7); background: var(--background);
+  counter-increment: how; }
+.how li::before { content: counter(how); display: block; font-size: 2rem; font-weight: 300;
+  line-height: 1; color: var(--text-helper); margin-bottom: var(--s-5); }
+.how h3 { font-size: 1.25rem; font-weight: 400; line-height: 1.4; }
+.how p { margin-top: var(--s-3); color: var(--text-secondary); font-size: 0.875rem; line-height: 1.45; }
+.how-who { position: absolute; top: var(--s-5); right: var(--s-5); padding: 0 var(--s-3);
+  border-radius: 0.9375rem; font-size: 0.75rem; letter-spacing: 0.32px; line-height: 1.5rem; }
+.how-code { background: var(--tag-teal-bg); color: var(--tag-teal-text); }
+.how-model { background: var(--tag-blue-bg); color: var(--tag-blue-text); }
+.how-human { background: var(--tag-purple-bg); color: var(--tag-purple-text); }
+@media (min-width: 42rem) and (max-width: 81.98rem) { .how li:last-child { grid-column: 1 / -1; } }
+
+.video-title { margin-top: var(--s-10); font-size: clamp(1.5rem, 1.4vw + 1rem, 2rem); font-weight: 300;
+  line-height: 1.25; max-width: 28ch; }
+.video { margin-top: var(--s-6); max-width: 72rem; }
+.video video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: #161616;
+  border: 1px solid var(--border-subtle); }
+.command { margin-top: var(--s-6); padding: var(--s-5); max-width: 32rem; overflow-x: auto;
+  background: var(--layer-01); border: 1px solid var(--border-subtle);
+  font-family: var(--font-mono); font-size: 1rem; }
+section [id] { scroll-margin-top: calc(var(--shell-height) + var(--s-6)); }
