@@ -31,7 +31,7 @@ type User struct {
 func (o *Orchestrator) GetUser(name string) (User, error) {
 	var u User
 	err := o.DB.QueryRow(`SELECT name, display, role, email, last_seen FROM users
-		WHERE name = ?`, name).Scan(&u.Name, &u.Display, &u.Role, &u.Email, &u.LastSeen)
+		WHERE name = $1`, name).Scan(&u.Name, &u.Display, &u.Role, &u.Email, &u.LastSeen)
 	if err != nil {
 		return User{}, fmt.Errorf("user %q is not known: %w", name, err)
 	}
@@ -139,7 +139,7 @@ func (o *Orchestrator) decide(ctx context.Context, id string, d Decision) (WorkI
 	hashes, _ := json.Marshal(planHashes(plans))
 	at := o.now()
 	if _, err := o.DB.Exec(`INSERT INTO approvals (work_item, approver, decision, comment,
-		commit_sha, plan_hashes, at) VALUES (?,?,?,?,?,?,?)`, wi.ID, user.Name, d.Decision,
+		commit_sha, plan_hashes, at) VALUES ($1,$2,$3,$4,$5,$6,$7)`, wi.ID, user.Name, d.Decision,
 		d.Comment, wi.Commit, string(hashes), at); err != nil {
 		return WorkItem{}, fmt.Errorf("record decision on %s: %w", id, err)
 	}

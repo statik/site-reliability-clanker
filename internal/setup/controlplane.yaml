@@ -264,9 +264,6 @@ Resources:
               Value: !Ref EnvName
             - Name: HOME
               Value: /root
-            # The data directory is on a network file system. See internal/store.
-            - Name: CLANKER_DB_JOURNAL
-              Value: DELETE
           Secrets: !If
             - WithModelKey
             - - Name: OPENROUTER_API_KEY

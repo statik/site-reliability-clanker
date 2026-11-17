@@ -36,7 +36,12 @@ The wizard never approves a change. To build the binaries yourself, run `make re
 ## Run the local demo
 
 You need Docker (running), `git`, `tofu`, `kubectl`, `helm`, `kind`, Go, Node 22 and
-`pnpm`. The tests also need `opa`. `nix develop` provides all of them except Docker.
+`pnpm`. The tests also need `opa`.
+
+The control plane keeps its data in PostgreSQL. On the local target `clanker up` starts a
+PostgreSQL container for the data directory. To use another database, set
+`CLANKER_DATABASE_URL`. The Go tests start their own PostgreSQL container, or use
+`CLANKER_TEST_DATABASE_URL`. `nix develop` provides all of them except Docker.
 
 ```
 make demo

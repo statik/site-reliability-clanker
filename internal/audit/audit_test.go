@@ -1,27 +1,22 @@
 package audit_test
 
 import (
-	"path/filepath"
+	"database/sql"
 	"testing"
 	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/audit"
-	"github.com/statik/site-reliability-clanker/internal/store"
+	"github.com/statik/site-reliability-clanker/internal/store/storetest"
 )
 
 type fixedClock struct{ t time.Time }
 
 func (c fixedClock) Now() time.Time { return c.t }
 
-func newLog(t *testing.T) (*audit.Log, string) {
+func newLog(t *testing.T) (*audit.Log, *sql.DB) {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "test.db")
-	db, err := store.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
-	return audit.New(db, fixedClock{time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC)}), path
+	db := storetest.Open(t)
+	return audit.New(db, fixedClock{time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC)}), db
 }
 
 func appendN(t *testing.T, log *audit.Log, n int) {
@@ -59,13 +54,8 @@ func TestChainVerifiesAndLinks(t *testing.T) {
 }
 
 func TestVerifyDetectsEditedEvent(t *testing.T) {
-	log, path := newLog(t)
+	log, db := newLog(t)
 	appendN(t, log, 4)
-	db, err := store.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
 	if _, err := db.Exec(`UPDATE events SET summary = 'tampered' WHERE seq = 2`); err != nil {
 		t.Fatal(err)
 	}
@@ -79,13 +69,8 @@ func TestVerifyDetectsEditedEvent(t *testing.T) {
 }
 
 func TestVerifyDetectsDeletedEvent(t *testing.T) {
-	log, path := newLog(t)
+	log, db := newLog(t)
 	appendN(t, log, 4)
-	db, err := store.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
 	if _, err := db.Exec(`DELETE FROM events WHERE seq = 3`); err != nil {
 		t.Fatal(err)
 	}

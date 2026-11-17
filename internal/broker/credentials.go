@@ -167,7 +167,7 @@ func (b *Broker) Revoke(ctx context.Context, g Grant, outcome string) error {
 func (b *Broker) ExpireOverdue() ([]Grant, error) {
 	now := store.FormatTime(b.clock.Now())
 	rows, err := b.db.Query(`SELECT `+grantColumns+` FROM grants
-		WHERE status IN ('issued', 'active') AND expires <= ?`, now)
+		WHERE status IN ('issued', 'active') AND expires <= $1`, now)
 	if err != nil {
 		return nil, fmt.Errorf("find overdue grants: %w", err)
 	}

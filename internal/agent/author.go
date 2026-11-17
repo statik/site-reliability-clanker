@@ -204,12 +204,12 @@ func (a *Agent) submit(ctx context.Context, d *draft) (orchestrator.WorkItem, er
 		Summary: fmt.Sprintf("Author opened pull request #%d for: %s", d.pull.ID,
 			d.finding.Title),
 		Data: map[string]any{"finding": d.finding.Key, "pr": d.pull.ID, "mode": a.LLM.Mode()}})
-	if _, err := a.DB.Exec(`UPDATE agent_calls SET work_item = ? WHERE work_item = '' AND
-		role = ?`, wi.ID, RoleAuthor); err != nil {
+	if _, err := a.DB.Exec(`UPDATE agent_calls SET work_item = $1 WHERE work_item = '' AND
+		role = $2`, wi.ID, RoleAuthor); err != nil {
 		return orchestrator.WorkItem{}, fmt.Errorf("link Author calls to %s: %w", wi.ID, err)
 	}
-	if _, err := a.DB.Exec(`UPDATE findings SET work_item = ?, state = 'drafted'
-		WHERE key = ?`, wi.ID, d.finding.Key); err != nil {
+	if _, err := a.DB.Exec(`UPDATE findings SET work_item = $1, state = 'drafted'
+		WHERE key = $2`, wi.ID, d.finding.Key); err != nil {
 		return orchestrator.WorkItem{}, fmt.Errorf("link finding to %s: %w", wi.ID, err)
 	}
 	if _, err := a.Orch.AttachPull(wi.ID, d.pull.ID, RoleAuthor); err != nil {

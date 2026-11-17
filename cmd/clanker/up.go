@@ -91,8 +91,8 @@ var standingRunbooks = []string{"restart-deployment", "db-backup", "restore-dril
 
 func seedUsers(db *sql.DB) error {
 	for _, u := range demoUsers {
-		if _, err := db.Exec(`INSERT OR IGNORE INTO users (name, display, role, email)
-			VALUES (?,?,?,?)`, u.Name, u.Display, u.Role, u.Email); err != nil {
+		if _, err := db.Exec(`INSERT INTO users (name, display, role, email)
+			VALUES ($1,$2,$3,$4) ON CONFLICT (name) DO NOTHING`, u.Name, u.Display, u.Role, u.Email); err != nil {
 			return fmt.Errorf("seed user %s: %w", u.Name, err)
 		}
 	}
@@ -139,7 +139,7 @@ func adapters(db *sql.DB, o options) ([]notify.Adapter, error) {
 		query := `SELECT email FROM users WHERE role IN ('approver', 'admin')`
 		args := []any{}
 		if role != "" {
-			query, args = `SELECT email FROM users WHERE role = ?`, []any{role}
+			query, args = `SELECT email FROM users WHERE role = $1`, []any{role}
 		}
 		rows, err := db.Query(query, args...)
 		if err != nil {
@@ -190,7 +190,11 @@ func build(o options) (*components, error) {
 	}
 	c := &components{}
 	var err error
-	if c.db, err = store.Open(filepath.Join(o.dataDir, "clanker.db")); err != nil {
+	databaseURL, err := database(o)
+	if err != nil {
+		return nil, err
+	}
+	if c.db, err = store.Open(databaseURL); err != nil {
 		return nil, err
 	}
 	if c.clock, err = sim.NewClock(c.db); err != nil {

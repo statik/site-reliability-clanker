@@ -43,20 +43,19 @@ func (f *Forge) OpenPull(p PullRequest, now string) (PullRequest, error) {
 		return PullRequest{}, fmt.Errorf("open pull request: base main: %w", err)
 	}
 	p.HeadCommit, p.BaseCommit, p.Base, p.State, p.CreatedAt = head, base, "main", "open", now
-	res, err := f.db.Exec(`INSERT INTO prs (repo, title, body, branch, base, head_commit,
-		base_commit, state, author, work_item, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+	err = f.db.QueryRow(`INSERT INTO prs (repo, title, body, branch, base, head_commit,
+		base_commit, state, author, work_item, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
 		p.Repo, p.Title, p.Body, p.Branch, p.Base, p.HeadCommit, p.BaseCommit, p.State,
-		p.Author, p.WorkItem, p.CreatedAt)
+		p.Author, p.WorkItem, p.CreatedAt).Scan(&p.ID)
 	if err != nil {
 		return PullRequest{}, fmt.Errorf("insert pull request for %s: %w", p.Branch, err)
 	}
-	p.ID, _ = res.LastInsertId()
 	return p, nil
 }
 
 // Pull returns one pull request.
 func (f *Forge) Pull(id int64) (PullRequest, error) {
-	p, err := scanPR(f.db.QueryRow(`SELECT `+prColumns+` FROM prs WHERE id = ?`, id))
+	p, err := scanPR(f.db.QueryRow(`SELECT `+prColumns+` FROM prs WHERE id = $1`, id))
 	if err == sql.ErrNoRows {
 		return PullRequest{}, fmt.Errorf("pull request %d does not exist", id)
 	}
@@ -68,7 +67,7 @@ func (f *Forge) Pulls(repo string) ([]PullRequest, error) {
 	query := `SELECT ` + prColumns + ` FROM prs`
 	args := []any{}
 	if repo != "" {
-		query += ` WHERE repo = ?`
+		query += ` WHERE repo = $1`
 		args = append(args, repo)
 	}
 	rows, err := f.db.Query(query+` ORDER BY id DESC`, args...)
@@ -89,7 +88,7 @@ func (f *Forge) Pulls(repo string) ([]PullRequest, error) {
 
 // SetPullWorkItem links a pull request to a work item.
 func (f *Forge) SetPullWorkItem(id int64, workItem string) error {
-	_, err := f.db.Exec(`UPDATE prs SET work_item = ? WHERE id = ?`, workItem, id)
+	_, err := f.db.Exec(`UPDATE prs SET work_item = $1 WHERE id = $2`, workItem, id)
 	return err
 }
 
@@ -103,7 +102,7 @@ func (f *Forge) RefreshPull(id int64) (PullRequest, error) {
 	if err != nil {
 		return PullRequest{}, err
 	}
-	if _, err := f.db.Exec(`UPDATE prs SET head_commit = ? WHERE id = ?`, head, id); err != nil {
+	if _, err := f.db.Exec(`UPDATE prs SET head_commit = $1 WHERE id = $2`, head, id); err != nil {
 		return PullRequest{}, fmt.Errorf("update head of pull request %d: %w", id, err)
 	}
 	p.HeadCommit = head
@@ -128,7 +127,7 @@ func (f *Forge) SyncPull(id int64) (PullRequest, error) {
 	if err != nil {
 		return PullRequest{}, err
 	}
-	if _, err := f.db.Exec(`UPDATE prs SET head_commit = ?, base_commit = ? WHERE id = ?`, head,
+	if _, err := f.db.Exec(`UPDATE prs SET head_commit = $1, base_commit = $2 WHERE id = $3`, head,
 		main, id); err != nil {
 		return PullRequest{}, fmt.Errorf("record update of pull request %d: %w", id, err)
 	}
@@ -159,7 +158,7 @@ func (f *Forge) MergePull(id int64, wantCommit, author, now string) (string, err
 	if err != nil {
 		return "", err
 	}
-	_, err = f.db.Exec(`UPDATE prs SET state = 'merged', merged_at = ? WHERE id = ?`, now, id)
+	_, err = f.db.Exec(`UPDATE prs SET state = 'merged', merged_at = $1 WHERE id = $2`, now, id)
 	if err != nil {
 		return "", fmt.Errorf("mark pull request %d merged: %w", id, err)
 	}
@@ -168,6 +167,6 @@ func (f *Forge) MergePull(id int64, wantCommit, author, now string) (string, err
 
 // ClosePull closes a pull request without a merge.
 func (f *Forge) ClosePull(id int64) error {
-	_, err := f.db.Exec(`UPDATE prs SET state = 'closed' WHERE id = ? AND state = 'open'`, id)
+	_, err := f.db.Exec(`UPDATE prs SET state = 'closed' WHERE id = $1 AND state = 'open'`, id)
 	return err
 }

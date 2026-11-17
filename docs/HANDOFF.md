@@ -52,12 +52,25 @@ group. Section 12 of the plan records the five decisions that follow from the la
   change-set review, the key in Parameter Store, and a template and tunnel for the ECS
   design. It passes its tests against a stand-in for the AWS CLI. It never ran in an AWS
   account. The ECS template is the starting point for the runner jobs.
-- **What the unikernel needs, in build order:** policy on the OPA library; the forge on a
-  git library; the split of core and runners; the state in S3 with a lease, so that two
-  instances never write; OIDC sign-in; the image build and the stack in the wizard; a run
-  in a real account.
-- **Open risks, to test first:** the embedded database on the Nanos file system, and three-way
-  merges and `git push` with a git library.
+- **What the unikernel needs, in build order:** policy on the OPA library (done); the
+  database outside the process (done: PostgreSQL); the forge on a git library with its
+  objects in the database; the split of core and runners; a lease, so that two instances
+  never write; OIDC sign-in; the image build and the stack in the wizard; a run in a real
+  account.
+- **Open risks:** the forge needs its own three-way merge, because the git library merges
+  only by fast-forward. The control plane still keeps plans, logs, OpenTofu state and its
+  signing key as files in the data directory; these must move before the unikernel can
+  hold no state.
+- **Nanos boot test (2026-11-17, a throwaway probe, on a laptop):** a Go program as a Nanos
+  0.1.56 image read its environment from the image configuration, made an outbound HTTPS
+  request, connected to PostgreSQL 18 and inserted a row, and answered HTTP from the host.
+  A subprocess was refused (`function not implemented`). It ran under QEMU with software
+  emulation; `ops run` with hardware acceleration failed on this machine (`HVF does not
+  support GICv2 emulation`, QEMU 11.1). A file write failed with `no space left on device`,
+  because the image has no free space unless the configuration asks for it.
+- **PostgreSQL (2026-11-17):** from an empty data directory, the first deployment and the ten
+  scenes of the scripted month ran on PostgreSQL with the live model. The thirteen work
+  items ended in the expected states and the audit chain verified at 310 events.
 - On a cloud, `clanker up` starts in a standby mode: it serves the dashboard and proposes
   no deployment.
 
@@ -93,7 +106,7 @@ group. Section 12 of the plan records the five decisions that follow from the la
 |---|---|---|
 | Workload | Paperboat is a fish rental app: inventory, aging, delivery, customer support | #17 |
 | Forge | Built into the control plane | #6 |
-| Control-plane database | Embedded SQLite | #7 |
+| Control-plane database | PostgreSQL, outside the process (changed 2026-11-17) | #7 |
 | First deployment | One approval. Later layers must stay inside a create-only envelope | #8 |
 | Inference | OpenRouter, confirmed by the owner on 2026-11-16 | #15 |
 | Merges | Merge a pull request when its checks pass and the change was run. See `CLAUDE.md` | — |

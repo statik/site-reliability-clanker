@@ -124,19 +124,18 @@ func (o *Orchestrator) startJob(wi WorkItem, layer, kind, grantID string) (Job, 
 	}
 	job := Job{WorkItem: wi.ID, Layer: layer, Kind: kind, Status: "running", GrantID: grantID,
 		ToolDigest: o.Runner.ToolDigest(), StartedAt: o.now()}
-	res, err := o.DB.Exec(`INSERT INTO jobs (work_item, layer, kind, status, grant_id,
-		tool_digest, started_at) VALUES (?,?,?,?,?,?,?)`, job.WorkItem, job.Layer, job.Kind,
-		job.Status, job.GrantID, job.ToolDigest, job.StartedAt)
+	err := o.DB.QueryRow(`INSERT INTO jobs (work_item, layer, kind, status, grant_id,
+		tool_digest, started_at) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`, job.WorkItem, job.Layer, job.Kind,
+		job.Status, job.GrantID, job.ToolDigest, job.StartedAt).Scan(&job.ID)
 	if err != nil {
 		return Job{}, nil, fmt.Errorf("record job for %s %s: %w", wi.ID, layer, err)
 	}
-	job.ID, _ = res.LastInsertId()
 	job.LogPath = filepath.Join(dir, fmt.Sprintf("%04d-%s-%s.log", job.ID, kind, layer))
 	logFile, err := os.Create(job.LogPath)
 	if err != nil {
 		return Job{}, nil, fmt.Errorf("create job log %s: %w", job.LogPath, err)
 	}
-	if _, err := o.DB.Exec(`UPDATE jobs SET log_path = ? WHERE id = ?`, job.LogPath,
+	if _, err := o.DB.Exec(`UPDATE jobs SET log_path = $1 WHERE id = $2`, job.LogPath,
 		job.ID); err != nil {
 		logFile.Close()
 		return Job{}, nil, fmt.Errorf("record log path of job %d: %w", job.ID, err)
@@ -151,7 +150,7 @@ func (o *Orchestrator) endJob(job Job, logFile *os.File, jobErr error) {
 		fmt.Fprintf(logFile, "\nJOB FAILED: %v\n", jobErr)
 	}
 	logFile.Close()
-	if _, err := o.DB.Exec(`UPDATE jobs SET status = ?, ended_at = ? WHERE id = ?`, status,
+	if _, err := o.DB.Exec(`UPDATE jobs SET status = $1, ended_at = $2 WHERE id = $3`, status,
 		o.now(), job.ID); err != nil {
 		panic(fmt.Sprintf("job table is not writable, stopping: %v", err))
 	}
@@ -233,18 +232,17 @@ func (o *Orchestrator) runPlan(ctx context.Context, wi WorkItem, layer, checkout
 		CreatedAt: o.now()}
 	factsJSON, _ := json.Marshal(facts)
 	decisionJSON, _ := json.Marshal(decision)
-	if _, err := o.DB.Exec(`UPDATE plans SET superseded = 1 WHERE work_item = ? AND layer = ?`,
+	if _, err := o.DB.Exec(`UPDATE plans SET superseded = 1 WHERE work_item = $1 AND layer = $2`,
 		wi.ID, layer); err != nil {
 		return Plan{}, fmt.Errorf("supersede old plans of %s %s: %w", wi.ID, layer, err)
 	}
-	res, err := o.DB.Exec(`INSERT INTO plans (work_item, layer, commit_sha, plan_sha256,
-		plan_path, json_path, facts, policy, created_at) VALUES (?,?,?,?,?,?,?,?,?)`,
+	err = o.DB.QueryRow(`INSERT INTO plans (work_item, layer, commit_sha, plan_sha256,
+		plan_path, json_path, facts, policy, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
 		plan.WorkItem, plan.Layer, plan.Commit, plan.SHA256, plan.PlanPath, plan.JSONPath,
-		string(factsJSON), string(decisionJSON), plan.CreatedAt)
+		string(factsJSON), string(decisionJSON), plan.CreatedAt).Scan(&plan.ID)
 	if err != nil {
 		return Plan{}, fmt.Errorf("record plan of %s %s: %w", wi.ID, layer, err)
 	}
-	plan.ID, _ = res.LastInsertId()
 	o.emit(audit.Event{Type: "plan.created", Actor: "runner", Env: wi.Env, Layer: layer,
 		WorkItem: wi.ID,
 		Summary: fmt.Sprintf("Plan of %s: %d to add, %d to change, %d to destroy, %d to replace",

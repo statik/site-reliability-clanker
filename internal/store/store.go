@@ -1,19 +1,18 @@
-// Package store opens the embedded SQLite database of the control plane.
+// Package store opens the PostgreSQL database of the control plane.
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"strings"
 	"time"
 
-	_ "modernc.org/sqlite" // registers the "sqlite" driver
+	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" driver
 )
 
 const schema = `
 CREATE TABLE IF NOT EXISTS events (
-  seq INTEGER PRIMARY KEY AUTOINCREMENT,
+  seq BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   ts TEXT NOT NULL, wall_ts TEXT NOT NULL, type TEXT NOT NULL, actor TEXT NOT NULL,
   env TEXT NOT NULL DEFAULT '', layer TEXT NOT NULL DEFAULT '',
   work_item TEXT NOT NULL DEFAULT '', summary TEXT NOT NULL DEFAULT '',
@@ -25,20 +24,20 @@ CREATE TABLE IF NOT EXISTS work_items (
   id TEXT PRIMARY KEY, title TEXT NOT NULL, kind TEXT NOT NULL, env TEXT NOT NULL,
   layers TEXT NOT NULL DEFAULT '[]', state TEXT NOT NULL,
   tier TEXT NOT NULL DEFAULT '', tier_rule TEXT NOT NULL DEFAULT '',
-  trigger TEXT NOT NULL DEFAULT '', pr_id INTEGER NOT NULL DEFAULT 0,
+  trigger TEXT NOT NULL DEFAULT '', pr_id BIGINT NOT NULL DEFAULT 0,
   commit_sha TEXT NOT NULL DEFAULT '', base_commit TEXT NOT NULL DEFAULT '',
   summary TEXT NOT NULL DEFAULT '', explanation TEXT NOT NULL DEFAULT '{}',
   scheduled_for TEXT NOT NULL DEFAULT '', rollback_of TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
 
 CREATE TABLE IF NOT EXISTS plans (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, work_item TEXT NOT NULL, layer TEXT NOT NULL,
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, work_item TEXT NOT NULL, layer TEXT NOT NULL,
   commit_sha TEXT NOT NULL, plan_sha256 TEXT NOT NULL, plan_path TEXT NOT NULL,
   json_path TEXT NOT NULL, facts TEXT NOT NULL DEFAULT '{}', policy TEXT NOT NULL DEFAULT '{}',
-  superseded INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
+  superseded BIGINT NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
 
 CREATE TABLE IF NOT EXISTS approvals (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, work_item TEXT NOT NULL, approver TEXT NOT NULL,
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, work_item TEXT NOT NULL, approver TEXT NOT NULL,
   decision TEXT NOT NULL, comment TEXT NOT NULL DEFAULT '', commit_sha TEXT NOT NULL,
   plan_hashes TEXT NOT NULL DEFAULT '{}', at TEXT NOT NULL);
 
@@ -50,36 +49,36 @@ CREATE TABLE IF NOT EXISTS grants (
   status TEXT NOT NULL, issued_at TEXT NOT NULL, ended_at TEXT NOT NULL DEFAULT '');
 
 CREATE TABLE IF NOT EXISTS jobs (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, work_item TEXT NOT NULL, layer TEXT NOT NULL DEFAULT '',
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, work_item TEXT NOT NULL, layer TEXT NOT NULL DEFAULT '',
   kind TEXT NOT NULL, status TEXT NOT NULL, log_path TEXT NOT NULL DEFAULT '',
   grant_id TEXT NOT NULL DEFAULT '', tool_digest TEXT NOT NULL DEFAULT '',
   started_at TEXT NOT NULL, ended_at TEXT NOT NULL DEFAULT '');
 
 CREATE TABLE IF NOT EXISTS prs (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, repo TEXT NOT NULL, title TEXT NOT NULL,
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, repo TEXT NOT NULL, title TEXT NOT NULL,
   body TEXT NOT NULL DEFAULT '', branch TEXT NOT NULL, base TEXT NOT NULL DEFAULT 'main',
   head_commit TEXT NOT NULL, base_commit TEXT NOT NULL, state TEXT NOT NULL,
   author TEXT NOT NULL, work_item TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL,
   merged_at TEXT NOT NULL DEFAULT '');
 
 CREATE TABLE IF NOT EXISTS findings (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, detector TEXT NOT NULL, env TEXT NOT NULL,
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, detector TEXT NOT NULL, env TEXT NOT NULL,
   key TEXT NOT NULL UNIQUE, title TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '{}',
   state TEXT NOT NULL, work_item TEXT NOT NULL DEFAULT '', at TEXT NOT NULL);
 
 CREATE TABLE IF NOT EXISTS snapshots (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, env TEXT NOT NULL,
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, ts TEXT NOT NULL, env TEXT NOT NULL,
   reason TEXT NOT NULL, data TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS snapshots_ts ON snapshots(env, ts);
 
 CREATE TABLE IF NOT EXISTS health (
-  ts TEXT NOT NULL, env TEXT NOT NULL, ok INTEGER NOT NULL, total INTEGER NOT NULL,
-  p95_ms REAL NOT NULL, version TEXT NOT NULL DEFAULT '');
+  ts TEXT NOT NULL, env TEXT NOT NULL, ok BIGINT NOT NULL, total BIGINT NOT NULL,
+  p95_ms DOUBLE PRECISION NOT NULL, version TEXT NOT NULL DEFAULT '');
 CREATE INDEX IF NOT EXISTS health_ts ON health(env, ts);
 
 CREATE TABLE IF NOT EXISTS deliveries (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, event_seq INTEGER NOT NULL, channel TEXT NOT NULL,
-  target TEXT NOT NULL, status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0,
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, event_seq BIGINT NOT NULL, channel TEXT NOT NULL,
+  target TEXT NOT NULL, status TEXT NOT NULL, attempts BIGINT NOT NULL DEFAULT 0,
   error TEXT NOT NULL DEFAULT '', subject TEXT NOT NULL DEFAULT '', at TEXT NOT NULL);
 
 CREATE TABLE IF NOT EXISTS users (
@@ -87,14 +86,14 @@ CREATE TABLE IF NOT EXISTS users (
   last_seen TEXT NOT NULL DEFAULT '');
 
 CREATE TABLE IF NOT EXISTS chat (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, work_item TEXT NOT NULL DEFAULT '',
-  user TEXT NOT NULL, role TEXT NOT NULL, body TEXT NOT NULL,
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, work_item TEXT NOT NULL DEFAULT '',
+  username TEXT NOT NULL, role TEXT NOT NULL, body TEXT NOT NULL,
   citations TEXT NOT NULL DEFAULT '[]', at TEXT NOT NULL);
 
 CREATE TABLE IF NOT EXISTS agent_calls (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT NOT NULL, work_item TEXT NOT NULL DEFAULT '',
-  model TEXT NOT NULL, mode TEXT NOT NULL, prompt_tokens INTEGER NOT NULL DEFAULT 0,
-  completion_tokens INTEGER NOT NULL DEFAULT 0, cost_usd REAL NOT NULL DEFAULT 0,
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, role TEXT NOT NULL, work_item TEXT NOT NULL DEFAULT '',
+  model TEXT NOT NULL, mode TEXT NOT NULL, prompt_tokens BIGINT NOT NULL DEFAULT 0,
+  completion_tokens BIGINT NOT NULL DEFAULT 0, cost_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
   transcript TEXT NOT NULL DEFAULT '', at TEXT NOT NULL);
 
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -118,38 +117,55 @@ func ParseTime(s string) time.Time {
 	return t
 }
 
-// JournalEnv names the environment variable that selects the journal mode of the database.
-const JournalEnv = "CLANKER_DB_JOURNAL"
+// PostgresImage is the container image of the database on the local target and in tests.
+const PostgresImage = "postgres:18.7"
 
-// journalMode returns the SQLite journal mode. The default is WAL. WAL needs shared
-// memory, which a network file system does not give, so a control plane whose data
-// directory is on one (Amazon EFS on Fargate) sets the variable to DELETE.
-func journalMode() (string, error) {
-	switch mode := strings.ToUpper(os.Getenv(JournalEnv)); mode {
-	case "", "WAL":
-		return "WAL", nil
-	case "DELETE":
-		return "DELETE", nil
-	default:
-		return "", fmt.Errorf("%s is %q: use WAL or DELETE", JournalEnv, mode)
-	}
-}
+// URLEnv names the environment variable with the address of the database. On a cloud the
+// setup sets it. On the local target `clanker up` starts a PostgreSQL container and sets it.
+const URLEnv = "CLANKER_DATABASE_URL"
 
-// Open opens the database file at path and applies the schema.
-func Open(path string) (*sql.DB, error) {
-	mode, err := journalMode()
-	if err != nil {
-		return nil, err
+// schemaLock is the key of the advisory lock that serializes schema changes, so that two
+// processes that start at the same moment do not create the same table twice.
+const schemaLock = 7070001
+
+// Open connects to the PostgreSQL database at url and applies the schema.
+//
+// The pool has one connection. The control plane relied on one writer when its database
+// was an embedded file, and the hash chain of the audit log needs each append to see the
+// one before it. One connection keeps that order.
+func Open(url string) (*sql.DB, error) {
+	if url == "" {
+		return nil, fmt.Errorf("the address of the database is empty: set %s to a "+
+			"postgres:// address", URLEnv)
 	}
-	dsn := "file:" + path + "?_pragma=journal_mode(" + mode + ")&_pragma=busy_timeout(10000)" +
-		"&_pragma=foreign_keys(ON)"
-	db, err := sql.Open("sqlite", dsn)
+	db, err := sql.Open("pgx", url)
 	if err != nil {
-		return nil, fmt.Errorf("open database %s: %w", path, err)
+		return nil, fmt.Errorf("open the database: %w", err)
 	}
 	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(schema); err != nil {
-		return nil, fmt.Errorf("apply schema to %s: %w", path, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := db.PingContext(ctx); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("connect to the database: %w", err)
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("start the schema transaction: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck // a rollback after a commit does nothing
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1)`, schemaLock); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("lock the schema: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, schema); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("apply the schema: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("commit the schema: %w", err)
 	}
 	return db, nil
 }
@@ -157,7 +173,7 @@ func Open(path string) (*sql.DB, error) {
 // GetKV reads a value from the kv table. A missing key gives "".
 func GetKV(db *sql.DB, key string) (string, error) {
 	var v string
-	err := db.QueryRow(`SELECT value FROM kv WHERE key = ?`, key).Scan(&v)
+	err := db.QueryRow(`SELECT value FROM kv WHERE key = $1`, key).Scan(&v)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
@@ -169,7 +185,7 @@ func GetKV(db *sql.DB, key string) (string, error) {
 
 // SetKV writes a value to the kv table.
 func SetKV(db *sql.DB, key, value string) error {
-	_, err := db.Exec(`INSERT INTO kv(key, value) VALUES(?, ?)
+	_, err := db.Exec(`INSERT INTO kv(key, value) VALUES($1, $2)
 		ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value)
 	if err != nil {
 		return fmt.Errorf("write kv %q: %w", key, err)

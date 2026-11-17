@@ -286,12 +286,11 @@ func (a *Agent) gatherWorkItem(workItem string) (grounding, error) {
 func (a *Agent) saveChat(e ChatEntry) (ChatEntry, error) {
 	citations, _ := json.Marshal(e.Citations)
 	e.At = a.now()
-	res, err := a.DB.Exec(`INSERT INTO chat (work_item, user, role, body, citations, at)
-		VALUES (?,?,?,?,?,?)`, e.WorkItem, e.User, e.Role, e.Body, string(citations), e.At)
+	err := a.DB.QueryRow(`INSERT INTO chat (work_item, username, role, body, citations, at)
+		VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`, e.WorkItem, e.User, e.Role, e.Body, string(citations), e.At).Scan(&e.ID)
 	if err != nil {
 		return ChatEntry{}, fmt.Errorf("store chat message: %w", err)
 	}
-	e.ID, _ = res.LastInsertId()
 	return e, nil
 }
 
@@ -352,8 +351,8 @@ func containsAny(text string, keywords []string) bool {
 
 // History returns the Ask conversation. An empty work item gives the global conversation.
 func (a *Agent) History(workItem string) ([]ChatEntry, error) {
-	rows, err := a.DB.Query(`SELECT id, work_item, user, role, body, citations, at FROM chat
-		WHERE work_item = ? ORDER BY id`, workItem)
+	rows, err := a.DB.Query(`SELECT id, work_item, username, role, body, citations, at FROM chat
+		WHERE work_item = $1 ORDER BY id`, workItem)
 	if err != nil {
 		return nil, fmt.Errorf("read chat history: %w", err)
 	}
