@@ -1,25 +1,12 @@
 package broker
 
 import (
-	"bytes"
 	"context"
-	_ "embed"
-	"encoding/json"
 	"fmt"
-	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
-
-//go:embed identities.yaml
-var identitiesManifest []byte
-
-//go:embed identities-app.yaml
-var appIdentitiesManifest []byte
-
-const identityNamespace = "clanker-system"
 
 // Credential is what the broker gives a runner for one grant.
 type Credential struct {
@@ -31,42 +18,15 @@ type Credential struct {
 	Mechanism string
 }
 
-// clusterLayers are the layers that need a Kubernetes credential on the local target.
-var clusterLayers = map[string]bool{"30-data": true, "40-platform": true, "50-app": true}
-
-func kubectl(ctx context.Context, kubeconfig string, stdin []byte, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "kubectl", append([]string{"--kubeconfig", kubeconfig},
-		args...)...)
-	if stdin != nil {
-		cmd.Stdin = bytes.NewReader(stdin)
-	}
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("kubectl %s: %w: %s", strings.Join(args, " "), err,
-			strings.TrimSpace(stderr.String()))
-	}
-	return stdout.String(), nil
-}
-
-// EnsureIdentities creates the service accounts and bindings on the cluster of env.
-func (b *Broker) EnsureIdentities(ctx context.Context, env string) error {
-	admin, err := b.adminKubeconfig(env)
-	if err != nil {
-		return err
-	}
-	if _, err := kubectl(ctx, admin, identitiesManifest, "apply", "-f", "-"); err != nil {
-		return fmt.Errorf("create broker identities on %s: %w", env, err)
-	}
-	if _, err := kubectl(ctx, admin, nil, "get", "namespace", "paperboat"); err != nil {
-		return nil
-	}
-	if _, err := kubectl(ctx, admin, appIdentitiesManifest, "apply", "-f", "-"); err != nil {
-		return fmt.Errorf("create namespace bindings on %s: %w", env, err)
-	}
-	return nil
+// Issuer makes and withdraws the credentials of grants on one kind of target. The broker
+// calls it only for a grant that it checked. Each target has its own issuer, because the
+// credential comes from the API of the target.
+type Issuer interface {
+	// Issue returns a credential that is valid for no longer than the target allows after
+	// remaining, the time until the grant expires.
+	Issue(ctx context.Context, g Grant, remaining time.Duration) (Credential, error)
+	// Withdraw makes the credential of an ended grant invalid.
+	Withdraw(ctx context.Context, g Grant) error
 }
 
 // Exchange checks the grant and returns a credential that expires with it.
@@ -74,84 +34,29 @@ func (b *Broker) Exchange(ctx context.Context, g Grant, p Presentation) (Credent
 	if err := b.Check(g, p); err != nil {
 		return Credential{}, err
 	}
-	cred := Credential{GrantID: g.ID}
-	if g.Kind == KindApply && !clusterLayers[g.Layer] {
-		cred.Mechanism = "local Docker socket; this layer has no cluster credential"
-		return cred, b.setStatus(g.ID, "active", false)
+	if b.issuer == nil {
+		return Credential{}, fmt.Errorf("grant %s: this control plane has no credential issuer "+
+			"for the target of %s", g.ID, g.Env)
 	}
-	admin, err := b.adminKubeconfig(g.Env)
-	if err != nil {
-		return Credential{}, err
-	}
-	if err := b.EnsureIdentities(ctx, g.Env); err != nil {
-		return Credential{}, err
-	}
-	account := "clanker-" + g.Identity
 	remaining := store.ParseTime(g.Expires).Sub(b.clock.Now())
-	// The Kubernetes API refuses a token lifetime under ten minutes.
-	lifetime := max(remaining, 10*time.Minute)
-	token, err := kubectl(ctx, admin, nil, "create", "token", account, "-n", identityNamespace,
-		fmt.Sprintf("--duration=%ds", int(lifetime.Seconds())), "--audience=https://kubernetes.default.svc.cluster.local")
-	if err != nil {
-		return Credential{}, fmt.Errorf("issue token for %s under grant %s: %w", account, g.ID, err)
-	}
-	text, err := grantKubeconfig(ctx, admin, g.ID, account, strings.TrimSpace(token))
+	cred, err := b.issuer.Issue(ctx, g, remaining)
 	if err != nil {
 		return Credential{}, err
 	}
-	cred.KubeConfig = text
-	cred.Mechanism = fmt.Sprintf("Kubernetes TokenRequest for service account %s, lifetime %s",
-		account, lifetime.Round(time.Second))
+	cred.GrantID = g.ID
 	return cred, b.setStatus(g.ID, "active", false)
 }
 
-// grantKubeconfig returns a kubeconfig for the cluster of the administrator kubeconfig,
-// with the token of the grant as its only user.
-func grantKubeconfig(ctx context.Context, admin, grantID, user, token string) (string, error) {
-	raw, err := kubectl(ctx, admin, nil, "config", "view", "--raw", "--minify", "-o", "json")
-	if err != nil {
-		return "", fmt.Errorf("read cluster address for grant %s: %w", grantID, err)
-	}
-	var config map[string]any
-	if err := json.Unmarshal([]byte(raw), &config); err != nil {
-		return "", fmt.Errorf("decode administrator kubeconfig: %w", err)
-	}
-	clusters, _ := config["clusters"].([]any)
-	if len(clusters) != 1 {
-		return "", fmt.Errorf("administrator kubeconfig has %d clusters, want 1", len(clusters))
-	}
-	cluster, _ := clusters[0].(map[string]any)
-	clusterName, _ := cluster["name"].(string)
-	config["users"] = []any{map[string]any{"name": user, "user": map[string]any{"token": token}}}
-	config["contexts"] = []any{map[string]any{"name": "grant", "context": map[string]any{
-		"cluster": clusterName, "user": user}}}
-	config["current-context"] = "grant"
-	out, err := json.MarshalIndent(config, "", "  ")
-	if err != nil {
-		return "", fmt.Errorf("encode kubeconfig for grant %s: %w", grantID, err)
-	}
-	return string(out), nil
-}
-
-// Revoke ends a grant. For an apply, runbook or debug grant on a cluster it also deletes and
-// recreates the service account, which makes every token of that account invalid at once.
+// Revoke ends a grant and then makes its credential invalid. The grant is ended also when
+// the issuer fails.
 func (b *Broker) Revoke(ctx context.Context, g Grant, outcome string) error {
 	if err := b.setStatus(g.ID, outcome, true); err != nil {
 		return err
 	}
-	if g.Kind == KindPlan || (g.Kind == KindApply && !clusterLayers[g.Layer]) {
+	if b.issuer == nil {
 		return nil
 	}
-	admin, err := b.adminKubeconfig(g.Env)
-	if err != nil {
-		return err
-	}
-	account := "clanker-" + g.Identity
-	if _, err := kubectl(ctx, admin, nil, "delete", "serviceaccount", account, "-n",
-		identityNamespace, "--ignore-not-found"); err != nil {
-		return fmt.Errorf("revoke tokens of %s for grant %s: %w", account, g.ID, err)
-	}
-	return b.EnsureIdentities(ctx, g.Env)
+	return b.issuer.Withdraw(ctx, g)
 }
 
 // ExpireOverdue marks grants whose window ended without a revoke. It returns them.

@@ -8,9 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/audit"
@@ -38,9 +36,10 @@ type Simulator struct {
 	SourceDir string
 	// AdminToken is the fault-injection token of the application.
 	AdminToken string
-	// AdminKubeconfig returns the administrator kubeconfig, to simulate a manual change.
-	AdminKubeconfig func(env string) (string, error)
-	Env             string
+	// ManualChange changes the environment outside the pipeline, as a person would. The
+	// target gives it. It is nil on a target that has none.
+	ManualChange func(ctx context.Context, env string) error
+	Env          string
 }
 
 // Scene is one step of the scripted month.
@@ -274,19 +273,15 @@ func (s *Simulator) drift(ctx context.Context) error {
 	if err := s.Advance(ctx, 24*time.Hour); err != nil {
 		return err
 	}
-	admin, err := s.AdminKubeconfig(s.Env)
-	if err != nil {
-		return err
+	if s.ManualChange == nil {
+		return fmt.Errorf("the target of %s has no way to simulate a manual change", s.Env)
 	}
-	out, err := exec.CommandContext(ctx, "kubectl", "--kubeconfig", admin, "-n",
-		"paperboat-data", "patch", "configmap", "backup-policy", "--type=merge", "-p",
-		`{"data":{"retention_days":"1"}}`).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("simulate a manual change: %w: %s", err, strings.TrimSpace(string(out)))
+	if err := s.ManualChange(ctx, s.Env); err != nil {
+		return fmt.Errorf("simulate a manual change: %w", err)
 	}
 	s.emit("sim.manual_change", "Someone set the backup retention to 1 day with kubectl",
 		map[string]any{"resource": "configmap/backup-policy", "namespace": "paperboat-data"})
-	_, err = s.Detector.CheckDrift(ctx, s.Env)
+	_, err := s.Detector.CheckDrift(ctx, s.Env)
 	return err
 }
 

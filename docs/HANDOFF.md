@@ -36,10 +36,12 @@ What ran on the build of commit `376617b`, the last change to the Go code:
 
 ### Next steps, in order
 
-1. **Local-only code behind interfaces.** The access broker (`internal/broker/credentials.go`)
-   and the simulator start `kubectl`. Move that code to packages that only the local target
-   wires in. Then make the lint check follow imports inside this module, from a core entry
-   point.
+1. **Local-only code behind interfaces.** Done. The code that starts `kubectl` is in
+   `internal/localtarget`, which only `cmd/clanker/up.go` wires in, and only for the local
+   target. The broker takes a `broker.Issuer` and the simulator takes a `ManualChange`
+   function. On a cloud both are absent: the broker exchanges no grant and the drift scene
+   reports an error. `scripts/lint-core.sh` follows the imports of the core packages inside
+   this module.
 2. **A core entry point with no file.** Today the core still writes: the unpacked bundle,
    the data directory, `broker.key`, `database.password`. On a cloud the signing key and the
    database address must come from a secret store at start. `ops` writes `Env` into the
@@ -151,11 +153,12 @@ group. Section 12 of the plan records the five decisions that follow from the la
   no fault in the objects that the forge wrote. Two changes to lines next to each other
   are a conflict, as in git.
 - **Core and runners (2026-11-17):** the control plane has two parts in one program.
-  - The core is the packages in `CORE_PACKAGES` of the Makefile. A lint check and CI refuse
-    a direct import of `os/exec` in them. The check does not follow imports: the
-    orchestrator still imports the access broker, and the API still imports the simulator,
-    and both of those start `kubectl`. The core holds no file path: plans, plan JSON, job logs and layer
-    outputs are rows in PostgreSQL, and policy rules and runbook scripts come from the forge.
+  - The core is the packages in `CORE_PACKAGES` of the Makefile and every package of this
+    module that they import. `make lint-core` and CI refuse an import of `os/exec` in them.
+    The check does not look inside other modules: go-git has a file transport that imports
+    `os/exec`, which the forge does not use. The core holds no file path: plans, plan JSON,
+    job logs and layer outputs are rows in PostgreSQL, and policy rules and runbook scripts
+    come from the forge.
   - A job is a value (`internal/jobspec`). The dispatcher (`internal/dispatch`) gives it to a
     runner and waits. A launcher starts the runner. On the local target the launcher starts
     `clanker runner` as a process on the same machine (`internal/launch`).
@@ -167,10 +170,9 @@ group. Section 12 of the plan records the five decisions that follow from the la
   - A plan file can hold secret values in clear text. It is now a row in the database, where
     before it was a file in the data directory. No route serves it.
 - **Still not ready for the unikernel:**
-  - The local access broker and the simulator start `kubectl`, and the broker keeps its
-    signing key in a file. They must move behind interfaces that only the local target
-    fills, and the lint check must then follow imports. A cloud needs a broker that uses the API of the cloud, and a key from a secret
-    store.
+  - The broker keeps its signing key in a file. A cloud needs a key from a secret store,
+    and a `broker.Issuer` that uses the API of the cloud. The simulator reads release
+    notes from the checkout.
   - There is no launcher for a cloud (a Fargate task), and the runner has no remote state
     backend. The job specification has a field for the backend settings.
   - A job in flight is lost when the core stops. The work item must be reconciled at start.

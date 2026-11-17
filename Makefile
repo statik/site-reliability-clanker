@@ -1,4 +1,4 @@
-.PHONY: build web demo test lint destroy clean-data bundle release
+.PHONY: build web demo test lint lint-core destroy clean-data bundle release
 
 build:
 	go build -o bin/clanker ./cmd/clanker
@@ -37,19 +37,18 @@ test:
 # The core of the control plane must run as a unikernel, which cannot start a program.
 CORE_PACKAGES := agent api audit detect dispatch forge jobspec monitor notify orchestrator planfacts policy scrub store
 
-lint:
-	@for p in $(CORE_PACKAGES); do \
-		if go list -f '{{join .Imports "\n"}}' ./internal/$$p | grep -qx os/exec; then \
-			echo "internal/$$p imports os/exec: the core must not start a program"; exit 1; \
-		fi; \
-	done
+lint-core:
+	scripts/lint-core.sh $(CORE_PACKAGES)
+
+lint: lint-core
 	test -z "$$(gofmt -l cmd internal apps/paperboat)"
 	go vet ./...
 	cd apps/paperboat && go vet ./...
 	tofu fmt -check -recursive platform
 	opa check runbooks/policy
-	shellcheck runbooks/jobs/*.sh apps/paperboat/build.sh ops/run-local.sh
-	shfmt -i 2 -d runbooks/jobs apps/paperboat/build.sh ops/run-local.sh
+	shellcheck runbooks/jobs/*.sh apps/paperboat/build.sh ops/run-local.sh scripts/*.sh \
+		scripts/verify/*.sh
+	shfmt -i 2 -d runbooks/jobs apps/paperboat/build.sh ops/run-local.sh scripts
 
 destroy: build
 	./bin/clanker destroy --env local
