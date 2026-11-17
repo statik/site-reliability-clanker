@@ -165,24 +165,53 @@ func (s *Service) login(w http.ResponseWriter, r *http.Request) {
 		oauth2.S256ChallengeOption(verifier)), http.StatusFound)
 }
 
-// identity checks the answer of the provider and returns the verified email.
-func (s *Service) identity(r *http.Request) (email, back string, err error) {
+// loginState reads what the login kept in the cookie of this browser, and checks that the
+// answer of the provider belongs to that login.
+func loginState(r *http.Request) (nonce, verifier, back string, err error) {
 	saved, err := r.Cookie(loginCookie)
 	if err != nil {
-		return "", "", errors.New("this browser did not start a sign-in, or the sign-in took " +
-			"longer than ten minutes")
+		return "", "", "", errors.New("this browser did not start a sign-in, or the sign-in " +
+			"took longer than ten minutes")
 	}
 	// The return path is the last part and can hold dots of its own.
 	parts := strings.SplitN(saved.Value, ".", 4)
 	if len(parts) != 4 {
-		return "", "", errors.New("the sign-in cookie is not valid")
+		return "", "", "", errors.New("the sign-in cookie is not valid")
 	}
-	state, nonce, verifier := parts[0], parts[1], parts[2]
-	if subtle.ConstantTimeCompare([]byte(r.URL.Query().Get("state")), []byte(state)) != 1 {
-		return "", "", errors.New("the answer of the identity provider does not belong to this sign-in")
+	if subtle.ConstantTimeCompare([]byte(r.URL.Query().Get("state")), []byte(parts[0])) != 1 {
+		return "", "", "", errors.New("the answer of the identity provider does not belong to " +
+			"this sign-in")
 	}
 	if problem := r.URL.Query().Get("error"); problem != "" {
-		return "", "", fmt.Errorf("the identity provider refused the sign-in: %s", problem)
+		return "", "", "", fmt.Errorf("the identity provider refused the sign-in: %s", problem)
+	}
+	if back, err = url.QueryUnescape(parts[3]); err != nil {
+		back = "/"
+	}
+	return parts[1], parts[2], localPath(back), nil
+}
+
+// confirmedEmail returns the email address of an ID token that the provider confirmed.
+func confirmedEmail(idToken *oidc.IDToken) (string, error) {
+	var claims struct {
+		Email    string `json:"email"`
+		Verified bool   `json:"email_verified"`
+	}
+	if err := idToken.Claims(&claims); err != nil {
+		return "", fmt.Errorf("read the claims of the ID token: %w", err)
+	}
+	if claims.Email == "" || !claims.Verified {
+		return "", errors.New("the identity provider did not confirm an email address for " +
+			"this account: the ID token needs the claims email and email_verified")
+	}
+	return strings.ToLower(claims.Email), nil
+}
+
+// identity checks the answer of the provider and returns the verified email.
+func (s *Service) identity(r *http.Request) (email, back string, err error) {
+	nonce, verifier, back, err := loginState(r)
+	if err != nil {
+		return "", "", err
 	}
 	token, err := s.oauth.Exchange(r.Context(), r.URL.Query().Get("code"),
 		oauth2.VerifierOption(verifier))
@@ -200,22 +229,8 @@ func (s *Service) identity(r *http.Request) (email, back string, err error) {
 	if subtle.ConstantTimeCompare([]byte(idToken.Nonce), []byte(nonce)) != 1 {
 		return "", "", errors.New("the ID token does not belong to this sign-in")
 	}
-	var claims struct {
-		Email    string `json:"email"`
-		Verified bool   `json:"email_verified"`
-	}
-	if err := idToken.Claims(&claims); err != nil {
-		return "", "", fmt.Errorf("read the claims of the ID token: %w", err)
-	}
-	if claims.Email == "" || !claims.Verified {
-		return "", "", errors.New("the identity provider did not confirm an email address for " +
-			"this account: the ID token needs the claims email and email_verified")
-	}
-	back, err = url.QueryUnescape(parts[3])
-	if err != nil {
-		back = "/"
-	}
-	return strings.ToLower(claims.Email), localPath(back), nil
+	email, err = confirmedEmail(idToken)
+	return email, back, err
 }
 
 func (s *Service) callback(w http.ResponseWriter, r *http.Request) {

@@ -135,6 +135,27 @@ func waitForToken(ctx context.Context, server, device string, interval time.Dura
 	}
 }
 
+// deviceGrant is the answer of a control plane to a request for a code.
+type deviceGrant struct {
+	Device   string `json:"device_code"`
+	User     string `json:"user_code"`
+	Page     string `json:"verification_uri_complete"`
+	Interval int    `json:"interval"`
+}
+
+func requestCode(ctx context.Context, server string) (deviceGrant, error) {
+	var code deviceGrant
+	status, err := postForm(ctx, server+"/auth/device/code", nil, &code)
+	if err != nil {
+		return deviceGrant{}, err
+	}
+	if status != http.StatusOK || code.Device == "" {
+		return deviceGrant{}, fmt.Errorf("%s gave no code (status %d): is this a control plane "+
+			"with a sign-in?", server, status)
+	}
+	return code, nil
+}
+
 // runLogin signs this machine in to a control plane with the device flow: it shows a code,
 // and a person who is signed in to the dashboard approves the code in a browser.
 func runLogin(ctx context.Context, args []string) error {
@@ -147,19 +168,9 @@ func runLogin(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	var code struct {
-		Device   string `json:"device_code"`
-		User     string `json:"user_code"`
-		Page     string `json:"verification_uri_complete"`
-		Interval int    `json:"interval"`
-	}
-	status, err := postForm(ctx, server+"/auth/device/code", nil, &code)
+	code, err := requestCode(ctx, server)
 	if err != nil {
 		return err
-	}
-	if status != http.StatusOK || code.Device == "" {
-		return fmt.Errorf("%s gave no code (status %d): is this a control plane with a sign-in?",
-			server, status)
 	}
 	fmt.Printf("Open this page in a browser where you are signed in to the dashboard:\n\n  %s\n\n"+
 		"Approve only when the page shows the code %s.\nWaiting for the approval...\n",
@@ -177,17 +188,49 @@ func runLogin(ctx context.Context, args []string) error {
 		return err
 	}
 	fmt.Printf("This machine is signed in to %s until %s.\nFor git, run once:\n\n"+
-		"  git config --global credential.%s.helper '!clanker git-credential'\n", server,
-		token.Expires.Local().Format("15:04 on 2 January"), server)
+		"  git config --global credential.%s.helper '!clanker git-credential'\n"+
+		"For a script, clanker token --server %s prints the token.\n", server,
+		token.Expires.Local().Format("15:04 on 2 January"), server, server)
 	return nil
 }
 
-// runGitCredential is a credential helper for git. git gives the address on standard input
-// and reads the user name and the password. The password is the token from clanker login.
-func runGitCredential(args []string) error {
-	if len(args) != 1 {
-		return errors.New("usage: clanker git-credential get|store|erase (git runs this)")
+// validToken returns the token of this machine for a control plane, when it has one that
+// did not end.
+func validToken(server string) (string, bool, error) {
+	saved, err := readCredentials()
+	if err != nil {
+		return "", false, err
 	}
+	token, found := saved[server]
+	return token.Token, found && time.Now().Before(token.Expires), nil
+}
+
+// runToken prints the token of this machine for a control plane, for a script.
+func runToken(args []string) error {
+	flags := flag.NewFlagSet("clanker token", flag.ContinueOnError)
+	address := flags.String("server", "", "address of the control plane")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	server, err := serverKey(*address)
+	if err != nil {
+		return err
+	}
+	token, valid, err := validToken(server)
+	if err != nil {
+		return err
+	}
+	if !valid {
+		return fmt.Errorf("this machine is not signed in to %s: run clanker login --server %s",
+			server, server)
+	}
+	fmt.Println(token)
+	return nil
+}
+
+// gitRequest reads what git gives a credential helper on standard input, and returns the
+// address of the server that git asks about.
+func gitRequest() (string, error) {
 	request := map[string]string{}
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
@@ -196,26 +239,47 @@ func runGitCredential(args []string) error {
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("read the request of git: %w", err)
+		return "", fmt.Errorf("read the request of git: %w", err)
 	}
-	server := request["protocol"] + "://" + request["host"]
+	return request["protocol"] + "://" + request["host"], nil
+}
+
+// runGitCredential is a credential helper for git. git gives the address on standard input
+// and reads the user name and the password. The password is the token from clanker login.
+func runGitCredential(args []string) error {
+	if len(args) != 1 {
+		return errors.New("usage: clanker git-credential get|store|erase (git runs this)")
+	}
+	server, err := gitRequest()
+	if err != nil {
+		return err
+	}
+	switch args[0] {
+	case "get":
+		// With no answer, git asks the next helper or the person.
+		token, valid, err := validToken(server)
+		if err != nil {
+			return err
+		}
+		if valid {
+			fmt.Printf("username=clanker\npassword=%s\n", token)
+		}
+	case "erase":
+		// git erases a credential that the server refused, so the token is of no use.
+		return forgetToken(server)
+	}
+	return nil
+}
+
+// forgetToken removes the token of this machine for a control plane.
+func forgetToken(server string) error {
 	saved, err := readCredentials()
 	if err != nil {
 		return err
 	}
-	token, found := saved[server]
-	switch args[0] {
-	case "get":
-		// With no answer, git asks the next helper or the person.
-		if found && time.Now().Before(token.Expires) {
-			fmt.Printf("username=clanker\npassword=%s\n", token.Token)
-		}
-	case "erase":
-		// git erases a credential that the server refused, so the token is of no use.
-		if found {
-			delete(saved, server)
-			return writeCredentials(saved)
-		}
+	if _, found := saved[server]; !found {
+		return nil
 	}
-	return nil
+	delete(saved, server)
+	return writeCredentials(saved)
 }

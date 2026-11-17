@@ -156,6 +156,18 @@ func serveUploadPack(w http.ResponseWriter, r *http.Request, gitServer transport
 	}
 }
 
+// changesMain reports whether a push creates, moves or removes the main branch. The main
+// branch is what the control plane plans and applies, and it holds the policy rules. It
+// changes only when the forge merges a pull request after the approvals.
+func changesMain(request *packp.ReferenceUpdateRequest) bool {
+	for _, command := range request.Commands {
+		if command.Name == branchRef(mainBranch) {
+			return true
+		}
+	}
+	return false
+}
+
 func serveReceivePack(w http.ResponseWriter, r *http.Request, gitServer transport.Transport,
 	endpoint *transport.Endpoint) {
 	input, err := body(r)
@@ -167,6 +179,11 @@ func serveReceivePack(w http.ResponseWriter, r *http.Request, gitServer transpor
 	request := packp.NewReferenceUpdateRequest()
 	if err := request.Decode(input); err != nil {
 		http.Error(w, "read the push request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if changesMain(request) {
+		http.Error(w, "the branch main changes only through a pull request: push another "+
+			"branch and open a pull request", http.StatusForbidden)
 		return
 	}
 	session, err := gitServer.NewReceivePackSession(endpoint, nil)

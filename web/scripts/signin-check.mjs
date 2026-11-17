@@ -31,6 +31,24 @@ if ((await page.getByText("There is no sign-in in this prototype").count()) > 0)
   problems.push("the panel still offers the user switcher of the demo");
 }
 
+// A program asks for a code, and the signed-in person approves it on the page of the core.
+const grant = await (await fetch(`${dashboard}/auth/device/code`, { method: "POST" })).json();
+await page.goto(grant.verification_uri_complete);
+await page.getByText(grant.user_code).waitFor({ timeout: 15000 }).catch(() =>
+  problems.push("the page of the device flow does not show the code"));
+await page.getByRole("button", { name: "Approve", exact: true }).click();
+await page.getByText(`The program is signed in as ${email}.`).waitFor({ timeout: 15000 }).catch(() =>
+  problems.push("the approval of the code did not work in the browser"));
+const issued = await (await fetch(`${dashboard}/auth/device/token`, {
+  method: "POST",
+  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  body: `device_code=${encodeURIComponent(grant.device_code)}`,
+})).json();
+const me = await fetch(`${dashboard}/api/v1/me`, { headers: { Authorization: `Bearer ${issued.access_token}` } });
+if (!me.ok || (await me.json()).email !== email) problems.push("the token of the program does not act as the person");
+await page.goto(`${dashboard}/timeline`);
+await page.getByRole("button", { name: "Account", exact: true }).click();
+
 // After the sign-out the provider offers an account that it did not confirm, so the next
 // sign-in must fail and the dashboard must stay closed.
 await person("mallory@example.com", false);
@@ -45,4 +63,4 @@ if (problems.length > 0) {
   console.error(`sign-in: ${problems.length} problems\n  - ${problems.join("\n  - ")}`);
   process.exit(1);
 }
-console.log(`sign-in: ${email} signed in as ${role}, signed out, and the dashboard closed`);
+console.log(`sign-in: ${email} signed in as ${role}, approved a program, signed out, and the dashboard closed`);

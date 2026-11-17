@@ -16,8 +16,10 @@ the machine image with `ops`.
 
 ### State at the end of the second session of 2026-11-17
 
-Next steps 1 to 5 are merged (#39, #42, #43, #44, #46, #47 and the pull request of the
-device flow). The next work is step 6: the cloud runner and broker.
+Next steps 1 to 4 are merged, and of step 5 the sign-in for a browser and the device flow
+for git and scripts (#39, #42, #43, #44, #46, #47 and the pull request of the device flow).
+The next work is the last part of step 5, the device flow in the iOS app. Step 6 comes
+after that.
 
 The owner decided three things in that session:
 
@@ -155,8 +157,17 @@ What ran on the build of commit `376617b`, the last change to the Go code:
    - `clanker login --server <address>` runs the flow and keeps the token in the
      configuration directory of the user. `clanker git-credential` is a credential helper
      that gives the token to git.
+   - `clanker token --server <address>` prints the token for a script.
+   - Nobody pushes to the main branch of a repository of the forge over HTTP, with or
+     without the sign-in. It changes only when the forge merges a pull request.
    - Ran: `core-check.sh` runs `clanker login`, approves the code as the admin, calls the
-     API with the token and clones two repositories with the credential helper.
+     API with the token, clones two repositories with the credential helper, pushes a
+     branch, and is refused a push to the main branch. `web/scripts/signin-check.mjs`
+     approves a code in a real browser.
+   - Limits to know before a run in a real account: a sign-in, a code and a token leave no
+     audit event. A tier T3 change needs two approvers, and a control plane on a cloud
+     has only the first admin until somebody adds a row to the users table. The request
+     for a code is open to everybody and is not slowed down.
    - Not built: the iOS app does not use the device flow yet, and still sends the user
      header, which only the demo reads. There is no page to add a user or change a role: a
      user other than the first admin needs a row in the users table. There is no list of

@@ -237,6 +237,30 @@ func gitPush(r *http.Request) bool {
 		r.URL.Query().Get("service") == "git-receive-pack"
 }
 
+// refuse answers a request that the gate does not let through.
+func refuse(w http.ResponseWriter, r *http.Request, err error) {
+	var se statusError
+	switch {
+	case errors.Is(err, ErrNotSignedIn):
+		git := strings.HasPrefix(r.URL.Path, "/git/")
+		if r.Method == http.MethodGet && !git && !strings.HasPrefix(r.URL.Path, "/api/") {
+			// A browser that opens a page goes to the sign-in.
+			http.Redirect(w, r, "/auth/login?return="+url.QueryEscape(r.URL.RequestURI()),
+				http.StatusFound)
+			return
+		}
+		if git {
+			// With this header git asks its credential helper for the token.
+			w.Header().Set("WWW-Authenticate", `Basic realm="clanker"`)
+		}
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "not signed in"})
+	case errors.As(err, &se):
+		writeJSON(w, se.status, map[string]string{"error": err.Error()})
+	default:
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+}
+
 // gate lets a request through only when a known user is signed in. A browser that opens a
 // page goes to the sign-in. Every other request gets an error and no content.
 func (s *Server) gate(next http.Handler) http.Handler {
@@ -246,31 +270,16 @@ func (s *Server) gate(next http.Handler) http.Handler {
 			return
 		}
 		user, err := s.Identify(r)
-		var se statusError
-		switch {
-		case err == nil && gitPush(r) && user.Role != "approver" && user.Role != "admin":
+		if err != nil {
+			refuse(w, r, err)
+			return
+		}
+		if gitPush(r) && user.Role != "approver" && user.Role != "admin" {
 			writeJSON(w, http.StatusForbidden, map[string]string{"error": user.Name +
 				" has role " + user.Role + "; a push needs one of: approver, admin"})
-		case err == nil:
-			next.ServeHTTP(w, r)
-		case errors.Is(err, ErrNotSignedIn):
-			page := r.Method == http.MethodGet && !strings.HasPrefix(r.URL.Path, "/api/") &&
-				!strings.HasPrefix(r.URL.Path, "/git/")
-			if page {
-				http.Redirect(w, r, "/auth/login?return="+url.QueryEscape(r.URL.RequestURI()),
-					http.StatusFound)
-				return
-			}
-			if strings.HasPrefix(r.URL.Path, "/git/") {
-				// With this header git asks its credential helper for the token.
-				w.Header().Set("WWW-Authenticate", `Basic realm="clanker"`)
-			}
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "not signed in"})
-		case errors.As(err, &se):
-			writeJSON(w, se.status, map[string]string{"error": err.Error()})
-		default:
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
 		}
+		next.ServeHTTP(w, r)
 	})
 }
 

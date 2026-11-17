@@ -162,7 +162,7 @@ if [ "$(status -b "${jar}" -d "user_code=${code}" -d decision=approve "${base}/a
   fail "the admin could not approve the code ${code}"
 fi
 if ! wait "${login}"; then fail "clanker login did not end well; see ${work}/login.log"; fi
-token="$(grep -o '"token": "[^"]*"' "$(find "${client}" -name credentials.json)" | cut -d '"' -f 4 || true)"
+token="$(HOME="${client}" "${work}/clanker" token --server "${base}" || true)"
 if [[ "$(curl -s -H "Authorization: Bearer ${token}" "${base}/api/v1/me")" != *'"role":"admin"'* ]]; then
   fail "the token of the program does not act as the admin"
 fi
@@ -179,6 +179,23 @@ if "${as_program[@]}" -c "credential.${base}.helper=" clone -q "${base}/git/runb
 fi
 "${as_program[@]}" clone -q "${base}/git/runbooks.git" "${work}/runbooks" 2>>"${work}/clone.log"
 "${as_program[@]}" clone -q "${base}/git/platform-live.git" "${work}/platform-live" 2>>"${work}/clone.log"
+
+echo "== the program pushes a branch, and cannot push to main"
+git -C "${work}/runbooks" checkout -q -b core-check
+echo "written by a program" >"${work}/runbooks/core-check.txt"
+git -C "${work}/runbooks" add core-check.txt
+git -C "${work}/runbooks" -c user.name=admin -c user.email=admin@example.com commit -q -m "Check a push"
+if ! (cd "${work}/runbooks" && "${as_program[@]}" push -q origin core-check 2>>"${work}/clone.log"); then
+  fail "the program could not push a branch with its token"
+fi
+if (cd "${work}/runbooks" && "${as_program[@]}" push -q origin core-check:main 2>>"${work}/clone.log"); then
+  fail "the program pushed to main"
+fi
+if [ "$("${as_program[@]}" ls-remote "${base}/git/runbooks.git" refs/heads/main | cut -f 1)" != "$(git -C "${work}/runbooks" rev-parse origin/main)" ]; then
+  fail "main of the runbooks repository moved"
+fi
+git -C "${work}/runbooks" checkout -q main
+
 git -C "${work}/runbooks" fsck --strict --no-dangling >/dev/null || fail "fsck of runbooks"
 git -C "${work}/platform-live" fsck --strict --no-dangling >/dev/null || fail "fsck of platform-live"
 if [ "$(git -C "${work}/runbooks" rev-parse 'HEAD^{tree}')" != "$(git -C "${repo}" rev-parse 'HEAD:runbooks')" ]; then

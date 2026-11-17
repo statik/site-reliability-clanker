@@ -98,57 +98,81 @@ func (s *Service) deviceCode(w http.ResponseWriter, r *http.Request) {
 		"expires_in":                int(deviceLife / time.Second), "interval": pollSeconds})
 }
 
-// deviceToken gives a program its token when a person approved its code. A device code
-// gives one token: the row is removed with the answer.
-func (s *Service) deviceToken(w http.ResponseWriter, r *http.Request) {
-	refuse := func(reason string) {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": reason})
-	}
-	id := hash(r.FormValue("device_code"))
-	var status, email, expires string
-	err := s.db.QueryRowContext(r.Context(), `SELECT status, email, expires FROM device_codes
+// claim uses a device code up. It returns the email of the person who approved the code,
+// or the reason why the program gets no token. A device code gives one answer: the row is
+// removed, and the removal says whether this request is the one that gets the answer, so
+// that two requests at the same moment do not both get a token.
+func (s *Service) claim(r *http.Request, id string) (email, refusal string, err error) {
+	var status, expires string
+	err = s.db.QueryRowContext(r.Context(), `SELECT status, email, expires FROM device_codes
 		WHERE id = $1`, id).Scan(&status, &email, &expires)
-	now := s.now()
-	switch {
-	case errors.Is(err, sql.ErrNoRows), err == nil && !now.Before(store.ParseTime(expires)):
-		refuse("expired_token")
-		return
-	case err != nil:
-		http.Error(w, "read the code: "+err.Error(), http.StatusInternalServerError)
-		return
-	case status == "pending":
-		refuse("authorization_pending")
-		return
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "expired_token", nil
 	}
-	// The removal says whether this request is the one that gets the answer, so that two
-	// requests at the same moment do not both get a token.
+	if err != nil {
+		return "", "", fmt.Errorf("read the code: %w", err)
+	}
+	if refusal := notDecided(status, s.now(), store.ParseTime(expires)); refusal != "" {
+		return "", refusal, nil
+	}
 	removed, err := s.db.ExecContext(r.Context(), `DELETE FROM device_codes WHERE id = $1`, id)
 	if err != nil {
-		http.Error(w, "use the code: "+err.Error(), http.StatusInternalServerError)
-		return
+		return "", "", fmt.Errorf("use the code: %w", err)
 	}
 	if rows, err := removed.RowsAffected(); err != nil || rows != 1 {
-		refuse("expired_token")
-		return
+		return "", "expired_token", nil
 	}
 	if status != "approved" {
-		refuse("access_denied")
-		return
+		return "", "access_denied", nil
 	}
+	return email, "", nil
+}
+
+// notDecided returns why a code cannot be used yet or any more, or nothing when a person
+// decided on it in time.
+func notDecided(status string, now, expires time.Time) string {
+	if !now.Before(expires) {
+		return "expired_token"
+	}
+	if status == "pending" {
+		return "authorization_pending"
+	}
+	return ""
+}
+
+// issue makes a token for a program that works as the person with this email.
+func (s *Service) issue(r *http.Request, email string) (string, error) {
 	token, err := random()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return "", err
 	}
+	now := s.now()
 	if _, err := s.db.ExecContext(r.Context(), `DELETE FROM tokens WHERE expires <= $1`,
 		store.FormatTime(now)); err != nil {
-		http.Error(w, "remove old tokens: "+err.Error(), http.StatusInternalServerError)
-		return
+		return "", fmt.Errorf("remove old tokens: %w", err)
 	}
 	if _, err := s.db.ExecContext(r.Context(), `INSERT INTO tokens (id, email, expires, created_at)
 		VALUES ($1, $2, $3, $4)`, hash(token), email, store.FormatTime(now.Add(tokenLife)),
 		store.FormatTime(now)); err != nil {
-		http.Error(w, "record the token: "+err.Error(), http.StatusInternalServerError)
+		return "", fmt.Errorf("record the token: %w", err)
+	}
+	return token, nil
+}
+
+// deviceToken gives a program its token when a person approved its code.
+func (s *Service) deviceToken(w http.ResponseWriter, r *http.Request) {
+	email, refusal, err := s.claim(r, hash(r.FormValue("device_code")))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if refusal != "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": refusal})
+		return
+	}
+	token, err := s.issue(r, email)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"access_token": token, "token_type": "Bearer",
@@ -245,20 +269,30 @@ func (s *Service) devicePage(w http.ResponseWriter, r *http.Request) {
 	s.showDevice(w, http.StatusOK, deviceView{Email: email, Code: code})
 }
 
-// deviceDecision records the decision of a signed-in person on a code. Only a browser
-// session counts, and only a request that comes from a page of this site.
-func (s *Service) deviceDecision(w http.ResponseWriter, r *http.Request) {
+// decider returns the person who may decide on a code with this request. Only a browser
+// session counts, and only a request that comes from a page of this site. When nobody may
+// decide, decider writes the answer and returns false.
+func (s *Service) decider(w http.ResponseWriter, r *http.Request) (string, bool) {
 	email, err := s.browserEmail(r)
 	if errors.Is(err, ErrNoSession) {
 		http.Error(w, "Sign in to the dashboard first.", http.StatusUnauthorized)
-		return
+		return "", false
 	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return "", false
 	}
 	if origin := r.Header.Get("Origin"); origin != "" && origin != s.public {
 		http.Error(w, "This request did not come from the dashboard.", http.StatusForbidden)
+		return "", false
+	}
+	return email, true
+}
+
+// deviceDecision records the decision of a signed-in person on a code.
+func (s *Service) deviceDecision(w http.ResponseWriter, r *http.Request) {
+	email, ok := s.decider(w, r)
+	if !ok {
 		return
 	}
 	status := map[string]string{"approve": "approved", "deny": "denied"}[r.FormValue("decision")]

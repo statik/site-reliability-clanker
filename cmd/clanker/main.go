@@ -35,6 +35,7 @@ Usage:
   clanker destroy --env local       destroy every layer of an environment
   clanker sink                      run the local webhook sink alone
   clanker login --server URL        sign this machine in to a control plane, for git and scripts
+  clanker token --server URL        print the token of this machine, for a script
 
 Common flags:
   --data DIR     data directory of the control plane (default .clanker in a checkout,
@@ -288,13 +289,15 @@ func run() error {
 		defer stop()
 		return runRunner(ctx, args[1:])
 	}
-	if command == "login" || command == "git-credential" {
-		// These commands talk to a control plane somewhere else. They need no checkout.
+	// These commands talk to a control plane somewhere else. They need no checkout.
+	switch command {
+	case "login":
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
-		if command == "login" {
-			return runLogin(ctx, args[1:])
-		}
+		return runLogin(ctx, args[1:])
+	case "token":
+		return runToken(args[1:])
+	case "git-credential":
 		return runGitCredential(args[1:])
 	}
 	o, err := parse(command, args[1:])
