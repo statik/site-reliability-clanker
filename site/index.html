@@ -153,15 +153,19 @@
           <li class="reveal"><span class="how-who how-human">Person</span>
             <h3>Approve</h3>
             <p>A notice goes out by email and chat. A person decides in the dashboard or the
-              phone app. The riskiest changes need two people.</p></li>
+              phone app. A high-risk change can ask for a second approver. Routine, low-risk
+              work needs no click: it runs under a standing approval that a person signed
+              once.</p></li>
           <li class="reveal"><span class="how-who how-code">Code</span>
             <h3>Apply</h3>
             <p>The access broker issues a signed grant for one layer. The runner applies exactly
               the plan that was approved. The grant is revoked when the job ends.</p></li>
           <li class="reveal"><span class="how-who how-code">Code</span>
             <h3>Verify</h3>
-            <p>A canary check tests the result and rolls back on failure. Each step is a record
-              in a hash-chained audit log.</p></li>
+            <p>A canary check tests the result. If it fails, S.R.C. rolls the release back
+              without waiting for a person. For some incidents it also runs a routine runbook,
+              such as a restart, by itself. Each step is a record in a hash-chained audit
+              log.</p></li>
         </ol>
         <div class="btn-row">
           <a class="btn btn-tertiary" href="architecture.html">See the architecture <span aria-hidden="true">&rarr;</span></a>
@@ -310,7 +314,8 @@ is an illustration of the approval page. For the dashboard itself, see
             <div class="card reveal">
               <h3>Routine work asks once.</h3>
               <p>Routine maintenance is tier T1. It runs under a standing approval that a
-                person signed once. A T2 change asks one approver. A T3 change asks two.</p>
+                person signed once. A T2 change asks one approver. A T3 change can ask for a
+                second approver.</p>
             </div>
             <div class="card reveal">
               <h3>The routes are a file in a repository.</h3>
