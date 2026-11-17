@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/statik/site-reliability-clanker/internal/audit"
 	"github.com/statik/site-reliability-clanker/internal/broker"
+	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/jobspec"
 	"github.com/statik/site-reliability-clanker/internal/planfacts"
 	"github.com/statik/site-reliability-clanker/internal/policy"
@@ -124,6 +126,30 @@ func (o *Orchestrator) policyModules() (map[string]string, error) {
 		modules[entry.Path] = source
 	}
 	return modules, nil
+}
+
+// ApprovalSettings reads the approval settings from the runbooks repository of f. A repository
+// that has no settings file gives the settings of policy.Approvals with no file. A file
+// that is not valid, and each other failure to read, is an error.
+func ApprovalSettings(f *forge.Forge) (policy.Approvals, error) {
+	source, err := f.ReadFile(RunbooksRepo, "main", policy.ApprovalsPath)
+	if errors.Is(err, forge.ErrFileNotFound) {
+		return policy.Approvals{}, nil
+	}
+	if err != nil {
+		return policy.Approvals{}, fmt.Errorf("read the approval settings: %w", err)
+	}
+	return policy.ParseApprovals([]byte(source))
+}
+
+// ApproversRequired is the number of distinct approvers that a change of the tier needs
+// now. It reads the approval settings at each call.
+func (o *Orchestrator) ApproversRequired(tier string) (int, error) {
+	approvals, err := ApprovalSettings(o.Forge)
+	if err != nil {
+		return 0, err
+	}
+	return approvals.Required(tier), nil
 }
 
 // layerApplied reports whether the layer was applied and has outputs.
@@ -396,20 +422,30 @@ func (o *Orchestrator) PlanWorkItem(ctx context.Context, id string) (WorkItem, e
 		err := o.setState(&wi, StateDone, "orchestrator", "the plans change nothing")
 		return wi, err
 	}
-	return o.requestApproval(ctx, wi)
+	return o.requestApproval(ctx, wi, false)
 }
 
 // requestApproval writes the explanation of a planned work item and asks for the approvals
-// that its tier needs.
-func (o *Orchestrator) requestApproval(ctx context.Context, wi WorkItem) (WorkItem, error) {
+// that its tier needs. again is true when a new plan replaced an approved plan. A work item
+// whose number of approvers cannot be read fails: nobody can approve it.
+func (o *Orchestrator) requestApproval(ctx context.Context, wi WorkItem, again bool) (
+	WorkItem, error) {
+	need, err := o.ApproversRequired(wi.Tier)
+	if err != nil {
+		return wi, o.setState(&wi, StateFailed, "orchestrator", err.Error())
+	}
 	o.explain(ctx, &wi)
-	need := policy.ApproversRequired(wi.Tier)
-	if err := o.setState(&wi, StateAwaitingApproval, "orchestrator",
-		fmt.Sprintf("tier %s needs %d approvers", wi.Tier, need)); err != nil {
+	reason := fmt.Sprintf("tier %s needs %d approvers", wi.Tier, need)
+	summary := "Approval needed: " + wi.Title
+	if again {
+		reason = "the plan changed; earlier approvals do not cover the new plan"
+		summary = "Approval needed again: " + wi.Title
+	}
+	if err := o.setState(&wi, StateAwaitingApproval, "orchestrator", reason); err != nil {
 		return WorkItem{}, err
 	}
 	o.emit(audit.Event{Type: "approval.requested", Actor: "orchestrator", Env: wi.Env,
-		WorkItem: wi.ID, Summary: "Approval needed: " + wi.Title,
+		WorkItem: wi.ID, Summary: summary,
 		Data: map[string]any{"tier": wi.Tier, "rule": wi.TierRule,
 			"sentence": wi.Explanation.Sentence, "approvers_required": need, "title": wi.Title}})
 	return wi, nil

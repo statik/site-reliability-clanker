@@ -28,6 +28,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/monitor"
 	"github.com/statik/site-reliability-clanker/internal/notify"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/policy"
 	"github.com/statik/site-reliability-clanker/internal/runbook"
 	"github.com/statik/site-reliability-clanker/internal/runner"
 	"github.com/statik/site-reliability-clanker/internal/sim"
@@ -270,7 +271,9 @@ func build(ctx context.Context, o options) (*components, error) {
 	if c.dispatcher, err = newDispatcher(o); err != nil {
 		return nil, err
 	}
-	if c.broker, err = broker.New(c.db, c.clock, secret.signingKey, on.issuer); err != nil {
+	c.broker, err = broker.New(c.db, c.clock, secret.signingKey, on.issuer,
+		func() (policy.Approvals, error) { return orchestrator.ApprovalSettings(c.forge) })
+	if err != nil {
 		return nil, err
 	}
 	c.orch = &orchestrator.Orchestrator{DB: c.db, Audit: c.log, Forge: c.forge,

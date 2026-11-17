@@ -429,7 +429,14 @@ Assigned by policy from the plan. A model never lowers a tier. Since 2026-11-17 
 | T0 | Read-only | Detectors, diagnostics, Q&A | None |
 | T1 | Routine and reversible | Restart a deployment, run a backup verification, scale within set bounds | Covered by a standing approval a human signed once; each use logged |
 | T2 | Normal change | App release, node pool roll, add-on upgrade, parameter change | One approver |
-| T3 | High risk | Anything replacing or destroying stateful resources, database major version, network or IAM changes | Two approvers and a maintenance window |
+| T3 | High risk | Anything replacing or destroying stateful resources, database major version, network or IAM changes | Two approvers, or one when the approval settings say so, and a maintenance window |
+
+The number of approvers for tier T3 comes from the file `policy/approvals.json` of the
+`runbooks` repository: `{"t3_approvers": 2}`. The allowed values are 1 and 2. A repository
+without the file needs two approvers. A file that is not valid is an error: no work item
+is approved and the broker issues no apply grant until the file is correct. The
+orchestrator and the broker each read the file when they need the number. No other tier
+has a setting.
 
 ### 6.4 Bootstrap
 

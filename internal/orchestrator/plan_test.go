@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
-	"github.com/statik/site-reliability-clanker/internal/policy"
 )
 
 func TestLayersForPaths(t *testing.T) {
@@ -33,14 +32,6 @@ func TestLayersForPaths(t *testing.T) {
 		got := orchestrator.LayersForPaths(tc.cloud, tc.paths)
 		if !slices.Equal(got, tc.want) {
 			t.Errorf("%s: want %q, got %q", tc.name, tc.want, got)
-		}
-	}
-}
-
-func TestApproversRequired(t *testing.T) {
-	for tier, want := range map[string]int{"T0": 0, "T1": 0, "T2": 1, "T3": 2, "": 0} {
-		if got := policy.ApproversRequired(tier); got != want {
-			t.Errorf("tier %q: want %d approvers, got %d", tier, want, got)
 		}
 	}
 }

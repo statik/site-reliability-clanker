@@ -37,7 +37,7 @@ func TestReconcileEndsWhatAStopInterrupted(t *testing.T) {
 		t.Fatal(err)
 	}
 	issuer := &refusingIssuer{}
-	b, err := broker.New(db, clock, key, issuer)
+	b, err := broker.New(db, clock, key, issuer, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

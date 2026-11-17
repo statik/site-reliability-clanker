@@ -6,7 +6,30 @@ This directory is the content of the `runbooks` repository in the forge.
 |---|---|
 | `jobs/` | One runbook for each pair of files: `<name>.json` is the definition and `<name>.sh` is the script |
 | `policy/` | The rules that give a plan its risk tier (Rego) |
+| `policy/approvals.json` | The number of approvers that a tier T3 change needs |
 | `notifications/routes.json` | Who is told about which event |
+
+## The approval settings
+
+`policy/approvals.json` has one key:
+
+```json
+{"t3_approvers": 2}
+```
+
+The value is the number of different approvers that a tier T3 change needs. The allowed
+values are 1 and 2. A repository without the file needs two approvers. The control plane
+reads the file at the head of `main` each time that it needs the number.
+
+A file that is not valid is an error. This includes text that is not JSON, a key that is
+not `t3_approvers`, a value that is not 1 or 2, and data after the object. While the file
+is not valid, no work item is approved and the broker issues no apply grant.
+
+Tier T2 always needs one approver. No other tier has a setting.
+
+The control plane copies this directory into the forge only at the first start. Until a
+pull request on the `runbooks` repository is possible, set the value before the first
+start.
 
 ## A runbook
 

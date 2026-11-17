@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/broker"
+	"github.com/statik/site-reliability-clanker/internal/policy"
 	"github.com/statik/site-reliability-clanker/internal/store/storetest"
 )
 
@@ -41,13 +42,19 @@ func (f *fakeIssuer) Withdraw(_ context.Context, g broker.Grant) error {
 
 func newBrokerWith(t *testing.T, issuer broker.Issuer) (*broker.Broker, *testClock) {
 	t.Helper()
+	return newBrokerWithApprovals(t, issuer, nil)
+}
+
+func newBrokerWithApprovals(t *testing.T, issuer broker.Issuer,
+	approvals func() (policy.Approvals, error)) (*broker.Broker, *testClock) {
+	t.Helper()
 	key, err := broker.NewKey()
 	if err != nil {
 		t.Fatal(err)
 	}
 	db := storetest.Open(t)
 	clock := &testClock{time.Date(2026, 11, 21, 2, 0, 0, 0, time.UTC)}
-	b, err := broker.New(db, clock, key, issuer)
+	b, err := broker.New(db, clock, key, issuer, approvals)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,6 +206,91 @@ func TestIssueNeedsTheApproversOfTheTier(t *testing.T) {
 	}
 }
 
+// settings returns a lookup that gives the settings of a file with this content.
+func settings(t *testing.T, content string) func() (policy.Approvals, error) {
+	t.Helper()
+	approvals, err := policy.ParseApprovals([]byte(content))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return func() (policy.Approvals, error) { return approvals, nil }
+}
+
+func TestIssueReadsTheNumberOfApproversForT3(t *testing.T) {
+	cases := []struct {
+		name      string
+		approvals func() (policy.Approvals, error)
+		approvers []string
+		wantErr   string
+	}{
+		{"one needed, one given", settings(t, `{"t3_approvers": 1}`), []string{"alice"}, ""},
+		{"one needed, none given", settings(t, `{"t3_approvers": 1}`), nil,
+			"tier T3 needs 1 approvers, got 0"},
+		{"two needed, one given", settings(t, `{"t3_approvers": 2}`), []string{"alice"},
+			"tier T3 needs 2 approvers, got 1"},
+		{"two needed, two given", settings(t, `{"t3_approvers": 2}`),
+			[]string{"alice", "bob"}, ""},
+		{"no lookup, one given", nil, []string{"alice"}, "tier T3 needs 2 approvers, got 1"},
+		{"no lookup, two given", nil, []string{"alice", "bob"}, ""},
+	}
+	for _, tc := range cases {
+		b, _ := newBrokerWithApprovals(t, nil, tc.approvals)
+		req := applyRequest()
+		req.Tier, req.Approvers = "T3", tc.approvers
+		_, err := b.Issue(req)
+		if tc.wantErr == "" && err != nil {
+			t.Errorf("%s: %v", tc.name, err)
+		}
+		if tc.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErr)) {
+			t.Errorf("%s: want an error with %q, got %v", tc.name, tc.wantErr, err)
+		}
+	}
+}
+
+func TestIssueReadsTheSettingsAtEachGrant(t *testing.T) {
+	content := `{"t3_approvers": 2}`
+	b, _ := newBrokerWithApprovals(t, nil, func() (policy.Approvals, error) {
+		return policy.ParseApprovals([]byte(content))
+	})
+	req := applyRequest()
+	req.Tier, req.Approvers = "T3", []string{"alice"}
+	if _, err := b.Issue(req); err == nil {
+		t.Fatal("want no grant for one approver while the settings say two")
+	}
+	content = `{"t3_approvers": 1}`
+	if _, err := b.Issue(req); err != nil {
+		t.Fatalf("the settings say one approver now: %v", err)
+	}
+}
+
+func TestIssueGivesNoApplyGrantWhenTheSettingsCannotBeRead(t *testing.T) {
+	failure := errors.New("policy/approvals.json has t3_approvers = 0")
+	b, _ := newBrokerWithApprovals(t, nil, func() (policy.Approvals, error) {
+		return policy.Approvals{}, failure
+	})
+	for _, tier := range []string{"T3", "T2"} {
+		req := applyRequest()
+		req.Tier, req.Approvers = tier, []string{"alice", "bob", "carol"}
+		g, err := b.Issue(req)
+		if !errors.Is(err, failure) {
+			t.Errorf("tier %s: want the error of the settings, got grant %q and %v", tier,
+				g.ID, err)
+		}
+	}
+	grants, err := b.List(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(grants) != 0 {
+		t.Errorf("%d grants recorded, want none", len(grants))
+	}
+	req := applyRequest()
+	req.Kind, req.Tier, req.Approvers = broker.KindPlan, "", nil
+	if _, err := b.Issue(req); err != nil {
+		t.Errorf("a plan grant needs no approver and no settings: %v", err)
+	}
+}
+
 func TestIssueApplyGrantNeedsCommitAndPlanHash(t *testing.T) {
 	b, _ := newBroker(t)
 	req := applyRequest()
@@ -296,7 +388,7 @@ func TestExpireOverdueMarksGrants(t *testing.T) {
 }
 
 func TestNewRefusesAKeyOfTheWrongSize(t *testing.T) {
-	_, err := broker.New(storetest.Open(t), &testClock{}, []byte("short"), nil)
+	_, err := broker.New(storetest.Open(t), &testClock{}, []byte("short"), nil, nil)
 	if err == nil || !strings.Contains(err.Error(), "has 5 bytes") {
 		t.Fatalf("want an error that gives the size of the key, got %v", err)
 	}

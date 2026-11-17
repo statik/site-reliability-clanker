@@ -89,15 +89,3 @@ func MaxTier(a, b string) string {
 	}
 	return b
 }
-
-// ApproversRequired is the number of distinct approvers that a tier needs.
-func ApproversRequired(tier string) int {
-	switch tier {
-	case "T3":
-		return 2
-	case "T2":
-		return 1
-	default:
-		return 0
-	}
-}

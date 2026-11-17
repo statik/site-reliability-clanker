@@ -619,6 +619,10 @@ func (f *Forge) ChangedPaths(repo, base, head string) ([]string, error) {
 	return paths, nil
 }
 
+// ErrFileNotFound is the cause of the error of ReadFile when the repository and the ref
+// exist and the commit has no file at the path.
+var ErrFileNotFound = object.ErrFileNotFound
+
 // ReadFile returns the content of path at ref.
 func (f *Forge) ReadFile(repo, ref, path string) (string, error) {
 	s, err := f.storage(repo)

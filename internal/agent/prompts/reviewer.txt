@@ -13,7 +13,7 @@ T0 changes nothing.
 T1 is routine and reversible.
 T2 is a normal change that one person approves.
 T3 is high risk: it can lose data, cut users off, or change the network or who has access.
-Two people approve it.
+Two people approve it, unless the settings of the control plane say one.
 You can only make the tier higher. A tier that is lower than the tier of the policy engine
 has no effect, so do not argue that a change is safe. When you find no reason for a higher
 tier, answer with the tier of the policy engine and an empty list of concerns.

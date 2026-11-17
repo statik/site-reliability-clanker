@@ -140,6 +140,6 @@ struct StateMappingTests {
     #expect(RiskTier(name: "") == .none)
     #expect(RiskTier(name: "T9") == .unknown("T9"))
     #expect(RiskTier.t2.approvalRule == "Needs one approver.")
-    #expect(RiskTier.t3.approvalRule.contains("two approvers"))
+    #expect(RiskTier.t3.approvalRule.contains("one or two approvers"))
   }
 }

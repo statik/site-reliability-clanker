@@ -49,7 +49,7 @@ func runbookOrchestrator(t *testing.T, extra fs.FS) (*Orchestrator, *fakeRunners
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := broker.New(db, clock, key, &refusingIssuer{})
+	b, err := broker.New(db, clock, key, &refusingIssuer{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
