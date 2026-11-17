@@ -15,7 +15,7 @@ a load balancer with OIDC sign-in; the wizard builds the machine image with `ops
 
 ### State at the end of the second session of 2026-11-17
 
-Next steps 1 to 4 are merged (#39, #42, #43 and the pull request of the writer guard).
+Next steps 1 to 4 are merged (#39, #42, #43 and #44).
 Nothing waits on a branch. The next work is step 5, OIDC sign-in.
 
 Two questions wait for the owner: issue #40 (the secrets of the core on AWS) and issue #41
