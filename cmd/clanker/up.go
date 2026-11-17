@@ -241,7 +241,9 @@ func build(o options) (*components, error) {
 			return notify.ParseRules([]byte(raw))
 		})
 	var llm agent.LLM = agent.Replay{}
-	if key := os.Getenv("OPENROUTER_API_KEY"); key != "" {
+	// CLANKER_AGENT_MODE=replay forces recorded responses, for a repeatable demo.
+	if key := os.Getenv("OPENROUTER_API_KEY"); key != "" &&
+		os.Getenv("CLANKER_AGENT_MODE") != "replay" {
 		llm = agent.NewOpenRouter(key)
 	}
 	c.agent = &agent.Agent{DB: c.db, Audit: c.log, Orch: c.orch, Forge: c.forge,
@@ -254,12 +256,52 @@ func build(o options) (*components, error) {
 		SourceDir: o.sourceDir, AdminToken: demoAdminToken, AdminKubeconfig: adminKubeconfig,
 		Env: o.env}
 	c.orch.Hooks = orchestrator.Hooks{Explain: c.agent.Explain, Verify: c.monitor.Verify,
+		LayerApplied: func(ctx context.Context, wi orchestrator.WorkItem, layer string) error {
+			if !o.demo || o.cloud != "local" || layer != "10-network" {
+				return nil
+			}
+			return publishImages(ctx, c, o)
+		},
 		Applied: func(ctx context.Context, wi orchestrator.WorkItem) {
 			if _, err := c.monitor.TakeSnapshot(ctx, wi.Env, "after "+wi.ID); err != nil {
 				slog.Error("take snapshot", "work_item", wi.ID, "error", err)
 			}
 		}}
 	return c, nil
+}
+
+// publishImages builds the Paperboat releases and pushes them to the registry of the local
+// target. It stands in for the release pipeline of the application, which the prototype
+// does not have. It runs when the registry exists, before the application layer needs it.
+func publishImages(ctx context.Context, c *components, o options) error {
+	outputs, err := c.runner.Outputs(o.env, "10-network")
+	if err != nil {
+		return err
+	}
+	registry, _ := outputs["image_registry"].(string)
+	if registry == "" {
+		return fmt.Errorf("layer 10-network of %s has no image_registry output", o.env)
+	}
+	logPath := filepath.Join(o.dataDir, "logs", "image-build.log")
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+		return fmt.Errorf("create log directory: %w", err)
+	}
+	logFile, err := os.Create(logPath)
+	if err != nil {
+		return fmt.Errorf("create image build log: %w", err)
+	}
+	defer logFile.Close()
+	cmd := exec.CommandContext(ctx, filepath.Join(o.sourceDir, "apps", "paperboat", "build.sh"),
+		registry)
+	cmd.Stdout, cmd.Stderr = logFile, logFile
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("build and push the Paperboat images to %s: %w; see %s", registry,
+			err, logPath)
+	}
+	_, err = c.log.Append(audit.Event{Type: "sim.images_published", Actor: "simulator",
+		Env: o.env, Summary: "Paperboat images for all releases are in the registry " + registry,
+		Data: map[string]any{"registry": registry}})
+	return err
 }
 
 // firstRun signs the demo standing approvals and opens the blank-slate work item when the

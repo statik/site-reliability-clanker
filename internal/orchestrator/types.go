@@ -140,6 +140,8 @@ type Hooks struct {
 	Explain func(ctx context.Context, wi WorkItem, plans []Plan) (Explanation, error)
 	// Verify checks the environment after an apply. Nil skips the check.
 	Verify func(ctx context.Context, wi WorkItem) (VerifyResult, error)
+	// LayerApplied runs after each layer of a work item is applied. An error stops the apply.
+	LayerApplied func(ctx context.Context, wi WorkItem, layer string) error
 	// Applied runs after a successful apply and verification, for example to take a snapshot.
 	Applied func(ctx context.Context, wi WorkItem)
 }

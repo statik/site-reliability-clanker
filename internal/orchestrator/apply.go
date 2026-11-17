@@ -205,6 +205,9 @@ func (o *Orchestrator) Apply(ctx context.Context, id string) (WorkItem, error) {
 	}
 	for _, layer := range wi.Layers {
 		err := o.applyLayer(ctx, &wi, layer, approvers)
+		if err == nil && o.Hooks.LayerApplied != nil {
+			err = o.Hooks.LayerApplied(ctx, wi, layer)
+		}
 		switch {
 		case err == nil:
 			continue
