@@ -58,7 +58,7 @@ pause: 1.6
 hold: 2.2
 
 - [find] One. It finds the needed maintenance | without someone having to manually ask for it: | a new release, a security fix, drift.
-- [write] It writes each change as infrastructure code, in a pull request.
+- [write] Each maintenance step is a version-controlled | Infrastructure as Code changeset.
 ## step-two
 
 pause: 1.6
