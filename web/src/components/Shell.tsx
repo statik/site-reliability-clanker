@@ -144,7 +144,7 @@ export function Shell({ children }: { children: ReactNode }) {
     <>
       <Header aria-label="S.R.C. (Site Reliability Clanker)">
         <SkipToContent />
-        <HeaderName as={RouterLink} to="/" prefix="">
+        <HeaderName as={RouterLink} to="/" prefix="" className="app-header-name">
           <img className="app-mark" src={mark} alt="" width={24} height={24} />
           S.R.C.
           <span className="app-product-name">Site Reliability Clanker</span>

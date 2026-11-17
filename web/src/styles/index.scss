@@ -28,43 +28,43 @@
 );
 @use "@carbon/react/scss/components/tag/tokens" as tag-tokens with (
   $tag-background-red: map.get(palette.$tag-fill, "red"),
-  $tag-color-red: palette.$tag-text,
+  $tag-color-red: map.get(palette.$tag-text, "red"),
   $tag-hover-red: map.get(palette.$tag-fill, "red"),
   $tag-border-red: map.get(palette.$tag-hue, "red"),
   $tag-background-magenta: map.get(palette.$tag-fill, "magenta"),
-  $tag-color-magenta: palette.$tag-text,
+  $tag-color-magenta: map.get(palette.$tag-text, "magenta"),
   $tag-hover-magenta: map.get(palette.$tag-fill, "magenta"),
   $tag-border-magenta: map.get(palette.$tag-hue, "magenta"),
   $tag-background-purple: map.get(palette.$tag-fill, "purple"),
-  $tag-color-purple: palette.$tag-text,
+  $tag-color-purple: map.get(palette.$tag-text, "purple"),
   $tag-hover-purple: map.get(palette.$tag-fill, "purple"),
   $tag-border-purple: map.get(palette.$tag-hue, "purple"),
   $tag-background-blue: map.get(palette.$tag-fill, "blue"),
-  $tag-color-blue: palette.$tag-text,
+  $tag-color-blue: map.get(palette.$tag-text, "blue"),
   $tag-hover-blue: map.get(palette.$tag-fill, "blue"),
   $tag-border-blue: map.get(palette.$tag-hue, "blue"),
   $tag-background-cyan: map.get(palette.$tag-fill, "cyan"),
-  $tag-color-cyan: palette.$tag-text,
+  $tag-color-cyan: map.get(palette.$tag-text, "cyan"),
   $tag-hover-cyan: map.get(palette.$tag-fill, "cyan"),
   $tag-border-cyan: map.get(palette.$tag-hue, "cyan"),
   $tag-background-teal: map.get(palette.$tag-fill, "teal"),
-  $tag-color-teal: palette.$tag-text,
+  $tag-color-teal: map.get(palette.$tag-text, "teal"),
   $tag-hover-teal: map.get(palette.$tag-fill, "teal"),
   $tag-border-teal: map.get(palette.$tag-hue, "teal"),
   $tag-background-green: map.get(palette.$tag-fill, "green"),
-  $tag-color-green: palette.$tag-text,
+  $tag-color-green: map.get(palette.$tag-text, "green"),
   $tag-hover-green: map.get(palette.$tag-fill, "green"),
   $tag-border-green: map.get(palette.$tag-hue, "green"),
   $tag-background-gray: map.get(palette.$tag-fill, "gray"),
-  $tag-color-gray: palette.$tag-text,
+  $tag-color-gray: map.get(palette.$tag-text, "gray"),
   $tag-hover-gray: map.get(palette.$tag-fill, "gray"),
   $tag-border-gray: map.get(palette.$tag-hue, "gray"),
   $tag-background-cool-gray: map.get(palette.$tag-fill, "cool-gray"),
-  $tag-color-cool-gray: palette.$tag-text,
+  $tag-color-cool-gray: map.get(palette.$tag-text, "cool-gray"),
   $tag-hover-cool-gray: map.get(palette.$tag-fill, "cool-gray"),
   $tag-border-cool-gray: map.get(palette.$tag-hue, "cool-gray"),
   $tag-background-warm-gray: map.get(palette.$tag-fill, "warm-gray"),
-  $tag-color-warm-gray: palette.$tag-text,
+  $tag-color-warm-gray: map.get(palette.$tag-text, "warm-gray"),
   $tag-hover-warm-gray: map.get(palette.$tag-fill, "warm-gray"),
   $tag-border-warm-gray: map.get(palette.$tag-hue, "warm-gray")
 );
@@ -135,6 +135,11 @@ body {
   margin-inline-start: 16rem;
 }
 
+.app-header-name {
+  flex: none;
+  white-space: nowrap;
+}
+
 .app-mark {
   margin-inline-end: spacing.$spacing-03;
 }
@@ -143,6 +148,12 @@ body {
   margin-inline-start: spacing.$spacing-03;
   color: theme.$text-secondary;
   font-weight: 400;
+}
+
+@include breakpoint.breakpoint-down("md") {
+  .app-product-name {
+    display: none;
+  }
 }
 
 .app-header-status {

@@ -192,35 +192,48 @@ $button: (
   button-disabled: $layer-03,
 );
 
-// Tag fills, as on the website: T0 gray, T1 sea, T2 sky, T3 red; green sage, purple honey.
-// The website has no magenta, cyan, cool gray or warm gray. Here magenta is terracotta (the
-// warning colour), cyan is the deep sea, and the three grays are one gray, as near to each
-// other as they are in Carbon. Every tag has an icon and a label: colour is the third signal.
+// Tag fills. The hues are those of the website: T0 gray, T1 sea, T2 sky, T3 red; green sage,
+// purple honey. The website shows four tiers side by side; the dashboard shows thirteen states
+// too, so sky and sage are stronger mixes here, and two kinds are a full colour with dark
+// text: magenta is terracotta (the warning colour, apart from the red of a failure) and cyan
+// is sky. The three grays are one gray, as near to each other as they are in Carbon. Every
+// tag has an icon and a label: colour is the third signal.
 $tag-fill: (
   "red": blend($red, 48%, $dark),
-  "magenta": blend($terracotta, 36%, $dark),
+  "magenta": $terracotta,
   "purple": blend($honey, 30%, $dark),
-  "blue": blend($sky, 34%, $dark),
-  "cyan": $sea-deep,
+  "blue": blend($sky, 56%, $dark),
+  "cyan": $sky,
   "teal": blend($sea-mid, 60%, $dark),
-  "green": blend($sage, 30%, $dark),
+  "green": blend($sage, 40%, $dark),
   "gray": $tag-gray,
   "cool-gray": $tag-gray,
   "warm-gray": $tag-gray,
+);
+$tag-text: (
+  "red": $cream,
+  "magenta": $dark,
+  "purple": $cream,
+  "blue": $cream,
+  "cyan": $dark,
+  "teal": $cream,
+  "green": $cream,
+  "gray": $cream,
+  "cool-gray": $cream,
+  "warm-gray": $cream,
 );
 $tag-hue: (
   "red": $red,
   "magenta": $terracotta,
   "purple": $honey,
   "blue": $sky,
-  "cyan": $sea-mid,
+  "cyan": $sky,
   "teal": $sea-mid,
   "green": $sage,
   "gray": $cream,
   "cool-gray": $cream,
   "warm-gray": $cream,
 );
-$tag-text: $cream;
 
 // Low-contrast notifications sit on the first layer, as in Carbon's dark themes. The kind
 // shows in the icon, the title and the coloured edge.

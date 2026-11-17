@@ -88,6 +88,28 @@ function contrast(a: Rgba, b: Rgba): number {
   return (light + 0.05) / (dark + 0.05);
 }
 
+function curve(share: number): number {
+  return share > 0.008856 ? Math.cbrt(share) : 7.787 * share + 16 / 116;
+}
+
+/** A colour in CIE L*a*b*, where equal distances look about equally different. */
+function lab([red, green, blue]: Rgba): [number, number, number] {
+  const [r, g, b] = [linear(red), linear(green), linear(blue)];
+  const x = curve((0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047);
+  const y = curve(0.2126 * r + 0.7152 * g + 0.0722 * b);
+  const z = curve((0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883);
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+}
+
+/** The CIE76 colour difference. About 2 is just visible; the tags need far more. */
+function difference(a: Rgba, b: Rgba): number {
+  const [first, second] = [lab(a), lab(b)];
+  return Math.hypot(first[0] - second[0], first[1] - second[1], first[2] - second[2]);
+}
+
+const LEAST_DIFFERENCE = 12;
+// The tiers (gray, teal, blue, red) and the states use these. The three grays are one colour.
+const DISTINCT_TAGS = ["red", "magenta", "purple", "blue", "cyan", "teal", "green", "gray"];
 const GROUNDS = ["theme-background", "layer-01", "layer-02", "layer-03"];
 const HOVER_GROUNDS = ["theme-background", "layer-01"];
 const TAGS = ["red", "magenta", "purple", "blue", "cyan", "teal", "green", "gray", "cool-gray",
@@ -114,7 +136,7 @@ function pairs(): Pair[] {
       "series-4", "series-5"].flatMap((fore) => onGrounds(fore, GRAPHIC)),
     ...FILLED_BUTTONS.map((kind): Pair =>
       ["theme-text-on-color", `button-button-${kind}`, TEXT]),
-    ...TAGS.map((kind): Pair => ["tag-text", `tag-fill-${kind}`, TEXT]),
+    ...TAGS.map((kind): Pair => [`tag-text-${kind}`, `tag-fill-${kind}`, TEXT]),
     ["theme-border-strong-01", "theme-background", GRAPHIC],
     ["theme-border-strong-01", "layer-01", GRAPHIC],
     ["theme-border-strong-02", "layer-02", GRAPHIC],
@@ -150,8 +172,10 @@ describe("the colours of the theme", () => {
     expect(contrast(colour("theme-text-secondary"), shown)).toBeGreaterThanOrEqual(TEXT);
   });
 
-  it("gives each tier its own tag colour", () => {
-    const fills = ["gray", "teal", "blue", "red"].map((kind) => colour(`tag-fill-${kind}`).join());
-    expect(new Set(fills).size).toBe(4);
+  it.each(DISTINCT_TAGS.flatMap((kind, index) =>
+    DISTINCT_TAGS.slice(index + 1).map((other) => [kind, other])),
+  )("the %s tag and the %s tag differ to the eye", (kind, other) => {
+    const apart = difference(colour(`tag-fill-${kind}`), colour(`tag-fill-${other}`));
+    expect(apart).toBeGreaterThanOrEqual(LEAST_DIFFERENCE);
   });
 });
