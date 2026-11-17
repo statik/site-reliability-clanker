@@ -89,7 +89,7 @@ node capture.mjs
 
 | Target | Address | Views |
 |---|---|---|
-| Dashboard | `http://127.0.0.1:7070` | Overview, Timeline, an approval page, Topology, Access, Audit, each in the light and the dark theme |
+| Dashboard | `http://127.0.0.1:7070` | Overview, Timeline, the page of one work item, Topology, Access, Audit |
 | Paperboat | `http://localhost:8088` | Inventory, Rentals, Deliveries, Support desk |
 | Mail inbox | `http://127.0.0.1:8025` | The inbox and one approval email |
 | Webhook sink | `http://127.0.0.1:7071` | The page |
@@ -97,14 +97,18 @@ node capture.mjs
 A target that is not up is skipped with a message. `screens/manifest.json` lists what was
 skipped, and the Live screens page says so. Run the script again when the target is up.
 
+The dashboard has one dark look, so there is one picture of each view. Paperboat, the mail
+inbox and the webhook sink keep their own looks.
+
 The script blocks every request that is not a `GET`, so it cannot approve, run or change
 anything in the control plane. One side effect remains: the mail inbox marks the one
 email that the script opens as read.
 
-The work items in the pictures are found through the API (the one that waits for
-approval, the one that was rolled back), not by a fixed number. The webhook sink keeps
-its payloads in memory, so after a restart it is empty; the script then keeps the
-earlier picture of it.
+The work item in the picture is found through the API, not by a fixed number: a change
+that waits for approval, or, if none waits, the newest change with a summary. The caption
+of the picture says which of the two it shows. The webhook sink keeps its payloads in
+memory, so after a restart it is empty; the script then keeps the earlier picture of it,
+and the caption says so.
 
 ## Check the site
 

@@ -1,194 +1,121 @@
 {
- "captured_at": "2026-11-17T06:10:18.765Z",
+ "captured_at": "2026-11-17T23:54:55.622Z",
  "shots": [
   {
-   "file": "dashboard-overview-light.png",
+   "file": "dashboard-overview.png",
    "width": 1440,
    "height": 900,
    "group": "dashboard",
-   "theme": "light",
    "title": "Overview",
-   "note": "Is each environment healthy, and what needs a decision now?",
-   "alt": "The Overview view of the S.R.C. dashboard, light theme."
+   "note": "The health of each environment, and the changes that wait for a decision.",
+   "alt": "The S.R.C. dashboard: overview."
   },
   {
-   "file": "dashboard-timeline-light.png",
+   "file": "dashboard-timeline.png",
    "width": 1440,
    "height": 900,
    "group": "dashboard",
-   "theme": "light",
    "title": "Timeline",
-   "note": "What happened, when, and what is coming next.",
-   "alt": "The Timeline view of the S.R.C. dashboard, light theme."
+   "note": "The work of the past weeks by layer, and the maintenance that is coming.",
+   "alt": "The S.R.C. dashboard: timeline."
   },
   {
-   "file": "dashboard-approval-light.png",
+   "file": "dashboard-work-item.png",
    "width": 1440,
-   "height": 2200,
+   "height": 3518,
    "group": "dashboard",
-   "theme": "light",
-   "title": "Approval page",
-   "note": "One sentence, the impact, the tier, what changes, and the decision.",
-   "alt": "The Approval page view of the S.R.C. dashboard, light theme."
+   "title": "Work item page, after the decision",
+   "note": "A finished change: the summary, the impact, the tier, the plan, and who approved it. No change waited for a decision when this picture was taken.",
+   "alt": "The S.R.C. dashboard: work item page, after the decision."
   },
   {
-   "file": "dashboard-topology-light.png",
+   "file": "dashboard-topology.png",
    "width": 1440,
    "height": 900,
    "group": "dashboard",
-   "theme": "light",
    "title": "Topology",
-   "note": "What exists in the environment and how it is connected.",
-   "alt": "The Topology view of the S.R.C. dashboard, light theme."
+   "note": "The parts of the environment and the connections between them.",
+   "alt": "The S.R.C. dashboard: topology."
   },
   {
-   "file": "dashboard-access-light.png",
+   "file": "dashboard-access.png",
    "width": 1440,
    "height": 900,
    "group": "dashboard",
-   "theme": "light",
    "title": "Access",
-   "note": "Who and what holds which permission now, and the history of grants.",
-   "alt": "The Access view of the S.R.C. dashboard, light theme."
+   "note": "The grants that are open now, and every grant that ended.",
+   "alt": "The S.R.C. dashboard: access."
   },
   {
-   "file": "dashboard-audit-light.png",
+   "file": "dashboard-audit.png",
    "width": 1440,
    "height": 900,
    "group": "dashboard",
-   "theme": "light",
    "title": "Audit",
-   "note": "The searchable, hash-chained event log.",
-   "alt": "The Audit view of the S.R.C. dashboard, light theme."
+   "note": "The event log, with a search and the check of its hash chain.",
+   "alt": "The S.R.C. dashboard: audit."
   },
   {
-   "file": "dashboard-overview-dark.png",
-   "width": 1440,
-   "height": 900,
-   "group": "dashboard",
-   "theme": "dark",
-   "title": "Overview",
-   "note": "Is each environment healthy, and what needs a decision now?",
-   "alt": "The Overview view of the S.R.C. dashboard, dark theme."
-  },
-  {
-   "file": "dashboard-timeline-dark.png",
-   "width": 1440,
-   "height": 900,
-   "group": "dashboard",
-   "theme": "dark",
-   "title": "Timeline",
-   "note": "What happened, when, and what is coming next.",
-   "alt": "The Timeline view of the S.R.C. dashboard, dark theme."
-  },
-  {
-   "file": "dashboard-approval-dark.png",
-   "width": 1440,
-   "height": 2200,
-   "group": "dashboard",
-   "theme": "dark",
-   "title": "Approval page",
-   "note": "One sentence, the impact, the tier, what changes, and the decision.",
-   "alt": "The Approval page view of the S.R.C. dashboard, dark theme."
-  },
-  {
-   "file": "dashboard-topology-dark.png",
-   "width": 1440,
-   "height": 900,
-   "group": "dashboard",
-   "theme": "dark",
-   "title": "Topology",
-   "note": "What exists in the environment and how it is connected.",
-   "alt": "The Topology view of the S.R.C. dashboard, dark theme."
-  },
-  {
-   "file": "dashboard-access-dark.png",
-   "width": 1440,
-   "height": 900,
-   "group": "dashboard",
-   "theme": "dark",
-   "title": "Access",
-   "note": "Who and what holds which permission now, and the history of grants.",
-   "alt": "The Access view of the S.R.C. dashboard, dark theme."
-  },
-  {
-   "file": "dashboard-audit-dark.png",
-   "width": 1440,
-   "height": 900,
-   "group": "dashboard",
-   "theme": "dark",
-   "title": "Audit",
-   "note": "The searchable, hash-chained event log.",
-   "alt": "The Audit view of the S.R.C. dashboard, dark theme."
-  },
-  {
-   "file": "paperboat-inventory-light.png",
+   "file": "paperboat-inventory.png",
    "width": 1440,
    "height": 900,
    "group": "paperboat",
-   "theme": "light",
    "title": "Live inventory board",
    "note": "Fish by tank, with status, age and condition. It updates from a live stream.",
    "alt": "Paperboat, the fish rental application: live inventory board."
   },
   {
-   "file": "paperboat-rentals-light.png",
+   "file": "paperboat-rentals.png",
    "width": 1440,
    "height": 900,
    "group": "paperboat",
-   "theme": "light",
    "title": "Rentals",
    "note": "Who has which fish, and until when.",
    "alt": "Paperboat, the fish rental application: rentals."
   },
   {
-   "file": "paperboat-deliveries-light.png",
+   "file": "paperboat-deliveries.png",
    "width": 1440,
    "height": 900,
    "group": "paperboat",
-   "theme": "light",
    "title": "Deliveries",
    "note": "Deliveries and collections, each with a manifest on the shared file system.",
    "alt": "Paperboat, the fish rental application: deliveries."
   },
   {
-   "file": "paperboat-support-light.png",
+   "file": "paperboat-support.png",
    "width": 1440,
    "height": 900,
    "group": "paperboat",
-   "theme": "light",
    "title": "Support desk",
    "note": "Tickets from customers, with each interaction.",
    "alt": "Paperboat, the fish rental application: support desk."
   },
   {
-   "file": "mail-inbox-light.png",
+   "file": "mail-inbox.png",
    "width": 1440,
    "height": 900,
    "group": "notifications",
-   "theme": "light",
    "title": "Mail inbox",
    "note": "The emails that S.R.C. sent to the approvers during the month.",
    "alt": "A mail inbox with the notification emails from S.R.C., most of them requests for approval."
   },
   {
-   "file": "mail-approval-light.png",
+   "file": "mail-approval.png",
    "width": 1440,
    "height": 900,
    "group": "notifications",
-   "theme": "light",
    "title": "An approval email",
    "note": "What an approver receives: the change in one sentence, and a link to decide.",
    "alt": "One notification email from S.R.C. that asks for an approval."
   },
   {
-   "file": "webhook-sink-light.png",
+   "file": "webhook-sink.png",
    "width": 1440,
    "height": 900,
    "group": "notifications",
-   "theme": "light",
    "title": "Webhook sink",
-   "note": "A local stand-in for Slack, Microsoft Teams and Discord, with the real payloads.",
+   "note": "A local stand-in for Slack, Microsoft Teams and Discord, with the real payloads. This picture is from an earlier run: the sink was empty when the other pictures were taken.",
    "alt": "The webhook sink page: a list of the chat notifications that S.R.C. sent."
   }
  ],
