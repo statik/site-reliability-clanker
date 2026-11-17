@@ -61,16 +61,19 @@ What ran on the build of commit `376617b`, the last change to the Go code:
      made. The check does not watch the rest of the disk.
    - Ran on the local target, on the same commit: `fresh-run.sh` (thirteen work items, the
      chain at 310 events, no error line), `sweep.py` and `stale_plan.py`.
-   - Did not run: the core under Nanos (step 3), and the walk through the wizard with a
-     released binary. From a released binary on the local path, only `clanker preflight`
+   - Did not run: the walk through the wizard with a released binary. From a released binary on the local path, only `clanker preflight`
      ran, which unpacks the files.
    - The local target keeps its data directory (`broker.key`, `database.password`, the
      unpacked bundle, the files of the runner).
    - Not done: the template `internal/setup/controlplane.yaml` (the ECS design) still
      passes `--data /data`, which the core now refuses. Step 7 replaces that template.
-3. **Boot the real core under Nanos** with `ops/run-local.sh`, in the standby mode
-   (`clanker up --cloud aws --demo=false`), against PostgreSQL. Only a throwaway probe ran
-   under Nanos so far.
+3. **Boot the real core under Nanos.** Done on a laptop (`scripts/verify/nanos-check.sh`,
+   arm64, nightly kernel, HVF). The core in the standby mode
+   (`clanker up --cloud aws --demo=false`) answered about one second after the start,
+   served the dashboard and seeded the forge from memory with the trees of the checkout.
+   A `git push` over HTTP was accepted, and a second unikernel on the same database had
+   the pushed branch. No job ran in it: the core proposes no deployment on a cloud yet.
+   Nothing ran on x86 or on EC2.
 4. **A guard for one writer.** The pool has one connection, but that does not stop two
    instances. Put the guard in PostgreSQL. Reconcile jobs that were in flight when the core
    stopped.

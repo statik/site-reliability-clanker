@@ -11,9 +11,12 @@ target and Python 3.
 | `sweep.py` | Calls every read route of the API, the event filters and one Ask question. It lists each answer that is not 2xx. `GET /topology` without `env` answers 400; that is correct | Under a minute |
 | `stale_plan.py <new directory>` | Pushes two branches that change different lines of one file with the git client, opens two pull requests, and approves them one after the other. The second plan is stale: the forge must merge, the plan must run again and the approval must be asked again | About 3 minutes |
 | `core-check.sh` | Builds a binary that carries its source files and starts it as the core on a cloud (`clanker up --cloud aws --demo=false`), outside a checkout, with its own PostgreSQL container. It checks the refusals at start, the dashboard, the seeded repositories and that the core left no file. It does not touch the local demo. The checkout must have no change that is not committed | About 2 minutes |
+| `nanos-check.sh` | Builds the same binary for `linux/arm64` and boots it as a Nanos unikernel under QEMU (`ops/run-local.sh`), with its own PostgreSQL container. It checks the dashboard and the seeded forge, pushes a branch with the git client, boots a second unikernel on the same database and looks for the branch. It needs `ops` and QEMU on an Apple Silicon Mac. It does not touch the local demo | About 1 minute |
 
 ## What a good run looks like
 
+- `nanos-check.sh`: the last line is
+  `RESULT: the core ran as a unikernel, took a push and kept it across a restart`.
 - `core-check.sh`: the last line is
   `RESULT: the core served the dashboard, seeded the forge from memory and left no file`.
 - `fresh-run.sh`: thirteen work items. Twelve end in `Done`. `WI-0005` (the faulty release)
@@ -24,6 +27,8 @@ target and Python 3.
 
 ## Limits
 
+- `nanos-check.sh` uses the nightly Nanos kernel on arm64 under QEMU. It says nothing
+  about x86 or EC2. The core on a cloud proposes no deployment yet, so no job runs in it.
 - `core-check.sh` runs the core as a process on this machine. It says nothing about Nanos.
   It looks for files only in the working directory, the home directory and the temporary
   directory of the core.

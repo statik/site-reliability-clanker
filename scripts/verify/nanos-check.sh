@@ -47,7 +47,7 @@ boot() {
     >"${work}/$1.log" 2>&1 &
   for _ in $(seq 1 120); do
     if curl -fs -m 2 -o /dev/null "${base}/api/v1/work-items"; then
-      echo "the API answered $(($(date +%s) - started)) s after the start of QEMU"
+      echo "the API answered $(($(date +%s) - started)) s after the start of the image build"
       return
     fi
     sleep 1
