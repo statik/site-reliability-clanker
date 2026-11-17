@@ -58,7 +58,7 @@ func (a *Agent) now() string { return store.FormatTime(a.Clock.Now()) }
 func (a *Agent) spentToday() (float64, error) {
 	day := a.now()[:10]
 	var spent sql.NullFloat64
-	err := a.DB.QueryRow(`SELECT SUM(cost_usd) FROM agent_calls WHERE at >= ?`, day).Scan(&spent)
+	err := a.DB.QueryRow(`SELECT SUM(cost_usd) FROM agent_calls WHERE at >= $1`, day).Scan(&spent)
 	if err != nil {
 		return 0, fmt.Errorf("read inference spend: %w", err)
 	}
@@ -90,7 +90,7 @@ func (a *Agent) complete(ctx context.Context, role, workItem string, req Request
 	transcript, _ := json.Marshal(map[string]any{"request": req.Messages,
 		"response": resp.Message, "replay_key": req.ReplayKey, "step": req.Step})
 	if _, err := a.DB.Exec(`INSERT INTO agent_calls (role, work_item, model, mode,
-		prompt_tokens, completion_tokens, cost_usd, transcript, at) VALUES (?,?,?,?,?,?,?,?,?)`,
+		prompt_tokens, completion_tokens, cost_usd, transcript, at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
 		role, workItem, resp.Model, a.LLM.Mode(), resp.PromptTokens, resp.CompletionTokens,
 		resp.CostUSD, string(transcript), a.now()); err != nil {
 		return Response{}, fmt.Errorf("record agent call: %w", err)
@@ -134,10 +134,11 @@ func (a *Agent) Calls(workItem string, limit int) ([]Call, error) {
 		cost_usd, transcript, at FROM agent_calls`
 	args := []any{}
 	if workItem != "" {
-		query += ` WHERE work_item = ?`
+		query += ` WHERE work_item = $1`
 		args = append(args, workItem)
 	}
-	rows, err := a.DB.Query(query+` ORDER BY id DESC LIMIT ?`, append(args, limit)...)
+	args = append(args, limit)
+	rows, err := a.DB.Query(query+fmt.Sprintf(` ORDER BY id DESC LIMIT $%d`, len(args)), args...)
 	if err != nil {
 		return nil, fmt.Errorf("list agent calls: %w", err)
 	}

@@ -84,15 +84,14 @@ func (l *Log) Append(e Event) (Event, error) {
 	e.WallTS = store.FormatTime(time.Now())
 	e.PrevHash = prev
 	e.Hash = hashEvent(e, string(data))
-	res, err := l.db.Exec(`INSERT INTO events
+	err = l.db.QueryRow(`INSERT INTO events
 		(ts, wall_ts, type, actor, env, layer, work_item, summary, data, prev_hash, hash)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING seq`,
 		e.TS, e.WallTS, e.Type, e.Actor, e.Env, e.Layer, e.WorkItem, e.Summary, string(data),
-		e.PrevHash, e.Hash)
+		e.PrevHash, e.Hash).Scan(&e.Seq)
 	if err != nil {
 		return Event{}, fmt.Errorf("insert audit event %s: %w", e.Type, err)
 	}
-	e.Seq, _ = res.LastInsertId()
 	for ch := range l.subs {
 		select {
 		case ch <- e:
@@ -132,39 +131,41 @@ type Filter struct {
 func (f Filter) where() (string, []any) {
 	var conds []string
 	var args []any
-	add := func(cond string, arg any) {
-		conds = append(conds, cond)
+	// mark adds an argument and returns its placeholder, such as $3.
+	mark := func(arg any) string {
 		args = append(args, arg)
+		return fmt.Sprintf("$%d", len(args))
 	}
 	if f.AfterSeq > 0 {
-		add("seq > ?", f.AfterSeq)
+		conds = append(conds, "seq > "+mark(f.AfterSeq))
 	}
 	if f.From != "" {
-		add("ts >= ?", f.From)
+		conds = append(conds, "ts >= "+mark(f.From))
 	}
 	if f.To != "" {
-		add("ts <= ?", f.To)
+		conds = append(conds, "ts <= "+mark(f.To))
 	}
 	if f.Env != "" {
-		add("env = ?", f.Env)
+		conds = append(conds, "env = "+mark(f.Env))
 	}
 	if f.WorkItem != "" {
-		add("work_item = ?", f.WorkItem)
+		conds = append(conds, "work_item = "+mark(f.WorkItem))
 	}
 	if f.TypePrefix != "" {
-		add("type LIKE ?", f.TypePrefix+"%")
+		conds = append(conds, "type LIKE "+mark(f.TypePrefix+"%"))
 	}
 	if f.Search != "" {
-		conds = append(conds, "(summary LIKE ? OR data LIKE ? OR actor LIKE ? OR type LIKE ?)")
-		like := "%" + f.Search + "%"
-		args = append(args, like, like, like, like)
+		// The search does not depend on the case of the letters.
+		like := mark("%" + f.Search + "%")
+		conds = append(conds, "(summary ILIKE "+like+" OR data ILIKE "+like+" OR actor ILIKE "+
+			like+" OR type ILIKE "+like+")")
 	}
 	if len(f.Types) > 0 {
-		marks := strings.TrimSuffix(strings.Repeat("?,", len(f.Types)), ",")
-		conds = append(conds, "type IN ("+marks+")")
+		marks := make([]string, 0, len(f.Types))
 		for _, t := range f.Types {
-			args = append(args, t)
+			marks = append(marks, mark(t))
 		}
+		conds = append(conds, "type IN ("+strings.Join(marks, ",")+")")
 	}
 	if len(conds) == 0 {
 		return "", args
@@ -184,8 +185,8 @@ func (l *Log) Query(f Filter) ([]Event, error) {
 		limit = 5000
 	}
 	rows, err := l.db.Query(`SELECT seq, ts, wall_ts, type, actor, env, layer, work_item,
-		summary, data, prev_hash, hash FROM events`+where+order+` LIMIT ?`,
-		append(args, limit)...)
+		summary, data, prev_hash, hash FROM events`+where+order+
+		fmt.Sprintf(` LIMIT $%d`, len(args)+1), append(args, limit)...)
 	if err != nil {
 		return nil, fmt.Errorf("query audit events: %w", err)
 	}

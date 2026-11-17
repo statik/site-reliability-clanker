@@ -43,6 +43,7 @@ func costEstimate(size Size) []CostLine {
 }
 
 var localCreates = []Change{
+	{"Add", "PostgreSQL for the control plane, in Docker", "container"},
 	{"Add", "A Kubernetes cluster in Docker", "kind"},
 	{"Add", "An image registry in Docker", "registry"},
 	{"Add", "PostgreSQL in the cluster", "CloudNativePG"},

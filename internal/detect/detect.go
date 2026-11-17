@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -70,16 +71,16 @@ type Detector struct {
 func (d *Detector) open(ctx context.Context, f Finding) error {
 	detail, _ := json.Marshal(f.Detail)
 	f.At, f.State = store.FormatTime(d.Clock.Now()), "open"
-	res, err := d.DB.Exec(`INSERT OR IGNORE INTO findings (detector, env, key, title, detail,
-		state, at) VALUES (?,?,?,?,?,?,?)`, f.Detector, f.Env, f.Key, f.Title, string(detail),
-		f.State, f.At)
+	err := d.DB.QueryRow(`INSERT INTO findings (detector, env, key, title, detail, state, at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (key) DO NOTHING RETURNING id`, f.Detector,
+		f.Env, f.Key, f.Title, string(detail), f.State, f.At).Scan(&f.ID)
+	// No row comes back when a finding with this key exists already.
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("record finding %s: %w", f.Key, err)
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return nil
-	}
-	f.ID, _ = res.LastInsertId()
 	if _, err := d.Audit.Append(audit.Event{Type: "finding.opened", Actor: "detector:" + f.Detector,
 		Env: f.Env, Summary: f.Title, Data: map[string]any{"key": f.Key, "detail": f.Detail}}); err != nil {
 		return err
@@ -92,7 +93,7 @@ func (d *Detector) open(ctx context.Context, f Finding) error {
 
 // SetWorkItem links a finding to the work item that handles it.
 func (d *Detector) SetWorkItem(key, workItem, state string) error {
-	_, err := d.DB.Exec(`UPDATE findings SET work_item = ?, state = ? WHERE key = ?`, workItem,
+	_, err := d.DB.Exec(`UPDATE findings SET work_item = $1, state = $2 WHERE key = $3`, workItem,
 		state, key)
 	if err != nil {
 		return fmt.Errorf("link finding %s to %s: %w", key, workItem, err)

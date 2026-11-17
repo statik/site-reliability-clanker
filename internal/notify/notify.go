@@ -249,7 +249,7 @@ func (n *Notifier) record(seq int64, channel, target, status string, attempts in
 	subject string) {
 	at := n.clock.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	if _, err := n.db.Exec(`INSERT INTO deliveries (event_seq, channel, target, status,
-		attempts, error, subject, at) VALUES (?,?,?,?,?,?,?,?)`, seq, channel, target, status,
+		attempts, error, subject, at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, seq, channel, target, status,
 		attempts, errText, subject, at); err != nil {
 		panic(fmt.Sprintf("delivery table is not writable, stopping: %v", err))
 	}
@@ -311,7 +311,7 @@ type Delivery struct {
 // Deliveries returns the newest deliveries.
 func (n *Notifier) Deliveries(limit int) ([]Delivery, error) {
 	rows, err := n.db.Query(`SELECT id, event_seq, channel, target, status, attempts, error,
-		subject, at FROM deliveries ORDER BY id DESC LIMIT ?`, limit)
+		subject, at FROM deliveries ORDER BY id DESC LIMIT $1`, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list deliveries: %w", err)
 	}

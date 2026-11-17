@@ -2,13 +2,12 @@ package broker_test
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/broker"
-	"github.com/statik/site-reliability-clanker/internal/store"
+	"github.com/statik/site-reliability-clanker/internal/store/storetest"
 )
 
 type testClock struct{ t time.Time }
@@ -18,11 +17,7 @@ func (c *testClock) Now() time.Time { return c.t }
 func newBroker(t *testing.T) (*broker.Broker, *testClock) {
 	t.Helper()
 	dir := t.TempDir()
-	db, err := store.Open(filepath.Join(dir, "test.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	clock := &testClock{time.Date(2026, 11, 21, 2, 0, 0, 0, time.UTC)}
 	b, err := broker.New(db, clock, dir, func(string) (string, error) {
 		return "", fmt.Errorf("no cluster in this test")

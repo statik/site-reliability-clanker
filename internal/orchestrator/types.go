@@ -214,7 +214,7 @@ func scanWorkItem(row interface{ Scan(...any) error }) (WorkItem, error) {
 // Get returns one work item.
 func (o *Orchestrator) Get(id string) (WorkItem, error) {
 	wi, err := scanWorkItem(o.DB.QueryRow(`SELECT `+workItemColumns+
-		` FROM work_items WHERE id = ?`, id))
+		` FROM work_items WHERE id = $1`, id))
 	if err == sql.ErrNoRows {
 		return WorkItem{}, fmt.Errorf("work item %s does not exist", id)
 	}
@@ -244,9 +244,9 @@ func (o *Orchestrator) save(wi WorkItem) error {
 	layers, _ := json.Marshal(wi.Layers)
 	explanation, _ := json.Marshal(wi.Explanation)
 	wi.UpdatedAt = o.now()
-	_, err := o.DB.Exec(`UPDATE work_items SET title=?, layers=?, state=?, tier=?, tier_rule=?,
-		pr_id=?, commit_sha=?, base_commit=?, summary=?, explanation=?, scheduled_for=?,
-		rollback_of=?, updated_at=? WHERE id=?`,
+	_, err := o.DB.Exec(`UPDATE work_items SET title=$1, layers=$2, state=$3, tier=$4, tier_rule=$5,
+		pr_id=$6, commit_sha=$7, base_commit=$8, summary=$9, explanation=$10, scheduled_for=$11,
+		rollback_of=$12, updated_at=$13 WHERE id=$14`,
 		wi.Title, string(layers), wi.State, wi.Tier, wi.TierRule, wi.PRID, wi.Commit,
 		wi.BaseCommit, wi.Summary, string(explanation), wi.ScheduledFor, wi.RollbackOf,
 		wi.UpdatedAt, wi.ID)
@@ -287,7 +287,7 @@ func (o *Orchestrator) Create(n NewWorkItem) (WorkItem, error) {
 	}
 	layers, _ := json.Marshal(wi.Layers)
 	_, err := o.DB.Exec(`INSERT INTO work_items (id, title, kind, env, layers, state, trigger,
-		created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)`,
+		created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
 		wi.ID, wi.Title, wi.Kind, wi.Env, string(layers), wi.State, wi.Trigger, now, now)
 	if err != nil {
 		return WorkItem{}, fmt.Errorf("insert work item %s: %w", wi.ID, err)
@@ -330,7 +330,7 @@ func (o *Orchestrator) closeFindings(wi WorkItem) error {
 	if outcome == "" {
 		return nil
 	}
-	if _, err := o.DB.Exec(`UPDATE findings SET state = ? WHERE work_item = ?`, outcome,
+	if _, err := o.DB.Exec(`UPDATE findings SET state = $1 WHERE work_item = $2`, outcome,
 		wi.ID); err != nil {
 		return fmt.Errorf("close findings of %s: %w", wi.ID, err)
 	}
@@ -340,7 +340,7 @@ func (o *Orchestrator) closeFindings(wi WorkItem) error {
 // Plans returns the plans of a work item. Superseded plans are included when all is set.
 func (o *Orchestrator) Plans(workItem string, all bool) ([]Plan, error) {
 	query := `SELECT id, work_item, layer, commit_sha, plan_sha256, plan_path, json_path, facts,
-		policy, superseded, created_at FROM plans WHERE work_item = ?`
+		policy, superseded, created_at FROM plans WHERE work_item = $1`
 	if !all {
 		query += ` AND superseded = 0`
 	}
@@ -371,7 +371,7 @@ func (o *Orchestrator) Plans(workItem string, all bool) ([]Plan, error) {
 // Approvals returns the decisions on a work item, oldest first.
 func (o *Orchestrator) Approvals(workItem string) ([]Approval, error) {
 	rows, err := o.DB.Query(`SELECT id, work_item, approver, decision, comment, commit_sha,
-		plan_hashes, at FROM approvals WHERE work_item = ? ORDER BY id`, workItem)
+		plan_hashes, at FROM approvals WHERE work_item = $1 ORDER BY id`, workItem)
 	if err != nil {
 		return nil, fmt.Errorf("list approvals of %s: %w", workItem, err)
 	}
@@ -395,7 +395,7 @@ func (o *Orchestrator) Approvals(workItem string) ([]Approval, error) {
 // Jobs returns the runner jobs of a work item, oldest first.
 func (o *Orchestrator) Jobs(workItem string) ([]Job, error) {
 	rows, err := o.DB.Query(`SELECT id, work_item, layer, kind, status, log_path, grant_id,
-		tool_digest, started_at, ended_at FROM jobs WHERE work_item = ? ORDER BY id`, workItem)
+		tool_digest, started_at, ended_at FROM jobs WHERE work_item = $1 ORDER BY id`, workItem)
 	if err != nil {
 		return nil, fmt.Errorf("list jobs of %s: %w", workItem, err)
 	}
@@ -416,7 +416,7 @@ func (o *Orchestrator) Jobs(workItem string) ([]Job, error) {
 func (o *Orchestrator) Job(id int64) (Job, error) {
 	var j Job
 	err := o.DB.QueryRow(`SELECT id, work_item, layer, kind, status, log_path, grant_id,
-		tool_digest, started_at, ended_at FROM jobs WHERE id = ?`, id).Scan(&j.ID, &j.WorkItem,
+		tool_digest, started_at, ended_at FROM jobs WHERE id = $1`, id).Scan(&j.ID, &j.WorkItem,
 		&j.Layer, &j.Kind, &j.Status, &j.LogPath, &j.GrantID, &j.ToolDigest, &j.StartedAt,
 		&j.EndedAt)
 	if err != nil {

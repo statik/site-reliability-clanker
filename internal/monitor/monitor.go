@@ -108,7 +108,7 @@ func (m *Monitor) Probe(ctx context.Context, env string, count int) (Sample, err
 // Record stores a sample in the health history.
 func (m *Monitor) Record(s Sample) error {
 	_, err := m.DB.Exec(`INSERT INTO health (ts, env, ok, total, p95_ms, version)
-		VALUES (?,?,?,?,?,?)`, s.TS, s.Env, s.OK, s.Total, s.P95MS, s.Version)
+		VALUES ($1,$2,$3,$4,$5,$6)`, s.TS, s.Env, s.OK, s.Total, s.P95MS, s.Version)
 	if err != nil {
 		return fmt.Errorf("record health sample for %s: %w", s.Env, err)
 	}
@@ -143,7 +143,7 @@ func (m *Monitor) History(env, from, to string, limit int) ([]Sample, error) {
 		to = "9999"
 	}
 	rows, err := m.DB.Query(`SELECT ts, env, ok, total, p95_ms, version FROM (
-		SELECT * FROM health WHERE env = ? AND ts >= ? AND ts <= ? ORDER BY ts DESC LIMIT ?)
+		SELECT * FROM health WHERE env = $1 AND ts >= $2 AND ts <= $3 ORDER BY ts DESC LIMIT $4)
 		ORDER BY ts ASC`, env, from, to, limit)
 	if err != nil {
 		return nil, fmt.Errorf("read health history of %s: %w", env, err)
@@ -244,12 +244,11 @@ func (m *Monitor) TakeSnapshot(ctx context.Context, env, reason string) (Snapsho
 	if err != nil {
 		return Snapshot{}, fmt.Errorf("encode snapshot of %s: %w", env, err)
 	}
-	res, err := m.DB.Exec(`INSERT INTO snapshots (ts, env, reason, data) VALUES (?,?,?,?)`,
-		snap.TS, env, reason, string(data))
+	err = m.DB.QueryRow(`INSERT INTO snapshots (ts, env, reason, data) VALUES ($1,$2,$3,$4) RETURNING id`,
+		snap.TS, env, reason, string(data)).Scan(&snap.ID)
 	if err != nil {
 		return Snapshot{}, fmt.Errorf("store snapshot of %s: %w", env, err)
 	}
-	snap.ID, _ = res.LastInsertId()
 	return snap, nil
 }
 
@@ -261,7 +260,7 @@ func (m *Monitor) SnapshotAt(env, asOf string) (Snapshot, bool, error) {
 	}
 	var id int64
 	var data string
-	err := m.DB.QueryRow(`SELECT id, data FROM snapshots WHERE env = ? AND ts <= ?
+	err := m.DB.QueryRow(`SELECT id, data FROM snapshots WHERE env = $1 AND ts <= $2
 		ORDER BY ts DESC, id DESC LIMIT 1`, env, asOf).Scan(&id, &data)
 	if err == sql.ErrNoRows {
 		return Snapshot{}, false, nil

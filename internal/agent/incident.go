@@ -112,8 +112,8 @@ func (a *Agent) HandleIncident(ctx context.Context, f detect.Finding) error {
 	opened := a.Clock.Now()
 	a.emit(audit.Event{Type: "incident.opened", Actor: "detector:health", Env: f.Env,
 		WorkItem: wi.ID, Summary: "Incident opened: " + f.Title, Data: f.Detail})
-	if _, err := a.DB.Exec(`UPDATE findings SET work_item = ?, state = 'drafted'
-		WHERE key = ?`, wi.ID, f.Key); err != nil {
+	if _, err := a.DB.Exec(`UPDATE findings SET work_item = $1, state = 'drafted'
+		WHERE key = $2`, wi.ID, f.Key); err != nil {
 		return fmt.Errorf("link incident finding to %s: %w", wi.ID, err)
 	}
 	if wi, err = a.Orch.Transition(wi.ID, orchestrator.StateDrafting, RoleInvestigator,

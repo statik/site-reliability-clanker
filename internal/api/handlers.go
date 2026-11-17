@@ -26,7 +26,7 @@ func (s *Server) postSeen(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = s.Orch.DB.Exec(`UPDATE users SET last_seen = ? WHERE name = ?`,
+	_, err = s.Orch.DB.Exec(`UPDATE users SET last_seen = $1 WHERE name = $2`,
 		store.FormatTime(s.Clock.Now()), user.Name)
 	return map[string]bool{"ok": true}, err
 }

@@ -172,7 +172,7 @@ func (b *Broker) Issue(req Request) (Grant, error) {
 	approversJSON, _ := json.Marshal(g.Approvers)
 	_, err := b.db.Exec(`INSERT INTO grants (id, work_item, env, layer, identity, kind,
 		commit_sha, plan_sha256, tier, approvers, not_before, expires, signature, status,
-		issued_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		issued_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
 		g.ID, g.WorkItem, g.Env, g.Layer, g.Identity, g.Kind, g.Commit, g.PlanSHA256, g.Tier,
 		string(approversJSON), g.NotBefore, g.Expires, g.Signature, g.Status, g.IssuedAt)
 	if err != nil {
@@ -246,7 +246,7 @@ func scanGrant(row interface{ Scan(...any) error }) (Grant, error) {
 
 // Get returns one grant.
 func (b *Broker) Get(id string) (Grant, error) {
-	g, err := scanGrant(b.db.QueryRow(`SELECT `+grantColumns+` FROM grants WHERE id = ?`, id))
+	g, err := scanGrant(b.db.QueryRow(`SELECT `+grantColumns+` FROM grants WHERE id = $1`, id))
 	if err == sql.ErrNoRows {
 		return Grant{}, fmt.Errorf("grant %s does not exist", id)
 	}
@@ -281,7 +281,7 @@ func (b *Broker) setStatus(id, status string, ended bool) error {
 	if ended {
 		endedAt = store.FormatTime(b.clock.Now())
 	}
-	_, err := b.db.Exec(`UPDATE grants SET status = ?, ended_at = ? WHERE id = ?`, status,
+	_, err := b.db.Exec(`UPDATE grants SET status = $1, ended_at = $2 WHERE id = $3`, status,
 		endedAt, id)
 	if err != nil {
 		return fmt.Errorf("set grant %s to %s: %w", id, status, err)
