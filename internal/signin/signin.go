@@ -56,6 +56,8 @@ type Service struct {
 	db       *sql.DB
 	verifier *oidc.IDTokenVerifier
 	oauth    oauth2.Config
+	// public is the address of the dashboard as a browser sees it, with no slash at the end.
+	public string
 	// secure is set when the dashboard is served over HTTPS. The cookies then go over
 	// HTTPS only.
 	secure bool
@@ -84,6 +86,7 @@ func New(ctx context.Context, db *sql.DB, cfg Config) (*Service, error) {
 			Endpoint:    provider.Endpoint(),
 			RedirectURL: strings.TrimSuffix(cfg.PublicURL, "/") + "/auth/callback",
 			Scopes:      []string{oidc.ScopeOpenID, "email", "profile"}},
+		public: strings.TrimSuffix(cfg.PublicURL, "/"),
 		secure: public.Scheme == "https",
 		now:    time.Now,
 	}, nil
@@ -134,6 +137,10 @@ func (s *Service) Handler() http.Handler {
 	mux.HandleFunc("GET /auth/login", s.login)
 	mux.HandleFunc("GET /auth/callback", s.callback)
 	mux.HandleFunc("POST /auth/logout", s.logout)
+	mux.HandleFunc("POST /auth/device/code", s.deviceCode)
+	mux.HandleFunc("POST /auth/device/token", s.deviceToken)
+	mux.HandleFunc("GET /auth/device", s.devicePage)
+	mux.HandleFunc("POST /auth/device", s.deviceDecision)
 	return mux
 }
 
@@ -251,16 +258,34 @@ func (s *Service) logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Email returns the email of the person whose session the request carries. It returns
-// ErrNoSession when there is no session or the session ended.
+// presented returns the secret that a request carries and the table that knows it: the
+// session cookie of a browser, or the token of a program. A program sends its token as a
+// bearer token, or as the password of basic authentication, which is what git does.
+func presented(r *http.Request) (secret, table string) {
+	if saved, err := r.Cookie(sessionCookie); err == nil {
+		return saved.Value, "sessions"
+	}
+	if bearer, found := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); found {
+		return bearer, "tokens"
+	}
+	if _, password, ok := r.BasicAuth(); ok {
+		return password, "tokens"
+	}
+	return "", ""
+}
+
+// Email returns the email of the person behind a request: the person of the session of a
+// browser, or the person who approved the token of a program. It returns ErrNoSession
+// when the request carries neither, or what it carries ended.
 func (s *Service) Email(r *http.Request) (string, error) {
-	saved, err := r.Cookie(sessionCookie)
-	if err != nil {
+	secret, table := presented(r)
+	if secret == "" {
 		return "", ErrNoSession
 	}
 	var email, expires string
-	err = s.db.QueryRowContext(r.Context(), `SELECT email, expires FROM sessions WHERE id = $1`,
-		hash(saved.Value)).Scan(&email, &expires)
+	// table is one of two constants above, never text from the request.
+	err := s.db.QueryRowContext(r.Context(), `SELECT email, expires FROM `+table+` WHERE id = $1`,
+		hash(secret)).Scan(&email, &expires)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrNoSession
 	}

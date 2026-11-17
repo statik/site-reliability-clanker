@@ -144,11 +144,41 @@ if [ "$(curl -fs -b "${jar}" "${base}/api/v1/work-items")" != "[]" ]; then
   fail "the core on a cloud proposed a work item"
 fi
 
-echo "== compare the seeded repositories with the checkout"
+echo "== a program signs in with the device flow, and git uses its token"
 unset HOME
-# git sends the session of the admin. A sign-in for git itself is not built yet.
-git -c http.cookieFile="${jar}" clone -q "${base}/git/runbooks.git" "${work}/runbooks" 2>>"${work}/clone.log"
-git -c http.cookieFile="${jar}" clone -q "${base}/git/platform-live.git" "${work}/platform-live" 2>>"${work}/clone.log"
+client="${work}/client"
+mkdir "${client}"
+HOME="${client}" "${work}/clanker" login --server "${base}" >"${work}/login.log" 2>&1 &
+login=$!
+for _ in $(seq 1 30); do
+  if grep -q "Approve only" "${work}/login.log"; then break; fi
+  sleep 1
+done
+code="$(grep -o '[A-Z]\{4\}-[A-Z]\{4\}' "${work}/login.log" | head -n 1 || true)"
+if [ "$(status "${base}/auth/device?user_code=${code}")" != 302 ]; then
+  fail "the page of the code did not send a person with no sign-in to the sign-in"
+fi
+if [ "$(status -b "${jar}" -d "user_code=${code}" -d decision=approve "${base}/auth/device")" != 200 ]; then
+  fail "the admin could not approve the code ${code}"
+fi
+if ! wait "${login}"; then fail "clanker login did not end well; see ${work}/login.log"; fi
+token="$(grep -o '"token": "[^"]*"' "$(find "${client}" -name credentials.json)" | cut -d '"' -f 4 || true)"
+if [[ "$(curl -s -H "Authorization: Bearer ${token}" "${base}/api/v1/me")" != *'"role":"admin"'* ]]; then
+  fail "the token of the program does not act as the admin"
+fi
+if [ "$(status -H "Authorization: Bearer ${token}" -d "user_code=${code}" -d decision=approve "${base}/auth/device")" != 401 ]; then
+  fail "a program with a token decided on a code"
+fi
+
+echo "== compare the seeded repositories with the checkout"
+# git has no credential but the helper, which gives the token of clanker login.
+as_program=(env HOME="${client}" GIT_TERMINAL_PROMPT=0 git -c credential.helper=
+  -c "credential.${base}.helper=!${work}/clanker git-credential")
+if "${as_program[@]}" -c "credential.${base}.helper=" clone -q "${base}/git/runbooks.git" "${work}/refused" 2>>"${work}/clone.log"; then
+  fail "git cloned a repository with no credential"
+fi
+"${as_program[@]}" clone -q "${base}/git/runbooks.git" "${work}/runbooks" 2>>"${work}/clone.log"
+"${as_program[@]}" clone -q "${base}/git/platform-live.git" "${work}/platform-live" 2>>"${work}/clone.log"
 git -C "${work}/runbooks" fsck --strict --no-dangling >/dev/null || fail "fsck of runbooks"
 git -C "${work}/platform-live" fsck --strict --no-dangling >/dev/null || fail "fsck of platform-live"
 if [ "$(git -C "${work}/runbooks" rev-parse 'HEAD^{tree}')" != "$(git -C "${repo}" rev-parse 'HEAD:runbooks')" ]; then
@@ -179,4 +209,4 @@ if [ "${failures}" -ne 0 ]; then
   echo "RESULT: ${failures} checks failed. The files are in ${work}"
   exit 1
 fi
-echo "RESULT: the core asked for a sign-in, served the admin, seeded the forge from memory and left no file"
+echo "RESULT: the core signed in a person and a program, seeded the forge from memory and left no file"

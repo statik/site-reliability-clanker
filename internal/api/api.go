@@ -261,6 +261,10 @@ func (s *Server) gate(next http.Handler) http.Handler {
 					http.StatusFound)
 				return
 			}
+			if strings.HasPrefix(r.URL.Path, "/git/") {
+				// With this header git asks its credential helper for the token.
+				w.Header().Set("WWW-Authenticate", `Basic realm="clanker"`)
+			}
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "not signed in"})
 		case errors.As(err, &se):
 			writeJSON(w, se.status, map[string]string{"error": err.Error()})
