@@ -253,8 +253,11 @@ func (s *Server) future(now string) ([]map[string]any, error) {
 		return nil, err
 	}
 	for _, adv := range advisories {
-		if adv.Due > now {
-			future = append(future, map[string]any{"ts": adv.Due, "env": s.envNames()[0],
+		if adv.Due <= now {
+			continue
+		}
+		for _, env := range s.envNames() {
+			future = append(future, map[string]any{"ts": adv.Due, "env": env,
 				"kind": "forecast", "title": adv.Title, "advisory": adv.ID})
 		}
 	}
@@ -455,15 +458,38 @@ func (s *Server) latestVersions() (map[string]string, error) {
 		if err != nil {
 			return nil, err
 		}
+		withdrawn, err := s.rolledBackVersions()
+		if err != nil {
+			return nil, err
+		}
 		for _, e := range entries {
 			v := strings.TrimSuffix(e.Name, ".md")
-			if latest["paperboat"] == "" || minorsBehind(latest["paperboat"], v) > 0 ||
-				strings.TrimSuffix(v, "-bad") > latest["paperboat"] {
+			if withdrawn[v] {
+				continue
+			}
+			if latest["paperboat"] == "" || detect.Newer(v, latest["paperboat"]) {
 				latest["paperboat"] = v
 			}
 		}
 	}
 	return latest, nil
+}
+
+// rolledBackVersions lists the application versions whose upgrade was rolled back. Such a
+// version is not a target, so the posture matrix does not count it as the latest.
+func (s *Server) rolledBackVersions() (map[string]bool, error) {
+	findings, err := s.Detector.Findings()
+	if err != nil {
+		return nil, err
+	}
+	withdrawn := map[string]bool{}
+	for _, f := range findings {
+		version, _ := f.Detail["value"].(string)
+		if f.State == "rolled back" && f.Detail["variable"] == "paperboat_version" {
+			withdrawn[version] = true
+		}
+	}
+	return withdrawn, nil
 }
 
 func (s *Server) getPosture(r *http.Request) (any, error) {

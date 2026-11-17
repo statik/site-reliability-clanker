@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live screens: Site Reliability Clanker</title>
+  <meta name="description" content="Real screenshots of the Clanker dashboard, of the Paperboat application that it manages, and of the notifications that it sent. Not mock-ups.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/site.css">
+  <script src="js/boot.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <header class="shell">
+    <a class="shell-name" href="index.html"><span class="shell-prefix">Site Reliability</span> Clanker</a>
+    <nav aria-label="Site">
+      <ul>
+        <li><a href="index.html">Concept</a></li>
+        <li><a href="walkthrough.html">Walkthrough</a></li>
+        <li><a href="architecture.html">Architecture</a></li>
+        <li><a href="screens.html" aria-current="page">Live screens</a></li>
+      </ul>
+    </nav>
+    <button type="button" class="theme-toggle js-only" aria-label="Switch theme">
+      <svg class="icon-sun" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 12a4 4 0 1 1-4 4 4 4 0 0 1 4-4m0-2a6 6 0 1 0 6 6 6 6 0 0 0-6-6ZM5.4 6.8l1.4-1.4 3.5 3.5-1.4 1.4zM2 15h5v2H2zM5.4 25.2l3.5-3.5 1.4 1.4-3.5 3.5zM15 25h2v5h-2zM21.7 23.1l1.4-1.4 3.5 3.5-1.4 1.4zM25 15h5v2h-5zM21.7 8.9l3.5-3.5 1.4 1.4-3.5 3.5zM15 2h2v5h-2z"/></svg>
+      <svg class="icon-moon" viewBox="0 0 32 32" aria-hidden="true"><path d="M13.5 5.4a11 11 0 0 0 13 13.1A11 11 0 1 1 13.5 5.4M15 3A13 13 0 1 0 29 17.6a1 1 0 0 0-1.5-1A9 9 0 0 1 15.4 4.5a1 1 0 0 0-.4-1.5Z"/></svg>
+    </button>
+  </header>
+
+  <main id="main">
+    <div class="wrap page-head">
+      <p class="kicker">Live screens</p>
+      <h1>Real views of the running demo, not mock-ups.</h1>
+      <p class="section-lead">A script opens each view in a browser and takes the picture. When the
+        product changes, one command takes the pictures again.</p>
+    </div>
+    <div class="wrap">
+      <!-- build:gallery -->
+<p class="figure-source">Captured on 2026-11-17 with
+Playwright. Nothing on this page is a mock-up.</p><section class="gallery-group" aria-labelledby="group-dashboard">
+<h2 id="group-dashboard">The Clanker dashboard</h2>
+<p class="section-lead">What an approver sees. Captured from the running demo.</p>
+<div class="gallery"><figure class="shot">
+<a href="screens/dashboard-overview-light.png"><img src="screens/dashboard-overview-light.png" alt="The Overview view of the Clanker dashboard, light theme."
+width="1440" height="900" loading="lazy"></a>
+<figcaption><strong>Overview</strong> <span class="tag tag-gray">light</span>
+<span class="shot-note">Is each environment healthy, and what needs a decision now?</span></figcaption>
+</figure><figure class="shot">
+<a href="screens/dashboard-timeline-light.png"><img src="screens/dashboard-timeline-light.png" alt="The Timeline view of the Clanker dashboard, light theme."
+width="1440" height="900" loading="lazy"></a>
+<figcaption><strong>Timeline</strong> <span class="tag tag-gray">light</span>
+<span class="shot-note">What happened, when, and what is coming next.</span></figcaption>
+</figure><figure class="shot">
+<a href="screens/dashboard-approval-light.png"><img src="screens/dashboard-approval-light.png" alt="The Approval page view of the Clanker dashboard, light theme."
+width="1440" height="2200" loading="lazy"></a>
+<figcaption><strong>Approval page</strong> <span class="tag tag-gray">light</span>
+<span class="shot-note">One sentence, the impact, the tier, what changes, and the decision.</span></figcaption>
+</figure><figure class="shot">
+<a href="screens/dashboard-topology-light.png"><img src="screens/dashboard-topology-light.png" alt="The Topology view of the Clanker dashboard, light theme."
+width="1440" height="900" loading="lazy"></a>
+<figcaption><strong>Topology</strong> <span class="tag tag-gray">light</span>
+<span class="shot-note">What exists in the environment and how it is connected.</span></figcaption>
+</figure><figure class="shot">
+<a href="screens/dashboard-access-light.png"><img src="screens/dashboard-access-light.png" alt="The Access view of the Clanker dashboard, light theme."
+width="1440" height="900" loading="lazy"></a>
+<figcaption><strong>Access</strong> <span class="tag tag-gray">light</span>
+<span class="shot-note">Who and what holds which permission now, and the history of grants.</span></figcaption>
+</figure><figure class="shot">
+<a href="screens/dashboard-audit-light.png"><img src="screens/dashboard-audit-light.png" alt="The Audit view of the Clanker dashboard, light theme."
+width="1440" height="900" loading="lazy"></a>
+<figcaption><strong>Audit</strong> <span class="tag tag-gray">light</span>
+<span class="shot-note">The searchable, hash-chained event log.</span></figcaption>
+</figure><figure class="shot">
+<a href="screens/dashboard-overview-dark.png"><img src="screens/dashboard-overview-dark.png" alt="The Overview view of the Clanker dashboard, dark theme."
+width="1440" height="900" loading="lazy"></a>
+<figcaption><strong>Overview</strong> <span class="tag tag-gray">dark</span>
+<span class="shot-note">Is each environment healthy, and what needs a decision now?</span></figcaption>
+</figure><figure class="shot">
+<a href="screens/dashboard-timeline-dark.png"><img src="screens/dashboard-timeline-dark.png" alt="The Timeline view of the Clanker dashboard, dark theme."
+width="1440" height="900" loading="lazy"></a>
+<figcaption><strong>Timeline</strong> <span class="tag tag-gray">dark</span>
+<span class="shot-note">What happened, when, and what is coming next.</span></figcaption>
+</figure><figure class="shot">
+<a href="screens/dashboard-approval-dark.png"><img src="screens/dashboard-approval-dark.png" alt="The Approval page view of the Clanker dashboard, dark theme."
+width="1440" height="2200" loading="lazy"></a>
+<figcaption><strong>Approval page</strong> <span class="tag tag-gray">dark</span>
+<span class="shot-note">One sentence, the impact, the tier, what changes, and the decision.</span></figcaption>
+</figure><figure class="shot">
+<a href="screens/dashboard-topology-dark.png"><img src="screens/dashboard-topology-dark.png" alt="The Topology view of the Clanker dashboard, dark theme."
+width="1440" height="900" loading="lazy"></a>
+<figcaption><strong>Topology</strong> <span class="tag tag-gray">dark</span>
+<span class="shot-note">What exists in the environment and how it is connected.</span></figcaption>
+</figure><figure class="shot">
+<a href="screens/dashboard-access-dark.png"><img src="screens/dashboard-access-dark.png" alt="The Access view of the Clanker dashboard, dark theme."
+width="1440" height="900" loading="lazy"></a>
+<figcaption><strong>Access</strong> <span class="tag tag-gray">dark</span>
+<span class="shot-note">Who and what holds which permission now, and the history of grants.</span></figcaption>
+</figure><figure class="shot">
+<a href="screens/dashboard-audit-dark.png"><img src="screens/dashboard-audit-dark.png" alt="The Audit view of the Clanker dashboard, dark theme."
+width="1440" height="900" loading="lazy"></a>
+<figcaption><strong>Audit</strong> <span class="tag tag-gray">dark</span>
+<span class="shot-note">The searchable, hash-chained event log.</span></figcaption>
+</figure></div>
+</section><section class="gallery-group" aria-labelledby="group-paperboat">
+<h2 id="group-paperboat">Paperboat, the managed application</h2>
+<p class="section-lead">The fish rental business that Clanker deploys and looks after.</p>
+<div class="gallery"><figure class="shot">
+<a href="screens/paperboat-inventory-light.png"><img src="screens/paperboat-inventory-light.png" alt="Paperboat, the fish rental application: live inventory board."
+width="1440" height="900" loading="lazy"></a>
+<figcaption><strong>Live inventory board</strong> <span class="tag tag-gray">light</span>
+<span class="shot-note">Fish by tank, with status, age and condition. It updates from a live stream.</span></figcaption>
+</figure><figure class="shot">
+<a href="screens/paperboat-rentals-light.png"><img src="screens/paperboat-rentals-light.png" alt="Paperboat, the fish rental application: rentals."
+width="1440" height="900" loading="lazy"></a>
+<figcaption><strong>Rentals</strong> <span class="tag tag-gray">light</span>
+<span class="shot-note">Who has which fish, and until when.</span></figcaption>
+</figure><figure class="shot">
+<a href="screens/paperboat-deliveries-light.png"><img src="screens/paperboat-deliveries-light.png" alt="Paperboat, the fish rental application: deliveries."
+width="1440" height="900" loading="lazy"></a>
+<figcaption><strong>Deliveries</strong> <span class="tag tag-gray">light</span>
+<span class="shot-note">Deliveries and collections, each with a manifest on the shared file system.</span></figcaption>
+</figure><figure class="shot">
+<a href="screens/paperboat-support-light.png"><img src="screens/paperboat-support-light.png" alt="Paperboat, the fish rental application: support desk."
+width="1440" height="900" loading="lazy"></a>
+<figcaption><strong>Support desk</strong> <span class="tag tag-gray">light</span>
+<span class="shot-note">Tickets from customers, with each interaction.</span></figcaption>
+</figure></div>
+</section><section class="gallery-group" aria-labelledby="group-notifications">
+<h2 id="group-notifications">Where the notifications arrive</h2>
+<p class="section-lead">The mail inbox and the webhook sink of the demo, with the real messages of the month.</p>
+<div class="gallery"><figure class="shot">
+<a href="screens/mail-inbox-light.png"><img src="screens/mail-inbox-light.png" alt="A mail inbox with the notification emails from Clanker, most of them requests for approval."
+width="1440" height="900" loading="lazy"></a>
+<figcaption><strong>Mail inbox</strong> <span class="tag tag-gray">light</span>
+<span class="shot-note">The emails that Clanker sent to the approvers during the month.</span></figcaption>
+</figure><figure class="shot">
+<a href="screens/mail-approval-light.png"><img src="screens/mail-approval-light.png" alt="One notification email from Clanker that asks for an approval."
+width="1440" height="900" loading="lazy"></a>
+<figcaption><strong>An approval email</strong> <span class="tag tag-gray">light</span>
+<span class="shot-note">What an approver receives: the change in one sentence, and a link to decide.</span></figcaption>
+</figure><figure class="shot">
+<a href="screens/webhook-sink-light.png"><img src="screens/webhook-sink-light.png" alt="The webhook sink page: a list of the chat notifications that Clanker sent."
+width="1440" height="900" loading="lazy"></a>
+<figcaption><strong>Webhook sink</strong> <span class="tag tag-gray">light</span>
+<span class="shot-note">A local stand-in for Slack, Microsoft Teams and Discord, with the real payloads.</span></figcaption>
+</figure></div>
+</section>
+<!-- /build:gallery -->
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <p>The screenshots are written by <code>capture.mjs</code> into <code>screens/</code>. The
+        people, customers and fish in them are fictional.</p>
+    </div>
+  </footer>
+
+  <script type="module" src="js/site.js"></script>
+</body>
+</html>

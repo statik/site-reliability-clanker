@@ -1,0 +1,17 @@
+{
+  "name": "clanker-site",
+  "private": true,
+  "type": "module",
+  "description": "Concept website, capture pipeline and explainer video for Site Reliability Clanker",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "node build.mjs",
+    "export": "node export-data.mjs",
+    "capture": "node capture.mjs",
+    "check": "node check.mjs",
+    "video": "./build-video.sh"
+  },
+  "devDependencies": {
+    "playwright": "1.65.1"
+  }
+}

@@ -105,8 +105,13 @@ func (s *Server) getWorkItem(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	valid, err := s.Orch.ValidApprovers(wi)
+	if err != nil {
+		return nil, err
+	}
 	detail := map[string]any{"work_item": wi, "plans": plans, "approvals": approvals,
-		"jobs": jobs, "events": events,
+		"valid_approvers": valid,
+		"jobs":            jobs, "events": events,
 		"approvers_required": policy.ApproversRequired(wi.Tier),
 		"deferred_layers":    deferredLayers(wi, plans)}
 	if wi.PRID != 0 {
@@ -169,7 +174,7 @@ func (s *Server) postDecision(r *http.Request) (any, error) {
 		orchestrator.Decision{User: user.Name, Decision: body.Decision, Comment: body.Comment,
 			ScheduledFor: body.ScheduledFor})
 	if err != nil {
-		return nil, forbidden(err)
+		return nil, err
 	}
 	return wi, nil
 }
@@ -214,7 +219,17 @@ func (s *Server) getJobLog(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read log of job %d: %w", id, err)
 	}
-	return map[string]any{"job": job, "log": string(raw)}, nil
+	return map[string]any{"job": job, "log": s.hidePaths(string(raw))}, nil
+}
+
+// hidePaths replaces the data directory and the home directory in a log with placeholders,
+// so a job log does not show where the control plane runs on its host.
+func (s *Server) hidePaths(text string) string {
+	text = strings.ReplaceAll(text, s.Orch.DataDir, "<data>")
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		text = strings.ReplaceAll(text, home, "~")
+	}
+	return text
 }
 
 func (s *Server) getEvents(r *http.Request) (any, error) {
@@ -437,7 +452,9 @@ func (s *Server) postChat(r *http.Request) (any, error) {
 	if err := decodeBody(r, &body); err != nil {
 		return nil, err
 	}
-	return s.Agent.Ask(r.Context(), user.Name, body.WorkItem, body.Question)
+	// The answer is stored even when the client goes away, so no question stays unanswered.
+	return s.Agent.Ask(context.WithoutCancel(r.Context()), user.Name, body.WorkItem,
+		body.Question)
 }
 
 func (s *Server) getAgentCalls(r *http.Request) (any, error) {

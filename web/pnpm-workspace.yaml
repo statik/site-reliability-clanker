@@ -1,0 +1,28 @@
+# No dependency may run an install script. The Carbon and Plex packages only use theirs to send
+# usage telemetry to IBM, and sass works without the native file watcher.
+allowBuilds:
+  "@carbon/charts": false
+  "@carbon/charts-react": false
+  "@carbon/colors": false
+  "@carbon/feature-flags": false
+  "@carbon/grid": false
+  "@carbon/icon-helpers": false
+  "@carbon/icons-react": false
+  "@carbon/layout": false
+  "@carbon/motion": false
+  "@carbon/react": false
+  "@carbon/styles": false
+  "@carbon/themes": false
+  "@carbon/type": false
+  "@carbon/utilities": false
+  "@carbon/utils-position": false
+  "@ibm/plex": false
+  "@ibm/plex-mono": false
+  "@ibm/plex-sans": false
+  "@ibm/plex-sans-arabic": false
+  "@ibm/plex-sans-devanagari": false
+  "@ibm/plex-sans-hebrew": false
+  "@ibm/plex-sans-thai": false
+  "@ibm/plex-sans-thai-looped": false
+  "@ibm/plex-serif": false
+  "@parcel/watcher": false

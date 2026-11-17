@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Site Reliability Clanker: an AI site reliability engineer that asks first</title>
+  <meta name="description" content="A concept prototype: an AI site reliability engineer that deploys and looks after an application through pull requests, human approval and just-in-time access.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/site.css">
+  <script src="js/boot.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <header class="shell">
+    <a class="shell-name" href="index.html"><span class="shell-prefix">Site Reliability</span> Clanker</a>
+    <nav aria-label="Site">
+      <ul>
+        <li><a href="index.html" aria-current="page">Concept</a></li>
+        <li><a href="walkthrough.html">Walkthrough</a></li>
+        <li><a href="architecture.html">Architecture</a></li>
+        <li><a href="screens.html">Live screens</a></li>
+      </ul>
+    </nav>
+    <button type="button" class="theme-toggle js-only" aria-label="Switch theme">
+      <svg class="icon-sun" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 12a4 4 0 1 1-4 4 4 4 0 0 1 4-4m0-2a6 6 0 1 0 6 6 6 6 0 0 0-6-6ZM5.4 6.8l1.4-1.4 3.5 3.5-1.4 1.4zM2 15h5v2H2zM5.4 25.2l3.5-3.5 1.4 1.4-3.5 3.5zM15 25h2v5h-2zM21.7 23.1l1.4-1.4 3.5 3.5-1.4 1.4zM25 15h5v2h-5zM21.7 8.9l3.5-3.5 1.4 1.4-3.5 3.5zM15 2h2v5h-2z"/></svg>
+      <svg class="icon-moon" viewBox="0 0 32 32" aria-hidden="true"><path d="M13.5 5.4a11 11 0 0 0 13 13.1A11 11 0 1 1 13.5 5.4M15 3A13 13 0 1 0 29 17.6a1 1 0 0 0-1.5-1A9 9 0 0 1 15.4 4.500a1 1 0 0 0-.4-1.5Z"/></svg>
+    </button>
+  </header>
+
+  <main id="main">
+    <section class="hero" aria-labelledby="hero-title">
+      <canvas class="hero-backdrop" id="hero-backdrop" aria-hidden="true"></canvas>
+      <div class="wrap">
+        <p class="kicker reveal">Concept prototype</p>
+        <h1 class="reveal" id="hero-title">An AI site reliability engineer that asks first.</h1>
+        <p class="hero-lead reveal">Clanker deploys an application and then looks after it: releases,
+          security patches, backups, restore drills, incidents. Every change is a pull request.
+          A person approves it. The access to apply it exists for seconds.</p>
+        <div class="btn-row reveal">
+          <a class="btn btn-primary" href="walkthrough.html">Walk through one month <span aria-hidden="true">&rarr;</span></a>
+          <a class="btn btn-tertiary" href="architecture.html">See how it works <span aria-hidden="true">&rarr;</span></a>
+        </div>
+        <p class="hero-hint reveal">Everything on this site comes from one real run of the prototype &middot;
+          <!-- build:period -->
+17 Nov 2026 to 16 Dec 2026
+<!-- /build:period --></p>
+      </div>
+      <button type="button" class="btn btn-ghost motion-toggle js-only" aria-pressed="false">Pause motion</button>
+    </section>
+
+    <section class="section" aria-labelledby="problem-title">
+      <div class="wrap">
+        <p class="kicker">The problem</p>
+        <h2 id="problem-title">Most of operations is maintenance, and most maintenance is late.</h2>
+        <div class="cards">
+          <div class="card reveal">
+            <h3>The work never ends.</h3>
+            <p>A Kubernetes version reaches its end of support. A base image gets a CVE. The database
+              has a patch. The backups need a restore test. Each job is small. Together they are a
+              full-time job that nobody has the time for.</p>
+          </div>
+          <div class="card reveal">
+            <h3>Automation with standing access is a standing risk.</h3>
+            <p>A pipeline or an agent that can change production at any time is a credential that
+              works at 03:00, for anybody who holds it. Give an AI that credential, and you have
+              made the risk larger and less predictable.</p>
+          </div>
+          <div class="card reveal">
+            <h3>The person who approves cannot read the plan.</h3>
+            <p>The people who are accountable for a change are often not the people who can read
+              four hundred lines of infrastructure diff. So they approve what they do not
+              understand, or they slow everything down.</p>
+          </div>
+        </div>
+        <p class="answer reveal">Clanker lets a language model do the reading and the writing. Plain
+          code and a person do the deciding.</p>
+      </div>
+    </section>
+
+    <section class="section section-alt" aria-labelledby="example-title">
+      <div class="wrap split">
+        <div>
+          <p class="kicker">The example</p>
+          <h2 id="example-title">A business that rents out live fish.</h2>
+          <div class="prose section-lead">
+            <p>Clanker needs something real to look after. The prototype uses Paperboat: customers
+              rent a fish, a driver delivers it, and a driver collects it when the rental ends.</p>
+            <p>It has a live inventory board, fish that age and retire, deliveries, and a support
+              desk for people whose fish looks at them strangely. Under that, it needs what every
+              business application needs: a database, a shared file system, a load balancer, and
+              releases that sometimes go wrong.</p>
+          </div>
+        </div>
+        <figure class="reveal">
+          <a href="screens.html"><img src="screens/paperboat-inventory-light.png" width="1440" height="900"
+            alt="The Paperboat inventory board: fish grouped by tank, each with its status, age and condition."></a>
+          <figcaption>The real Paperboat inventory board, captured from the running application.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="numbers-title">
+      <div class="wrap">
+        <p class="kicker">One month, measured</p>
+        <h2 id="numbers-title">The agent worked for a month. It held write access for minutes.</h2>
+        <p class="section-lead">The prototype ran a scripted month on the local target: a first
+          deployment, three releases, a rollback, patches, backups, a restore drill, drift and an
+          incident at 02:00. These numbers are counted from its audit log.</p>
+        <!-- build:stats -->
+<dl class="stats"><div class="stat reveal">
+<dt>days of operation</dt><dd><span class="stat-value">29</span>
+<span class="stat-note">one scripted month on the local target</span></dd></div><div class="stat reveal">
+<dt>audit records</dt><dd><span class="stat-value">323</span>
+<span class="stat-note">hash chain verified</span></dd></div><div class="stat reveal">
+<dt>human approvals</dt><dd><span class="stat-value">7</span>
+<span class="stat-note">for 14 work items</span></dd></div><div class="stat reveal">
+<dt>grants issued</dt><dd><span class="stat-value">18</span>
+<span class="stat-note">18 already revoked</span></dd></div><div class="stat reveal">
+<dt>of write or debug access</dt><dd><span class="stat-value">3 min 27 s</span>
+<span class="stat-note">in 29 days, in total</span></dd></div><div class="stat reveal">
+<dt>automatic rollback</dt><dd><span class="stat-value">1</span>
+<span class="stat-note">caught by the canary check</span></dd></div></dl>
+<!-- /build:stats -->
+        <div class="btn-row">
+          <a class="btn btn-tertiary" href="walkthrough.html">See each step with its real events <span aria-hidden="true">&rarr;</span></a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt" aria-labelledby="principles-title">
+      <div class="wrap">
+        <p class="kicker">Five principles</p>
+        <h2 id="principles-title">Five rules decide almost everything else.</h2>
+        <p class="section-lead">Each rule is short. Under each one is what it did in the scripted
+          month.</p>
+        <!-- build:principles -->
+<ol class="principles"><li class="principle reveal">
+<span class="principle-index" aria-hidden="true">1</span>
+<h3>The model proposes. Code decides.</h3>
+<p>The language model drafts changes, summaries and answers. It never rates its own risk, never holds a cloud credential, and has no tool that applies a change.</p>
+<p class="principle-evidence"><span class="evidence-label">In the scripted month</span>
+Policy code set the tier of all 7 rated changes.</p>
+</li><li class="principle reveal">
+<span class="principle-index" aria-hidden="true">2</span>
+<h3>Every change is a pull request.</h3>
+<p>No console clicks and no ad-hoc kubectl. Even “restart that deployment” is a recorded runbook job with parameters.</p>
+<p class="principle-evidence"><span class="evidence-label">In the scripted month</span>
+6 pull requests and 5 runbook jobs. The one change made by hand was found by the drift check and put back through a pull request.</p>
+</li><li class="principle reveal">
+<span class="principle-index" aria-hidden="true">3</span>
+<h3>What was approved is exactly what runs.</h3>
+<p>An approval is bound to a commit and to the hash of a saved plan. If the world moved, the apply is refused and the change comes back for approval.</p>
+<p class="principle-evidence"><span class="evidence-label">In the scripted month</span>
+Each of the 12 applies ran the plan hash that was approved.</p>
+</li><li class="principle reveal">
+<span class="principle-index" aria-hidden="true">4</span>
+<h3>No standing write access.</h3>
+<p>Read-only by default. Write permission exists for one approved job, for the one layer that the job touches, and is revoked when the job ends.</p>
+<p class="principle-evidence"><span class="evidence-label">In the scripted month</span>
+18 grants in 29 days. Write or debug access existed for
+3 min 27 s in total. The longest grant lasted
+67 s.</p>
+</li><li class="principle reveal">
+<span class="principle-index" aria-hidden="true">5</span>
+<h3>Multi-cloud is a contract, not a port.</h3>
+<p>One interface, four implementations (AWS, Google Cloud, Azure and a local target), and one conformance suite for all of them.</p>
+<p class="principle-evidence"><span class="evidence-label">In the scripted month</span>
+The local target ran this whole month. The AWS, Google Cloud and Azure stacks
+are validated against the same contract and are not applied yet.</p>
+</li></ol>
+<!-- /build:principles -->
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="approver-title">
+      <div class="wrap">
+        <p class="kicker">What an approver sees</p>
+        <h2 id="approver-title">Decide in less than a minute. Or read down to the raw plan.</h2>
+        <p class="section-lead">The approval page starts with one sentence: what changes, and why
+          now. Then the impact, the risk tier and the rule that set it, what changes, how it is
+          made safe, and which permission the change asks for. The model writes the words. The
+          counts, the names and the tier come from the plan and from policy code, and the model
+          cannot change them.</p>
+        <!-- build:approval -->
+<article class="approval reveal" aria-label="Approval page for WI-0014">
+<header class="approval-head">
+<p class="approval-id"><span class="mono">WI-0014</span> <span class="tag tag-t2">T2</span>
+<span class="tag tag-blue">Waiting for approval</span></p>
+<h3>Run two api replicas for the holiday rush</h3>
+<p class="approval-sentence">Change the paperboat API from one replica to two, so it can handle the holiday rush (WI-0014).
+<span class="ai-label" title="Written by anthropic/claude-haiku-5.5; the facts come from the plan">AI</span></p>
+</header>
+<div class="approval-grid">
+<section><h4>Impact</h4>
+<dl class="kv">
+<div><dt>Downtime</dt><dd>None expected. The plan updates the existing release and does not replace or delete anything.</dd></div>
+<div><dt>Effect on users</dt><dd>No direct change for users. The API should have more capacity during the holiday period, so it should cope better with heavy traffic.</dd></div>
+<div><dt>Cost</dt><dd>The plan does not show a cost figure. Running a second replica adds compute use for as long as it stays on.</dd></div>
+</dl></section>
+<section><h4>Risk tier</h4>
+<p><span class="tag tag-t2">T2</span> set by the policy rule <code>normal-change</code>, not by
+the model. Needs 1 approver.</p>
+<h4>What changes</h4>
+<p class="plan-counts mono">0 to add · 1 to change ·
+0 to destroy · 0 to replace</p>
+<ul class="change-list"><li>
+<span class="tag tag-blue">update</span>
+<code>module.app.helm_release.paperboat</code>
+<span class="change-detail mono">values.api.replicas: 1 → 2</span>
+</li></ul></section>
+<section><h4>Safety</h4>
+<dl class="kv">
+<div><dt>Rollback</dt><dd>Set the replica count back to 1 and apply again, or roll the Helm release back to the previous revision. The plan returns a release revision output, so the previous revision can be identified.</dd></div>
+<div><dt>Verification</dt><dd>After the apply, confirm that the paperboat release shows the new revision and that two API replicas are running and healthy.</dd></div>
+</dl></section>
+<section><h4>Permissions requested</h4>
+<p>A grant for <code>applier-50-app</code>, for
+the layer <code>50-app</code> only, bound to commit
+<code>f1f5d0b</code> and plan
+<code>016a293</code>. It is revoked when the job ends.</p>
+<h4>Evidence</h4>
+<p>Trigger: Pull request by Carol Reyes. Pull request #6 in
+<code>platform-live</code>. Approval needed: Run two api replicas for the holiday rush (16 Dec 2026, 02:01:19 UTC).</p></section>
+</div>
+<footer class="approval-decide" aria-label="Decisions (illustration, not active)">
+<span class="btn btn-primary is-static">Approve</span>
+<span class="btn btn-tertiary is-static">Approve and schedule</span>
+<span class="btn btn-ghost is-static">Request changes</span>
+<span class="btn btn-ghost is-static">Reject</span>
+<span class="btn btn-ghost is-static">Defer</span>
+</footer>
+<p class="approval-source">The words and numbers are the real work item WI-0014,
+exported from the running control plane; the summary was written by
+<span class="mono">anthropic/claude-haiku-5.5</span> around facts read from the plan. The layout
+is an illustration of the approval page. For the dashboard itself, see
+<a href="screens.html">Live screens</a>.</p>
+</article>
+<!-- /build:approval -->
+        <h3 class="kicker questions-title">Questions that the agent must answer well</h3>
+        <ul class="questions">
+          <li>What is waiting on me, and what happens if I leave it for a week?</li>
+          <li>Are we behind on any patches? Which ones matter?</li>
+          <li>What changed in production in the last 30 days, and who approved each change?</li>
+          <li>When was the last successful restore test?</li>
+          <li>Why did the upgrade last night take longer than planned?</li>
+          <li>What does the agent have access to right now?</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section section-alt" aria-labelledby="clouds-title">
+      <div class="wrap">
+        <p class="kicker">Supported clouds</p>
+        <h2 id="clouds-title">One contract. Four targets. One of them has run.</h2>
+        <p class="section-lead">Each cloud implements the same module interface, so the stacks above
+          it and the control plane do not change. This is the honest status of the prototype
+          today.</p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Status of each target">
+          <table class="data-table">
+            <thead>
+              <tr><th scope="col">Target</th><th scope="col">Kubernetes</th><th scope="col">Postgres</th>
+                <th scope="col">Shared files</th><th scope="col">Status today</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Local</th><td>kind</td><td>CloudNativePG in the cluster</td><td>NFS provisioner</td>
+                <td><span class="status status-ok"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a7 7 0 1 0 7 7 7 7 0 0 0-7-7ZM7 11 4.300 8.300l.900-.800L7 9.300l4-3.900.900.800Z"/></svg>Runs end to end</span><br>
+                  The whole scripted month on this site ran here.</td></tr>
+              <tr><th scope="row">AWS</th><td>EKS</td><td>RDS for PostgreSQL</td><td>EFS</td>
+                <td><span class="status status-partial"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1 1 14h14Zm-.6 5h1.200v4.500H7.400Zm.6 7a.800.800 0 1 1 .800-.800.800.800 0 0 1-.800.800Z"/></svg>Validated, not applied</span><br>
+                  The stacks pass <code>tofu validate</code>. No plan or apply has run.</td></tr>
+              <tr><th scope="row">Google Cloud</th><td>GKE</td><td>Cloud SQL for PostgreSQL</td><td>Filestore</td>
+                <td><span class="status status-partial"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1 1 14h14Zm-.6 5h1.200v4.500H7.400Zm.6 7a.800.800 0 1 1 .800-.800.800.800 0 0 1-.800.800Z"/></svg>Validated, not applied</span><br>
+                  The stacks pass <code>tofu validate</code>. No plan or apply has run.</td></tr>
+              <tr><th scope="row">Azure</th><td>AKS</td><td>Azure Database for PostgreSQL</td><td>Azure Files (NFS)</td>
+                <td><span class="status status-partial"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1 1 14h14Zm-.6 5h1.200v4.500H7.400Zm.6 7a.800.800 0 1 1 .800-.800.800.800 0 0 1-.800.800Z"/></svg>Validated, not applied</span><br>
+                  The stacks pass <code>tofu validate</code>. No plan or apply has run.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="figure-caption">No cloud account was used for this prototype. The local target is
+          not a mock: it runs the same stacks and the same control plane on one laptop.</p>
+      </div>
+    </section>
+
+    <section class="section closing" aria-labelledby="closing-title">
+      <div class="wrap">
+        <h2 id="closing-title">Follow one month, one change at a time.</h2>
+        <p class="section-lead">Each step shows the real events: who did what, when, at
+          which risk tier, who approved it, and how long the access lasted.</p>
+        <div class="btn-row">
+          <a class="btn btn-primary" href="walkthrough.html">Start the walkthrough <span aria-hidden="true">&rarr;</span></a>
+          <a class="btn btn-tertiary" href="architecture.html">Architecture <span aria-hidden="true">&rarr;</span></a>
+          <a class="btn btn-tertiary" href="screens.html">Live screens <span aria-hidden="true">&rarr;</span></a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <p>Site Reliability Clanker is a concept prototype. Paperboat, its customers and its fish
+        are fictional, and so are the approvers Alice, Bob and Carol.</p>
+      <p>This site makes no network requests to other hosts. The typeface is IBM Plex, under the
+        SIL Open Font License. The look follows the IBM Carbon Design System.</p>
+    </div>
+  </footer>
+
+  <script type="module" src="js/site.js"></script>
+  <script type="module" src="js/backdrop.js"></script>
+</body>
+</html>

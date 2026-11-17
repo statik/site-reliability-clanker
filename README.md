@@ -51,9 +51,12 @@ The agent uses OpenRouter. Put the key in a file named `.env` in the repository 
 OPENROUTER_API_KEY=sk-or-...
 ```
 
-Without a key, the agent runs in replay mode with recorded responses, and the full demo works
-without a network connection to a model. To force replay mode with a key present, set
-`CLANKER_AGENT_MODE=replay`. The runtime stops model calls for the day after 5 USD.
+Without a key, the agent runs in replay mode with recorded responses. To force replay mode
+with a key present, set `CLANKER_AGENT_MODE=replay`. The recorded responses pass the eval
+scorers, but nobody ran the full demo in replay mode yet: every run so far used the live
+model. The runtime stops model calls for the day after 5 USD.
+
+Stop a running control plane before you start `make demo` again: `pkill -f "clanker up"`.
 
 ## What is in the repository
 
@@ -65,8 +68,23 @@ without a network connection to a model. To force replay mode with a key present
 | `platform/` | OpenTofu modules and stacks for `local`, `aws`, `gcp`, `azure` |
 | `apps/paperboat` | The managed application, its Helm chart and its releases |
 | `runbooks/` | Runbook jobs, the risk tier policy (Rego) and the notification routes |
-| `evals/` | Inspect AI evaluations for the agent roles |
+| `evals/` | Inspect AI evaluations for the agent roles. Results: `evals/RESULTS.md` |
 | `site/` | The concept website and the build of the explainer video |
+| `ios/` | Paperboat Manager, an iOS app to review and approve work from a phone |
+
+## Website, video, evals and iOS app
+
+| Task | Command |
+|---|---|
+| Preview the website | `cd site && python3 -m http.server 4173`, then open http://127.0.0.1:4173 |
+| Export the data, capture the screens, render the video | `cd site && node export-data.mjs && node capture.mjs --video && ./build-video.sh` |
+| Run the evals without a model | `cd evals && ./run.sh mock` |
+| Run the evals with the live model (costs about 2 USD) | `cd evals && ./run.sh live` |
+| Build and test the iOS app | `ios/build.sh` |
+| Run the iOS app in the simulator | `ios/run.sh` |
+
+The video is written to `site/out/explainer.mp4`. The capture and the video need the demo to
+run.
 
 ## Tests
 

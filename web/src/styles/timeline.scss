@@ -1,0 +1,318 @@
+// The swimlane timeline. Every colour, size, font and duration here is a Carbon token.
+@use "@carbon/react/scss/theme";
+@use "@carbon/react/scss/spacing";
+@use "@carbon/react/scss/type";
+@use "@carbon/react/scss/motion";
+
+.tl-wrap {
+  inline-size: 100%;
+  border: 1px solid theme.$border-subtle-01;
+  background: theme.$layer-01;
+}
+
+.tl-svg {
+  display: block;
+  cursor: grab;
+  user-select: none;
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.tl-selecting .tl-svg {
+  cursor: crosshair;
+}
+
+.tl-gutter {
+  fill: theme.$layer-01;
+}
+
+.tl-row {
+  fill: theme.$layer-02;
+}
+
+.tl-row-layer {
+  fill: theme.$layer-accent-01;
+  fill-opacity: 0.45;
+}
+
+.tl-lane-label {
+  @include type.type-style("heading-compact-01");
+
+  fill: theme.$text-primary;
+}
+
+.tl-layer-label {
+  @include type.type-style("label-01");
+
+  fill: theme.$text-secondary;
+}
+
+.tl-lane-toggle {
+  cursor: pointer;
+
+  rect {
+    fill: transparent;
+  }
+
+  &:hover rect {
+    fill: theme.$layer-hover-01;
+  }
+
+  &:focus-visible {
+    outline: none;
+
+    rect {
+      stroke: theme.$focus;
+      stroke-width: 2;
+    }
+  }
+}
+
+.tl-chevron {
+  fill: none;
+  stroke: theme.$icon-primary;
+  stroke-width: 1.5;
+}
+
+.tl-axis {
+  @include type.type-style("label-01");
+
+  .domain {
+    stroke: none;
+  }
+
+  .tick line {
+    stroke: theme.$border-subtle-01;
+    stroke-dasharray: 2 4;
+  }
+
+  .tick text {
+    fill: theme.$text-secondary;
+    font-family: inherit;
+    font-size: inherit;
+  }
+}
+
+.tl-axis-band {
+  fill: transparent;
+  cursor: col-resize;
+}
+
+.tl-future-zone {
+  fill: theme.$layer-accent-01;
+  fill-opacity: 0.35;
+  pointer-events: none;
+}
+
+.tl-future-label {
+  @include type.type-style("label-01");
+
+  fill: theme.$text-helper;
+  pointer-events: none;
+}
+
+.tl-now {
+  pointer-events: none;
+
+  line {
+    stroke: theme.$interactive;
+    stroke-width: 2;
+  }
+
+  text {
+    @include type.type-style("label-01");
+
+    fill: theme.$interactive;
+  }
+}
+
+.tl-range {
+  fill: theme.$highlight;
+  fill-opacity: 0.5;
+  stroke: theme.$interactive;
+  pointer-events: none;
+}
+
+.tl-brush .selection {
+  fill: theme.$highlight;
+  fill-opacity: 0.5;
+  stroke: theme.$interactive;
+}
+
+.tl-marker {
+  cursor: pointer;
+
+  .tl-hit {
+    fill: transparent;
+  }
+
+  .tl-glyph,
+  .tl-cluster {
+    transition: transform motion.$duration-fast-02 motion.motion(standard, productive);
+  }
+
+  &:hover .tl-glyph,
+  &:hover .tl-cluster {
+    transform: scale(1.3);
+  }
+}
+
+.tl-glyph path {
+  stroke: theme.$layer-01;
+  stroke-width: 1;
+}
+
+.tl-outcome-none path {
+  fill: theme.$icon-secondary;
+}
+
+.tl-outcome-Done path {
+  fill: theme.$support-success;
+}
+
+.tl-outcome-Failed {
+  path {
+    fill: theme.$support-error;
+  }
+
+  .tl-ring {
+    fill: none;
+    stroke: theme.$support-error;
+    stroke-width: 1.5;
+  }
+}
+
+.tl-outcome-RolledBack path {
+  fill: theme.$layer-01;
+  stroke: theme.$support-caution-major;
+  stroke-width: 2.5;
+}
+
+.tl-outcome-Rejected path {
+  fill: theme.$layer-01;
+  stroke: theme.$text-secondary;
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+}
+
+.tl-future path {
+  fill: theme.$layer-01;
+  stroke: theme.$interactive;
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+}
+
+.tl-cluster {
+  rect {
+    fill: theme.$layer-01;
+    stroke: theme.$icon-secondary;
+    stroke-width: 1.5;
+  }
+
+  text {
+    @include type.type-style("label-01");
+
+    fill: theme.$text-primary;
+  }
+}
+
+.tl-cluster-bad rect {
+  stroke: theme.$support-error;
+  stroke-width: 2.5;
+}
+
+.tl-health-good {
+  fill: theme.$support-success;
+}
+
+.tl-health-warn {
+  fill: theme.$support-caution-major;
+}
+
+.tl-health-bad {
+  fill: theme.$support-error;
+}
+
+.tl-scrub {
+  line {
+    stroke: theme.$text-primary;
+    stroke-width: 1;
+    stroke-dasharray: 4 3;
+    pointer-events: none;
+  }
+}
+
+.tl-scrub-handle {
+  cursor: ew-resize;
+
+  path {
+    fill: theme.$text-primary;
+    stroke: theme.$layer-01;
+  }
+
+  &:focus-visible {
+    outline: none;
+
+    path {
+      stroke: theme.$focus;
+      stroke-width: 2;
+    }
+  }
+}
+
+.tl-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: spacing.$spacing-03 spacing.$spacing-06;
+  padding: spacing.$spacing-04 spacing.$spacing-05;
+  border: 1px solid theme.$border-subtle-01;
+  border-block-start: 0;
+  background: theme.$layer-01;
+}
+
+.tl-legend-item {
+  @include type.type-style("label-01");
+
+  display: inline-flex;
+  align-items: center;
+  gap: spacing.$spacing-02;
+  color: theme.$text-secondary;
+
+  svg {
+    flex: none;
+  }
+}
+
+.tl-hover {
+  @include type.type-style("body-compact-01");
+
+  min-block-size: spacing.$spacing-08;
+  padding: spacing.$spacing-03 spacing.$spacing-05;
+  border: 1px solid theme.$border-subtle-01;
+  border-block-end: 0;
+  background: theme.$layer-01;
+  color: theme.$text-secondary;
+}
+
+// The access lane chart reuses the timeline look.
+.tl-access-bar {
+  fill: theme.$interactive;
+}
+
+.tl-access-bar-debug {
+  fill: theme.$support-caution-major;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tl-marker .tl-glyph,
+  .tl-marker .tl-cluster {
+    transition: none;
+  }
+
+  .tl-marker:hover .tl-glyph,
+  .tl-marker:hover .tl-cluster {
+    transform: none;
+  }
+}

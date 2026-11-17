@@ -197,8 +197,23 @@ func (o *Orchestrator) execRunbook(ctx context.Context, wi WorkItem, req Runbook
 var diagnosticCommands = [][]string{
 	{"get", "pods", "-n", "paperboat", "-o", "wide"},
 	{"get", "deployments", "-n", "paperboat"},
+	{"logs", "-n", "paperboat", "deployment/paperboat-api", "--tail=30"},
 	{"get", "events", "-n", "paperboat", "--sort-by=.lastTimestamp"},
-	{"logs", "-n", "paperboat", "deployment/paperboat-api", "--tail=40"},
+}
+
+// maxCommandOutput is the most text that one diagnostic command adds to the transcript. The
+// newest lines are at the end of logs and events, so the end is what is kept.
+const maxCommandOutput = 2800
+
+func lastPart(text string) string {
+	if len(text) <= maxCommandOutput {
+		return text
+	}
+	cut := text[len(text)-maxCommandOutput:]
+	if _, after, found := strings.Cut(cut, "\n"); found {
+		cut = after
+	}
+	return "(earlier output left out)\n" + cut
 }
 
 // DebugSession opens a time-boxed, read-only session with the debugger identity, runs the
@@ -235,7 +250,7 @@ func (o *Orchestrator) DebugSession(ctx context.Context, wi WorkItem, actor, rea
 			cmd := exec.CommandContext(ctx, "kubectl", append([]string{"--kubeconfig",
 				cred.KubeConfig}, args...)...)
 			raw, err := cmd.CombinedOutput()
-			fmt.Fprintln(out, scrub.Text(strings.TrimSpace(string(raw))))
+			fmt.Fprintln(out, lastPart(scrub.Text(strings.TrimSpace(string(raw)))))
 			if err != nil {
 				fmt.Fprintf(out, "(command failed: %v)\n", err)
 			}

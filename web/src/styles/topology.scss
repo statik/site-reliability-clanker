@@ -1,0 +1,77 @@
+// The topology diagram. Every colour, size and font here is a Carbon token.
+@use "@carbon/react/scss/theme";
+@use "@carbon/react/scss/spacing";
+@use "@carbon/react/scss/type";
+
+.topo-scroll {
+  overflow-x: auto;
+  padding: spacing.$spacing-05;
+  border: 1px solid theme.$border-subtle-01;
+  background: theme.$layer-01;
+}
+
+.topo-canvas {
+  position: relative;
+  margin-inline: auto;
+}
+
+.topo-edges {
+  position: absolute;
+  inset: 0;
+}
+
+.topo-edge {
+  fill: none;
+  stroke: theme.$border-strong-01;
+  stroke-width: 1.5;
+}
+
+.topo-layer {
+  @include type.type-style("label-01");
+
+  position: absolute;
+  inset-inline-start: 0;
+  color: theme.$text-secondary;
+  white-space: nowrap;
+}
+
+.topo-node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-02;
+  padding: spacing.$spacing-03;
+  overflow: hidden;
+  border: 1px solid theme.$border-strong-01;
+  background: theme.$layer-02;
+}
+
+.topo-node-changed {
+  border: 2px dashed theme.$interactive;
+  background: theme.$highlight;
+}
+
+.topo-node-label {
+  @include type.type-style("heading-compact-01");
+
+  color: theme.$text-primary;
+}
+
+.topo-node-detail {
+  @include type.type-style("label-01");
+
+  overflow: hidden;
+  color: theme.$text-secondary;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topo-node-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: spacing.$spacing-01;
+
+  .cds--tag {
+    margin: 0;
+  }
+}

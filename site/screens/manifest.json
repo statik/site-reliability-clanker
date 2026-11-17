@@ -1,0 +1,196 @@
+{
+ "captured_at": "2026-11-17T06:10:18.765Z",
+ "shots": [
+  {
+   "file": "dashboard-overview-light.png",
+   "width": 1440,
+   "height": 900,
+   "group": "dashboard",
+   "theme": "light",
+   "title": "Overview",
+   "note": "Is each environment healthy, and what needs a decision now?",
+   "alt": "The Overview view of the Clanker dashboard, light theme."
+  },
+  {
+   "file": "dashboard-timeline-light.png",
+   "width": 1440,
+   "height": 900,
+   "group": "dashboard",
+   "theme": "light",
+   "title": "Timeline",
+   "note": "What happened, when, and what is coming next.",
+   "alt": "The Timeline view of the Clanker dashboard, light theme."
+  },
+  {
+   "file": "dashboard-approval-light.png",
+   "width": 1440,
+   "height": 2200,
+   "group": "dashboard",
+   "theme": "light",
+   "title": "Approval page",
+   "note": "One sentence, the impact, the tier, what changes, and the decision.",
+   "alt": "The Approval page view of the Clanker dashboard, light theme."
+  },
+  {
+   "file": "dashboard-topology-light.png",
+   "width": 1440,
+   "height": 900,
+   "group": "dashboard",
+   "theme": "light",
+   "title": "Topology",
+   "note": "What exists in the environment and how it is connected.",
+   "alt": "The Topology view of the Clanker dashboard, light theme."
+  },
+  {
+   "file": "dashboard-access-light.png",
+   "width": 1440,
+   "height": 900,
+   "group": "dashboard",
+   "theme": "light",
+   "title": "Access",
+   "note": "Who and what holds which permission now, and the history of grants.",
+   "alt": "The Access view of the Clanker dashboard, light theme."
+  },
+  {
+   "file": "dashboard-audit-light.png",
+   "width": 1440,
+   "height": 900,
+   "group": "dashboard",
+   "theme": "light",
+   "title": "Audit",
+   "note": "The searchable, hash-chained event log.",
+   "alt": "The Audit view of the Clanker dashboard, light theme."
+  },
+  {
+   "file": "dashboard-overview-dark.png",
+   "width": 1440,
+   "height": 900,
+   "group": "dashboard",
+   "theme": "dark",
+   "title": "Overview",
+   "note": "Is each environment healthy, and what needs a decision now?",
+   "alt": "The Overview view of the Clanker dashboard, dark theme."
+  },
+  {
+   "file": "dashboard-timeline-dark.png",
+   "width": 1440,
+   "height": 900,
+   "group": "dashboard",
+   "theme": "dark",
+   "title": "Timeline",
+   "note": "What happened, when, and what is coming next.",
+   "alt": "The Timeline view of the Clanker dashboard, dark theme."
+  },
+  {
+   "file": "dashboard-approval-dark.png",
+   "width": 1440,
+   "height": 2200,
+   "group": "dashboard",
+   "theme": "dark",
+   "title": "Approval page",
+   "note": "One sentence, the impact, the tier, what changes, and the decision.",
+   "alt": "The Approval page view of the Clanker dashboard, dark theme."
+  },
+  {
+   "file": "dashboard-topology-dark.png",
+   "width": 1440,
+   "height": 900,
+   "group": "dashboard",
+   "theme": "dark",
+   "title": "Topology",
+   "note": "What exists in the environment and how it is connected.",
+   "alt": "The Topology view of the Clanker dashboard, dark theme."
+  },
+  {
+   "file": "dashboard-access-dark.png",
+   "width": 1440,
+   "height": 900,
+   "group": "dashboard",
+   "theme": "dark",
+   "title": "Access",
+   "note": "Who and what holds which permission now, and the history of grants.",
+   "alt": "The Access view of the Clanker dashboard, dark theme."
+  },
+  {
+   "file": "dashboard-audit-dark.png",
+   "width": 1440,
+   "height": 900,
+   "group": "dashboard",
+   "theme": "dark",
+   "title": "Audit",
+   "note": "The searchable, hash-chained event log.",
+   "alt": "The Audit view of the Clanker dashboard, dark theme."
+  },
+  {
+   "file": "paperboat-inventory-light.png",
+   "width": 1440,
+   "height": 900,
+   "group": "paperboat",
+   "theme": "light",
+   "title": "Live inventory board",
+   "note": "Fish by tank, with status, age and condition. It updates from a live stream.",
+   "alt": "Paperboat, the fish rental application: live inventory board."
+  },
+  {
+   "file": "paperboat-rentals-light.png",
+   "width": 1440,
+   "height": 900,
+   "group": "paperboat",
+   "theme": "light",
+   "title": "Rentals",
+   "note": "Who has which fish, and until when.",
+   "alt": "Paperboat, the fish rental application: rentals."
+  },
+  {
+   "file": "paperboat-deliveries-light.png",
+   "width": 1440,
+   "height": 900,
+   "group": "paperboat",
+   "theme": "light",
+   "title": "Deliveries",
+   "note": "Deliveries and collections, each with a manifest on the shared file system.",
+   "alt": "Paperboat, the fish rental application: deliveries."
+  },
+  {
+   "file": "paperboat-support-light.png",
+   "width": 1440,
+   "height": 900,
+   "group": "paperboat",
+   "theme": "light",
+   "title": "Support desk",
+   "note": "Tickets from customers, with each interaction.",
+   "alt": "Paperboat, the fish rental application: support desk."
+  },
+  {
+   "file": "mail-inbox-light.png",
+   "width": 1440,
+   "height": 900,
+   "group": "notifications",
+   "theme": "light",
+   "title": "Mail inbox",
+   "note": "The emails that Clanker sent to the approvers during the month.",
+   "alt": "A mail inbox with the notification emails from Clanker, most of them requests for approval."
+  },
+  {
+   "file": "mail-approval-light.png",
+   "width": 1440,
+   "height": 900,
+   "group": "notifications",
+   "theme": "light",
+   "title": "An approval email",
+   "note": "What an approver receives: the change in one sentence, and a link to decide.",
+   "alt": "One notification email from Clanker that asks for an approval."
+  },
+  {
+   "file": "webhook-sink-light.png",
+   "width": 1440,
+   "height": 900,
+   "group": "notifications",
+   "theme": "light",
+   "title": "Webhook sink",
+   "note": "A local stand-in for Slack, Microsoft Teams and Discord, with the real payloads.",
+   "alt": "The webhook sink page: a list of the chat notifications that Clanker sent."
+  }
+ ],
+ "skipped": []
+}

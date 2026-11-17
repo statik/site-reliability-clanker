@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/agent"
 	"github.com/statik/site-reliability-clanker/internal/audit"
@@ -70,9 +71,16 @@ func wrap(h handler) http.HandlerFunc {
 		if err != nil {
 			status := http.StatusInternalServerError
 			var se statusError
-			if errors.As(err, &se) {
+			switch {
+			case errors.As(err, &se):
 				status = se.status
-			} else if strings.Contains(err.Error(), "does not exist") {
+			case errors.Is(err, orchestrator.ErrForbidden):
+				status = http.StatusForbidden
+			case errors.Is(err, orchestrator.ErrConflict):
+				status = http.StatusConflict
+			case errors.Is(err, orchestrator.ErrInvalid):
+				status = http.StatusBadRequest
+			case strings.Contains(err.Error(), "does not exist"):
 				status = http.StatusNotFound
 			}
 			writeJSON(w, status, map[string]string{"error": err.Error()})
@@ -198,10 +206,15 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 	defer stop()
 	fmt.Fprint(w, ": connected\n\n")
 	flusher.Flush()
+	heartbeat := time.NewTicker(20 * time.Second)
+	defer heartbeat.Stop()
 	for {
 		select {
 		case <-r.Context().Done():
 			return
+		case <-heartbeat.C:
+			fmt.Fprint(w, ": heartbeat\n\n")
+			flusher.Flush()
 		case e := <-events:
 			data, err := json.Marshal(e)
 			if err != nil {

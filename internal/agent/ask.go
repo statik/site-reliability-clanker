@@ -322,7 +322,7 @@ func (a *Agent) Ask(ctx context.Context, user, workItem, question string) (ChatE
 		resp, err := a.complete(ctx, RoleExplainer, workItem, Request{
 			Messages: []ChatMessage{
 				{Role: "system", Content: askSystem},
-				{Role: "user", Content: "Question: " + question + "\n<data>" + body + "</data>"},
+				{Role: "user", Content: "Question: " + question + "\n" + frame(g.lines)},
 			}})
 		if err != nil && !errors.Is(err, ErrNoRecording) {
 			return ChatEntry{}, err

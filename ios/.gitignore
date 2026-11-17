@@ -1,0 +1,8 @@
+PaperboatManager.xcodeproj/
+App/Info.plist
+.build/
+DerivedData/
+build/
+*.xcresult
+xcuserdata/
+.DS_Store
