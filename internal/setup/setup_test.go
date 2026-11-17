@@ -44,7 +44,8 @@ func (f *fakeCLI) called(key string) bool {
 func newServer(t *testing.T, cli *fakeCLI) (*Server, http.Handler) {
 	t.Helper()
 	server, err := New(context.Background(), Config{DataDir: t.TempDir(), Version: "v9.9.9",
-		ReleaseBase: "http://127.0.0.1:1", DashboardURL: "http://127.0.0.1:1", CLI: cli.run})
+		ReleaseBase: "http://127.0.0.1:1", DashboardURL: "http://127.0.0.1:1", CLI: cli.run,
+		EnableAWS: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,6 +188,26 @@ func TestSignInRefusesNamesThatAreNotNames(t *testing.T) {
 	}
 	if len(cli.calls) != 0 {
 		t.Fatalf("the CLI ran for a name that is not valid: %v", cli.calls)
+	}
+}
+
+func TestAWSIsRefusedWhenItIsSwitchedOff(t *testing.T) {
+	server, err := New(context.Background(), Config{DataDir: t.TempDir(), Version: "v9.9.9"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler, err := server.Handler("127.0.0.1:7069")
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, _ := request(t, handler, server.Token(), http.MethodPost, "/api/target",
+		`{"target":"aws","env":"prod-1"}`)
+	if status != http.StatusBadRequest {
+		t.Fatalf("status %d, want 400", status)
+	}
+	if status, _ := request(t, handler, server.Token(), http.MethodPost, "/api/target",
+		`{"target":"local"}`); status != http.StatusOK {
+		t.Fatalf("local target: status %d, want 200", status)
 	}
 }
 

@@ -58,10 +58,9 @@ own state starts local and `clanker bootstrap` migrates it.
 
 ### The home of the control plane is not a layer
 
-The setup wizard creates the ECS service that the control plane runs in with one
-CloudFormation stack (`internal/setup/controlplane.yaml`), before any layer exists. The stack is outside
-this contract. Its output `RoleArn` is the value for `broker_principal` of `00-bootstrap`
-on AWS.
+The setup wizard creates the home of the control plane before any layer exists. That home
+is outside this contract. The role that the control plane runs as is the value for
+`broker_principal` of `00-bootstrap` on AWS.
 
 ## 3. Inputs and outputs for each layer
 

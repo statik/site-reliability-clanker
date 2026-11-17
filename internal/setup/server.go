@@ -36,6 +36,10 @@ type Config struct {
 	StartLocal func(ctx context.Context, env string) error
 	// CLI runs the aws program. Nil means the real program.
 	CLI CLI
+	// EnableAWS offers the AWS target. It is off in a release: the home of the control
+	// plane on AWS is being rebuilt as a unikernel, and the code here still creates the
+	// earlier design, a container on ECS. Tests switch it on.
+	EnableAWS bool
 }
 
 // State is what the wizard remembers between starts. It holds no secret.

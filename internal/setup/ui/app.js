@@ -144,7 +144,7 @@ function choice(value, title, text, disabledNote) {
 }
 
 function drawTarget() {
-  const awsNote = view.aws_release ? null : "needs a released build";
+  const awsNote = view.aws_enabled ? null : "not yet";
   return [
     el("h1", {}, "Where do you want Clanker to run?"),
     el("p", { class: "lead" }, "Clanker has two parts: the control plane, which finds the work and " +
@@ -153,8 +153,9 @@ function drawTarget() {
     el("div", { class: "choices", role: "radiogroup", "aria-label": "Target" },
       choice("local", "This machine", "A Kubernetes cluster in Docker, with the example application. " +
         "Free. Good for a first look."),
-      choice("aws", "Your AWS account", "One small container for the control plane on Amazon ECS " +
-        "with Fargate, in its own network, with no open port. About 18 USD each month.", awsNote),
+      choice("aws", "Your AWS account", view.aws_enabled
+        ? "One small container for the control plane on Amazon ECS with Fargate, in its own network, with no open port."
+        : "The control plane for AWS is being built as a unikernel in an auto scaling group. The wizard does not set up this cloud yet.", awsNote),
       choice("gcp", "Google Cloud", "The stacks exist and are validated. The wizard does not set " +
         "up this cloud yet.", "not yet"),
       choice("azure", "Azure", "The stacks exist and are validated. The wizard does not set up " +

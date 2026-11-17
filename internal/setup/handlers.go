@@ -65,7 +65,7 @@ func (s *Server) getState(r *http.Request) (any, error) {
 		"dashboard_url": s.cfg.DashboardURL,
 		"dashboard_up":  s.dashboardUp(r.Context()),
 		"cost":          costEstimate(SizeOf(state.Size)),
-		"aws_release":   s.cfg.Version != "" && s.cfg.Version != "dev",
+		"aws_enabled":   s.cfg.EnableAWS,
 	}, nil
 }
 
@@ -85,6 +85,9 @@ func (s *Server) postTarget(r *http.Request) (any, error) {
 	if body.Target != TargetLocal && body.Target != TargetAWS {
 		return nil, invalid("target %q does not exist: use %s or %s", body.Target, TargetLocal,
 			TargetAWS)
+	}
+	if body.Target == TargetAWS && !s.cfg.EnableAWS {
+		return nil, invalid("the wizard cannot set up AWS in this version")
 	}
 	if body.Target == TargetLocal {
 		body.Env = "local"

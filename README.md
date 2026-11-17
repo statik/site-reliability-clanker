@@ -29,10 +29,7 @@ The wizard has two targets:
 | Target | What the wizard does | Status |
 |---|---|---|
 | This machine | Checks the tools, takes the model key, starts the control plane. The control plane then plans the first deployment and waits for approval | Runs end to end |
-| Your AWS account | Uses your own AWS CLI sign-in. Shows the resources and the cost, then creates one container on Amazon ECS with Fargate with CloudFormation, in its own network with no inbound rule, with its data on an encrypted EFS file system. You reach the dashboard through an ECS Exec tunnel | Built and tested against a stand-in for the AWS CLI. Not yet run in a real account |
-
-On AWS the control plane starts and serves its dashboard. It does not install the environment
-there yet: the runner and the access broker can apply only the local target.
+| Your AWS account | Not available yet. See "Direction for the cloud control plane" in `docs/HANDOFF.md` | Not built |
 
 The wizard never approves a change. To build the binaries yourself, run `make release`.
 

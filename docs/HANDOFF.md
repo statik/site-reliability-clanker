@@ -34,25 +34,32 @@ Everything in this section was run on the local target (kind on Docker, macOS ar
 - `clanker setup` serves a wizard on `127.0.0.1:7069`. `make release` builds self-contained
   binaries (tag `bundle`) for macOS and Linux in `dist/`.
 - **Ran:** the macOS binary, started outside a checkout, walked through the local target in
-  a real browser and started the control plane (`web/scripts/setup-wizard-check.mjs`). It
-  used the data directory of the running demo, so a first deployment from an empty machine
-  through the wizard was not run. The command of the ECS task definition ran in the same
-  Amazon Linux 2023 image on this machine: it installed `git`, downloaded the Linux arm64
-  binary, checked the hash, started the control plane with the DELETE journal mode and
-  passed the health check. With a wrong hash it stopped.
-- **Not run:** anything in a real AWS account. The sign-in, review, deployment, tunnel and
-  removal are tested against a stand-in for the AWS CLI. `cfn-lint` passes on the template.
-  The open risks are the ones that only AWS can answer: the database and the repositories on
-  EFS, the ECS Exec tunnel to the loopback port, and the start time of the container.
-- **Not built:** installing the environment on AWS from the cloud control plane. The runner
-  has only a local state path, the broker has no AWS path, and nothing publishes the
-  Paperboat images for a cloud. On a cloud, `clanker up` starts in a standby mode. The
-  container has no OpenTofu, `opa` or `kubectl` yet.
-- The dashboard still trusts a header for the user. This is acceptable only because the
-  dashboard listens on the loopback address inside the container and the tunnel needs an
-  AWS session with permission for ECS Exec.
+  a real browser and started the control plane (`web/scripts/setup-wizard-check.mjs`), on
+  the first-run path and on the restart path. It used the data directory of the running
+  demo, so a first deployment from an empty machine through the wizard was not run.
+- The wizard offers only the local target. The AWS target is switched off
+  (`setup.Config.EnableAWS`).
 - A binary that a browser downloads is unsigned, so macOS can refuse to start it. The
   `curl` command in the README avoids this.
+
+## Direction for the cloud control plane (decided 2026-11-17)
+
+The owner changed the home of the control plane on AWS twice on this day: first a Linux
+virtual machine, then a container on Amazon ECS, then a Nanos unikernel in an auto scaling
+group. Section 12 of the plan records the five decisions that follow from the last one.
+
+- **What exists:** the code in `internal/setup` for the AWS CLI sign-in, the CloudFormation
+  change-set review, the key in Parameter Store, and a template and tunnel for the ECS
+  design. It passes its tests against a stand-in for the AWS CLI. It never ran in an AWS
+  account. The ECS template is the starting point for the runner jobs.
+- **What the unikernel needs, in build order:** policy on the OPA library; the forge on a
+  git library; the split of core and runners; the state in S3 with a lease, so that two
+  instances never write; OIDC sign-in; the image build and the stack in the wizard; a run
+  in a real account.
+- **Open risks, to test first:** the embedded database on the Nanos file system, and three-way
+  merges and `git push` with a git library.
+- On a cloud, `clanker up` starts in a standby mode: it serves the dashboard and proposes
+  no deployment.
 
 ## What is validated only
 
