@@ -67,6 +67,7 @@ const STATUS_LOOK: Record<string, Look> = {
   issued: { type: "cyan", icon: Time, label: "Issued" },
   open: { type: "purple", icon: Pending, label: "Open" },
   failed: { type: "red", icon: ErrorFilled, label: "Failed" },
+  lost: { type: "red", icon: ErrorFilled, label: "Lost" },
   revoked: { type: "warm-gray", icon: Misuse, label: "Revoked" },
   expired: { type: "warm-gray", icon: Time, label: "Expired" },
   closed: { type: "warm-gray", icon: Misuse, label: "Closed" },

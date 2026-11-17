@@ -189,7 +189,7 @@ private struct JobsSection: View {
   private func symbol(_ status: String) -> String {
     switch status {
     case "succeeded": "checkmark.circle.fill"
-    case "failed": "xmark.octagon.fill"
+    case "failed", "lost": "xmark.octagon.fill"
     default: "hourglass"
     }
   }
@@ -197,7 +197,7 @@ private struct JobsSection: View {
   private func tone(_ status: String) -> Tone {
     switch status {
     case "succeeded": .good
-    case "failed": .bad
+    case "failed", "lost": .bad
     default: .active
     }
   }
