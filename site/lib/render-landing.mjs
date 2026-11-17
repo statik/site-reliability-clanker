@@ -1,7 +1,7 @@
 // Prerender the parts of the landing page that come from the exported month.
 
 import { clock, dayYear, duration, html, plural, shortHash } from "./html.mjs";
-import { displayName } from "./month.mjs";
+import { displayName, incidentRefusal } from "./month.mjs";
 import { pickFlowItem } from "./render-architecture.mjs";
 import { tierTag } from "./render-walkthrough.mjs";
 import { PRINCIPLES } from "./story.mjs";
@@ -21,7 +21,7 @@ export function renderStats(totals) {
 }
 
 function evidenceLines(month, totals) {
-  const refusal = month.events.find((event) => event.type === "agent.failed");
+  const refusal = incidentRefusal(month);
   const stale = month.events.find((event) => event.type === "apply.refused");
   const pulls = month.events.filter((event) => event.type === "pr.opened").length;
   const manual = month.events.find((event) => event.type === "sim.manual_change");

@@ -209,9 +209,9 @@ Each of the 12 applies ran the plan hash that was approved.</p>
 <h3>No standing write access.</h3>
 <p>Read-only by default. Write permission exists for one approved job, for the one layer that the job touches, and is revoked when the job ends.</p>
 <p class="principle-evidence"><span class="evidence-label">In the scripted month</span>
-18 grants in 29 days. Write or debug access existed for
-3 min 27 s in total. The longest grant lasted
-67 s.</p>
+18 grants in 28 days. Write or debug access existed for
+1 min 53 s in total. The longest grant lasted
+27 s.</p>
 </li><li class="principle reveal">
 <span class="principle-index" aria-hidden="true">5</span>
 <h3>Multi-cloud is a contract, not a port.</h3>
@@ -239,15 +239,15 @@ are validated against the same contract and are not applied yet.</p>
 <p class="approval-id"><span class="mono">WI-0014</span> <span class="tag tag-t2">T2</span>
 <span class="tag tag-blue">Waiting for approval</span></p>
 <h3>Run two api replicas for the holiday rush</h3>
-<p class="approval-sentence">Change the paperboat API from one replica to two, so it can handle the holiday rush (WI-0014).
+<p class="approval-sentence">Raise the api service from one replica to two in the local environment, so it can handle more traffic during the holiday rush.
 <span class="ai-label" title="Written by anthropic/claude-haiku-5.5; the facts come from the plan">AI</span></p>
 </header>
 <div class="approval-grid">
 <section><h4>Impact</h4>
 <dl class="kv">
-<div><dt>Downtime</dt><dd>None expected. The plan updates the existing release and does not replace or delete anything.</dd></div>
-<div><dt>Effect on users</dt><dd>No direct change for users. The API should have more capacity during the holiday period, so it should cope better with heavy traffic.</dd></div>
-<div><dt>Cost</dt><dd>The plan does not show a cost figure. Running a second replica adds compute use for as long as it stays on.</dd></div>
+<div><dt>Downtime</dt><dd>The plan does not state any planned outage. It updates the existing paperboat Helm release in place and creates or destroys nothing.</dd></div>
+<div><dt>Effect on users</dt><dd>Users should see the same app. Requests can now be spread across two api instances, which should help when traffic is high.</dd></div>
+<div><dt>Cost</dt><dd>The plan does not state a cost figure. The second api replica will use additional compute while it runs.</dd></div>
 </dl></section>
 <section><h4>Risk tier</h4>
 <p><span class="tag tag-t2">T2</span> set by the policy rule <code>normal-change</code>, not by
@@ -262,17 +262,17 @@ the model. Needs 1 approver.</p>
 </li></ul></section>
 <section><h4>Safety</h4>
 <dl class="kv">
-<div><dt>Rollback</dt><dd>Set the replica count back to 1 and apply again, or roll the Helm release back to the previous revision. The plan returns a release revision output, so the previous revision can be identified.</dd></div>
-<div><dt>Verification</dt><dd>After the apply, confirm that the paperboat release shows the new revision and that two API replicas are running and healthy.</dd></div>
+<div><dt>Rollback</dt><dd>Set the api replica count back to 1 and apply the plan again. The plan outputs a release_revision, so the previous Helm revision is also available as a fallback.</dd></div>
+<div><dt>Verification</dt><dd>Confirm the apply finishes and reports the new release_revision. Then confirm the api runs two replicas and that the paperboat release is healthy.</dd></div>
 </dl></section>
 <section><h4>Permissions requested</h4>
 <p>A grant for <code>applier-50-app</code>, for
 the layer <code>50-app</code> only, bound to commit
-<code>f1f5d0b</code> and plan
-<code>016a293</code>. It is revoked when the job ends.</p>
+<code>d1eb106</code> and plan
+<code>f1ece59</code>. It is revoked when the job ends.</p>
 <h4>Evidence</h4>
 <p>Trigger: Pull request by Carol Reyes. Pull request #6 in
-<code>platform-live</code>. Approval needed: Run two api replicas for the holiday rush (16 Dec 2026, 02:01:19 UTC).</p></section>
+<code>platform-live</code>. Approval needed: Run two api replicas for the holiday rush (16 Dec 2026, 02:01:53 UTC).</p></section>
 </div>
 <footer class="approval-decide" aria-label="Decisions (illustration, not active)">
 <span class="btn btn-primary is-static">Approve</span>
@@ -331,7 +331,7 @@ is an illustration of the approval page. For the dashboard itself, see
 <figure class="notice reveal">
 <div class="notice-card">
 <p class="notice-title">Approval needed: local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0</p>
-<p>Upgrade the Paperboat app in local from version 1.0.0 to 1.1.0. This adds fish condition scores and retires old fish from the rentable stock. Open the dashboard and sign in to decide. You cannot approve
+<p>Upgrade the local Paperboat app from 1.0.0 to 1.1.0, which adds fish condition scores and retires old fish from the rentable stock. Open the dashboard and sign in to decide. You cannot approve
 from this message.</p>
 <dl class="notice-facts"><div><dt>Work item</dt><dd>WI-0003</dd></div><div><dt>Environment</dt><dd>local</dd></div><div><dt>Tier</dt><dd>T2</dd></div><div><dt>Rule</dt><dd>normal-change</dd></div><div><dt>Approvers required</dt><dd>1</dd></div></dl>
 <p class="notice-link">Open in Clanker <span aria-hidden="true">&rarr;</span></p>
@@ -360,16 +360,16 @@ for WI-0003, as the control plane sends it to Slack and to Teams.</figcaption>
 <!-- /build:period -->.</p>
         <!-- build:stats -->
 <dl class="stats"><div class="stat reveal">
-<dt>days of operation</dt><dd><span class="stat-value">29</span>
+<dt>days of operation</dt><dd><span class="stat-value">28</span>
 <span class="stat-note">one scripted month on the local target</span></dd></div><div class="stat reveal">
-<dt>audit records</dt><dd><span class="stat-value">323</span>
+<dt>audit records</dt><dd><span class="stat-value">331</span>
 <span class="stat-note">hash chain verified</span></dd></div><div class="stat reveal">
-<dt>human approvals</dt><dd><span class="stat-value">7</span>
+<dt>human approvals</dt><dd><span class="stat-value">8</span>
 <span class="stat-note">for 14 work items</span></dd></div><div class="stat reveal">
 <dt>grants issued</dt><dd><span class="stat-value">18</span>
 <span class="stat-note">18 already revoked</span></dd></div><div class="stat reveal">
-<dt>of write or debug access</dt><dd><span class="stat-value">3 min 27 s</span>
-<span class="stat-note">in 29 days, in total</span></dd></div><div class="stat reveal">
+<dt>of write or debug access</dt><dd><span class="stat-value">1 min 53 s</span>
+<span class="stat-note">in 28 days, in total</span></dd></div><div class="stat reveal">
 <dt>automatic rollback</dt><dd><span class="stat-value">1</span>
 <span class="stat-note">caught by the canary check</span></dd></div></dl>
 <!-- /build:stats -->

@@ -3,7 +3,7 @@
 // story cannot say something that the product did not do.
 
 import { clock, dayYear, duration, html, list, minute, numberWord, plural } from "./html.mjs";
-import { displayName, seconds } from "./month.mjs";
+import { displayName, incidentRefusal, seconds } from "./month.mjs";
 
 export const PRINCIPLES = [
   {
@@ -268,10 +268,10 @@ const STORY = {
   incident: {
     principle: 1,
     title: "02:00. Inventory requests start to fail",
-    lead(step, { users }) {
+    lead(step, { users, month }) {
       const opened = step.all("incident.opened");
       const debug = step.grants.find((grant) => grant.kind === "debug");
-      const refusal = step.find("agent.failed");
+      const refusal = incidentRefusal(month, step.events);
       const runbook = step.find("runbook.succeeded");
       const fix = step.work_items.find((item) => item.kind.startsWith("runbook"));
       const fixGrant = writeGrant(step, fix);

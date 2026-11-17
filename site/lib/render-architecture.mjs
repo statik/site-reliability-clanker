@@ -4,7 +4,7 @@
 import { plateHtml } from "./anatomy/iso-kit.mjs";
 import { clock, day, dayYear, duration, html, list, plural, raw, shortHash } from "./html.mjs";
 import { renderMachineSvg } from "./machine.mjs";
-import { displayName, grantViews } from "./month.mjs";
+import { displayName, grantViews, incidentRefusal } from "./month.mjs";
 import { tierTag } from "./render-walkthrough.mjs";
 
 // ---------------------------------------------------------------- the figure of the system
@@ -314,7 +314,7 @@ export function renderGrantLanes(month, totals, position, axis) {
 }
 
 export function renderRefusal(month) {
-  const refusal = month.events.find((event) => event.type === "agent.failed");
+  const refusal = incidentRefusal(month);
   const diagnosis = month.events.find((event) => event.type === "incident.diagnosed");
   if (!refusal) return html``;
   return html`<figure class="quote">
