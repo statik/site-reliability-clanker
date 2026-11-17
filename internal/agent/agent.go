@@ -23,6 +23,7 @@ const (
 	RoleAuthor       = "author"
 	RoleExplainer    = "explainer"
 	RoleInvestigator = "investigator"
+	RoleReviewer     = "reviewer"
 )
 
 // Clock gives the virtual time.
@@ -50,6 +51,7 @@ func DefaultModels() map[string]string {
 		RoleExplainer:    "anthropic/claude-haiku-5.5",
 		RoleAuthor:       "anthropic/claude-sonnet-5.5",
 		RoleInvestigator: "anthropic/claude-sonnet-5.5",
+		RoleReviewer:     "anthropic/claude-sonnet-5.5",
 	}
 }
 

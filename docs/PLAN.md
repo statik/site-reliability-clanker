@@ -255,6 +255,7 @@ and that tool set is the security boundary.
 | Author | Writes the OpenTofu or runbook change and opens a PR | Read repos, write to a branch, request a plan | Merge, approve, apply |
 | Explainer | Writes the approval summary and answers questions | Read plan JSON, PR diff, history, audit log | Change anything |
 | Investigator | Diagnoses incidents under a debug grant | Scoped read tools, recorded session commands | Make persistent changes |
+| Reviewer | Reviews a planned change as an adversary of the Author: looks for reasons for a higher risk tier | None. It reads the plans, the policy decision and the diff | Lower a tier, approve, change anything |
 
 Safeguards:
 
@@ -436,7 +437,7 @@ issues credentials that expire with the grant and are revoked when the job ends.
 
 ### 6.3 Risk tiers
 
-Assigned by policy from the plan, never by the model.
+Assigned by policy from the plan. A model never lowers a tier. Since 2026-11-17 an adversarial review can raise it: after the policy engine sets the tier, the Reviewer role (a second model call with its own prompt) reads the plans and the diff and looks for reasons for a higher tier. The orchestrator takes the higher of the two tiers. When the review fails, the tier of the policy engine stands. The owner asked for this step.
 
 | Tier | Meaning | Examples | Approval |
 |---|---|---|---|

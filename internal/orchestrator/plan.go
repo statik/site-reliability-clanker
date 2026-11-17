@@ -315,6 +315,52 @@ func (o *Orchestrator) runPlan(ctx context.Context, wi WorkItem, layer string,
 	return plan, nil
 }
 
+// pinCommit gives a work item that has no commit yet the head of the main branch.
+func (o *Orchestrator) pinCommit(wi *WorkItem) error {
+	if wi.Commit != "" {
+		return nil
+	}
+	head, err := o.Forge.Head(PlatformRepo, "main")
+	if err != nil {
+		return err
+	}
+	wi.Commit, wi.BaseCommit = head, head
+	return nil
+}
+
+// planned is the result of the plans of a work item.
+type planned struct {
+	// tier and rule are the highest tier of the policy engine over the plans.
+	tier, rule string
+	// deferred are the layers that cannot be planned before the layer below them exists.
+	deferred []string
+	// changes is set when a plan changes a resource.
+	changes bool
+}
+
+// planLayers plans every layer of the work item that can be planned now.
+func (o *Orchestrator) planLayers(ctx context.Context, wi WorkItem) (planned, error) {
+	result := planned{tier: "T0", rule: "no-changes", deferred: []string{}}
+	for _, layer := range wi.Layers {
+		if !o.canPlan(wi.Env, layer) {
+			result.deferred = append(result.deferred, layer)
+			continue
+		}
+		plan, err := o.planLayer(ctx, wi, layer)
+		if err != nil {
+			return planned{}, err
+		}
+		result.changes = result.changes || plan.Facts.HasChanges()
+		if plan.Policy.Tier > result.tier {
+			result.tier, result.rule = plan.Policy.Tier, plan.Policy.Rule
+		}
+	}
+	if len(result.deferred) > 0 && result.tier < "T3" {
+		result.tier, result.rule = "T3", "deferred-layers"
+	}
+	return result, nil
+}
+
 // PlanWorkItem plans every layer of the work item that can be planned now, assigns the tier
 // and moves the work item to AwaitingApproval. Layers that cannot be planned yet are planned
 // at apply time and must then stay inside the create-only envelope.
@@ -325,35 +371,19 @@ func (o *Orchestrator) PlanWorkItem(ctx context.Context, id string) (WorkItem, e
 	}
 	unlock := o.lockEnv(wi.Env)
 	defer unlock()
-	if wi.Commit == "" {
-		head, err := o.Forge.Head(PlatformRepo, "main")
-		if err != nil {
-			return WorkItem{}, err
-		}
-		wi.Commit, wi.BaseCommit = head, head
+	if err := o.pinCommit(&wi); err != nil {
+		return WorkItem{}, err
 	}
-	tier, rule := "T0", "no-changes"
-	deferred := []string{}
-	changes := false
-	for _, layer := range wi.Layers {
-		if !o.canPlan(wi.Env, layer) {
-			deferred = append(deferred, layer)
-			continue
+	planned, err := o.planLayers(ctx, wi)
+	if err != nil {
+		if stateErr := o.setState(&wi, StateFailed, "runner", err.Error()); stateErr != nil {
+			return WorkItem{}, stateErr
 		}
-		plan, err := o.planLayer(ctx, wi, layer)
-		if err != nil {
-			if stateErr := o.setState(&wi, StateFailed, "runner", err.Error()); stateErr != nil {
-				return WorkItem{}, stateErr
-			}
-			return wi, err
-		}
-		changes = changes || plan.Facts.HasChanges()
-		if plan.Policy.Tier > tier {
-			tier, rule = plan.Policy.Tier, plan.Policy.Rule
-		}
+		return wi, err
 	}
-	if len(deferred) > 0 && tier < "T3" {
-		tier, rule = "T3", "deferred-layers"
+	tier, rule, deferred, changes := planned.tier, planned.rule, planned.deferred, planned.changes
+	if changes || len(deferred) > 0 {
+		tier, rule = o.review(ctx, wi, tier, rule)
 	}
 	wi.Tier, wi.TierRule = tier, rule
 	if err := o.setState(&wi, StatePlanned, "orchestrator", "plans saved"); err != nil {
@@ -366,16 +396,62 @@ func (o *Orchestrator) PlanWorkItem(ctx context.Context, id string) (WorkItem, e
 		err := o.setState(&wi, StateDone, "orchestrator", "the plans change nothing")
 		return wi, err
 	}
+	return o.requestApproval(ctx, wi)
+}
+
+// requestApproval writes the explanation of a planned work item and asks for the approvals
+// that its tier needs.
+func (o *Orchestrator) requestApproval(ctx context.Context, wi WorkItem) (WorkItem, error) {
 	o.explain(ctx, &wi)
+	need := policy.ApproversRequired(wi.Tier)
 	if err := o.setState(&wi, StateAwaitingApproval, "orchestrator",
-		fmt.Sprintf("tier %s needs %d approvers", tier, policy.ApproversRequired(tier))); err != nil {
+		fmt.Sprintf("tier %s needs %d approvers", wi.Tier, need)); err != nil {
 		return WorkItem{}, err
 	}
 	o.emit(audit.Event{Type: "approval.requested", Actor: "orchestrator", Env: wi.Env,
 		WorkItem: wi.ID, Summary: "Approval needed: " + wi.Title,
-		Data: map[string]any{"tier": tier, "rule": rule, "sentence": wi.Explanation.Sentence,
-			"approvers_required": policy.ApproversRequired(tier), "title": wi.Title}})
+		Data: map[string]any{"tier": wi.Tier, "rule": wi.TierRule,
+			"sentence": wi.Explanation.Sentence, "approvers_required": need, "title": wi.Title}})
 	return wi, nil
+}
+
+// ReviewRule is the tier rule of a work item whose tier the adversarial review made higher.
+const ReviewRule = "adversarial-review"
+
+// review runs the adversarial review of a planned change and returns the tier and the
+// rule of the work item. The review can make the tier of the policy engine higher. It can
+// never make it lower: a model that is told, or tricked, to call a change safe changes
+// nothing. When the review fails, the tier of the policy engine stands and the failure is
+// in the audit log.
+func (o *Orchestrator) review(ctx context.Context, wi WorkItem, tier, rule string) (string, string) {
+	if o.Hooks.Review == nil {
+		return tier, rule
+	}
+	plans, err := o.Plans(wi.ID, false)
+	if err != nil {
+		plans = nil
+	}
+	review, err := o.Hooks.Review(ctx, wi, plans, tier)
+	if err != nil {
+		o.emit(audit.Event{Type: "agent.failed", Actor: "reviewer", Env: wi.Env, WorkItem: wi.ID,
+			Summary: "The adversarial review failed; the tier of the policy engine stands",
+			Data:    map[string]any{"error": err.Error(), "policy_tier": tier}})
+		return tier, rule
+	}
+	if review.Tier == "" {
+		return tier, rule
+	}
+	final, finalRule := tier, rule
+	summary := fmt.Sprintf("Adversarial review agrees with tier %s of the policy engine", tier)
+	if review.Tier > tier {
+		final, finalRule = review.Tier, ReviewRule
+		summary = fmt.Sprintf("Adversarial review raised the tier from %s to %s", tier, final)
+	}
+	o.emit(audit.Event{Type: "review.completed", Actor: "reviewer", Env: wi.Env, WorkItem: wi.ID,
+		Summary: summary, Data: map[string]any{"policy_tier": tier, "policy_rule": rule,
+			"proposed_tier": review.Tier, "tier": final, "concerns": review.Concerns,
+			"model": review.Source}})
+	return final, finalRule
 }
 
 func (o *Orchestrator) explain(ctx context.Context, wi *WorkItem) {
