@@ -17,7 +17,7 @@ the machine image with `ops`.
 ### State at the end of the second session of 2026-11-17
 
 Next steps 1 to 4 are merged, and of step 5 the sign-in for a browser and the device flow
-for git and scripts (#39, #42, #43, #44, #46, #47 and the pull request of the device flow).
+for git and scripts (#39, #42, #43, #44, #46, #47 and #48).
 The next work is the last part of step 5, the device flow in the iOS app. Step 6 comes
 after that.
 
