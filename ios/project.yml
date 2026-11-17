@@ -37,6 +37,11 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.clanker.paperboat-manager
+        # The Keychain refuses an app without a signature (status -34018). A signature
+        # "to run locally" needs no development team and is enough in the simulator.
+        CODE_SIGNING_ALLOWED: YES
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_PREVIEWS: YES

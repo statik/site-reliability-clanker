@@ -133,7 +133,7 @@ struct DecisionFormView: View {
   private func summary(_ detail: WorkItemDetail) -> DecisionSummary {
     DecisionSummary(
       choice: choice, detail: detail, changes: model.changes, approvers: model.approvers,
-      user: app.settings.user, scheduledFor: scheduledFor)
+      user: app.userName, scheduledFor: scheduledFor)
   }
 
   /// Reads the clock of the control plane for the schedule picker, then honours the
