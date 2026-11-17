@@ -241,6 +241,12 @@ func run() error {
 		fmt.Println(version)
 		return nil
 	}
+	if command == "runner" {
+		// A runner needs no checkout and no database: it gets its job from the core.
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		return runRunner(ctx, args[1:])
+	}
 	o, err := parse(args[1:])
 	if err != nil {
 		return err

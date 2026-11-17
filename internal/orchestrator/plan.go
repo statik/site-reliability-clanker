@@ -12,9 +12,9 @@ import (
 
 	"github.com/statik/site-reliability-clanker/internal/audit"
 	"github.com/statik/site-reliability-clanker/internal/broker"
+	"github.com/statik/site-reliability-clanker/internal/jobspec"
 	"github.com/statik/site-reliability-clanker/internal/planfacts"
 	"github.com/statik/site-reliability-clanker/internal/policy"
-	"github.com/statik/site-reliability-clanker/internal/runner"
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
 
@@ -77,14 +77,29 @@ func (o *Orchestrator) AttachPull(id string, prID int64, actor string) (WorkItem
 	return wi, nil
 }
 
-// checkout returns the tree of the commit of the work item, for a runner job. The plan and
-// the apply of one commit share one checkout on the runner.
-func (o *Orchestrator) checkout(wi WorkItem) (runner.Checkout, error) {
+// layerJob returns a job for one layer of the work item, with the tree of its commit. The
+// plan and the apply of one commit share one checkout on the runner.
+func (o *Orchestrator) layerJob(wi WorkItem, kind, layer string) (jobspec.Job, error) {
 	archive, err := o.Forge.Archive(PlatformRepo, wi.Commit)
 	if err != nil {
-		return runner.Checkout{}, err
+		return jobspec.Job{}, err
 	}
-	return runner.Checkout{ID: wi.ID + "/" + wi.Commit, Archive: archive}, nil
+	return jobspec.Job{Spec: jobspec.Spec{Kind: kind, Env: wi.Env, Cloud: o.Envs[wi.Env].Cloud,
+		Layer: layer, CheckoutID: wi.ID + "/" + wi.Commit, Variables: o.JobVariables},
+		Checkout: archive}, nil
+}
+
+// run gives the job to a runner and records the tool versions that the runner reports.
+func (o *Orchestrator) run(ctx context.Context, job *Job, spec jobspec.Job) (jobspec.Result, error) {
+	result, err := o.Runners.Run(ctx, spec)
+	if result.ToolDigest != "" {
+		job.ToolDigest = result.ToolDigest
+		if _, dbErr := o.DB.Exec(`UPDATE jobs SET tool_digest = $1 WHERE id = $2`,
+			result.ToolDigest, job.ID); dbErr != nil && err == nil {
+			err = fmt.Errorf("record the tools of job %d: %w", job.ID, dbErr)
+		}
+	}
+	return result, err
 }
 
 // policyModules reads the policy rules from the runbooks repository.
@@ -172,7 +187,7 @@ func (l *jobLog) Close() error {
 
 func (o *Orchestrator) startJob(wi WorkItem, layer, kind, grantID string) (Job, *jobLog, error) {
 	job := Job{WorkItem: wi.ID, Layer: layer, Kind: kind, Status: "running", GrantID: grantID,
-		ToolDigest: o.Runner.ToolDigest(), StartedAt: o.now()}
+		StartedAt: o.now()}
 	err := o.DB.QueryRow(`INSERT INTO jobs (work_item, layer, kind, status, grant_id,
 		tool_digest, started_at) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`, job.WorkItem, job.Layer, job.Kind,
 		job.Status, job.GrantID, job.ToolDigest, job.StartedAt).Scan(&job.ID)
@@ -215,7 +230,7 @@ func (o *Orchestrator) planCredential(ctx context.Context, wi WorkItem, layer st
 
 // planLayer runs plan and policy for one layer and stores the result.
 func (o *Orchestrator) planLayer(ctx context.Context, wi WorkItem, layer string) (Plan, error) {
-	checkout, err := o.checkout(wi)
+	spec, err := o.layerJob(wi, jobspec.KindPlan, layer)
 	if err != nil {
 		return Plan{}, err
 	}
@@ -235,7 +250,8 @@ func (o *Orchestrator) planLayer(ctx context.Context, wi WorkItem, layer string)
 	if err != nil {
 		return Plan{}, err
 	}
-	plan, err := o.runPlan(ctx, wi, layer, checkout, cred.KubeConfig, job, logFile)
+	spec.KubeConfig, spec.Log = cred.KubeConfig, logFile
+	plan, err := o.runPlan(ctx, wi, layer, spec, &job, logFile)
 	o.endJob(job, logFile, err)
 	if err != nil {
 		o.emit(audit.Event{Type: "plan.failed", Actor: "runner", Env: wi.Env, Layer: layer,
@@ -247,19 +263,19 @@ func (o *Orchestrator) planLayer(ctx context.Context, wi WorkItem, layer string)
 }
 
 func (o *Orchestrator) runPlan(ctx context.Context, wi WorkItem, layer string,
-	checkout runner.Checkout, kubeconfig string, job Job, logFile *jobLog) (Plan, error) {
-	result, err := o.Runner.Plan(ctx, runner.Job{Env: wi.Env, Cloud: o.Envs[wi.Env].Cloud,
-		Layer: layer, Checkout: checkout, KubeConfig: kubeconfig, Log: logFile})
+	spec jobspec.Job, job *Job, logFile *jobLog) (Plan, error) {
+	result, err := o.run(ctx, job, spec)
 	if err != nil {
 		return Plan{}, err
 	}
 	// The hash that an approver agrees to is the hash of the bytes that are stored here,
 	// and an apply gets exactly these bytes.
-	if held := runner.SHA256(result.Plan); held != result.SHA256 {
-		return Plan{}, fmt.Errorf("plan of %s: the runner reported hash %s for a plan with "+
-			"hash %s", layer, result.SHA256, held)
+	sha := jobspec.SHA256(result.Plan)
+	if len(result.Plan) == 0 || sha != result.PlanSHA256 {
+		return Plan{}, fmt.Errorf("plan of %s: the runner reported hash %q for a plan of %d "+
+			"bytes with hash %s", layer, result.PlanSHA256, len(result.Plan), sha)
 	}
-	facts, err := planfacts.Parse(result.JSON)
+	facts, err := planfacts.Parse(result.PlanJSON)
 	if err != nil {
 		return Plan{}, err
 	}
@@ -268,12 +284,12 @@ func (o *Orchestrator) runPlan(ctx context.Context, wi WorkItem, layer string,
 		return Plan{}, err
 	}
 	decision, err := policy.Evaluate(ctx, policy.Input{Kind: wi.Kind, Layer: layer,
-		PlanJSON: result.JSON, Modules: modules})
+		PlanJSON: result.PlanJSON, Modules: modules})
 	if err != nil {
 		return Plan{}, err
 	}
 	fmt.Fprintf(logFile, "\npolicy: tier %s by rule %s\n", decision.Tier, decision.Rule)
-	plan := Plan{WorkItem: wi.ID, Layer: layer, Commit: wi.Commit, SHA256: result.SHA256,
+	plan := Plan{WorkItem: wi.ID, Layer: layer, Commit: wi.Commit, SHA256: sha,
 		Facts: facts, Policy: decision, CreatedAt: o.now()}
 	factsJSON, _ := json.Marshal(facts)
 	decisionJSON, _ := json.Marshal(decision)
@@ -283,7 +299,7 @@ func (o *Orchestrator) runPlan(ctx context.Context, wi WorkItem, layer string,
 	}
 	err = o.DB.QueryRow(`INSERT INTO plans (work_item, layer, commit_sha, plan_sha256,
 		plan, plan_json, facts, policy, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
-		plan.WorkItem, plan.Layer, plan.Commit, plan.SHA256, result.Plan, result.JSON,
+		plan.WorkItem, plan.Layer, plan.Commit, plan.SHA256, result.Plan, result.PlanJSON,
 		string(factsJSON), string(decisionJSON), plan.CreatedAt).Scan(&plan.ID)
 	if err != nil {
 		return Plan{}, fmt.Errorf("record plan of %s %s: %w", wi.ID, layer, err)

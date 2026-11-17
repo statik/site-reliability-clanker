@@ -26,10 +26,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/statik/site-reliability-clanker/internal/jobspec"
 )
 
 // ErrStalePlan means that the state changed after the plan was saved.
-var ErrStalePlan = errors.New("the saved plan is stale")
+var ErrStalePlan = jobspec.ErrStalePlan
 
 // Runner runs the jobs.
 type Runner struct {
@@ -281,12 +283,6 @@ type PlanResult struct {
 	SHA256 string
 }
 
-// SHA256 returns the hex SHA-256 of data.
-func SHA256(data []byte) string {
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:])
-}
-
 // planFile makes an empty temporary directory for one plan file.
 func (r *Runner) planFile(layer string) (string, func(), error) {
 	dir, err := os.MkdirTemp(r.WorkRoot, "plan-")
@@ -323,13 +319,13 @@ func (r *Runner) Plan(ctx context.Context, j Job) (PlanResult, error) {
 	if err != nil {
 		return PlanResult{}, fmt.Errorf("read the saved plan of %s/%s: %w", j.Env, j.Layer, err)
 	}
-	return PlanResult{Plan: plan, JSON: planJSON.Bytes(), SHA256: SHA256(plan)}, nil
+	return PlanResult{Plan: plan, JSON: planJSON.Bytes(), SHA256: jobspec.SHA256(plan)}, nil
 }
 
 // Apply applies a saved plan and returns the outputs of the layer. It checks first that
 // the plan has the approved hash. It never makes a new plan.
 func (r *Runner) Apply(ctx context.Context, j Job, plan []byte, wantSHA256 string) (map[string]any, error) {
-	if sum := SHA256(plan); sum != wantSHA256 {
+	if sum := jobspec.SHA256(plan); sum != wantSHA256 {
 		return nil, fmt.Errorf("apply %s/%s: plan hash %s is not the approved hash %s",
 			j.Env, j.Layer, sum, wantSHA256)
 	}

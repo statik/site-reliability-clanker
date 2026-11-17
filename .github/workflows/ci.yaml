@@ -39,7 +39,7 @@ jobs:
         run: test -z "$(gofmt -l cmd internal apps/paperboat)"
       - name: Check that the core starts no program
         run: |
-          for p in agent api audit detect forge monitor notify orchestrator planfacts policy scrub store; do
+          for p in agent api audit detect dispatch forge jobspec monitor notify orchestrator planfacts policy scrub store; do
             if go list -f '{{join .Imports "\n"}}' "./internal/$p" | grep -qx os/exec; then
               echo "internal/$p imports os/exec: the core must not start a program"
               exit 1

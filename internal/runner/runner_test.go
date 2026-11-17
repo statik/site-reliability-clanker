@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/statik/site-reliability-clanker/internal/jobspec"
 )
 
 type entry struct {
@@ -135,16 +137,9 @@ func TestCredentialFileIsPrivateAndRemoved(t *testing.T) {
 func TestApplyRefusesAPlanWithAnotherHash(t *testing.T) {
 	r := newRunner(t)
 	_, err := r.Apply(context.Background(), Job{Env: "local", Cloud: "local", Layer: "50-app"},
-		[]byte("the plan"), SHA256([]byte("another plan")))
+		[]byte("the plan"), jobspec.SHA256([]byte("another plan")))
 	if err == nil || !strings.Contains(err.Error(), "not the approved hash") {
 		t.Fatalf("error = %v, want a refusal before anything runs", err)
-	}
-}
-
-func TestSHA256(t *testing.T) {
-	const want = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-	if got := SHA256([]byte("abc")); got != want {
-		t.Fatalf("got %s, want %s", got, want)
 	}
 }
 

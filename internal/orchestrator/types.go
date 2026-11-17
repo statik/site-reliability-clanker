@@ -14,9 +14,9 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/audit"
 	"github.com/statik/site-reliability-clanker/internal/broker"
 	"github.com/statik/site-reliability-clanker/internal/forge"
+	"github.com/statik/site-reliability-clanker/internal/jobspec"
 	"github.com/statik/site-reliability-clanker/internal/planfacts"
 	"github.com/statik/site-reliability-clanker/internal/policy"
-	"github.com/statik/site-reliability-clanker/internal/runner"
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
 
@@ -162,17 +162,27 @@ type VerifyResult struct {
 	Reason string   `json:"reason"`
 }
 
+// Executor runs one job on a runner and returns its result. A failed job is an error, and
+// a stale plan is an error that wraps jobspec.ErrStalePlan.
+type Executor interface {
+	Run(ctx context.Context, job jobspec.Job) (jobspec.Result, error)
+}
+
 // Orchestrator runs work items.
 type Orchestrator struct {
-	DB      *sql.DB
-	Audit   *audit.Log
-	Forge   *forge.Forge
-	Runner  *runner.Runner
+	DB    *sql.DB
+	Audit *audit.Log
+	Forge *forge.Forge
+	// Runners runs the jobs. The orchestrator starts no program itself.
+	Runners Executor
 	Broker  *broker.Broker
 	Clock   Clock
+	// DataDir is the data directory of the control plane. The API hides it in job logs.
 	DataDir string
 	Envs    map[string]EnvConfig
 	Hooks   Hooks
+	// JobVariables are added to the environment of OpenTofu in every job.
+	JobVariables map[string]string
 
 	envLocks sync.Map
 	idMu     sync.Mutex

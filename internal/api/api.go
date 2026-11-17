@@ -36,6 +36,9 @@ type Server struct {
 	Clock    *sim.Clock
 	// Web is the built dashboard. Nil serves the API only.
 	Web fs.FS
+	// Runners serves the runners of the jobs, below /runner/v1/. Each request carries the
+	// token of one job. The user header means nothing there.
+	Runners http.Handler
 }
 
 // statusError carries an HTTP status with an error.
@@ -172,6 +175,9 @@ func (s *Server) Handler() (http.Handler, error) {
 		return nil, err
 	}
 	mux.Handle("/git/", gitHandler)
+	if s.Runners != nil {
+		mux.Handle("/runner/v1/", s.Runners)
+	}
 	if s.Web != nil {
 		mux.Handle("/", spaHandler(s.Web))
 	}
