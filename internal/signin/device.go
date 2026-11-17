@@ -179,9 +179,10 @@ func (s *Service) deviceToken(w http.ResponseWriter, r *http.Request) {
 		"expires_in": int(tokenLife / time.Second)})
 }
 
-// browserEmail returns the person of the browser session of a request. A program with a
-// token is not a person in a browser: it must not approve a code and get more tokens.
-func (s *Service) browserEmail(r *http.Request) (string, error) {
+// BrowserEmail returns the person of the browser session of a request. A program with a
+// token is not a person in a browser: it must not approve a code and get more tokens, and
+// it must not link a chat account.
+func (s *Service) BrowserEmail(r *http.Request) (string, error) {
 	if _, err := r.Cookie(sessionCookie); err != nil {
 		return "", ErrNoSession
 	}
@@ -240,7 +241,7 @@ func (s *Service) pending(r *http.Request, code string) (bool, error) {
 
 // devicePage shows a signed-in person the code of a program and asks for a decision.
 func (s *Service) devicePage(w http.ResponseWriter, r *http.Request) {
-	email, err := s.browserEmail(r)
+	email, err := s.BrowserEmail(r)
 	if errors.Is(err, ErrNoSession) {
 		http.Redirect(w, r, "/auth/login?return="+url.QueryEscape(r.URL.RequestURI()),
 			http.StatusFound)
@@ -273,7 +274,7 @@ func (s *Service) devicePage(w http.ResponseWriter, r *http.Request) {
 // session counts, and only a request that comes from a page of this site. When nobody may
 // decide, decider writes the answer and returns false.
 func (s *Service) decider(w http.ResponseWriter, r *http.Request) (string, bool) {
-	email, err := s.browserEmail(r)
+	email, err := s.BrowserEmail(r)
 	if errors.Is(err, ErrNoSession) {
 		http.Error(w, "Sign in to the dashboard first.", http.StatusUnauthorized)
 		return "", false

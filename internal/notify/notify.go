@@ -1,6 +1,6 @@
 // Package notify routes audit events to email, Slack, Microsoft Teams and Discord. It reads
-// the same event stream as the audit log. A message links to the dashboard; it never carries
-// an approve action.
+// the same event stream as the audit log. A message of this package links to the dashboard
+// and carries no approve action. Package chatops has the adapters with an approve action.
 package notify
 
 import (
@@ -26,6 +26,12 @@ type Message struct {
 	Link     string
 	Urgency  string
 	Severity string
+	// Event is the type of the audit event, and WorkItem is its work item, if it has one.
+	Event    string
+	WorkItem string
+	// Sentence is the sentence that says what changes, without the advice to open the
+	// dashboard that Body ends with.
+	Sentence string
 }
 
 // Adapter sends a message on one channel.
@@ -166,7 +172,7 @@ func (n *Notifier) link(workItem string) string {
 
 func (n *Notifier) message(e audit.Event, route Route) Message {
 	m := Message{Title: scrub.Text(e.Summary), Link: n.link(e.WorkItem), Urgency: route.Urgency,
-		Severity: severity(e.Type)}
+		Severity: severity(e.Type), Event: e.Type, WorkItem: e.WorkItem}
 	add := func(label, value string) {
 		if value != "" {
 			m.Facts = append(m.Facts, [2]string{label, scrub.Text(value)})
@@ -187,6 +193,7 @@ func (n *Notifier) message(e audit.Event, route Route) Message {
 	}
 	if sentence, ok := e.Data["sentence"].(string); ok {
 		m.Body = scrub.Text(sentence)
+		m.Sentence = m.Body
 	}
 	if e.Type == "approval.requested" {
 		m.Body += " Open the dashboard and sign in to decide. You cannot approve from this message."
