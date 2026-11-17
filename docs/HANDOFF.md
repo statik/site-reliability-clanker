@@ -74,9 +74,25 @@ What ran on the build of commit `376617b`, the last change to the Go code:
    A `git push` over HTTP was accepted, and a second unikernel on the same database had
    the pushed branch. No job ran in it: the core proposes no deployment on a cloud yet.
    Nothing ran on x86 or on EC2.
-4. **A guard for one writer.** The pool has one connection, but that does not stop two
-   instances. Put the guard in PostgreSQL. Reconcile jobs that were in flight when the core
-   stopped.
+4. **A guard for one writer.** Done.
+   - The control plane holds an advisory lock in PostgreSQL on a connection of its own
+     (`store.HoldWriter`). A second control plane waits and serves nothing. A holder whose
+     connection breaks stops. The lock is not a fence around each write: after a break the
+     old holder can still write for a few seconds.
+   - At start, `Orchestrator.Reconcile` ends each running job as `lost`, revokes each grant
+     that did not end, and fails each work item that was in `Applying` or `Verifying`. It
+     does not continue an apply.
+   - Ran (`scripts/verify/restart_check.py`, commit `0e6572d`): a second control plane
+     waited. After `kill -9` in the middle of an apply, the restarted control plane failed
+     the work item, ended its job as `lost`, revoked its grant, and the audit chain
+     verified. `fresh-run.sh`, `sweep.py` and `stale_plan.py` gave the usual results on
+     the same commit.
+   - Open (issue #41): a work item that was in the plan or between the approval and the
+     apply when the control plane stopped stays in its state (`Detected`, `Drafting`,
+     `Planned` or `Approved`) and nothing continues it.
+   - Not examined: the runner process of the killed apply. It was gone after the restart,
+     but nothing shows whether it finished its `tofu apply` first. A break of the lock
+     connection was tested only by the unit tests of the wait, not by a cut connection.
 5. **OIDC sign-in**, and no trust in the `X-Clanker-User` header. This blocks every public
    deployment.
 6. **Cloud runner and broker:** a launcher that starts a Fargate task, an S3 state backend
