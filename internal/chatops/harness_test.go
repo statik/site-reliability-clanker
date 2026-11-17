@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -16,9 +17,11 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/audit"
+	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/notify"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
 	"github.com/statik/site-reliability-clanker/internal/signin"
@@ -89,7 +92,13 @@ func newWorld(t *testing.T) *world {
 	db := storetest.Open(t)
 	clock := fixedClock{}
 	w := &world{t: t, db: db, log: audit.New(db, clock)}
-	w.orch = &orchestrator.Orchestrator{DB: db, Audit: w.log, Clock: clock}
+	// The orchestrator reads the approval settings from the runbooks repository.
+	f := forge.New(db)
+	if err := f.Seed(orchestrator.RunbooksRepo, map[string]fs.FS{".": fstest.MapFS{
+		"README.md": {Data: []byte("Runbooks\n")}}}, "Seed runbooks"); err != nil {
+		t.Fatal(err)
+	}
+	w.orch = &orchestrator.Orchestrator{DB: db, Audit: w.log, Forge: f, Clock: clock}
 	// An approval starts the apply in the background. The apply must end before the
 	// database of the test goes away.
 	t.Cleanup(w.settle)

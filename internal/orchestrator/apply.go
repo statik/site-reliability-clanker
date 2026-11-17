@@ -16,7 +16,6 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/audit"
 	"github.com/statik/site-reliability-clanker/internal/broker"
 	"github.com/statik/site-reliability-clanker/internal/jobspec"
-	"github.com/statik/site-reliability-clanker/internal/policy"
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
 
@@ -232,7 +231,10 @@ func (o *Orchestrator) afterApproval(ctx context.Context, wi WorkItem, d Decisio
 	if err != nil {
 		return WorkItem{}, err
 	}
-	need := policy.ApproversRequired(wi.Tier)
+	need, err := o.ApproversRequired(wi.Tier)
+	if err != nil {
+		return WorkItem{}, fmt.Errorf("count the approvals of %s: %w", wi.ID, err)
+	}
 	if len(approvers) < need {
 		return wi, nil
 	}
@@ -357,17 +359,7 @@ func (o *Orchestrator) backToApproval(ctx context.Context, wi WorkItem, cause er
 			return wi, o.setState(&wi, StateFailed, "runner", err.Error())
 		}
 	}
-	o.explain(ctx, &wi)
-	if err := o.setState(&wi, StateAwaitingApproval, "orchestrator",
-		"the plan changed; earlier approvals do not cover the new plan"); err != nil {
-		return WorkItem{}, err
-	}
-	o.emit(audit.Event{Type: "approval.requested", Actor: "orchestrator", Env: wi.Env,
-		WorkItem: wi.ID, Summary: "Approval needed again: " + wi.Title,
-		Data: map[string]any{"tier": wi.Tier, "rule": wi.TierRule, "title": wi.Title,
-			"sentence":           wi.Explanation.Sentence,
-			"approvers_required": policy.ApproversRequired(wi.Tier)}})
-	return wi, nil
+	return o.requestApproval(ctx, wi, true)
 }
 
 func (o *Orchestrator) currentPlan(wi WorkItem, layer string) (Plan, bool, error) {

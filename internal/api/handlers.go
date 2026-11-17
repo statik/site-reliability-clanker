@@ -15,7 +15,6 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/broker"
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
-	"github.com/statik/site-reliability-clanker/internal/policy"
 	"github.com/statik/site-reliability-clanker/internal/runbook"
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
@@ -106,14 +105,14 @@ func (s *Server) getWorkItem(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	valid, err := s.Orch.ValidApprovers(wi)
+	valid, required, err := s.approvalProgress(wi)
 	if err != nil {
 		return nil, err
 	}
 	detail := map[string]any{"work_item": wi, "plans": plans, "approvals": approvals,
 		"valid_approvers": valid,
 		"jobs":            jobs, "events": events,
-		"approvers_required": policy.ApproversRequired(wi.Tier),
+		"approvers_required": required,
 		"deferred_layers":    deferredLayers(wi, plans)}
 	if wi.PRID != 0 {
 		pr, err := s.Forge.Pull(wi.PRID)
@@ -604,6 +603,17 @@ func (s *Server) postDebugSession(r *http.Request) (any, error) {
 		return nil, err
 	}
 	return map[string]string{"work_item": wi.ID, "transcript": transcript}, nil
+}
+
+// approvalProgress returns the approvers whose approval covers the current plans of the
+// work item, and the number of approvers that its tier needs.
+func (s *Server) approvalProgress(wi orchestrator.WorkItem) ([]string, int, error) {
+	valid, err := s.Orch.ValidApprovers(wi)
+	if err != nil {
+		return nil, 0, err
+	}
+	required, err := s.Orch.ApproversRequired(wi.Tier)
+	return valid, required, err
 }
 
 func (s *Server) startEnvironmentWork(r *http.Request, kind, title, trigger string) (any, error) {

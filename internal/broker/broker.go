@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -56,6 +57,9 @@ type Broker struct {
 	// issuer makes the credentials of the target. It is nil when the control plane has no
 	// issuer for its target; the broker then signs and checks grants but exchanges none.
 	issuer Issuer
+	// approvals reads the approval settings. It is nil when the broker has no source of
+	// settings; the broker then uses the settings of a repository with no settings file.
+	approvals func() (policy.Approvals, error)
 }
 
 // NewKey makes a signing key for New.
@@ -68,13 +72,16 @@ func NewKey() ([]byte, error) {
 }
 
 // New returns a broker that signs with key, which NewKey made. The caller keeps the key:
-// the broker reads and writes no file. issuer can be nil.
-func New(db *sql.DB, clock Clock, key []byte, issuer Issuer) (*Broker, error) {
+// the broker reads and writes no file. issuer can be nil. approvals reads the approval
+// settings for each apply grant; it must not get them from the caller of Issue. It can be
+// nil: tier T3 then needs two approvers.
+func New(db *sql.DB, clock Clock, key []byte, issuer Issuer,
+	approvals func() (policy.Approvals, error)) (*Broker, error) {
 	if len(key) != ed25519.PrivateKeySize {
 		return nil, fmt.Errorf("the broker signing key has %d bytes, want %d", len(key),
 			ed25519.PrivateKeySize)
 	}
-	return &Broker{db: db, clock: clock, key: key, issuer: issuer}, nil
+	return &Broker{db: db, clock: clock, key: key, issuer: issuer, approvals: approvals}, nil
 }
 
 func (g Grant) signedText() string {
@@ -126,14 +133,11 @@ func distinct(names []string) []string {
 // that the tier requires.
 func (b *Broker) Issue(req Request) (Grant, error) {
 	approvers := distinct(req.Approvers)
-	need := policy.ApproversRequired(req.Tier)
-	if req.Kind == KindApply && len(approvers) < need {
-		return Grant{}, fmt.Errorf("issue grant for %s %s/%s: tier %s needs %d approvers, got %d",
-			req.WorkItem, req.Env, req.Layer, req.Tier, need, len(approvers))
-	}
-	if req.Kind == KindApply && (req.Commit == "" || req.PlanSHA256 == "") {
-		return Grant{}, fmt.Errorf("issue grant for %s %s/%s: an apply grant needs a commit "+
-			"and a plan hash", req.WorkItem, req.Env, req.Layer)
+	if req.Kind == KindApply {
+		if err := b.checkApply(req, approvers); err != nil {
+			return Grant{}, fmt.Errorf("issue grant for %s %s/%s: %w", req.WorkItem, req.Env,
+				req.Layer, err)
+		}
 	}
 	now := b.clock.Now()
 	notBefore := req.NotBefore
@@ -164,6 +168,26 @@ func (b *Broker) Issue(req Request) (Grant, error) {
 		return Grant{}, fmt.Errorf("record grant %s: %w", g.ID, err)
 	}
 	return g, nil
+}
+
+// checkApply refuses an apply grant that has too few approvers for its tier, or that names
+// no commit or no plan. The broker reads the number of approvers itself.
+func (b *Broker) checkApply(req Request, approvers []string) error {
+	var approvals policy.Approvals
+	if b.approvals != nil {
+		var err error
+		if approvals, err = b.approvals(); err != nil {
+			return fmt.Errorf("the number of approvers for tier %s is not known: %w", req.Tier,
+				err)
+		}
+	}
+	if need := approvals.Required(req.Tier); len(approvers) < need {
+		return fmt.Errorf("tier %s needs %d approvers, got %d", req.Tier, need, len(approvers))
+	}
+	if req.Commit == "" || req.PlanSHA256 == "" {
+		return errors.New("an apply grant needs a commit and a plan hash")
+	}
+	return nil
 }
 
 // Presentation is what a runner shows the broker together with the grant.

@@ -458,3 +458,24 @@ func TestArchiveHoldsTheTreeOfACommit(t *testing.T) {
 		t.Fatal("no error for a commit that does not exist")
 	}
 }
+
+func TestReadFileSaysWhenOnlyTheFileIsMissing(t *testing.T) {
+	f, _ := seeded(t)
+	for _, path := range []string{"platform/app/absent.json", "platform/absent/file.json",
+		"absent/file.json", "platform/app"} {
+		if _, err := f.ReadFile(repo, "main", path); !errors.Is(err, ErrFileNotFound) {
+			t.Errorf("%s: want ErrFileNotFound, got %v", path, err)
+		}
+	}
+	if _, err := f.ReadFile("no-such-repository", "main", "run.sh"); err == nil ||
+		errors.Is(err, ErrFileNotFound) {
+		t.Errorf("a missing repository: want another error, got %v", err)
+	}
+	if _, err := f.ReadFile(repo, "no-such-branch", "run.sh"); err == nil ||
+		errors.Is(err, ErrFileNotFound) {
+		t.Errorf("a missing branch: want another error, got %v", err)
+	}
+	if _, err := f.ReadFile(repo, "main", "platform/run.sh"); err != nil {
+		t.Errorf("a file that exists: %v", err)
+	}
+}
