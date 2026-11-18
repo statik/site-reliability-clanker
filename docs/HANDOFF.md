@@ -66,9 +66,13 @@ Merged for this:
   router), and the IAM rights of the identity from the policy simulator. `setup.Place`
   proposes a network that exists, or a new one with a free address range.
 - #84: the step "Network" of the wizard shows the survey and saves the choice
-  (`POST /api/aws/place`). `clanker setup --preview-aws` offers it and refuses the review
-  and the creation on AWS (`setup.Config.SurveyOnly`), because those steps still create the
-  container on ECS. `web/scripts/setup-aws-survey-check.mjs` walks it in a browser.
+  (`POST /api/aws/place`). `web/scripts/setup-aws-survey-check.mjs` walks it in a browser.
+- On 2026-11-18 the ECS design left the wizard: the template, the tunnel, the container
+  size, the creation and the removal, and the flag `--preview-aws`. `clanker setup` always
+  offers AWS. The path ends at the review, which lists what S.R.C. creates in the chosen
+  network, the tag `clanker_env` and the list prices of one week (`internal/setup/plan.go`).
+  The wizard creates nothing on AWS. The browser walk now runs against a stand-in for the
+  AWS command line (`web/scripts/fixtures/aws-account/aws`), not against an account.
 - #82: a runner passes the `backend` settings of a job to `tofu init`. No job names a
   backend yet. The runner still sets `TF_VAR_state_location` to its own directory.
 - #83: with `CLANKER_PARAMETER_PATH` and `AWS_REGION`, the core on AWS reads its settings
@@ -88,8 +92,8 @@ Not built, in the order of the work:
    exists.
 2. First, one paid test: Nanos never booted on EC2 in this project. If it does not boot,
    ask the owner; do not change to a container without a decision.
-3. The review, the creation and the removal in the wizard for that stack, and the removal of
-   the ECS design (`controlplane.yaml`, the tunnel, the container size).
+3. The creation and the removal in the wizard for that stack. The review is built, and
+   the ECS design is removed.
 4. The STS issuer and the Fargate launcher. The credential of the broker must carry
    short-lived AWS keys beside the kubeconfig: show the owner that shape first.
 5. Prices from the AWS price list in the wizard. Checked by hand on 2026-11-17 for one US
@@ -393,8 +397,8 @@ What ran on the build of commit `376617b`, the last change to the Go code:
      hand-over link answered.
    - The local target keeps its data directory (`broker.key`, `database.password`, the
      unpacked bundle, the files of the runner).
-   - Not done: the template `internal/setup/controlplane.yaml` (the ECS design) still
-     passes `--data /data`, which the core now refuses. Step 7 replaces that template.
+   - The template of the ECS design, which passed `--data /data`, was removed on
+     2026-11-18.
 3. **Boot the real core under Nanos.** Done on a laptop (`scripts/verify/nanos-check.sh`,
    arm64, nightly kernel, HVF). The core in the standby mode
    (`clanker up --cloud aws --demo=false`) answered about one second after the start,
@@ -544,9 +548,8 @@ What ran on the build of commit `376617b`, the last change to the Go code:
        `CLANKER_PUBLIC_URL` (`cmd/clanker/up.go`). The chat requests use `CLANKER_PUBLIC_URL`.
 6. **Cloud runner and broker:** a launcher that starts a Fargate task, an S3 state backend
    in the runner (the job specification has the field `backend`), a broker that uses STS.
-   The ECS task definition in `internal/setup/controlplane.yaml` is the starting point.
 7. **The wizard for AWS:** build the image with `ops`, create the stack (auto scaling group,
-   load balancer, RDS), switch `setup.Config.EnableAWS` on.
+   load balancer, RDS). The wizard offers AWS and ends at the review.
 8. **A run in a real account.**
 
 ### What the owner must give
@@ -612,9 +615,9 @@ Everything in this section was run on the local target (kind on Docker, macOS ar
   a real browser and started the control plane (`web/scripts/setup-wizard-check.mjs`), on
   the first-run path and on the restart path. It used the data directory of the running
   demo, so a first deployment from an empty machine through the wizard was not run.
-- A release offers only the local target. `clanker setup --preview-aws` adds the sign-in to
-  AWS and the step "Network", and creates nothing there. See "Step 6 and the installer for
-  AWS" above.
+- `clanker setup` offers the local target and AWS. On AWS it signs in, surveys the account,
+  records the network and shows the review, and creates nothing there. See "Step 6 and the
+  installer for AWS" above.
 - Ran on 2026-11-17 after the step "Network": the first-run path of the local target with
   `setup-wizard-check.mjs`, from a checkout.
 - A binary that a browser downloads is unsigned, so macOS can refuse to start it. The
