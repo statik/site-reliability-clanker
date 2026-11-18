@@ -66,7 +66,7 @@ func TestParseWindowsRefusesWhatIsNotExact(t *testing.T) {
 		"start without zero":  changed(`02:00`, `2:00`),
 		"start hour 24":       changed(`02:00`, `24:00`),
 		"start with seconds":  changed(`02:00`, `02:00:00`),
-		"minutes too small":   changed(`120`, `29`),
+		"minutes too small":   changed(`120`, `59`),
 		"minutes too large":   changed(`120`, `1441`),
 		"minutes a fraction":  changed(`120`, `60.5`),
 		"minutes a text":      changed(`120`, `"60"`),
@@ -88,7 +88,7 @@ func TestParseWindowsRefusesWhatIsNotExact(t *testing.T) {
 func TestParseWindowsAcceptsSeveralWindows(t *testing.T) {
 	windows := parsedWindows(t, `{"windows": [
 		{"days": ["sat", "sun"], "start": "02:00", "minutes": 120, "time_zone": "Europe/Dublin"},
-		{"days": ["wed"], "start": "23:30", "minutes": 30, "time_zone": "UTC"}]}`+"\n")
+		{"days": ["wed"], "start": "23:30", "minutes": 60, "time_zone": "UTC"}]}`+"\n")
 	if windows.Empty() {
 		t.Fatal("two windows were parsed to no window")
 	}

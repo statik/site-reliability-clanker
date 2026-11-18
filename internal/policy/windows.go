@@ -18,17 +18,20 @@ import (
 const WindowsPath = "policy/maintenance-windows.json"
 
 // WindowReserve is the time that must be left in a maintenance window when an apply
-// starts. It is the lifetime of an apply grant, so that the grant ends before the window.
+// starts. It is the lifetime of the apply grant of one layer. An apply of several layers
+// can end after the window.
 const WindowReserve = 30 * time.Minute
 
+// A window is longer than the reserve: the scheduler starts a change some seconds after
+// the start of the window, and the reserve must still be left then.
 const (
-	minWindowMinutes = int(WindowReserve / time.Minute)
+	minWindowMinutes = 60
 	maxWindowMinutes = 24 * 60
 )
 
 const windowsFormat = `the file must be {"windows": [{"days": ["sat"], "start": "02:00", ` +
 	`"minutes": 120, "time_zone": "Europe/Dublin"}]}; days are mon to sun, start is HH:MM ` +
-	`on a 24-hour clock, minutes is 30 to 1440, and time_zone is an IANA name`
+	`on a 24-hour clock, minutes is 60 to 1440, and time_zone is an IANA name`
 
 var weekdays = map[string]time.Weekday{"sun": time.Sunday, "mon": time.Monday,
 	"tue": time.Tuesday, "wed": time.Wednesday, "thu": time.Thursday, "fri": time.Friday,
@@ -258,7 +261,7 @@ func (w window) next(from time.Time) (at, windowStart time.Time) {
 			return from, start
 		}
 	}
-	// Each weekday is in the nine days above, and a window is as long as the reserve or
-	// longer, so this line is not reached with a parsed window.
+	// Each weekday is in the nine days above, and a window is longer than the reserve, so
+	// this line is not reached with a parsed window.
 	return time.Time{}, time.Time{}
 }

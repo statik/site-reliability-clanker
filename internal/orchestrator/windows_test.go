@@ -260,6 +260,20 @@ func TestTierT3WaitsForTheWindowAndGetsItsGrantThere(t *testing.T) {
 	}
 }
 
+func TestTheShortestWindowIsUsedWhenTheSchedulerComesLate(t *testing.T) {
+	h := windowOrchestrator(t, strings.Replace(saturdayWindow, "120", "60", 1))
+	h.changingItem(t, "WI-0001", "T3")
+	wantWait(t, h.approveBoth(t, "WI-0001"), saturday, saturday)
+	// The scheduler looks every five seconds, and the apply can wait for another apply.
+	late := saturday.Add(30 * time.Minute)
+	if wi := h.runDue(t, "WI-0001", late); wi.State != StateDone {
+		t.Fatalf("want Done in the window, got %s scheduled for %s", wi.State, wi.ScheduledFor)
+	}
+	if times := h.runners.applyTimes(); len(times) != 1 || !times[0].Equal(late) {
+		t.Errorf("want one apply 30 minutes after the start, got %v", times)
+	}
+}
+
 func TestTierT2DoesNotWaitForAWindow(t *testing.T) {
 	for name, windows := range map[string]string{"a window": saturdayWindow,
 		"a file that is not valid": `{"windows": "always"}`} {

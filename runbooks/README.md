@@ -46,7 +46,7 @@ start.
 |---|---|
 | `days` | One or more of `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`: the days on which the window starts |
 | `start` | The start as `HH:MM` on a 24-hour clock in the time zone |
-| `minutes` | The length of the window, from 30 to 1440. A window can cross midnight |
+| `minutes` | The length of the window, from 60 to 1440. A window can cross midnight |
 | `time_zone` | An IANA name, for example `Europe/Dublin` or `UTC` |
 
 A repository without the file, or with an empty list, has no windows: an approved tier T3
@@ -57,8 +57,9 @@ With one window or more, an approved tier T3 change applies only inside a window
 - When the last approval comes outside a window, the work item goes to the state
   `Scheduled` and waits for the start of the next window.
 - When the last approval comes inside a window with 30 minutes or more left, the change
-  applies at once. With less than 30 minutes left, it waits for the next window. An apply
-  grant lasts 30 minutes, so the grant ends before the window ends.
+  applies at once. With less than 30 minutes left, it waits for the next window. The
+  apply grant of one layer lasts 30 minutes. The rule is for the start of the apply: an
+  apply of several layers can end after the window.
 - When an approver sets a time for the apply, the change applies at the first moment at or
   after that time that is inside a window with 30 minutes or more left.
 
