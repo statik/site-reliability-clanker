@@ -68,7 +68,18 @@ one against Amazon Bedrock.
 - The OIDC issuer, the client and the admin email; plain HTTP or an internal load balancer.
 - The section "Status today" on the front page of the site.
 
-**The Nanos boot test on EC2** started and is not finished. Facts for the installer:
+**The Nanos boot test on EC2 passed on 2026-11-18.** A Go probe as a Nanos image on one
+`t4g.small` instance (arm64), in a private subnet with no public address, answered on its
+port through the private network about 5 seconds after the launch. The console showed the
+UEFI firmware, the address and the first line of the probe, with no error line. The
+instance, the image, the snapshot and the security group are removed. The real core did not
+run there, and no database was part of the test.
+
+A release exists: `v0.1.0` has the `clanker` binary for four platforms (`make release`), and
+the front page of the site gives the download (#95). The wizard from the downloaded binary
+did not run through to a created local environment.
+
+Facts for the installer:
 
 - `ops` 0.1.47 wants a bucket name in its configuration and does not use it. It writes the
   snapshot with the EBS direct API, so the build leaves one image and one snapshot.
