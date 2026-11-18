@@ -38,13 +38,20 @@ type Agent struct {
 	Monitor *monitor.Monitor
 	Clock   Clock
 	LLM     LLM
-	// Models maps a role to an OpenRouter model name.
+	// Models maps a role to the name of a model on the endpoint of the LLM.
 	Models map[string]string
 	// DailyBudgetUSD stops model calls for the day when the spend reaches it.
 	DailyBudgetUSD float64
+	// DailyBudgetTokens stops model calls for the day when the calls that report no cost
+	// reach this number of tokens. Zero means no limit.
+	DailyBudgetTokens int64
 }
 
-// DefaultModels are the models for each role when the configuration names none.
+// DefaultDailyTokens is the daily token limit for calls that report no cost. An endpoint
+// that the operator runs reports no cost, so the limit in USD never stops a loop there.
+const DefaultDailyTokens = 5_000_000
+
+// DefaultModels are the OpenRouter models for each role.
 func DefaultModels() map[string]string {
 	return map[string]string{
 		RoleTriage:       "anthropic/claude-haiku-5.5",
@@ -67,6 +74,42 @@ func (a *Agent) spentToday() (float64, error) {
 	return spent.Float64, nil
 }
 
+// unpricedTokensToday counts the tokens of the calls of today that report no cost. Replay
+// calls record zero tokens, so they add nothing.
+func (a *Agent) unpricedTokensToday() (int64, error) {
+	day := a.now()[:10]
+	var tokens int64
+	err := a.DB.QueryRow(`SELECT COALESCE(SUM(prompt_tokens + completion_tokens), 0)::BIGINT
+		FROM agent_calls WHERE at >= $1 AND cost_usd = 0`, day).Scan(&tokens)
+	if err != nil {
+		return 0, fmt.Errorf("read the tokens of calls with no cost: %w", err)
+	}
+	return tokens, nil
+}
+
+// usage is the model use of one day.
+type usage struct {
+	spentUSD       float64
+	unpricedTokens int64
+}
+
+// budgetReached says which daily limit stops the next call. The summary is for the audit
+// log and the error is for the caller. Both are empty when no limit is reached.
+func (a *Agent) budgetReached(used usage) (summary string, err error) {
+	if a.DailyBudgetUSD > 0 && used.spentUSD >= a.DailyBudgetUSD {
+		return fmt.Sprintf("Inference spend cap reached: %.2f of %.2f USD today", used.spentUSD,
+				a.DailyBudgetUSD),
+			fmt.Errorf("the inference budget of %.2f USD for today is spent", a.DailyBudgetUSD)
+	}
+	if a.DailyBudgetTokens > 0 && used.unpricedTokens >= a.DailyBudgetTokens {
+		return fmt.Sprintf("Inference token cap reached: %d of %d tokens with no cost today",
+				used.unpricedTokens, a.DailyBudgetTokens),
+			fmt.Errorf("the inference budget of %d tokens for today is spent on calls with "+
+				"no cost", a.DailyBudgetTokens)
+	}
+	return "", nil
+}
+
 // complete sends one request for a role, enforces the budget, scrubs the input and records
 // the call with its transcript.
 func (a *Agent) complete(ctx context.Context, role, workItem string, req Request) (Response, error) {
@@ -74,12 +117,14 @@ func (a *Agent) complete(ctx context.Context, role, workItem string, req Request
 	if err != nil {
 		return Response{}, err
 	}
-	if a.DailyBudgetUSD > 0 && spent >= a.DailyBudgetUSD {
+	tokens, err := a.unpricedTokensToday()
+	if err != nil {
+		return Response{}, err
+	}
+	if summary, err := a.budgetReached(usage{spentUSD: spent, unpricedTokens: tokens}); err != nil {
 		a.emit(audit.Event{Type: "agent.budget_reached", Actor: role, WorkItem: workItem,
-			Summary: fmt.Sprintf("Inference spend cap reached: %.2f of %.2f USD today", spent,
-				a.DailyBudgetUSD)})
-		return Response{}, fmt.Errorf("the inference budget of %.2f USD for today is spent",
-			a.DailyBudgetUSD)
+			Summary: summary})
+		return Response{}, err
 	}
 	req.Model = a.Models[role]
 	for i := range req.Messages {

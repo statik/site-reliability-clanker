@@ -305,15 +305,13 @@ func build(ctx context.Context, o options) (*components, error) {
 			}
 			return notify.ParseRules([]byte(raw))
 		})
-	var llm agent.LLM = agent.Replay{}
-	// CLANKER_AGENT_MODE=replay forces recorded responses, for a repeatable demo.
-	if key := os.Getenv("OPENROUTER_API_KEY"); key != "" &&
-		os.Getenv("CLANKER_AGENT_MODE") != "replay" {
-		llm = agent.NewOpenRouter(key)
+	llm, models, err := chooseLLM(os.Getenv)
+	if err != nil {
+		return nil, err
 	}
 	c.agent = &agent.Agent{DB: c.db, Audit: c.log, Orch: c.orch, Forge: c.forge,
-		Monitor: c.monitor, Clock: c.clock, LLM: llm, Models: agent.DefaultModels(),
-		DailyBudgetUSD: 5}
+		Monitor: c.monitor, Clock: c.clock, LLM: llm, Models: models,
+		DailyBudgetUSD: 5, DailyBudgetTokens: agent.DefaultDailyTokens}
 	c.detector = &detect.Detector{DB: c.db, Audit: c.log, Orch: c.orch, Forge: c.forge,
 		Monitor: c.monitor, Clock: c.clock, OnFinding: c.agent.HandleFinding}
 	c.sim = &sim.Simulator{DB: c.db, Clock: c.clock, Audit: c.log, Forge: c.forge,

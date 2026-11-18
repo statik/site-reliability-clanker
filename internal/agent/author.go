@@ -168,7 +168,8 @@ func (a *Agent) Draft(ctx context.Context, f detect.Finding) (orchestrator.WorkI
 			Step: step, Messages: messages, Tools: authorTools()})
 		if errors.Is(err, ErrNoRecording) && d.pull == nil {
 			return orchestrator.WorkItem{}, fmt.Errorf("replay mode has no Author recording "+
-				"for finding %s: set OPENROUTER_API_KEY for a live model", f.Key)
+				"for finding %s: set OPENROUTER_API_KEY or CLANKER_LLM_BASE_URL for a live "+
+				"model", f.Key)
 		}
 		if err != nil && d.pull == nil {
 			return orchestrator.WorkItem{}, err
