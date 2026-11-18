@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# A stand-in for the AWS command line. It answers the read calls of the setup wizard as
+# one account with one network that a Tailscale subnet router serves. It calls nothing.
+# It fails for every other call, so a walk that uses it cannot change an account.
+#
+# Usage: put the directory of this file first in PATH, then start `clanker setup`.
+# With SRC_FIXTURE_LOG set, it appends each call to that file.
+set -euo pipefail
+
+if [ -n "${SRC_FIXTURE_LOG:-}" ]; then
+  echo "$*" >>"${SRC_FIXTURE_LOG}"
+fi
+
+call="${1:-} ${2:-}"
+# A query with length() counts what runs in a region. Only us-west-2 holds something.
+counts=false
+case "$*" in
+*"length("*"--region us-west-2"*) counts=true ;;
+*"length("*)
+  echo 0
+  exit 0
+  ;;
+esac
+
+case "${call}" in
+"configure list-profiles")
+  echo "fixture-operator"
+  ;;
+"sts get-caller-identity")
+  echo '{"Account":"111122223333","Arn":"arn:aws:sts::111122223333:assumed-role/Operator/fixture"}'
+  ;;
+"ec2 describe-regions")
+  echo '["us-west-2","us-east-1"]'
+  ;;
+"ec2 describe-instances")
+  if "${counts}"; then echo 2; else echo '["vpc-0fixture1","vpc-0fixture1"]'; fi
+  ;;
+"ec2 describe-vpcs")
+  if "${counts}"; then
+    echo 1
+  else
+    echo '[{"id":"vpc-0fixture1","cidr":"10.2.0.0/16","default":false,
+      "tags":[{"Key":"Name","Value":"apps"}]}]'
+  fi
+  ;;
+"ec2 describe-subnets")
+  echo '[{"id":"subnet-a","vpc":"vpc-0fixture1","cidr":"10.2.0.0/24","zone":"us-west-2a","tags":null},
+    {"id":"subnet-b","vpc":"vpc-0fixture1","cidr":"10.2.1.0/24","zone":"us-west-2b","tags":null},
+    {"id":"subnet-p","vpc":"vpc-0fixture1","cidr":"10.2.2.0/24","zone":"us-west-2a","tags":null}]'
+  ;;
+"ec2 describe-route-tables")
+  echo '[{"vpc":"vpc-0fixture1","main":true,"subnets":[null],"nat":null,"gateway":"igw-1"},
+    {"vpc":"vpc-0fixture1","main":false,"subnets":["subnet-a","subnet-b"],"nat":"nat-1","gateway":null}]'
+  ;;
+"ecs list-clusters")
+  echo '["arn:aws:ecs:us-west-2:111122223333:cluster/routers"]'
+  ;;
+"ecs list-services")
+  echo '["arn:router"]'
+  ;;
+"ecs describe-services")
+  echo '[{"name":"router","task":"task-router","running":1,"subnets":["subnet-a"]}]'
+  ;;
+"ecs describe-task-definition")
+  echo '[{"image":"tailscale/tailscale:stable","routes":"10.2.0.0/16"}]'
+  ;;
+"iam get-role")
+  echo '"arn:aws:iam::111122223333:role/Operator"'
+  ;;
+"iam simulate-principal-policy")
+  echo '[{"action":"iam:CreateRole","decision":"allowed"},{"action":"ec2:RunInstances","decision":"allowed"}]'
+  ;;
+*)
+  echo "the fixture has no answer for: aws $*" >&2
+  exit 1
+  ;;
+esac

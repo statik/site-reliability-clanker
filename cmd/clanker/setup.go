@@ -14,8 +14,6 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/setup"
 )
 
-const releaseBase = "https://github.com/statik/site-reliability-clanker/releases/download"
-
 // runSetup serves the first-run wizard on the loopback address and opens it in the
 // browser. For the local target it also runs the control plane, in this process.
 func runSetup(ctx context.Context, o options) error {
@@ -28,9 +26,7 @@ func runSetup(ctx context.Context, o options) error {
 			"the wizard acts with your cloud sign-in, so it does not listen on %s", host)
 	}
 	wizard, err := setup.New(ctx, setup.Config{
-		DataDir: o.dataDir, Version: version, ReleaseBase: releaseBase,
-		DashboardURL: "http://" + o.addr,
-		EnableAWS:    o.previewAWS, SurveyOnly: o.previewAWS,
+		DataDir: o.dataDir, Version: version, DashboardURL: "http://" + o.addr,
 		StartLocal: func(ctx context.Context, env string) error {
 			local := o
 			local.env, local.cloud, local.demo = env, "local", true

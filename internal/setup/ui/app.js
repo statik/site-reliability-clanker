@@ -18,15 +18,15 @@ const STEPS = [
   { id: "signin", title: "Sign in", only: "aws" },
   { id: "where", title: "Network", only: "aws" },
   { id: "review", title: "Review" },
-  { id: "create", title: "Create" },
-  { id: "handover", title: "Hand over" },
+  { id: "create", title: "Create", only: "local" },
+  { id: "handover", title: "Hand over", only: "local" },
 ];
 
 let view = null;
 let step = "target";
 let message = null;
 let timer = null;
-const form = { target: "", env: "clanker", key: "", model: "", local: null, profile: "", size: "small", profiles: null,
+const form = { target: "", env: "clanker", key: "", model: "", local: null, profile: "", profiles: null,
   checks: null, found: null, surveying: false, place: "" };
 
 async function call(method, path, body) {
@@ -146,20 +146,17 @@ function choice(value, title, text, disabledNote) {
 }
 
 function drawTarget() {
-  const awsNote = view.aws_enabled ? null : "not yet";
   return [
     el("h1", {}, "Where do you want S.R.C. to run?"),
     el("p", { class: "lead" }, "S.R.C. has two parts: the control plane, which finds the work and " +
-      "asks you, and the environment that it looks after. This wizard creates the home of the " +
+      "asks you, and the environment that it looks after. This wizard prepares the home of the " +
       "control plane. The control plane then proposes the first deployment, and you approve it."),
     el("div", { class: "choices", role: "radiogroup", "aria-label": "Target" },
       choice("local", "This machine", "A Kubernetes cluster in Docker, with the example application. " +
         "Free. Good for a first look."),
-      choice("aws", "Your AWS account", view.survey_only
-        ? "The wizard signs in with your AWS command line, reads your account and proposes the network of the control plane. This version creates nothing on AWS."
-        : view.aws_enabled
-        ? "One small container for the control plane on Amazon ECS with Fargate, in its own network, with no open port."
-        : "The control plane for AWS is being built as a unikernel in an auto scaling group. The wizard does not set up this cloud yet.", awsNote),
+      choice("aws", "Your AWS account", "A unikernel on one small virtual machine, in a private " +
+        "network of your account, with a small PostgreSQL database. The wizard signs in with your " +
+        "AWS command line, reads your account, and shows what S.R.C. creates there and its price."),
       choice("gcp", "Google Cloud", "The stacks exist and are validated. The wizard does not set " +
         "up this cloud yet.", "not yet"),
       choice("azure", "Azure", "The stacks exist and are validated. The wizard does not set up " +
@@ -266,8 +263,8 @@ function localModelBlock() {
 
 function hostedKeyBlock() {
   const where = targetOf() === "aws"
-    ? "The wizard stores it encrypted in AWS Systems Manager Parameter Store in your account. " +
-      "Only the control plane can read it. It is not written to a file here."
+    ? "The wizard holds it in memory while it runs. It is not written to a file here, and " +
+      "nothing is stored in your AWS account."
     : "The wizard saves it in the data directory on this machine, readable only by you.";
   return el("label", { class: "field" }, "OpenRouter API key",
     el("input", { type: "password", autocomplete: "off", spellcheck: "false", placeholder: "sk-or-…",
@@ -339,7 +336,7 @@ async function loadProfiles() {
 }
 
 async function signIn() {
-  const body = { profile: form.profile, region: "", size: form.size };
+  const body = { profile: form.profile, region: "" };
   try {
     await call("POST", "/api/aws/signin", body);
     await refresh();
@@ -367,20 +364,14 @@ function drawSignIn() {
   return [
     el("h1", {}, "Sign in to your AWS account."),
     el("p", { class: "lead" }, "Choose a profile of the AWS command line. The wizard works as you, " +
-      "with your permissions, and only while it runs. " + (view.survey_only
-      ? "The next step reads your account and changes nothing."
-      : "You need permission to create a network, IAM roles, a file system and an ECS service.")),
+      "with your permissions, and only while it runs. The next step reads your account and " +
+      "changes nothing."),
     form.profiles.length === 0 ? el("div", { class: "notice notice-warning" },
       "The AWS command line has no profile on this machine. Run ", el("code", {}, "aws configure sso"),
       " in a terminal, then load this page again.") : null,
     el("label", { class: "field" }, "Profile",
       el("select", { onchange: (event) => { form.profile = event.target.value; draw(); } },
         form.profiles.map((name) => el("option", { value: name, selected: name === form.profile }, name)))),
-    view.survey_only ? null : el("label", { class: "field" }, "Size of the container",
-      el("select", { onchange: (event) => { form.size = event.target.value; } },
-        [["small", "Small: 0.5 vCPU and 1 GB of memory, about 14 USD each month"],
-          ["medium", "Medium: 1 vCPU and 2 GB of memory, about 29 USD each month"]].map(([value, label]) =>
-          el("option", { value, selected: value === form.size }, label)))),
     signedIn ? el("dl", { class: "facts" },
       el("div", {}, el("dt", {}, "Account"), el("dd", {}, state.account)),
       el("div", {}, el("dt", {}, "Signed in as"), el("dd", {}, state.principal.split("/").slice(-1)[0]))) : null,
@@ -419,12 +410,6 @@ async function savePlace() {
   try {
     await call("POST", "/api/aws/place", body);
     await refresh();
-    if (view.survey_only) {
-      message = { kind: "info", text: "The choice is saved. This version of the wizard stops here: " +
-        "it does not create the control plane on AWS yet." };
-      draw();
-      return;
-    }
     go("review");
   } catch (error) { fail(error); }
 }
@@ -487,9 +472,10 @@ function rightsBlock(found) {
     refused.map((right) => right.action).join(", "), ". The installation needs them.");
 }
 
+const holds = (region) => (region.instances > 0 || region.networks > 0
+  ? `${region.instances} running instances, ${region.networks} networks` : "nothing runs here");
+
 function regionField(found) {
-  const holds = (region) => (region.instances > 0 || region.networks > 0
-    ? `${region.instances} running instances, ${region.networks} networks` : "nothing runs here");
   return el("label", { class: "field" }, "Region",
     el("select", { disabled: form.surveying, onchange: (event) => survey(event.target.value) },
       found.regions.map((region) => el("option", { value: region.name, selected: region.name === found.region },
@@ -535,53 +521,77 @@ function drawWhere() {
 
 async function startReview() {
   try {
-    const { started } = await call("POST", "/api/review");
+    await call("POST", "/api/review");
     await refresh();
     draw();
-    if (started) watchJob();
   } catch (error) { fail(error); }
 }
 
-const money = (value) => (value === 0 ? "0" : value.toFixed(2));
+const money = (value) => value.toFixed(2);
 
 function drawReview() {
-  const aws = targetOf() === "aws";
+  if (targetOf() === "aws") return drawAwsReview();
   const reviewed = (view.review ?? []).length > 0;
-  const reviewJob = view.job?.name === "review" ? view.job : null;
-  if (!reviewed && !reviewJob && !jobRunning()) startReview();
-  const total = view.cost.reduce((sum, line) => sum + line.monthly_usd, 0);
+  if (!reviewed && !message) startReview();
   return [
     el("h1", {}, reviewed ? "This is what the wizard will create." : "Working out what will be created"),
-    el("p", { class: "lead" }, aws
-      ? "CloudFormation made this list from the template. Nothing exists yet. The next step creates exactly this."
-      : "The wizard starts the control plane on this machine. The control plane then plans these parts and asks you before it creates them."),
+    el("p", { class: "lead" }, "The wizard starts the control plane on this machine. The control plane " +
+      "then plans these parts and asks you before it creates them."),
     modelFact(),
-    view.job?.name === "review" && !reviewed ? jobBlock() : null,
     reviewed ? el("table", {},
-      el("thead", {}, el("tr", {}, el("th", {}, aws ? "Resource" : "Part"), el("th", {}, "Type"))),
+      el("thead", {}, el("tr", {}, el("th", {}, "Part"), el("th", {}, "Type"))),
       el("tbody", {}, view.review.map((change) => el("tr", {},
         el("td", {}, change.id), el("td", {}, el("code", {}, change.type)))))) : null,
-    aws ? el("h2", {}, "Estimated cost") : null,
-    aws ? el("table", {},
-      el("thead", {}, el("tr", {}, el("th", {}, "Item"), el("th", {}, "Size"),
-        el("th", { class: "num" }, "USD each month"))),
-      el("tbody", {}, view.cost.map((line) => el("tr", {},
-        el("td", {}, line.item), el("td", {}, line.size), el("td", { class: "num" }, money(line.monthly_usd))))),
-      el("tfoot", {}, el("tr", {}, el("td", { colspan: "2" }, "Total, about"),
-        el("td", { class: "num" }, money(total))))) : null,
-    aws ? el("p", { class: "help" }, "List prices for us-east-1, with no tax and no data transfer. " +
-      "AWS bills you, not this project. The environment that the control plane later proposes " +
-      "(cluster, database, load balancer) costs more, and you approve it separately.") : null,
-    aws ? el("div", { class: "notice" }, el("strong", {}, "How you reach it"),
-      "The container has a public address, because it must reach AWS and the model provider, " +
-      "but its firewall has no inbound rule. You reach the dashboard through a private tunnel of " +
-      "ECS Exec, as the signed-in user.") : null,
     notice(),
     buttons(
-      button("Back", "secondary", () => go(aws ? "where" : "key")),
-      reviewJob?.status === "failed" ? button("Try the review again", "secondary", startReview) : null,
-      button(aws ? "Create these resources" : "Start the control plane", "primary", startDeploy,
-        !reviewed || jobRunning())),
+      button("Back", "secondary", () => go("key")),
+      button("Start the control plane", "primary", startDeploy, !reviewed || jobRunning())),
+  ];
+}
+
+function priceTable(plan) {
+  return [
+    el("h2", {}, "Price of one week"),
+    el("table", {},
+      el("thead", {}, el("tr", {}, el("th", {}, "Item"),
+        el("th", { class: "num" }, "USD each hour"), el("th", { class: "num" }, "USD each week"))),
+      el("tbody", {}, plan.prices.lines.map((line) => el("tr", {},
+        el("td", {}, `${line.item}, `, el("code", {}, line.size)),
+        el("td", { class: "num" }, String(line.hourly_usd)), el("td", { class: "num" }, money(line.weekly_usd))))),
+      el("tfoot", {}, el("tr", {}, el("td", { colspan: "2" }, "One week, about"),
+        el("td", { class: "num" }, money(plan.weekly_usd))))),
+    el("p", { class: "help" }, `List prices of ${plan.prices.region}, read on ${plan.prices.checked}, with no tax ` +
+      `and no data transfer. Not in the estimate: ${plan.not_priced.join("; ")}. AWS bills you, not this project.`),
+  ];
+}
+
+function drawAwsReview() {
+  const plan = view.aws_plan;
+  if (!plan) {
+    return [el("h1", {}, "The network is not chosen."),
+      el("p", { class: "lead" }, "The review needs the sign-in and the network of the control plane."),
+      buttons(button("Back", "secondary", () => go("where")))];
+  }
+  const state = view.state;
+  return [
+    el("h1", {}, "This is what S.R.C. creates in your AWS account."),
+    el("p", { class: "lead" }, `${plan.network} ${plan.access}`),
+    el("dl", { class: "facts" },
+      el("div", {}, el("dt", {}, "Account"), el("dd", {}, state.account)),
+      el("div", {}, el("dt", {}, "Region"), el("dd", {}, state.region)),
+      el("div", {}, el("dt", {}, "Language model"), el("dd", {}, MODELS[state.key_choice] ?? "Not chosen"))),
+    el("table", {},
+      el("thead", {}, el("tr", {}, el("th", {}, "Resource"), el("th", {}, "What it is"))),
+      el("tbody", {}, plan.creates.map((item) => el("tr", {},
+        el("td", {}, item.what), el("td", {}, item.detail))))),
+    el("p", { class: "block" }, "Every resource carries the tag ", el("code", {}, `${plan.tag_key}=${plan.tag_value}`),
+      ". One command removes everything that has this tag."),
+    priceTable(plan),
+    el("div", { class: "notice" }, el("strong", {}, "The wizard stops here for AWS."),
+      "The review is the last step for AWS in this version. The wizard created nothing and stored " +
+      "nothing in your account. Your choices are saved on this machine."),
+    notice(),
+    buttons(button("Back", "secondary", () => go("where"))),
   ];
 }
 
@@ -599,64 +609,30 @@ async function startDeploy() {
 function drawCreate() {
   const failed = view.job?.status === "failed";
   return [
-    el("h1", {}, failed ? "The creation stopped." : "Creating the home of the control plane"),
-    el("p", { class: "lead" }, targetOf() === "aws"
-      ? "This takes about five minutes. CloudFormation reports the service as created only when the container runs and passes its health check."
-      : "This takes less than a minute."),
+    el("h1", {}, failed ? "The start stopped." : "Starting the control plane"),
+    el("p", { class: "lead" }, "This takes less than a minute."),
     jobBlock(),
     notice(),
-    failed ? buttons(
-      button("Back to the review", "secondary", () => go("review")),
-      targetOf() === "aws" ? button("Remove what was created", "danger", startDestroy) : null) : null,
+    failed ? buttons(button("Back to the review", "secondary", () => go("review"))) : null,
   ];
 }
 
 // ---------------------------------------------------------------- 8. hand over
 
-async function startDestroy() {
-  if (!window.confirm("Delete the control plane and everything that this wizard created in the account?")) return;
-  try {
-    await call("POST", "/api/destroy");
-    await refresh();
-    draw();
-    watchJob(async () => { await refresh(); go("target"); });
-  } catch (error) { fail(error); }
-}
-
-async function reconnect() {
-  try {
-    await call("POST", "/api/connect");
-    await refresh();
-    draw();
-    watchJob();
-  } catch (error) { fail(error); }
-}
-
 function drawHandover() {
-  const aws = targetOf() === "aws";
   const up = view.dashboard_up;
   return [
     el("h1", {}, up ? "The control plane runs. It is yours now." : "The control plane does not answer here."),
-    aws
-      ? el("p", { class: "lead" }, "It runs in your AWS account. The dashboard below comes through the private tunnel, which lives while this program runs.")
-      : el("p", { class: "lead" }, "On a first run it plans the first deployment of the example application and waits. Nothing is created until the approvers agree. The wizard does not approve for you."),
-    aws ? el("div", { class: "notice notice-warning" }, el("strong", {}, "What does not work yet on AWS"),
-      "The control plane starts and shows its dashboard. It does not install the environment on AWS " +
-      "yet: that step is built and proven only on the local target.") : null,
-    aws ? el("dl", { class: "facts" },
-      el("div", {}, el("dt", {}, "Account"), el("dd", {}, view.state.account)),
-      el("div", {}, el("dt", {}, "Region"), el("dd", {}, view.state.region)),
-      el("div", {}, el("dt", {}, "ECS cluster"), el("dd", {}, `clanker-${view.state.env}-control`))) : null,
-    aws ? null : modelFact(),
+    el("p", { class: "lead" }, "On a first run it plans the first deployment of the example application " +
+      "and waits. Nothing is created until the approvers agree. The wizard does not approve for you."),
+    modelFact(),
     view.job && view.job.name !== "deploy" ? jobBlock() : null,
     notice(),
     buttons(
-      up ? el("a", { href: aws ? view.dashboard_url : `${view.dashboard_url}/approvals`, target: "_blank", rel: "noopener" },
-        button(aws ? "Open the dashboard" : "Open the first approval", "primary", () => {})) : null,
-      aws && !up ? button("Open the tunnel again", "primary", reconnect, jobRunning()) : null,
-      !aws && !up ? button("Start the control plane", "primary", startDeploy, jobRunning()) : null,
-      aws ? button("Remove everything", "danger", startDestroy, jobRunning()) : null),
-    aws ? null : el("p", { class: "help" }, "To stop, press Ctrl+C in the terminal. To start again later, run ",
+      up ? el("a", { href: `${view.dashboard_url}/approvals`, target: "_blank", rel: "noopener" },
+        button("Open the first approval", "primary", () => {})) : null,
+      up ? null : button("Start the control plane", "primary", startDeploy, jobRunning())),
+    el("p", { class: "help" }, "To stop, press Ctrl+C in the terminal. To start again later, run ",
       el("code", {}, "clanker up"), ". To remove the local environment, run ", el("code", {}, "clanker destroy --env local"), "."),
   ];
 }
@@ -683,8 +659,7 @@ async function start() {
   }
   form.target = view.state.target;
   form.env = view.state.env || form.env;
-  form.size = view.state.size || form.size;
-  if (view.state.deployed) step = "handover";
+  if (view.state.deployed && view.state.target === "local") step = "handover";
   if (jobRunning()) {
     step = { deploy: "create", model: "key" }[view.job.name] ?? step;
     watchJob();

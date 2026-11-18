@@ -92,7 +92,7 @@ func modelServer(t *testing.T, ollamaURL string) (*Server, http.Handler) {
 	LookPath = func(name string) (string, error) { return "/usr/bin/" + name, nil }
 	DockerAnswers = func() bool { return true }
 	server, err := New(context.Background(), Config{DataDir: t.TempDir(), Version: "v9.9.9",
-		DashboardURL: dashboard.URL, OllamaURL: ollamaURL, EnableAWS: true})
+		DashboardURL: dashboard.URL, OllamaURL: ollamaURL})
 	if err != nil {
 		t.Fatal(err)
 	}
