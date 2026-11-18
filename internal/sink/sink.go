@@ -27,7 +27,7 @@ type Sink struct {
 }
 
 var page = template.Must(template.New("sink").Parse(`<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Clanker webhook sink</title>
+<html lang="en"><head><meta charset="utf-8"><title>S.R.C. webhook sink</title>
 <meta http-equiv="refresh" content="5">
 <style>
 body{font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;background:#f4f4f4;color:#161616;margin:0;padding:32px}

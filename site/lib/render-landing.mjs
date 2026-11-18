@@ -164,7 +164,7 @@ export function renderNotice(month) {
       <p>${request.data.sentence} Open the dashboard and sign in to decide. You cannot approve
         from this message.</p>
       <dl class="notice-facts">${facts.map(([label, value]) => html`<div><dt>${label}</dt><dd>${value}</dd></div>`)}</dl>
-      <p class="notice-link">Open in Clanker <span aria-hidden="true">&rarr;</span></p>
+      <p class="notice-link">Open in S.R.C. <span aria-hidden="true">&rarr;</span></p>
     </div>
     <figcaption class="figure-caption">A drawing, not a screenshot. The words are the notice
       for ${id}, as the control plane sends it to Slack and to Teams.</figcaption>

@@ -52,7 +52,7 @@ takes about ten minutes, because it downloads the cluster image.
 
 | Address | What it is |
 |---|---|
-| http://127.0.0.1:7070 | Clanker dashboard |
+| http://127.0.0.1:7070 | S.R.C. dashboard |
 | http://localhost:8088 | Paperboat, after the first deployment is approved and applied |
 | http://127.0.0.1:8025 | Mailpit: the local inbox for notification email |
 | http://127.0.0.1:7071 | Webhook sink: the local stand-in for Slack, Teams and Discord |

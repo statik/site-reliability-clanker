@@ -164,7 +164,7 @@ func cardActions(request Request, open bool, private Answer) []map[string]any {
 				"title": strings.ToUpper(verb[:1]) + verb[1:], "verb": verb, "data": data})
 		}
 	}
-	actions = append(actions, map[string]any{"type": "Action.OpenUrl", "title": "Open in Clanker",
+	actions = append(actions, map[string]any{"type": "Action.OpenUrl", "title": "Open in S.R.C.",
 		"url": request.Link})
 	if private.URL != "" && private.URL != request.Link {
 		actions = append(actions, map[string]any{"type": "Action.OpenUrl",
