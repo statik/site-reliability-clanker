@@ -386,6 +386,11 @@ func TestARejectEndsTheWait(t *testing.T) {
 		Decision: "reject", Comment: "not this week"}); err != nil {
 		t.Fatal(err)
 	}
+	recorded := h.events(t, "WI-0001", "approval.recorded")
+	if last := recorded[len(recorded)-1]; last.Data["decision"] != "reject" ||
+		last.Actor != "alice" {
+		t.Errorf("want an audit event for the reject by alice, got %+v", last)
+	}
 	wi := h.runDue(t, "WI-0001", saturday)
 	if wi.State != StateRejected || wi.MaintenanceWindow != "" {
 		t.Errorf("want Rejected and no window, got %s and %q", wi.State, wi.MaintenanceWindow)
