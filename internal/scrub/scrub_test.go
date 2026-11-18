@@ -120,12 +120,14 @@ func TestTextKeepsOrdinarySentencesAndCommands(t *testing.T) {
 
 func TestTextRemovesKnownValues(t *testing.T) {
 	t.Cleanup(scrub.Forget)
-	scrub.Add("cnry-bare-7719-qk", "abcdefgh12", "gh12345678", "short", `qu"ote<and>&back\slash`)
+	scrub.Add("cnry-bare-7719-qk", "abcdefgh12", "gh12345678", "short",
+		"outer-inner-value-end", "inner-value", `qu"ote<and>&back\slash`)
 	cases := []struct{ name, in, want string }{
 		{"bare table cell", "| relay | 587 | cnry-bare-7719-qk |", "| relay | 587 | [REDACTED] |"},
 		{"inside a word", "xcnry-bare-7719-qky", "x[REDACTED]y"},
 		{"two times", "cnry-bare-7719-qk cnry-bare-7719-qk", "[REDACTED] [REDACTED]"},
 		{"two values that overlap", "see abcdefgh12345678 here", "see [REDACTED] here"},
+		{"a value inside a value", "see outer-inner-value-end here", "see [REDACTED] here"},
 		{"a value below the floor", "a short word", "a short word"},
 		{"raw form", `it is qu"ote<and>&back\slash.`, "it is [REDACTED]."},
 		{"no value", "nothing here", "nothing here"},
