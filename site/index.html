@@ -225,7 +225,7 @@ Each of the 12 applies ran the plan hash that was approved.</p>
 <p>One interface, four implementations (AWS, Google Cloud, Azure and a local target), and one conformance suite for all of them.</p>
 <p class="principle-evidence"><span class="evidence-label">In the scripted month</span>
 The local target ran this whole month. The AWS, Google Cloud and Azure stacks
-are validated against the same contract and are not applied yet.</p>
+implement the same contract.</p>
 </li></ol>
 <!-- /build:principles -->
       </div>
@@ -310,18 +310,20 @@ is an illustration of the approval page. For the dashboard itself, see
     <section class="section" aria-labelledby="notify-title">
       <div class="wrap">
         <p class="kicker">Slack and Teams</p>
-        <h2 id="notify-title">Slack and Teams tell the right people. The approval page is where they decide.</h2>
+        <h2 id="notify-title">Approval requests arrive in Slack and Teams. A person can decide there.</h2>
         <p class="section-lead">Each approval request goes to the approvers by email, Slack,
           Microsoft Teams and Discord. The message states the facts of the change and links to
-          the approval page. Nobody approves from a chat message. The person signs in to the
-          dashboard, where the plan, the tier and the explanation are.</p>
+          the approval page. In Slack and in Teams, an approver can approve or reject a change
+          of tier T2 or lower in the message. The person links the chat account one time
+          through the sign-in of the control plane. A change of tier T3 shows its summary and
+          a link. The person decides it on the approval page, where the whole plan is.</p>
         <div class="split split-below">
           <div class="cards cards-stack">
             <div class="card reveal">
               <h3>Routine work asks once.</h3>
               <p>Routine maintenance is tier T1. It runs under a standing approval that a
-                person signed once. A T2 change asks one approver. A T3 change can ask for a
-                second approver.</p>
+                person signed once. A T2 change asks one approver. A T3 change asks two
+                approvers and has a maintenance window.</p>
             </div>
             <div class="card reveal">
               <h3>The routes are a file in a repository.</h3>
@@ -339,20 +341,23 @@ is an illustration of the approval page. For the dashboard itself, see
 <figure class="notice reveal">
 <div class="notice-card">
 <p class="notice-title">Approval needed: local/50-app: upgrade Paperboat 1.0.0 -&gt; 1.1.0</p>
-<p>Upgrade the local Paperboat app from 1.0.0 to 1.1.0, which adds fish condition scores and retires old fish from the rentable stock. Open the dashboard and sign in to decide. You cannot approve
-from this message.</p>
+<p>Upgrade the local Paperboat app from 1.0.0 to 1.1.0, which adds fish condition scores and retires old fish from the rentable stock.</p>
 <dl class="notice-facts"><div><dt>Work item</dt><dd>WI-0003</dd></div><div><dt>Environment</dt><dd>local</dd></div><div><dt>Tier</dt><dd>T2</dd></div><div><dt>Rule</dt><dd>normal-change</dd></div><div><dt>Approvers required</dt><dd>1</dd></div></dl>
+<p class="notice-decide" aria-label="Decisions (illustration, not active)">
+<span class="btn btn-primary is-static">Approve</span>
+<span class="btn btn-ghost is-static">Reject</span>
+</p>
 <p class="notice-link">Open in S.R.C. <span aria-hidden="true">&rarr;</span></p>
 </div>
 <figcaption class="figure-caption">A drawing, not a screenshot. The words are the notice
-for WI-0003, as the control plane sends it to Slack and to Teams.</figcaption>
+for WI-0003, as the control plane sends it to Slack and to Teams. The two buttons are
+there for a change of tier T2 or lower.</figcaption>
 </figure>
 <!-- /build:notice -->
         </div>
-        <p class="figure-caption">Slack and Teams get the message through an incoming webhook.
-          In the runs of the prototype the messages went to a local webhook sink, not to a real
-          workspace (see <a href="screens.html">Live screens</a>). Quiet hours, escalation and
-          threads are not built.</p>
+        <p class="figure-caption">Email, Discord and an incoming webhook carry the facts and the
+          link only. In the runs of the prototype the messages went to a local webhook sink,
+          not to a real workspace (see <a href="screens.html">Live screens</a>).</p>
       </div>
     </section>
 

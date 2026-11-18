@@ -43,7 +43,7 @@ function evidenceLines(month, totals) {
       ${duration(totals.held_seconds)} in total. The longest grant lasted
       ${duration(totals.longest.held_seconds)}.`,
     html`The local target ran this whole month. The AWS, Google Cloud and Azure stacks
-      are validated against the same contract and are not applied yet.`,
+      implement the same contract.`,
   ];
 }
 
@@ -161,12 +161,16 @@ export function renderNotice(month) {
   return html`<figure class="notice reveal">
     <div class="notice-card">
       <p class="notice-title">${request.summary}</p>
-      <p>${request.data.sentence} Open the dashboard and sign in to decide. You cannot approve
-        from this message.</p>
+      <p>${request.data.sentence}</p>
       <dl class="notice-facts">${facts.map(([label, value]) => html`<div><dt>${label}</dt><dd>${value}</dd></div>`)}</dl>
+      <p class="notice-decide" aria-label="Decisions (illustration, not active)">
+        <span class="btn btn-primary is-static">Approve</span>
+        <span class="btn btn-ghost is-static">Reject</span>
+      </p>
       <p class="notice-link">Open in S.R.C. <span aria-hidden="true">&rarr;</span></p>
     </div>
     <figcaption class="figure-caption">A drawing, not a screenshot. The words are the notice
-      for ${id}, as the control plane sends it to Slack and to Teams.</figcaption>
+      for ${id}, as the control plane sends it to Slack and to Teams. The two buttons are
+      there for a change of tier T2 or lower.</figcaption>
   </figure>`;
 }
