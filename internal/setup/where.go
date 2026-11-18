@@ -4,11 +4,6 @@ import (
 	"net/http"
 )
 
-// errSurveyOnly answers the steps after the survey while the installation on AWS is not
-// built.
-var errSurveyOnly = invalid("the wizard surveys your AWS account and records where the " +
-	"control plane goes. It does not create the control plane on AWS in this version")
-
 // clearPlacement forgets where the control plane goes. The caller holds the lock.
 func (s *Server) clearPlacement() {
 	s.state.PlaceMode, s.state.Network, s.state.Subnets = "", "", nil

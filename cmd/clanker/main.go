@@ -62,8 +62,6 @@ type options struct {
 	demo      bool
 	setupAddr string
 	noBrowser bool
-	// previewAWS offers the survey of an AWS account in the wizard.
-	previewAWS bool
 	// profile and region are the AWS CLI profile and the region of `clanker discover`.
 	profile string
 	region  string
@@ -76,8 +74,6 @@ func parse(command string, args []string) (options, error) {
 	flags.StringVar(&o.sourceDir, "source", "", "checkout of this repository")
 	flags.StringVar(&o.setupAddr, "setup-addr", "127.0.0.1:7069", "listen address of the wizard")
 	flags.BoolVar(&o.noBrowser, "no-browser", false, "do not open the wizard in the browser")
-	flags.BoolVar(&o.previewAWS, "preview-aws", false,
-		"offer AWS in the wizard: it surveys the account and creates nothing there")
 	flags.StringVar(&o.addr, "addr", "127.0.0.1:7070", "listen address of the control plane")
 	flags.StringVar(&o.sinkAddr, "sink-addr", "127.0.0.1:7071", "listen address of the sink")
 	flags.StringVar(&o.env, "env", "local", "environment name")

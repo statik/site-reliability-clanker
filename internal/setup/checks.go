@@ -1,6 +1,7 @@
 // Package setup is the first-run wizard: a small web application on the loopback address
-// that checks the machine, signs in to the cloud, creates the home of the control plane
-// and hands over to the control plane.
+// that checks the machine and chooses the language model. On this machine it starts the
+// control plane and hands over to it. On AWS it signs in, surveys the account and shows
+// what the control plane needs there.
 package setup
 
 import (
@@ -37,14 +38,8 @@ var localTools = []tool{
 	{"kind", "creates the local cluster", "brew install kind"},
 }
 
-// tunnelTool opens the tunnel to the container of the earlier design.
-const tunnelTool = "session-manager-plugin"
-
 var awsTools = []tool{
-	{"aws", "signs in to your AWS account and creates the control plane",
-		"brew install awscli"},
-	{tunnelTool, "opens the private tunnel to the container of the control plane",
-		"brew install --cask session-manager-plugin"},
+	{"aws", "signs in to your AWS account and reads it", "brew install awscli"},
 }
 
 // LookPath finds a program. Tests replace it.

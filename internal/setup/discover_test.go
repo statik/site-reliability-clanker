@@ -450,35 +450,6 @@ func TestSignInWithoutARegionForgetsTheSurveyAndThePlace(t *testing.T) {
 	}
 }
 
-func TestSurveyOnlyRefusesTheReviewAndTheCreationOnAWS(t *testing.T) {
-	cli := accountCLI()
-	server, err := New(context.Background(), Config{DataDir: t.TempDir(), Version: "v9.9.9",
-		CLI: cli.run, EnableAWS: true, SurveyOnly: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	handler, err := server.Handler("127.0.0.1:7069")
-	if err != nil {
-		t.Fatal(err)
-	}
-	post(t, server, handler, "/api/target", `{"target":"aws","env":"prod"}`)
-	post(t, server, handler, "/api/model", `{"choice":"recorded"}`)
-	post(t, server, handler, "/api/aws/signin", `{"profile":"p","region":""}`)
-	server.review = []Change{{ID: "x", Type: "y"}}
-	for _, path := range []string{"/api/review", "/api/deploy"} {
-		code, body := post(t, server, handler, path, "")
-		message, _ := body["error"].(string)
-		if code != http.StatusBadRequest ||
-			!strings.Contains(message, "does not create the control plane") {
-			t.Errorf("%s: status = %d, error = %q", path, code, message)
-		}
-	}
-	if cli.called("cloudformation create-change-set") ||
-		cli.called("cloudformation execute-change-set") {
-		t.Fatal("CloudFormation was called")
-	}
-}
-
 func TestRegionsListsEveryEnabledRegionTheMostUsedFirst(t *testing.T) {
 	cli := &fakeCLI{answers: map[string]string{
 		"ec2 describe-regions": `["ap-south-1","eu-west-1","us-east-1"]`}}
@@ -503,32 +474,6 @@ func TestRegionsListsEveryEnabledRegionTheMostUsedFirst(t *testing.T) {
 	}
 	if got := mostUsed([]RegionUse{{Name: "ap-south-1"}}, "us-east-1"); got != "us-east-1" {
 		t.Fatalf("the region of an account that holds nothing = %q, want the fallback", got)
-	}
-}
-
-func TestSurveyOnlyDoesNotAskForTheTunnelTool(t *testing.T) {
-	names := func(surveyOnly bool) []string {
-		server, err := New(context.Background(), Config{DataDir: t.TempDir(), CLI: accountCLI().run,
-			EnableAWS: true, SurveyOnly: surveyOnly})
-		if err != nil {
-			t.Fatal(err)
-		}
-		handler, err := server.Handler("127.0.0.1:7069")
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, body := request(t, handler, server.Token(), http.MethodGet, "/api/checks?target=aws", "")
-		found := []string{}
-		for _, check := range body["checks"].([]any) {
-			found = append(found, check.(map[string]any)["name"].(string))
-		}
-		return found
-	}
-	if got := names(true); !slices.Equal(got, []string{"aws"}) {
-		t.Fatalf("checks of the survey = %v, want only aws", got)
-	}
-	if got := names(false); !slices.Contains(got, tunnelTool) {
-		t.Fatalf("checks of the installation = %v, want %s among them", got, tunnelTool)
 	}
 }
 

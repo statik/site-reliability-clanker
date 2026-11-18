@@ -27,8 +27,6 @@ type Config struct {
 	DataDir string
 	// Version is the release of this binary, or "dev".
 	Version string
-	// ReleaseBase is the download address of the releases, without the version.
-	ReleaseBase string
 	// DashboardURL is where the dashboard answers on this machine.
 	DashboardURL string
 	// StartLocal starts the control plane for the local target in this process. It
@@ -38,14 +36,6 @@ type Config struct {
 	CLI CLI
 	// OllamaURL is where Ollama answers on this machine. Empty means its usual address.
 	OllamaURL string
-	// EnableAWS offers the AWS target. It is off in a release: the home of the control
-	// plane on AWS is being rebuilt as a unikernel, and the code here still creates the
-	// earlier design, a container on ECS. Tests switch it on.
-	EnableAWS bool
-	// SurveyOnly lets the wizard sign in to AWS, survey the account and record where the
-	// control plane goes, and refuses the review and the creation there. The steps after
-	// the survey still create the earlier design.
-	SurveyOnly bool
 }
 
 // State is what the wizard remembers between starts. It holds no secret.
@@ -56,7 +46,6 @@ type State struct {
 	Region    string `json:"region"`
 	Account   string `json:"account"`
 	Principal string `json:"principal"`
-	Size      string `json:"size"`
 	KeyChoice string `json:"key_choice"`
 	Deployed  bool   `json:"deployed"`
 	// PlaceMode says whether the control plane goes into a network that exists or into a
@@ -84,7 +73,6 @@ type Server struct {
 	// found is the last survey of the account. A placement must come from it.
 	found   *Discovery
 	job     *job
-	tunnel  context.CancelFunc
 	baseCtx context.Context
 }
 
@@ -137,7 +125,7 @@ func (s *Server) save() error {
 
 func (s *Server) aws() AWS {
 	return AWS{Profile: s.state.Profile, Region: s.state.Region, Env: s.state.Env,
-		Run: s.cfg.CLI, WorkDir: s.cfg.DataDir}
+		Run: s.cfg.CLI}
 }
 
 // Handler serves the pages and the API. listenHost is the host and port that the browser
@@ -178,8 +166,6 @@ func (s *Server) Handler(listenHost string) (http.Handler, error) {
 	api("POST /api/aws/login", s.postLogin)
 	api("POST /api/review", s.postReview)
 	api("POST /api/deploy", s.postDeploy)
-	api("POST /api/connect", s.postConnect)
-	api("POST /api/destroy", s.postDestroy)
 	_, port, err := net.SplitHostPort(listenHost)
 	if err != nil {
 		return nil, fmt.Errorf("read the listen address %q: %w", listenHost, err)
