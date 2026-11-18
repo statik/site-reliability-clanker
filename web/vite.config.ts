@@ -11,5 +11,5 @@ export default defineConfig({
   preview: { proxy },
   build: { outDir: "dist", chunkSizeWarningLimit: 4000 },
   css: { preprocessorOptions: { scss: { quietDeps: true } } },
-  test: { environment: "node", include: ["src/**/*.test.ts"] },
+  test: { environment: "node", include: ["src/**/*.test.{ts,tsx}"] },
 });
