@@ -43,29 +43,92 @@ title card of the video. The video built from it (99.0 s) and a copy is in
 not uploaded to the release `site-video`, so the public site still has the video without
 the figure. Pushes now go over HTTPS with the `gh` token, as the owner said.
 
-**Step 6 (the cloud runner and broker) is started only as questions.** The owner named an
-AWS profile, wants everything removable at the end of the week of 2026-11-17, wants no
-public load balancer (access is through Tailscale), and asked which VPCs exist. The
-spending limit is 200 USD for that week. Only read calls ran in the account, and nothing
-was made.
+**Step 6 and the installer for AWS (state at the end of 2026-11-17).** Nothing was made in
+an AWS account. The owner decided:
+
+- The control plane for the test of this week goes into a VPC that exists and that a
+  Tailscale subnet router serves. The owner named the VPC; the session keeps the name.
+- The core runs in that VPC, so that a runner reaches it directly. There is no public load
+  balancer.
+- The scope of the week: the core as a Nanos unikernel on one instance, a small managed
+  PostgreSQL, and one plan job through a Fargate runner with STS credentials and S3 state.
+  The six layers of the workload on AWS are not in the scope.
+- OpenTofu in one state for everything, 200 USD for the week, and all of it removable at
+  the end of the week.
+- What a person finds out about an account by hand belongs in the installer. A survey with
+  scratch scripts is not the product.
+
+Merged for this:
+
+- #81: `clanker discover --profile NAME [--region NAME]` and `POST /api/aws/discover` survey
+  an account with read calls: the enabled regions with what runs in each, the networks of
+  one region (subnets, default routes, running instances, tags, the Tailscale subnet
+  router), and the IAM rights of the identity from the policy simulator. `setup.Place`
+  proposes a network that exists, or a new one with a free address range.
+- #84: the step "Network" of the wizard shows the survey and saves the choice
+  (`POST /api/aws/place`). `clanker setup --preview-aws` offers it and refuses the review
+  and the creation on AWS (`setup.Config.SurveyOnly`), because those steps still create the
+  container on ECS. `web/scripts/setup-aws-survey-check.mjs` walks it in a browser.
+- #82: a runner passes the `backend` settings of a job to `tofu init`. No job names a
+  backend yet. The runner still sets `TF_VAR_state_location` to its own directory.
+- #83: with `CLANKER_PARAMETER_PATH` and `AWS_REGION`, the core on AWS reads its settings
+  from Parameter Store with the role of its instance (issue #40). It ran against a
+  stand-in only.
+
+Ran against a real account, read calls only: `clanker discover` and the browser walk of the
+step "Network". Both proposed the VPC that the owner had chosen by hand.
+
+Not built, in the order of the work:
+
+1. The stack of the core in OpenTofu: the image from `ops`, one instance in an auto scaling
+   group of one, the database, the roles, the parameters, a security group that admits only
+   the Tailscale router. One tag on every resource, one teardown command, and a tag query
+   that returns nothing as the proof. The image and the snapshot that `ops` makes are
+   outside the state: the teardown must remove them too. Make no change to a VPC that
+   exists.
+2. First, one paid test: Nanos never booted on EC2 in this project. If it does not boot,
+   ask the owner; do not change to a container without a decision.
+3. The review, the creation and the removal in the wizard for that stack, and the removal of
+   the ECS design (`controlplane.yaml`, the tunnel, the container size).
+4. The STS issuer and the Fargate launcher. The credential of the broker must carry
+   short-lived AWS keys beside the kubeconfig: show the owner that shape first.
+5. Prices from the AWS price list in the wizard.    one US region: 0.0208 USD each hour for `t3.small`, 0.016 for `db.t4g.micro`, 0.0225 for an
+   application load balancer, 0.04048 for each vCPU and 0.004445 for each GB of Fargate.
+   That is about 7 USD for the week without a load balancer.
+
+The owner must still give:
+
+- The OIDC provider (a free Okta or Auth0 tenant is enough), its issuer and client ID, the
+  admin email, and the client secret in `.env`.
+- Plain HTTP or an internal load balancer with a certificate. The sign-in works on plain
+  HTTP, because the cookie is `Secure` only for an https address. But the session cookie
+  and the credentials of a job then cross the VPC in clear text. The load balancer needs a
+  domain that the owner can validate.
+
+To know:
 
 - This repository is public. Do not write the profile, the account, or the names of its
-  networks and services here, in an issue or in a pull request. The session keeps them in
-  its memory, and the owner knows them.
+  networks and services here, in an issue or in a pull request. A screenshot of the step
+  "Network" shows them.
 - Credentials: the owner runs `assume --export <profile>` in their own terminal. It fails
-  in a shell that is not interactive. The profile has no region: pass `--region`.
-- The role can create, pass and delete IAM roles and policies, and has no permissions
-  boundary.
-- The account has VPCs with private subnets behind NAT gateways and a running Tailscale
-  subnet router. No new VPC and no new NAT gateway are necessary.
-- Open: which VPC, and how a Fargate runner reaches `/runner/v1/` of the core. A subnet
-  router carries traffic from the tailnet into the VPC, not from the VPC to a laptop.
-
-For the removal: one OpenTofu state, one tag on every resource, one teardown command, and a
-tag query that returns nothing as the proof. Make no change to a VPC that exists.
+  in a shell that is not interactive. A profile of that kind is not an SSO profile, so
+  `aws sso login` cannot renew it.
+- The survey finds a Tailscale router only as an ECS service with the setting `TS_ROUTES`.
+  A default route through a transit gateway, a firewall or a NAT instance counts as no way
+  out. The free address range is checked in one region. The policy simulator does not know
+  a service control policy.
+- The reader of Parameter Store stops the start for a parameter whose name is not a
+  setting. The wizard still names the model key `/clanker/<env>/openrouter-api-key`; the
+  stack must use the names of the settings.
+- The first full run for #82 failed once: Docker refused to start the container of the
+  local cluster (status 125) in the apply of `20-cluster`. The second run on the same commit
+  passed. The cause is not known.
+- Start one full run at a time, and wait until the first has ended. Two overlapped once in
+  this session.
 
 Worktrees that can be removed, because their work is on the main branch:
-`src-wt-domtests` (branch `dashboard-nav-tests`), `src-wt-titlecard` (branch `title-card-figure`),
+`src-wt-domtests`, `src-wt-titlecard`, `src-wt-backend`, `src-wt-params`, `src-wt-discover`,
+`src-wt-where`,
 `agent-aa1afd77bc263132f` (branch `chat-approval`, locked), `agent-ae36a6a2b9fad684f` (the
 site and the video), `colours-wizard`, `colours-ios`, `colours-dashboard`, `copy-iac`. Many local branches and
 a few remote ones are merged too. Nothing was removed with force.
@@ -187,8 +250,7 @@ by the Pages workflow; a merge that touches `site/` deploys it). What the owner 
 **The order of the work now**
 
 1. Let the owner hear the video with the figure behind the title card, then upload it.
-2. Step 6, after the owner answers the questions above. Issue #40 has the decision for
-   its secrets (Parameter Store with the AWS SDK for Go v2).
+2. Step 6 and the installer for AWS: the list "Not built" above.
 3. The pull request path for runbooks, when the owner decides how.
 4. Issue #51: scrub the input of the model roles before the JSON frame.
 
@@ -549,8 +611,11 @@ Everything in this section was run on the local target (kind on Docker, macOS ar
   a real browser and started the control plane (`web/scripts/setup-wizard-check.mjs`), on
   the first-run path and on the restart path. It used the data directory of the running
   demo, so a first deployment from an empty machine through the wizard was not run.
-- The wizard offers only the local target. The AWS target is switched off
-  (`setup.Config.EnableAWS`).
+- A release offers only the local target. `clanker setup --preview-aws` adds the sign-in to
+  AWS and the step "Network", and creates nothing there. See "Step 6 and the installer for
+  AWS" above.
+- Ran on 2026-11-17 after the step "Network": the first-run path of the local target with
+  `setup-wizard-check.mjs`, from a checkout.
 - A binary that a browser downloads is unsigned, so macOS can refuse to start it. The
   `curl` command in the README avoids this.
 
