@@ -45,9 +45,11 @@ func (a *Agent) diagnose(ctx context.Context, wi orchestrator.WorkItem, f detect
 		return diagnosis{}, "", err
 	}
 	var d diagnosis
-	content := strings.TrimSpace(resp.Message.Content)
-	content = strings.TrimSuffix(strings.TrimPrefix(content, "```json"), "```")
-	if err := json.Unmarshal([]byte(content), &d); err != nil {
+	content, err := firstObject(resp.Message.Content)
+	if err == nil {
+		err = json.Unmarshal([]byte(content), &d)
+	}
+	if err != nil {
 		return diagnosis{}, "", fmt.Errorf("the investigator did not return the JSON object: %w",
 			err)
 	}

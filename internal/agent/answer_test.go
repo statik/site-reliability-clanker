@@ -1,0 +1,48 @@
+package agent
+
+import "testing"
+
+func TestFirstObjectIgnoresTheTextAroundTheObject(t *testing.T) {
+	object := `{"diagnosis":"a {brace} in a string","nested":{"n":1}}`
+	answers := []string{
+		object,
+		"  " + object + "\n\n",
+		"```json\n" + object + "\n```",
+		"```\n" + object + "\n```",
+		"Here is the answer:\n" + object,
+		object + "\nThe pods recover on the next probe.",
+		object + "\n```json\n" + object + "\n```",
+		object + `{"diagnosis":"a second object"}`,
+		object + " {",
+		`{"diagnosis":"a draft"}` + "\n```\n</think>\n\n" + object,
+		`{"diagnosis":"a draft"}</think>{"diagnosis":"a second draft"}</think>` + object,
+		"</think>" + object,
+		object + "\n```\n</think>",
+		object + "</think> No object follows.",
+	}
+	for _, answer := range answers {
+		got, err := firstObject(answer)
+		if err != nil || got != object {
+			t.Errorf("firstObject(%q) = %q, %v; want the object", answer, got, err)
+		}
+	}
+}
+
+func TestFirstObjectRefusesAnAnswerWithNoCompleteObject(t *testing.T) {
+	answers := []string{
+		"",
+		"The system is healthy.",
+		"null",
+		"[]",
+		`{"diagnosis":"the answer stops here`,
+		`{"diagnosis":"no closing brace"`,
+		`The set {a, b} is not JSON. {"diagnosis":"too late"}`,
+		`{"diagnosis":"a draft"}</think>{"diagnosis":"the answer stops here`,
+		`</think>`,
+	}
+	for _, answer := range answers {
+		if got, err := firstObject(answer); err == nil {
+			t.Errorf("firstObject(%q) = %q, want an error", answer, got)
+		}
+	}
+}

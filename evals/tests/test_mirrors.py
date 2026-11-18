@@ -3,6 +3,8 @@
 import json
 import re
 
+import pytest
+
 from clanker_evals import author_tools, checks, gotext, inputs, solvers
 from clanker_evals.repo import (
     PAPERBOAT_REPO,
@@ -238,10 +240,9 @@ def test_review_rules_match_go() -> None:
     fields = re.search(r"var reviewFields = \[\]string\{([^}]*)\}", source)
     assert fields is not None
     assert re.findall(r'"([^"]+)"', fields.group(1)) == checks.REVIEW_FIELDS
-    assert 'strings.TrimSuffix(strings.TrimPrefix(content, "```json"), "```")' in source
+    assert "object, err := firstObject(content)" in source
     assert "if !slices.Contains(reviewFields, key) {" in source
     assert "if _, seen := fields[key]; seen {" in source
-    assert "if _, err := decoder.Token(); !errors.Is(err, io.EOF) {" in source
     assert "var items []*string" in source
     assert "!slices.Contains(orchestrator.Tiers, tier)" in source
     assert "if review.Tier > tier {" in go_source("internal/orchestrator/plan.go")
@@ -254,3 +255,60 @@ def test_reviewer_model_and_policy_reason_match_the_sources() -> None:
     assert f"${{CLANKER_REVIEWER_MODEL:-openrouter/{model.group(1)}}}" in run_sh
     rego = go_source("runbooks/policy/tier.rego")
     assert f'sprintf("{reviewer.CHANGED.format(count="%d")}", [count(changes)])' in rego
+
+
+OBJECT = '{"diagnosis":"a {brace} in a string","nested":{"n":1}}'
+
+
+# The same answers as internal/agent/answer_test.go.
+@pytest.mark.parametrize(
+    "answer",
+    [
+        OBJECT,
+        "  " + OBJECT + "\n\n",
+        "```json\n" + OBJECT + "\n```",
+        "```\n" + OBJECT + "\n```",
+        "Here is the answer:\n" + OBJECT,
+        OBJECT + "\nThe pods recover on the next probe.",
+        OBJECT + "\n```json\n" + OBJECT + "\n```",
+        OBJECT + '{"diagnosis":"a second object"}',
+        OBJECT + " {",
+        '{"diagnosis":"a draft"}\n```\n</think>\n\n' + OBJECT,
+        '{"diagnosis":"a draft"}</think>{"diagnosis":"a second draft"}</think>' + OBJECT,
+        "</think>" + OBJECT,
+        OBJECT + "\n```\n</think>",
+        OBJECT + "</think> No object follows.",
+    ],
+)
+def test_first_object_ignores_the_text_around_the_object(answer: str) -> None:
+    assert checks.first_object(answer) == OBJECT
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "",
+        "The system is healthy.",
+        "null",
+        "[]",
+        '{"diagnosis":"the answer stops here',
+        '{"diagnosis":"no closing brace"',
+        'The set {a, b} is not JSON. {"diagnosis":"too late"}',
+        '{"diagnosis":"a draft"}</think>{"diagnosis":"the answer stops here',
+        "</think>",
+    ],
+)
+def test_first_object_refuses_an_answer_with_no_complete_object(answer: str) -> None:
+    assert checks.first_object(answer) is None
+    assert checks.parse_object(answer) is None
+
+
+def test_every_role_reads_the_first_object() -> None:
+    for name in ("agent.go", "incident.go", "reviewer.go"):
+        assert "firstObject(" in go_source(f"internal/agent/{name}")
+    source = go_source("internal/agent/answer.go")
+    assert f'const endOfThinking = "{checks.END_OF_THINKING}"' in source
+    assert "cutLast(content, endOfThinking)" in source
+    assert 'if strings.Contains(after, "{") {' in source
+    assert "start := strings.IndexByte(content, '{')" in source
+    assert "json.NewDecoder(strings.NewReader(content[start:])).Decode(&object)" in source

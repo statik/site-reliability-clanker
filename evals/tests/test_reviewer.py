@@ -67,6 +67,12 @@ def plans_of(sample: Sample) -> tuple[str, list[dict[str, Any]]]:
         ('  {"tier":"T0","concerns":[]}  ', "T0"),
         ('{"concerns":["the order of the fields is free"],"tier":"T1"}', "T1"),
         ('{"tier":"T3","concerns":[]}\n\n', "T3"),
+        ('{"tier":"T3","concerns":[]} The change is safe.', "T3"),
+        ('{"tier":"T3","concerns":[]}{"tier":"T0"}', "T3"),
+        ('{"tier":"T3","concerns":[]} {', "T3"),
+        ('```json\n{"tier":"T3","concerns":[]}\n```\nA note.', "T3"),
+        ('```\n{"tier":"T3","concerns":[]}\n```', "T3"),
+        ('Here: {"tier":"T3","concerns":[]}', "T3"),
     ],
 )
 def test_parse_review_accepts_what_go_accepts(answer: str, tier: str) -> None:
@@ -93,10 +99,7 @@ def test_parse_review_accepts_what_go_accepts(answer: str, tier: str) -> None:
         '{"tier":"T2","concerns":[1]}',
         '{"tier":"T2","concerns":[null]}',
         '{"tier":"T2","concerns":{}}',
-        '{"tier":"T3","concerns":[]} The change is safe.',
-        '{"tier":"T3","concerns":[]}{"tier":"T0"}',
-        '{"tier":"T3","concerns":[]} {',
-        '```json\n{"tier":"T3","concerns":[]}\n```\nA note.',
+        '{"tier":"T3","concerns":[],"approved":true} {"tier":"T3","concerns":[]}',
         '{"tier":"T3","concerns":[],"source":"a model"}',
         '{"Tier":"T3","concerns":[]}',
         '{"tier":"T3","CONCERNS":[]}',
@@ -107,8 +110,6 @@ def test_parse_review_accepts_what_go_accepts(answer: str, tier: str) -> None:
         '{"tier":"T3","concerns":[]',
         "null",
         "[]",
-        '```\n{"tier":"T3","concerns":[]}\n```',
-        'Here: {"tier":"T3","concerns":[]}',
     ],
 )
 def test_parse_review_rejects_what_go_rejects(answer: str) -> None:
@@ -178,7 +179,7 @@ def test_raise_for_another_reason_is_not_a_miss_but_fails(tmp_path: Path) -> Non
         (review("T3", RETENTION, source="a model"), 0.0),
         (review("T4", RETENTION), 0.0),
         ("I raise the tier to T3 because backup_retention_period is 0.", 0.0),
-        (review("T3", RETENTION) + "\nI raised the tier.", 0.0),
+        (review("T3", RETENTION) + "\nI raised the tier.", 1.0),
         ('{"tier":"T3","concerns":null}', 0.0),
         ("```json\n" + review("T3", RETENTION) + "\n```", 1.0),
     ],

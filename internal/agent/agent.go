@@ -228,9 +228,11 @@ func (a *Agent) Explain(ctx context.Context, wi orchestrator.WorkItem,
 		return orchestrator.Explanation{}, err
 	}
 	var explanation orchestrator.Explanation
-	content := strings.TrimSpace(resp.Message.Content)
-	content = strings.TrimSuffix(strings.TrimPrefix(content, "```json"), "```")
-	if err := json.Unmarshal([]byte(content), &explanation); err != nil {
+	content, err := firstObject(resp.Message.Content)
+	if err == nil {
+		err = json.Unmarshal([]byte(content), &explanation)
+	}
+	if err != nil {
 		return orchestrator.Explanation{}, fmt.Errorf("the explainer did not return the JSON "+
 			"object: %w", err)
 	}
