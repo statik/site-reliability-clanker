@@ -16,9 +16,11 @@ import (
 const (
 	// storageSceneDays is the number of daily samples that the scene feeds.
 	storageSceneDays = 8
-	// The scene starts at 60 percent of the volume and adds 2 percent each day, so the
-	// volume is full 13 days after the last sample: inside the warning horizon.
-	storageSceneStartPercent = 60
+	// The scene starts at 61 percent of the volume and adds 2 percent each day, so the
+	// volume is full 12.5 days after the last sample: inside the warning horizon. The odd
+	// start keeps the proposed size away from a whole GiB, where rounding could go two ways
+	// when the detector loop reads the samples before the scene ends.
+	storageSceneStartPercent = 61
 	storageSceneDailyPercent = 2
 )
 

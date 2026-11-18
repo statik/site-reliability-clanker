@@ -54,16 +54,16 @@ func TestStorageGrowthSceneMakesTheForecastFire(t *testing.T) {
 		t.Fatalf("samples = %d, want 8", len(samples))
 	}
 	finding := <-raised
-	// 74 percent of 2 GiB is used and 2 percent of 2 GiB is added each day:
-	// 1.48 GiB + 90 x 0.04 GiB = 5.08 GiB, which needs 6 GiB.
+	// 75 percent of 2 GiB is used and 2 percent of 2 GiB is added each day:
+	// 1.50 GiB + 90 x 0.04 GiB = 5.10 GiB, which needs 6 GiB.
 	if finding.Detail["running"] != "2" || finding.Detail["value"] != "6" {
 		t.Errorf("the finding grows %v GiB to %v GiB, want 2 to 6", finding.Detail["running"],
 			finding.Detail["value"])
 	}
 	fullAt := store.ParseTime(finding.Detail["full_at"].(string))
 	days := fullAt.Sub(s.Clock.Now()).Hours() / 24
-	if days < 12.5 || days > 13.5 {
-		t.Errorf("the volume is full in %.1f days, want 13", days)
+	if days < 12 || days > 13 {
+		t.Errorf("the volume is full in %.1f days, want 12.5", days)
 	}
 	state, err := s.State()
 	if err != nil {

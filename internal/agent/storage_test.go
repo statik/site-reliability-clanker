@@ -53,8 +53,10 @@ func TestStoragePullSetsTheSizeThatTheFindingNames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.pull.Title != "Grow the database volume from 2 GiB to 5 GiB" {
-		t.Errorf("title = %q", d.pull.Title)
+	wantTitle := "Grow the database volume from 2 GiB to 5 GiB (declared size only: the " +
+		"local target adds no disk space)"
+	if d.pull.Title != wantTitle {
+		t.Errorf("title = %q, want %q", d.pull.Title, wantTitle)
 	}
 	for _, part := range []string{"postgres_storage_gb in layer 30-data goes from 2 to 5",
 		"full on 2026-11-21", "90 days of growth", "Rollback:", "local-path"} {
@@ -73,6 +75,31 @@ func TestStoragePullSetsTheSizeThatTheFindingNames(t *testing.T) {
 	want := strings.Replace(main, "postgres_storage_gb   = 2", "postgres_storage_gb   = 5", 1)
 	if want == main || branch != want {
 		t.Errorf("tfvars on the branch:\n%s\nwant only the size changed:\n%s", branch, want)
+	}
+}
+
+func TestStoragePullOnACloudDoesNotSpeakOfTheLocalTarget(t *testing.T) {
+	a := agentWithDataLayer(t)
+	tfvars, err := a.Forge.ReadFile(orchestrator.PlatformRepo, "main", dataTfvars)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cloudTfvars := strings.Replace(dataTfvars, "/local/", "/aws/", 1)
+	if _, err := a.Forge.Commit(forge.CommitRequest{Repo: orchestrator.PlatformRepo,
+		Branch: "main", Base: "main", Author: "test", Message: "Add a cloud stack",
+		Files: map[string]string{cloudTfvars: tfvars}}); err != nil {
+		t.Fatal(err)
+	}
+	a.Orch.Envs["local"] = orchestrator.EnvConfig{Cloud: "aws"}
+	d, err := a.storagePull(storageFinding("2", "5"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.pull.Title != "Grow the database volume from 2 GiB to 5 GiB" {
+		t.Errorf("title = %q", d.pull.Title)
+	}
+	if strings.Contains(d.pull.Body, "local target") {
+		t.Errorf("the body speaks of the local target:\n%s", d.pull.Body)
 	}
 }
 

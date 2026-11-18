@@ -48,6 +48,10 @@ func (a *Agent) storagePull(f detect.Finding) (*draft, error) {
 		return nil, err
 	}
 	title := fmt.Sprintf("Grow the database volume from %s GiB to %s GiB", running, value)
+	if d.cloud == "local" {
+		// The title is what the work item shows, so the limit must be in it.
+		title += " (declared size only: the local target adds no disk space)"
+	}
 	if _, err := a.toolOpenPull(d, map[string]string{"title": title,
 		"body": storagePullBody(f, d.cloud, running, value)}); err != nil {
 		return nil, err
