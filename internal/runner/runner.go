@@ -91,7 +91,10 @@ type Job struct {
 	// KubeConfig is the text of the credential file from the access broker. It is empty
 	// when the layer needs no cluster credential.
 	KubeConfig string
-	Log        io.Writer
+	// Backend holds the settings of a remote state backend, as `tofu init -backend-config`
+	// takes them. When it is empty the state is a file in the state directory.
+	Backend map[string]string
+	Log     io.Writer
 }
 
 // StateDir returns the state directory of an environment.
@@ -267,10 +270,27 @@ func (r *Runner) tofu(ctx context.Context, p run, log, capture io.Writer, args .
 	return nil
 }
 
+// backendConfig returns the arguments of `tofu init` that say where the state of the job is.
+func (r *Runner) backendConfig(j Job) []string {
+	if len(j.Backend) == 0 {
+		statePath := filepath.Join(r.StateDir(j.Env), j.Layer+".tfstate")
+		return []string{"-backend-config=path=" + statePath}
+	}
+	names := make([]string, 0, len(j.Backend))
+	for name := range j.Backend {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	config := make([]string, 0, len(names))
+	for _, name := range names {
+		config = append(config, "-backend-config="+name+"="+j.Backend[name])
+	}
+	return config
+}
+
 func (r *Runner) init(ctx context.Context, p run) error {
-	statePath := filepath.Join(r.StateDir(p.job.Env), p.job.Layer+".tfstate")
-	return r.tofu(ctx, p, p.job.Log, nil, "init", "-no-color", "-input=false",
-		"-backend-config=path="+statePath)
+	args := append([]string{"init", "-no-color", "-input=false"}, r.backendConfig(p.job)...)
+	return r.tofu(ctx, p, p.job.Log, nil, args...)
 }
 
 // PlanResult is a saved plan.

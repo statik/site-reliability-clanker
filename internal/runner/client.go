@@ -160,10 +160,6 @@ func (c *Client) run(ctx context.Context, spec jobspec.Spec, log io.Writer) jobs
 }
 
 func (c *Client) execute(ctx context.Context, spec jobspec.Spec, log io.Writer) (jobspec.Result, error) {
-	if len(spec.Backend) > 0 {
-		return jobspec.Result{}, errors.New("this runner keeps the state on its own disk and " +
-			"cannot use the state backend that the job names")
-	}
 	names := make([]string, 0, len(spec.Variables))
 	for name := range spec.Variables {
 		names = append(names, name)
@@ -182,7 +178,7 @@ func (c *Client) execute(ctx context.Context, spec jobspec.Spec, log io.Writer) 
 		checkout.Archive = archive
 	}
 	job := Job{Env: spec.Env, Cloud: spec.Cloud, Layer: spec.Layer, Checkout: checkout,
-		KubeConfig: spec.KubeConfig, Log: log}
+		KubeConfig: spec.KubeConfig, Backend: spec.Backend, Log: log}
 	switch spec.Kind {
 	case jobspec.KindPlan:
 		plan, err := c.Runner.Plan(ctx, job)
