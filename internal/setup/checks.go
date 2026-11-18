@@ -37,10 +37,13 @@ var localTools = []tool{
 	{"kind", "creates the local cluster", "brew install kind"},
 }
 
+// tunnelTool opens the tunnel to the container of the earlier design.
+const tunnelTool = "session-manager-plugin"
+
 var awsTools = []tool{
 	{"aws", "signs in to your AWS account and creates the control plane",
 		"brew install awscli"},
-	{"session-manager-plugin", "opens the private tunnel to the container of the control plane",
+	{tunnelTool, "opens the private tunnel to the container of the control plane",
 		"brew install --cask session-manager-plugin"},
 }
 

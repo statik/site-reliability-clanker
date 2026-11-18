@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -475,5 +476,67 @@ func TestSurveyOnlyRefusesTheReviewAndTheCreationOnAWS(t *testing.T) {
 	if cli.called("cloudformation create-change-set") ||
 		cli.called("cloudformation execute-change-set") {
 		t.Fatal("CloudFormation was called")
+	}
+}
+
+func TestRegionsListsEveryEnabledRegionTheMostUsedFirst(t *testing.T) {
+	cli := &fakeCLI{answers: map[string]string{
+		"ec2 describe-regions": `["ap-south-1","eu-west-1","us-east-1"]`}}
+	counts := map[string][2]string{"eu-west-1": {"7", "2"}, "us-east-1": {"0", "1"},
+		"ap-south-1": {"0", "0"}}
+	var lock sync.Mutex
+	run := func(ctx context.Context, args ...string) ([]byte, error) {
+		lock.Lock()
+		defer lock.Unlock()
+		pair := counts[argumentAfter(args, "--region")]
+		cli.answers["ec2 describe-instances"], cli.answers["ec2 describe-vpcs"] = pair[0], pair[1]
+		return cli.run(ctx, args...)
+	}
+	regions, err := AWS{Profile: "p", Run: run}.Regions(context.Background(), "us-east-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []RegionUse{{Name: "eu-west-1", Instances: 7, Networks: 2},
+		{Name: "us-east-1", Networks: 1}, {Name: "ap-south-1"}}
+	if !slices.Equal(regions, want) {
+		t.Fatalf("regions = %+v, want %+v", regions, want)
+	}
+	if got := mostUsed([]RegionUse{{Name: "ap-south-1"}}, "us-east-1"); got != "us-east-1" {
+		t.Fatalf("the region of an account that holds nothing = %q, want the fallback", got)
+	}
+}
+
+func TestSurveyOnlyDoesNotAskForTheTunnelTool(t *testing.T) {
+	names := func(surveyOnly bool) []string {
+		server, err := New(context.Background(), Config{DataDir: t.TempDir(), CLI: accountCLI().run,
+			EnableAWS: true, SurveyOnly: surveyOnly})
+		if err != nil {
+			t.Fatal(err)
+		}
+		handler, err := server.Handler("127.0.0.1:7069")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, body := request(t, handler, server.Token(), http.MethodGet, "/api/checks?target=aws", "")
+		found := []string{}
+		for _, check := range body["checks"].([]any) {
+			found = append(found, check.(map[string]any)["name"].(string))
+		}
+		return found
+	}
+	if got := names(true); !slices.Equal(got, []string{"aws"}) {
+		t.Fatalf("checks of the survey = %v, want only aws", got)
+	}
+	if got := names(false); !slices.Contains(got, tunnelTool) {
+		t.Fatalf("checks of the installation = %v, want %s among them", got, tunnelTool)
+	}
+}
+
+func TestAFailedLoginSaysWhatToDoForAProfileOfAnotherTool(t *testing.T) {
+	cli := &fakeCLI{errors: map[string]error{"sso login": errors.New("no sso_start_url")}}
+	err := AWS{Profile: "team/operator", Run: cli.run}.Login(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "sign in with that tool") ||
+		!strings.Contains(err.Error(), "no sso_start_url") {
+		t.Fatalf("error = %v", err)
 	}
 }

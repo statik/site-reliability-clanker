@@ -150,7 +150,9 @@ function drawTarget() {
     el("div", { class: "choices", role: "radiogroup", "aria-label": "Target" },
       choice("local", "This machine", "A Kubernetes cluster in Docker, with the example application. " +
         "Free. Good for a first look."),
-      choice("aws", "Your AWS account", view.aws_enabled
+      choice("aws", "Your AWS account", view.survey_only
+        ? "The wizard signs in with your AWS command line, reads your account and proposes the network of the control plane. This version creates nothing on AWS."
+        : view.aws_enabled
         ? "One small container for the control plane on Amazon ECS with Fargate, in its own network, with no open port."
         : "The control plane for AWS is being built as a unikernel in an auto scaling group. The wizard does not set up this cloud yet.", awsNote),
       choice("gcp", "Google Cloud", "The stacks exist and are validated. The wizard does not set " +
@@ -283,15 +285,16 @@ function drawSignIn() {
   return [
     el("h1", {}, "Sign in to your AWS account."),
     el("p", { class: "lead" }, "Choose a profile of the AWS command line. The wizard works as you, " +
-      "with your permissions, and only while it runs. You need permission to create a network, " +
-      "IAM roles, a file system and an ECS service."),
+      "with your permissions, and only while it runs. " + (view.survey_only
+      ? "The next step reads your account and changes nothing."
+      : "You need permission to create a network, IAM roles, a file system and an ECS service.")),
     form.profiles.length === 0 ? el("div", { class: "notice notice-warning" },
       "The AWS command line has no profile on this machine. Run ", el("code", {}, "aws configure sso"),
       " in a terminal, then load this page again.") : null,
     el("label", { class: "field" }, "Profile",
       el("select", { onchange: (event) => { form.profile = event.target.value; draw(); } },
         form.profiles.map((name) => el("option", { value: name, selected: name === form.profile }, name)))),
-    el("label", { class: "field" }, "Size of the container",
+    view.survey_only ? null : el("label", { class: "field" }, "Size of the container",
       el("select", { onchange: (event) => { form.size = event.target.value; } },
         [["small", "Small: 0.5 vCPU and 1 GB of memory, about 14 USD each month"],
           ["medium", "Medium: 1 vCPU and 2 GB of memory, about 29 USD each month"]].map(([value, label]) =>
@@ -360,8 +363,11 @@ function networkChoice(network, found) {
   const proposed = found.placement.network_id === network.id;
   const selected = form.place === network.id;
   const tag = rejected ? "does not fit" : proposed ? "proposed" : null;
+  const tags = Object.entries(network.tags ?? {}).filter(([key]) => key !== "Name" && !key.startsWith("aws:"))
+    .map(([key, value]) => `${key}: ${value}`).join(", ");
   const facts = `${network.cidr}. ${network.instances} running instances. Private subnets with a NAT ` +
-    `gateway in ${zonesOf(network)} availability zones. ${accessOf(network)}.`;
+    `gateway in ${zonesOf(network)} availability zones. ${accessOf(network)}.` +
+    (tags === "" ? "" : ` Tags: ${tags}.`);
   return el("label", { class: `choice${selected ? " is-selected" : ""}${rejected ? " is-disabled" : ""}` },
     el("input", { type: "radio", name: "network", value: network.id, checked: selected,
       disabled: Boolean(rejected), onchange: () => { form.place = network.id; draw(); } }),
@@ -400,13 +406,13 @@ function rightsBlock(found) {
 }
 
 function regionField(found) {
-  const used = found.regions.some((region) => region.name === found.region)
-    ? found.regions : [{ name: found.region, instances: 0, networks: 0 }, ...found.regions];
+  const holds = (region) => (region.instances > 0 || region.networks > 0
+    ? `${region.instances} running instances, ${region.networks} networks` : "nothing runs here");
   return el("label", { class: "field" }, "Region",
     el("select", { disabled: form.surveying, onchange: (event) => survey(event.target.value) },
-      used.map((region) => el("option", { value: region.name, selected: region.name === found.region },
-        `${region.name}: ${region.instances} running instances, ${region.networks} networks`))),
-    el("span", { class: "help" }, "The regions of your account that hold something, the most used first."));
+      found.regions.map((region) => el("option", { value: region.name, selected: region.name === found.region },
+        `${region.name}: ${holds(region)}`))),
+    el("span", { class: "help" }, "The regions that are enabled in your account, the most used first."));
 }
 
 function drawWhere() {

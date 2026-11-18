@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -75,6 +76,13 @@ func (s *Server) getChecks(r *http.Request) (any, error) {
 	checks, err := Checks(r.URL.Query().Get("target"))
 	if err != nil {
 		return nil, invalid("%v", err)
+	}
+	if s.cfg.SurveyOnly {
+		// The survey needs only the AWS command line. The tunnel is a part of the steps
+		// that this mode refuses.
+		checks = slices.DeleteFunc(checks, func(check Check) bool {
+			return check.Name == tunnelTool
+		})
 	}
 	return map[string]any{"checks": checks, "ready": len(Missing(checks)) == 0}, nil
 }

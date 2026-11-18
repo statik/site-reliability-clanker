@@ -77,4 +77,4 @@ if (problems.length > 0) {
   console.error(`FAILED:\n${problems.join("\n")}`);
   process.exit(1);
 }
-console.log(`RESULT: the wizard surveyed the account, proposed one of ${networks} choices in ${regions} regions in use, and saved the choice`);
+console.log(`RESULT: the wizard surveyed the account, listed ${regions} regions, proposed one of ${networks} choices, and saved the choice`);
