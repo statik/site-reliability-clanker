@@ -5,13 +5,20 @@ import (
 	"testing"
 )
 
-func TestParseReviewAcceptsOnlyTheAgreedForm(t *testing.T) {
+func TestParseReviewAcceptsOnlyTheAgreedObject(t *testing.T) {
 	good := map[string]string{
 		`{"tier":"T3","concerns":["aws_db_instance.main: backup_retention_period goes to 0"]}`: "T3",
 		"```json\n{\"tier\":\"T2\",\"concerns\":[]}\n```":                                      "T2",
 		`  {"tier":"T0","concerns":[]}  `:                                                      "T0",
 		`{"concerns":["the order of the fields is free"],"tier":"T1"}`:                         "T1",
 		"{\"tier\":\"T3\",\"concerns\":[]}\n\n":                                                "T3",
+		// The text around the first object is ignored.
+		`{"tier":"T3","concerns":[]} The change is safe.`:          "T3",
+		`{"tier":"T3","concerns":[]}{"tier":"T0"}`:                 "T3",
+		`{"tier":"T3","concerns":[]} {`:                            "T3",
+		"```json\n{\"tier\":\"T3\",\"concerns\":[]}\n```\nA note.": "T3",
+		"```\n{\"tier\":\"T3\",\"concerns\":[]}\n```":              "T3",
+		`Here: {"tier":"T3","concerns":[]}`:                        "T3",
 	}
 	for content, want := range good {
 		review, err := parseReview(content)
@@ -34,11 +41,8 @@ func TestParseReviewAcceptsOnlyTheAgreedForm(t *testing.T) {
 		`{"tier":"T2","concerns":[1]}`:                   notObject,
 		`{"tier":"T2","concerns":[null]}`:                notObject,
 		`{"tier":"T2","concerns":{}}`:                    notObject,
-		// Text after the object, or a second object.
-		`{"tier":"T3","concerns":[]} The change is safe.`:          notObject,
-		`{"tier":"T3","concerns":[]}{"tier":"T0"}`:                 notObject,
-		`{"tier":"T3","concerns":[]} {`:                            notObject,
-		"```json\n{\"tier\":\"T3\",\"concerns\":[]}\n```\nA note.": notObject,
+		// A first object in another form is not saved by a second object.
+		`{"tier":"T3","concerns":[],"approved":true} {"tier":"T3","concerns":[]}`: notObject,
 		// The code sets the source. The model does not.
 		`{"tier":"T3","concerns":[],"source":"a model"}`: notObject,
 		// The names of the fields are exact, and each field is there once.
@@ -52,8 +56,6 @@ func TestParseReviewAcceptsOnlyTheAgreedForm(t *testing.T) {
 		`{"tier":"T3","concerns":[]`: notObject,
 		`null`:                       notObject,
 		`[]`:                         notObject,
-		"```\n{\"tier\":\"T3\",\"concerns\":[]}\n```": notObject,
-		`Here: {"tier":"T3","concerns":[]}`:           notObject,
 	}
 	for content, want := range bad {
 		_, err := parseReview(content)

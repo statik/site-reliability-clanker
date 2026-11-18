@@ -131,14 +131,33 @@ async def confirm(state: TaskState, text: str, verdict: Verdict, concern: str) -
     return (False, f"{verdict[1]}; confirmed by the grader: {answer[-300:]}")
 
 
-def parse_object(text: str) -> dict[str, Any] | None:
-    """Decode the answer of a role as Go does: trim, drop a ```json fence, decode an object."""
-    content = text.strip().removeprefix("```json").removesuffix("```")
+def first_object(text: str) -> str | None:
+    """Return the first JSON object in an answer, as firstObject does in internal/agent.
+
+    The object is the text from the first opening brace to the brace that closes it. The
+    text before and after the object is ignored.
+
+    Args:
+        text: The answer of the model.
+
+    Returns:
+        The text of the object, or None when the answer has no brace or the object that
+        starts at the first brace is not complete.
+    """
+    start = text.find("{")
+    if start < 0:
+        return None
     try:
-        value = json.loads(content)
+        _, end = json.JSONDecoder().raw_decode(text, start)
     except json.JSONDecodeError:
         return None
-    return value if isinstance(value, dict) else None
+    return text[start:end]
+
+
+def parse_object(text: str) -> dict[str, Any] | None:
+    """Decode the answer of a role as Go does: the first JSON object in the answer."""
+    content = first_object(text)
+    return None if content is None else json.loads(content)
 
 
 def _unique_fields(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -152,10 +171,10 @@ def _unique_fields(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 def parse_review(text: str) -> tuple[dict[str, Any] | None, str]:
     """Decode the answer of the Reviewer as parseReview does in internal/agent/reviewer.go.
 
-    The Go code accepts only the form that the prompt asks for: one JSON object, alone or in
-    a ```json fence, with exactly the fields tier and concerns, each once and with these
+    The Go code reads the first JSON object in the answer and ignores the text around it.
+    The object must have exactly the fields tier and concerns, each once and with these
     names. The tier is one of TIERS. The concerns are a list of strings, which can be empty.
-    Text after the object, another field, a missing or null field is refused.
+    Another field, a missing or null field is refused.
 
     Args:
         text: The answer of the model.
@@ -163,13 +182,13 @@ def parse_review(text: str) -> tuple[dict[str, Any] | None, str]:
     Returns:
         The review as {"tier": ..., "concerns": [...]} and "", or None and the reason.
     """
-    content = text.strip().removeprefix("```json").removesuffix("```").strip()
+    content = first_object(text)
+    if content is None:
+        return (None, "the answer has no complete JSON object")
     try:
         value = json.loads(content, object_pairs_hook=_unique_fields)
     except ValueError as error:
-        return (None, f"the answer is not one JSON object: {error}")
-    if not isinstance(value, dict):
-        return (None, "the answer is not a JSON object")
+        return (None, f"the JSON object is not valid: {error}")
     extra = sorted(set(value) - set(REVIEW_FIELDS))
     if extra:
         return (None, f"unexpected field: {', '.join(extra)}")

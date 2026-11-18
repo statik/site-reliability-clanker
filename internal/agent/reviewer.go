@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"slices"
 	"strings"
 
@@ -59,24 +58,17 @@ func readReviewField(decoder *json.Decoder, fields map[string]json.RawMessage) e
 	return nil
 }
 
-// readReviewObject reads the answer as one JSON object and returns the raw value of each
-// field. Text after the object is an error.
-func readReviewObject(content string) (map[string]json.RawMessage, error) {
-	decoder := json.NewDecoder(strings.NewReader(content))
-	if token, err := decoder.Token(); err != nil || token != json.Delim('{') {
-		return nil, errors.New("the answer does not start with a JSON object")
+// readReviewObject reads one JSON object and returns the raw value of each field.
+func readReviewObject(object string) (map[string]json.RawMessage, error) {
+	decoder := json.NewDecoder(strings.NewReader(object))
+	if _, err := decoder.Token(); err != nil {
+		return nil, err
 	}
 	fields := map[string]json.RawMessage{}
 	for decoder.More() {
 		if err := readReviewField(decoder, fields); err != nil {
 			return nil, err
 		}
-	}
-	if _, err := decoder.Token(); err != nil {
-		return nil, err
-	}
-	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
-		return nil, errors.New("the answer has text after the JSON object")
 	}
 	return fields, nil
 }
@@ -100,15 +92,19 @@ func reviewConcerns(raw json.RawMessage) ([]string, error) {
 	return concerns, nil
 }
 
-// parseReview reads the answer of the Reviewer. It accepts only the form that the prompt
-// asks for: one JSON object, alone or in a ```json fence, with the field tier, one of the
-// tiers, and the field concerns, a list of strings, each field once and no other field. An
-// answer in another form is an error, so that a confused model never counts as a review.
+// parseReview reads the answer of the Reviewer. It reads the first JSON object in the answer
+// and ignores the text around it. The object must have the form that the prompt asks for:
+// the field tier, one of the tiers, and the field concerns, a list of strings, each field
+// once and no other field. An object in another form is an error, so that a confused model
+// never counts as a review. A review can only make the tier higher, so text that the
+// function ignores cannot make a change easier to approve.
 // The answer never sets the source of the review; Review sets it.
 func parseReview(content string) (orchestrator.Review, error) {
-	content = strings.TrimSpace(content)
-	content = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(content, "```json"), "```"))
-	fields, err := readReviewObject(content)
+	object, err := firstObject(content)
+	if err != nil {
+		return orchestrator.Review{}, fmt.Errorf("the reviewer did not return the JSON object: %w", err)
+	}
+	fields, err := readReviewObject(object)
 	if err != nil {
 		return orchestrator.Review{}, fmt.Errorf("the reviewer did not return the JSON object: %w", err)
 	}
