@@ -37,8 +37,8 @@
           <a class="btn btn-primary" href="#closing-title">Try it on your laptop <span aria-hidden="true">&darr;</span></a>
           <a class="btn btn-tertiary" href="#video-title">Watch the video <span aria-hidden="true">&darr;</span></a>
         </div>
-        <p class="hero-hint reveal">A working prototype. It runs end to end on a local cluster
-          today.</p>
+        <p class="hero-hint reveal">A working prototype. It runs end to end on a local
+          cluster.</p>
       </div>
       <button type="button" class="btn btn-ghost motion-toggle js-only" aria-pressed="false">Pause motion</button>
     </section>
@@ -116,9 +116,11 @@
       <div class="wrap">
         <p class="kicker">How it works</p>
         <h2 id="how-title">Setup is a single download. Then every change takes the same three steps.</h2>
-        <p class="section-lead">The download walks you through logging in to your cloud provider
-          and sets up the control plane. The control plane then deploys your product, layer by
-          layer. After that, it keeps the product up to date like this.</p>
+        <p class="section-lead">The download is a setup wizard. It checks your machine, asks where
+          to run and asks for the language model. It surveys your cloud account and proposes a
+          network. It shows a review with the prices, and then it creates the control plane.
+          The control plane deploys your product, layer by layer. After that, it keeps the
+          product up to date like this.</p>
         <ol class="how">
           <li class="reveal">
             <h3>It finds the work and writes the change.</h3>
@@ -356,7 +358,7 @@ for WI-0003, as the control plane sends it to Slack and to Teams.</figcaption>
 
     <section class="section section-alt" aria-labelledby="cost-title">
       <div class="wrap">
-        <p class="kicker">Cost and runbooks</p>
+        <p class="kicker">Runbooks and the cost of models</p>
         <h2 id="cost-title">The model works when a runbook is written, not each time it runs.</h2>
         <p class="section-lead">A runbook is a fixed script in a repository. The prototype has four:
           restart a deployment, back up the database, run a restore drill, and maintain the
@@ -377,12 +379,13 @@ for WI-0003, as the control plane sends it to Slack and to Teams.</figcaption>
           </div>
           <div class="card reveal">
             <h3>A model for each role, and a daily cap.</h3>
-            <p>The Explainer uses a smaller model. The Author and the Investigator use a larger
-              one. The control plane adds up the cost of the model calls of the day. At 5 US
+            <p>The Explainer and the Ask role use a smaller model. The Author, the
+              Investigator and the Reviewer use a larger one. The control plane adds up the cost of the model calls of the day. At 5 US
               dollars it stops the calls for that day and writes an audit record. Each call is
               stored with its role, model, tokens and cost.</p>
           </div>
         </div>
+        <h3 class="kicker subhead">The cost of a model with open weights</h3>
         <p class="section-lead">A model with open weights can run in two ways in your own cloud
           account. A managed service such as Amazon Bedrock charges for each token and costs
           nothing while the model is idle. A GPU instance charges for each hour, with work or
@@ -426,12 +429,13 @@ for WI-0003, as the control plane sends it to Slack and to Teams.</figcaption>
       <div class="wrap">
         <p class="kicker">Evals</p>
         <h2 id="evals-title">Evals measure each role before you trust it.</h2>
-        <p class="section-lead">The suite has nine tasks on Inspect AI. Eight test the model
-          roles with the live models. One tests the tier policy and calls no model. A task
-          passes a run only if every check passes. These results are from
-          <code>evals/RESULTS.md</code>: three rounds on 17 Nov 2026, with
+        <p class="section-lead">The suite has ten tasks on Inspect AI. Nine test the five
+          model roles with the live models. One tests the tier policy and calls no model. A
+          task passes a run only if every check passes. These results are from
+          <code>evals/RESULTS.md</code>: five rounds on 17 Nov 2026, with
           <span class="mono">claude-haiku-5.5</span> for the Explainer and the Ask role, and
-          <span class="mono">claude-sonnet-5.5</span> for the Author and the Investigator.</p>
+          <span class="mono">claude-sonnet-5.5</span> for the Author, the Investigator and the
+          Reviewer.</p>
         <div class="table-scroll" tabindex="0" role="region" aria-label="Results of the evals">
           <table class="data-table">
             <thead>
@@ -439,15 +443,16 @@ for WI-0003, as the control plane sends it to Slack and to Teams.</figcaption>
                 <th scope="col">Weak spot</th></tr>
             </thead>
             <tbody>
-              <tr><th scope="row">Prompt injection, all four roles</th><td>63</td>
+              <tr><th scope="row">Prompt injection, all five roles</th><td>81</td>
                 <td>No attack succeeded.</td>
                 <td>The attack success on the Investigator was 0.20 in round 1 and 0.00 in round 2.
                   The evals also found that a log line closed the frame around untrusted input. That
                   input is now JSON-encoded.</td></tr>
-              <tr><th scope="row">Secret leakage, all four roles</th><td>51</td>
+              <tr><th scope="row">Secret leakage, all five roles</th><td>63</td>
                 <td>No canary secret appeared in an output.</td>
-                <td>In round 1, the Ask role had a leak rate of 0.19. A canary still passed the scrubber
-                  in 75% to 100% of the runs: a pattern cannot catch a secret in a sentence.</td></tr>
+                <td>In round 1, the Ask role had a leak rate of 0.19. In round 4, the Reviewer had a
+                  leak rate of 0.58, and 0.00 in round 5. A canary still passed the scrubber in
+                  75% to 100% of the runs: a pattern cannot catch a secret in a sentence.</td></tr>
               <tr><th scope="row">Author: the right change, one pull request</th><td>13</td>
                 <td>Score 0.92.</td>
                 <td>One run opened no pull request. The same sample passed 3 of 3 repeated runs.</td></tr>
@@ -456,6 +461,11 @@ for WI-0003, as the control plane sends it to Slack and to Teams.</figcaption>
               <tr><th scope="row">Investigator: the diagnosis and an allowed mitigation</th><td>12</td>
                 <td>Score 1.00 in round 3.</td>
                 <td>The score was 0.83 in round 1 and 0.92 in round 2.</td></tr>
+              <tr><th scope="row">Reviewer: raises the tier of a risky change</th><td>24</td>
+                <td>Score 1.00. The review missed no hidden risk and raised no benign
+                  change.</td>
+                <td>The expected tier of a hidden risk is a judgement of the sample
+                  author.</td></tr>
               <tr><th scope="row">Explainer: agrees with the plan, states no other tier</th><td>12 and 8</td>
                 <td>Score 1.00 on both tasks.</td>
                 <td>A grader model rated the accuracy of the explanations at 0.58. That rating is not
@@ -468,14 +478,55 @@ for WI-0003, as the control plane sends it to Slack and to Teams.</figcaption>
             </tbody>
           </table>
         </div>
-        <p class="figure-caption">The logs behind the result table cost 1.4374 US dollars at list
+        <p class="figure-caption">The logs behind the result table cost 1.7400 US dollars at list
           price.</p>
+        <p class="section-lead">The same suite measures any model before a role uses it. Three
+          more models ran on 18 Nov 2026. The first column is the hosted baseline of the table
+          above. A score is the share of runs that pass every check.</p>
+        <div class="table-scroll" tabindex="0" role="region"
+          aria-label="Results of the evals for four sets of models">
+          <table class="data-table">
+            <thead>
+              <tr><th scope="col">What is tested</th>
+                <th scope="col">Claude Sonnet 5.5 and Haiku 5.5<br>hosted</th>
+                <th scope="col">Kimi K3.1<br>Amazon Bedrock</th>
+                <th scope="col">Qwen3.8 27B<br>a laptop</th>
+                <th scope="col">Gemma 4 31B<br>a laptop</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Author: the right change, one pull request</th>
+                <td>0.92</td><td>1.00</td><td>0.85</td><td>0.85</td></tr>
+              <tr><th scope="row">Author: no change, or the smallest change</th>
+                <td>1.00</td><td>0.80</td><td>0.80</td><td>0.60</td></tr>
+              <tr><th scope="row">Investigator: the diagnosis</th>
+                <td>1.00</td><td>1.00</td><td>1.00</td><td>1.00</td></tr>
+              <tr><th scope="row">Reviewer: raises the tier of a risky change</th>
+                <td>1.00</td><td>1.00</td><td>0.92</td><td>0.96</td></tr>
+              <tr><th scope="row">Explainer: agrees with the plan</th>
+                <td>1.00</td><td>1.00</td><td>1.00</td><td>1.00</td></tr>
+              <tr><th scope="row">Explainer: states no other tier</th>
+                <td>1.00</td><td>1.00</td><td>0.88</td><td>1.00</td></tr>
+              <tr><th scope="row">Ask: answers use only the records</th>
+                <td>1.00</td><td>0.93</td><td>0.86</td><td>1.00</td></tr>
+              <tr><th scope="row">Prompt injection, five roles: attacks that succeeded</th>
+                <td>None</td><td>None</td><td>2 of 81 runs</td><td>10 of 81 runs</td></tr>
+              <tr><th scope="row">Secret leakage, five roles: runs with a leak</th>
+                <td>None</td><td>None</td><td>7 of 66 runs</td><td>3 of 66 runs</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="figure-caption">Kimi K3.1 ran with an answer limit of 8,192 tokens. Qwen3.8 27B
+          and Gemma 4 31B ran through Ollama on an Apple laptop, with a context of 32,000
+          tokens. For these three models, each task ran one time, and the prompt injection and
+          secret leakage tasks ran each sample three times. A model on a laptop can explain and
+          diagnose as well as the hosted models, and the evals show which roles still need a
+          stronger model.</p>
         <p class="answer reveal">Inference is now one of the core ingredients of a modern
           application stack, alongside storage, memory, and compute. Your product should get better and easier to manage when new
           models come out.</p>
         <p class="section-lead">The model of each role is one setting. Each eval task runs
           against a named model, so you can measure a new model before a role uses it. Nothing
-          changes the model by itself today: a person changes the setting.</p>
+          changes the model by itself: a person changes the setting.</p>
       </div>
     </section>
 

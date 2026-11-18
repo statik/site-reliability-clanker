@@ -58,9 +58,10 @@
               <button type="button" class="btn btn-primary flow-play" aria-pressed="true">Pause</button>
               <button type="button" class="btn btn-tertiary flow-next">Next stop</button>
             </div>
-            <p class="figure-caption">What runs today: the local target runs end to end, and the
-              core boots as a unikernel on a laptop. In progress: the cloud targets (nothing is
-              applied in a cloud account yet) and approval from inside a chat message.</p>
+            <p class="figure-caption">On AWS, the core of the control plane is a Nanos unikernel on
+              one virtual machine in an auto scaling group, in your own private network. Its
+              state is in a managed PostgreSQL database. Each job runs in a short-lived
+              runner.</p>
           </div>
           <div>
             <!-- build:flow -->
