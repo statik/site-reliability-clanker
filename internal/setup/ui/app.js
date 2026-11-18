@@ -14,7 +14,7 @@ const stepList = document.getElementById("steps");
 const STEPS = [
   { id: "target", title: "Where to run" },
   { id: "checks", title: "Check this machine" },
-  { id: "key", title: "Model key" },
+  { id: "key", title: "Language model" },
   { id: "signin", title: "Sign in", only: "aws" },
   { id: "where", title: "Network", only: "aws" },
   { id: "review", title: "Review" },
@@ -26,7 +26,7 @@ let view = null;
 let step = "target";
 let message = null;
 let timer = null;
-const form = { target: "", env: "clanker", key: "", profile: "", size: "small", profiles: null,
+const form = { target: "", env: "clanker", key: "", model: "", local: null, profile: "", size: "small", profiles: null,
   checks: null, found: null, surveying: false, place: "" };
 
 async function call(method, path, body) {
@@ -116,10 +116,15 @@ function jobBlock() {
   if (!job) return null;
   return el("div", { class: "block" },
     job.status === "running" ? el("p", {}, el("span", { class: "spinner" }), "Working…") : null,
+    job.status === "running" && job.total > 0 ? el("p", { class: "progress" },
+      el("progress", { value: job.completed, max: job.total, "aria-label": "Download" }),
+      `${gigabytes(job.completed)} of ${gigabytes(job.total)} GB`) : null,
     job.lines.length > 0 ? el("div", { class: "log", tabindex: "0" }, job.lines.join("\n")) : null,
     job.status === "failed" ? el("div", { class: "notice notice-error", role: "alert" },
       el("strong", {}, "This step failed."), job.error) : null);
 }
+
+const gigabytes = (bytes) => (bytes / 1e9).toFixed(1);
 
 function buttons(...items) {
   return el("div", { class: "btn-row" }, items);
@@ -211,39 +216,116 @@ function drawChecks() {
   ];
 }
 
-// ---------------------------------------------------------------- 3. model key
+// ---------------------------------------------------------------- 3. language model
 
-function drawKey() {
+const MODELS = {
+  live: "A hosted key",
+  local: "A model on this machine",
+  recorded: "Recorded answers",
+};
+const LOCAL_LIMITS = "In our evals, this model explained changes and diagnosed incidents as well as " +
+  "the hosted models. As the Author it scored 0.85 and 0.80 against 0.92 and 1.00, and as the " +
+  "Reviewer it copied a secret into its answer in 5 of 12 runs. Use a hosted model for the Author " +
+  "and the Reviewer when the environment matters.";
+
+function modelChoice(value, text, disabledNote) {
+  const selected = form.model === value;
+  return el("label", { class: `choice${selected ? " is-selected" : ""}${disabledNote ? " is-disabled" : ""}` },
+    el("input", { type: "radio", name: "model", value, checked: selected, disabled: Boolean(disabledNote),
+      onchange: () => { form.model = value; message = null; draw(); } }),
+    el("span", { class: "choice-title" }, MODELS[value]),
+    [text].flat().map((part) => el("span", { class: "choice-text" }, part)),
+    disabledNote ? el("span", { class: "choice-text" }, disabledNote) : null);
+}
+
+async function loadLocalModel() {
+  try {
+    form.local = await call("GET", "/api/model/local");
+  } catch (error) { fail(error); return; }
+  draw();
+}
+
+function localModelBlock() {
+  if (form.local === null) {
+    loadLocalModel();
+    return el("p", { class: "block" }, el("span", { class: "spinner" }), "Checking this machine…");
+  }
+  return [
+    el("h2", {}, "What the model on this machine needs"),
+    el("table", {},
+      el("thead", {}, el("tr", {}, el("th", {}, "Needed"), el("th", {}, "For"), el("th", {}, "Status"))),
+      el("tbody", {}, form.local.checks.map((check) => el("tr", {},
+        el("td", {}, check.name),
+        el("td", {}, check.why),
+        el("td", { class: check.ok ? "ok" : "bad" }, check.ok ? check.detail : `${check.detail}. ${check.fix}`))))),
+    form.local.present ? null : el("p", { class: "help" }, `The wizard downloads ${form.local.model} through ` +
+      "Ollama. A download that stops continues where it stopped."),
+    view.job?.name === "model" ? jobBlock() : null,
+  ];
+}
+
+function hostedKeyBlock() {
   const where = targetOf() === "aws"
     ? "The wizard stores it encrypted in AWS Systems Manager Parameter Store in your account. " +
       "Only the control plane can read it. It is not written to a file here."
     : "The wizard saves it in the data directory on this machine, readable only by you.";
+  return el("label", { class: "field" }, "OpenRouter API key",
+    el("input", { type: "password", autocomplete: "off", spellcheck: "false", placeholder: "sk-or-…",
+      value: form.key, oninput: (event) => { form.key = event.target.value; } }),
+    el("span", { class: "help" }, where));
+}
+
+function modelButton() {
+  const busy = jobRunning();
+  if (form.model === "live") return button("Save the key and continue", "primary", saveModel, busy);
+  if (form.model === "recorded") return button("Use recorded answers and continue", "primary", saveModel, busy);
+  if (form.model !== "local") return button("Continue", "primary", saveModel, true);
+  if (form.local === null || !form.local.ready) {
+    return button("Check again", "secondary", () => { form.local = null; draw(); }, form.local === null);
+  }
+  return button(form.local.present ? "Use this model and continue" : "Download the model and continue",
+    "primary", saveModel, busy);
+}
+
+function drawKey() {
+  const aws = targetOf() === "aws";
+  if (form.model === "") form.model = view.state.key_choice;
+  if (aws && form.model === "local") form.model = "";
   return [
-    el("h1", {}, "Give S.R.C. a language model."),
+    el("h1", {}, "Choose the language model of S.R.C."),
     el("p", { class: "lead" }, "The model drafts changes and writes the summaries. It gets no cloud " +
-      "credential. S.R.C. uses OpenRouter, and stops at 5 USD each day."),
-    el("label", { class: "field" }, "OpenRouter API key",
-      el("input", { type: "password", autocomplete: "off", spellcheck: "false", placeholder: "sk-or-…",
-        value: form.key, oninput: (event) => { form.key = event.target.value; } }),
-      el("span", { class: "help" }, where)),
+      "credential."),
+    el("div", { class: "choices choices-list", role: "radiogroup", "aria-label": "Language model" },
+      modelChoice("live", "An OpenRouter key. S.R.C. chooses a hosted model for each role, and stops " +
+        "at 5 USD each day."),
+      modelChoice("local", ["Ollama runs qwen3.8:27b on this machine. It needs no key, and no text " +
+        "leaves the machine. It needs 32 GB of memory and about 18 GB of disk.", LOCAL_LIMITS],
+        aws ? "A control plane on AWS cannot reach a model on this machine." : null),
+      modelChoice("recorded", "S.R.C. answers from recordings, with no model and no key. The " +
+        "recordings fit the example application only.")),
+    form.model === "live" ? hostedKeyBlock() : null,
+    form.model === "local" ? localModelBlock() : null,
     notice(),
-    buttons(
-      button("Back", "secondary", () => go("checks")),
-      button("Continue without a key", "secondary", () => saveKey("")),
-      button("Save the key and continue", "primary", () => saveKey(form.key))),
-    el("p", { class: "help" }, "Without a key, S.R.C. uses recorded answers. They fit the example " +
-      "application only."),
+    buttons(button("Back", "secondary", () => go("checks"), jobRunning()), modelButton()),
   ];
 }
 
-async function saveKey(key) {
-  if (key === "" && form.key !== "" && !window.confirm("Continue without the key that you typed?")) return;
+const afterModel = () => go(targetOf() === "aws" ? "signin" : "review");
+
+async function saveModel() {
   try {
-    await call("POST", "/api/key", { key });
+    const { started } = await call("POST", "/api/model", { choice: form.model, key: form.key });
     form.key = "";
     await refresh();
-    go(targetOf() === "aws" ? "signin" : "review");
+    if (!started) { afterModel(); return; }
+    draw();
+    watchJob(async () => { form.local = null; afterModel(); });
   } catch (error) { fail(error); }
+}
+
+function modelFact() {
+  return el("dl", { class: "facts" },
+    el("div", {}, el("dt", {}, "Language model"), el("dd", {}, MODELS[view.state.key_choice] ?? "Not chosen")));
 }
 
 // ---------------------------------------------------------------- 4. sign in
@@ -473,6 +555,7 @@ function drawReview() {
     el("p", { class: "lead" }, aws
       ? "CloudFormation made this list from the template. Nothing exists yet. The next step creates exactly this."
       : "The wizard starts the control plane on this machine. The control plane then plans these parts and asks you before it creates them."),
+    modelFact(),
     view.job?.name === "review" && !reviewed ? jobBlock() : null,
     reviewed ? el("table", {},
       el("thead", {}, el("tr", {}, el("th", {}, aws ? "Resource" : "Part"), el("th", {}, "Type"))),
@@ -564,6 +647,7 @@ function drawHandover() {
       el("div", {}, el("dt", {}, "Account"), el("dd", {}, view.state.account)),
       el("div", {}, el("dt", {}, "Region"), el("dd", {}, view.state.region)),
       el("div", {}, el("dt", {}, "ECS cluster"), el("dd", {}, `clanker-${view.state.env}-control`))) : null,
+    aws ? null : modelFact(),
     view.job && view.job.name !== "deploy" ? jobBlock() : null,
     notice(),
     buttons(
@@ -602,7 +686,7 @@ async function start() {
   form.size = view.state.size || form.size;
   if (view.state.deployed) step = "handover";
   if (jobRunning()) {
-    step = view.job.name === "deploy" ? "create" : step;
+    step = { deploy: "create", model: "key" }[view.job.name] ?? step;
     watchJob();
   }
   draw();

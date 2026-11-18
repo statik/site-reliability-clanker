@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -117,24 +115,38 @@ func (s *Server) postTarget(r *http.Request) (any, error) {
 	return s.state, s.save()
 }
 
-func (s *Server) postKey(r *http.Request) (any, error) {
-	var body struct{ Key string }
+// postModel records which language model the control plane uses: a hosted key, the model
+// on this machine, or the recorded answers. The model on this machine needs a job, which
+// downloads it when Ollama does not hold it.
+func (s *Server) postModel(r *http.Request) (any, error) {
+	var body struct{ Choice, Key string }
 	if err := decode(r, &body); err != nil {
 		return nil, err
 	}
-	key := strings.TrimSpace(body.Key)
-	if key != "" && (len(key) < 20 || strings.ContainsAny(key, " \t\r\n\"'")) {
-		return nil, invalid("this does not look like an API key: paste the key alone, " +
-			"with no quotes or spaces")
+	switch body.Choice {
+	case ModelHosted:
+		key := strings.TrimSpace(body.Key)
+		if len(key) < 20 || strings.ContainsAny(key, " \t\r\n\"'") {
+			return nil, invalid("this does not look like an API key: paste the key alone, " +
+				"with no quotes or spaces")
+		}
+		return map[string]bool{"started": false}, s.chooseModel(ModelHosted, key)
+	case ModelRecorded:
+		return map[string]bool{"started": false}, s.chooseModel(ModelRecorded, "")
+	case ModelLocal:
+		s.mu.Lock()
+		target := s.state.Target
+		s.mu.Unlock()
+		if target != TargetLocal {
+			return nil, invalid("a control plane in the cloud cannot reach a model on this " +
+				"machine: use a hosted key or the recorded answers")
+		}
+		err := s.start("model", s.prepareLocalModel)
+		return map[string]bool{"started": err == nil}, err
+	default:
+		return nil, invalid("the choice %q does not exist: use %s, %s or %s", body.Choice,
+			ModelHosted, ModelLocal, ModelRecorded)
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.key = key
-	s.state.KeyChoice = "recorded"
-	if key != "" {
-		s.state.KeyChoice = "live"
-	}
-	return s.state, s.save()
 }
 
 func (s *Server) getProfiles(r *http.Request) (any, error) {
@@ -250,7 +262,7 @@ func (s *Server) postDeploy(r *http.Request) (any, error) {
 		return nil, invalid("review what will be created before you create it")
 	}
 	if state.KeyChoice == "" {
-		return nil, invalid("choose a model key, or the recorded answers, before you deploy")
+		return nil, invalid("choose a language model before you start the control plane")
 	}
 	work := s.deployLocal
 	if state.Target == TargetAWS {
@@ -272,13 +284,13 @@ func (s *Server) deployLocal(ctx context.Context, log func(string)) error {
 		return fmt.Errorf("this machine is not ready: %s", strings.Join(missing, ", "))
 	}
 	s.mu.Lock()
-	key, env := s.key, s.state.Env
+	key, env, choice, chosen := s.key, s.state.Env, s.state.KeyChoice, s.modelChosen
 	s.mu.Unlock()
-	if key != "" {
-		if err := s.saveLocalKey(key); err != nil {
+	if chosen {
+		if err := s.saveModelSettings(choice, key); err != nil {
 			return err
 		}
-		log("The model key is saved on this machine, readable only by you.")
+		log(modelSaved[choice])
 	}
 	if s.dashboardUp(ctx) {
 		log("The control plane already runs on this machine.")
@@ -295,26 +307,18 @@ func (s *Server) deployLocal(ctx context.Context, log func(string)) error {
 	return s.markDeployed()
 }
 
-// saveLocalKey writes the key to secrets.env in the data directory. `clanker up` reads it.
-func (s *Server) saveLocalKey(key string) error {
-	if err := os.MkdirAll(s.cfg.DataDir, 0o755); err != nil {
-		return fmt.Errorf("create the data directory %s: %w", s.cfg.DataDir, err)
-	}
-	path := filepath.Join(s.cfg.DataDir, "secrets.env")
-	if err := os.WriteFile(path, []byte("OPENROUTER_API_KEY="+key+"\n"), 0o600); err != nil {
-		return fmt.Errorf("save the model key in %s: %w", path, err)
-	}
-	if err := os.Setenv("OPENROUTER_API_KEY", key); err != nil {
-		return fmt.Errorf("set the model key for this process: %w", err)
-	}
-	return nil
+// modelSaved says what the start of the control plane wrote for each choice.
+var modelSaved = map[string]string{
+	ModelHosted:   "The model key is saved on this machine, readable only by you.",
+	ModelLocal:    "The control plane is set to use the model on this machine.",
+	ModelRecorded: "The control plane is set to use the recorded answers.",
 }
 
 func (s *Server) markDeployed() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.state.Deployed = true
-	s.key = ""
+	s.key, s.modelChosen = "", false
 	return s.save()
 }
 

@@ -36,6 +36,8 @@ type Config struct {
 	StartLocal func(ctx context.Context, env string) error
 	// CLI runs the aws program. Nil means the real program.
 	CLI CLI
+	// OllamaURL is where Ollama answers on this machine. Empty means its usual address.
+	OllamaURL string
 	// EnableAWS offers the AWS target. It is off in a release: the home of the control
 	// plane on AWS is being rebuilt as a unikernel, and the code here still creates the
 	// earlier design, a container on ECS. Tests switch it on.
@@ -72,10 +74,13 @@ type Server struct {
 	cfg   Config
 	token string
 
-	mu     sync.Mutex
-	state  State
-	key    string
-	review []Change
+	mu    sync.Mutex
+	state State
+	key   string
+	// modelChosen says that the person chose the language model in this start. Only then
+	// does the start of the control plane write the model settings.
+	modelChosen bool
+	review      []Change
 	// found is the last survey of the account. A placement must come from it.
 	found   *Discovery
 	job     *job
@@ -87,6 +92,9 @@ type Server struct {
 func New(ctx context.Context, cfg Config) (*Server, error) {
 	if cfg.CLI == nil {
 		cfg.CLI = realCLI
+	}
+	if cfg.OllamaURL == "" {
+		cfg.OllamaURL = defaultOllamaURL
 	}
 	raw := make([]byte, 16)
 	if _, err := rand.Read(raw); err != nil {
@@ -161,7 +169,8 @@ func (s *Server) Handler(listenHost string) (http.Handler, error) {
 	api("GET /api/state", s.getState)
 	api("GET /api/checks", s.getChecks)
 	api("POST /api/target", s.postTarget)
-	api("POST /api/key", s.postKey)
+	api("POST /api/model", s.postModel)
+	api("GET /api/model/local", s.getLocalModel)
 	api("GET /api/aws/profiles", s.getProfiles)
 	api("POST /api/aws/signin", s.postSignIn)
 	api("POST /api/aws/discover", s.postDiscover)
