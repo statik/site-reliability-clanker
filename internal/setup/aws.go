@@ -27,7 +27,7 @@ var ErrNeedsLogin = errors.New("the AWS profile has no valid session")
 var (
 	envNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{1,22}[a-z0-9]$`)
 	regionPattern  = regexp.MustCompile(`^[a-z]{2}(-[a-z]+)+-\d$`)
-	profilePattern = regexp.MustCompile(`^[A-Za-z0-9_.@+=,-]{1,128}$`)
+	profilePattern = regexp.MustCompile(`^[A-Za-z0-9_.@+=,][A-Za-z0-9_.@+=,/-]{0,127}$`)
 )
 
 // CLI runs the aws program and returns its standard output. Tests replace it.

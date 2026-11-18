@@ -136,6 +136,20 @@ func (s *Server) getProfiles(r *http.Request) (any, error) {
 	return map[string]any{"profiles": profiles}, nil
 }
 
+// postDiscover surveys the account of a profile and proposes where the control plane goes.
+// It only reads. With no region it surveys the region that is used most.
+func (s *Server) postDiscover(r *http.Request) (any, error) {
+	var body struct{ Profile, Region string }
+	if err := decode(r, &body); err != nil {
+		return nil, err
+	}
+	account := AWS{Profile: body.Profile, Run: s.cfg.CLI}
+	if err := account.checkNames(body.Region); err != nil {
+		return nil, invalid("%v", err)
+	}
+	return account.Discover(r.Context(), startRegion, body.Region)
+}
+
 func (s *Server) postSignIn(r *http.Request) (any, error) {
 	var body struct{ Profile, Region, Size string }
 	if err := decode(r, &body); err != nil {
