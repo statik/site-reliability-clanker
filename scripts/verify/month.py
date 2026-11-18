@@ -53,4 +53,14 @@ for scene in sys.argv[1:]:
     print(" ", call("POST", f"/sim/scenes/{scene}", {}), flush=True)
     time.sleep(8)
     known = settle(known)
-print("chain:", call("GET", "/audit/verify"))
+chain = call("GET", "/audit/verify")
+print("chain:", chain)
+# A run with a failed item, an item in flight or a broken chain is not a pass. The scene
+# bad-release ends in RolledBack on purpose, so that state is not a failure.
+bad = sorted(
+    wid for wid, w in known.items() if w["state"] == "Failed" or w["state"] not in TERMINAL
+)
+if bad or not chain.get("ok"):
+    print(f"RESULT: failed. Items not done: {', '.join(bad) or 'none'}; chain ok: {chain.get('ok')}")
+    sys.exit(1)
+print(f"RESULT: {len(known)} work items reached an end state and the chain verifies")

@@ -46,6 +46,12 @@ curl -s -o /dev/null -w "dashboard %{http_code}\n" http://127.0.0.1:7070/
 echo "== first deployment and the scripted month"
 python3 "${repo}/scripts/verify/month.py" quiet-week feature-release cve bad-release \
   kubernetes-eol database-patch database-upkeep restore-drill drift incident
+month=$?
 
 echo "== error lines in the log of the control plane"
-grep -c "level=ERROR" .clanker/up.log || true
+errors="$(grep -c "level=ERROR" .clanker/up.log || true)"
+echo "${errors}"
+if [ "${month}" -ne 0 ] || [ "${errors}" -ne 0 ]; then
+  echo "RESULT: the run did not pass"
+  exit 1
+fi
