@@ -4,16 +4,16 @@
 import { html } from "./html.mjs";
 
 const GROUPS = [
-  ["dashboard", "The S.R.C. dashboard", "What an approver sees. Captured from the running demo."],
+  ["dashboard", "The S.R.C. dashboard", "Six views of the dashboard that the control plane serves, as an approver sees them."],
   ["paperboat", "Paperboat, the managed application", "The fish rental business that S.R.C. deploys and looks after."],
-  ["notifications", "Where the notifications arrive", "The mail inbox and the webhook sink of the demo, with the real messages of the month."],
+  ["notifications", "Where the notifications arrive", "The mail inbox and the webhook sink of the demo, with the messages that the control plane sent."],
 ];
 
 function figure(shot) {
   return html`<figure class="shot">
     <a href="screens/${shot.file}"><img src="screens/${shot.file}" alt="${shot.alt}"
       width="${shot.width}" height="${shot.height}" loading="lazy"></a>
-    <figcaption><strong>${shot.title}</strong> <span class="tag tag-gray">${shot.theme}</span>
+    <figcaption><strong>${shot.title}</strong>
       <span class="shot-note">${shot.note ?? ""}</span></figcaption>
   </figure>`;
 }

@@ -22,7 +22,7 @@ export async function dashboardIsUp(page) {
 }
 
 export function dashboardNav(page) {
-  return page.getByRole("navigation").filter({ has: page.getByRole("link", { name: "Timeline" }) }).first();
+  return page.getByRole("navigation", { name: "Dashboard areas" });
 }
 
 // Block every request that could change something. The capture must stay read-only:
@@ -46,11 +46,15 @@ export async function openDashboard(page, area) {
   await page.waitForTimeout(1200);
 }
 
-export async function waitingWorkItem() {
+// The work item for the picture of a work item page: one that waits for a decision, or
+// if none waits, the newest one with a summary. `waiting` tells which it is, so that the
+// caption of the picture can say what the page shows.
+export async function workItemToShow() {
   const response = await fetch(`${DASHBOARD}/api/v1/work-items`, { method: "GET" });
   if (!response.ok) throw new Error(`GET /work-items answered ${response.status}`);
   const items = await response.json();
   const waiting = items.find((item) => item.state === "AwaitingApproval");
-  const explained = items.find((item) => item.explanation?.sentence);
-  return (waiting ?? explained ?? items[0])?.id;
+  const item = waiting ?? items.find((one) => one.explanation?.sentence);
+  if (!item) throw new Error("the control plane has no work item with a summary");
+  return { id: item.id, waiting: waiting !== undefined };
 }
