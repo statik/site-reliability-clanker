@@ -30,6 +30,7 @@ func runSetup(ctx context.Context, o options) error {
 	wizard, err := setup.New(ctx, setup.Config{
 		DataDir: o.dataDir, Version: version, ReleaseBase: releaseBase,
 		DashboardURL: "http://" + o.addr,
+		EnableAWS:    o.previewAWS, SurveyOnly: o.previewAWS,
 		StartLocal: func(ctx context.Context, env string) error {
 			local := o
 			local.env, local.cloud, local.demo = env, "local", true

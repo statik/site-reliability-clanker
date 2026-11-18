@@ -5,9 +5,11 @@ import (
 	"errors"
 	"maps"
 	"net/http"
+	"os"
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -322,7 +324,7 @@ func TestTheWizardServesTheDiscovery(t *testing.T) {
 	cli := accountCLI()
 	cli.answers["ec2 describe-regions"] = `[]`
 	server, handler := newServer(t, cli)
-	code, body := request(t, handler, server.Token(), http.MethodPost, "/api/aws/discover",
+	code, body := post(t, server, handler, "/api/aws/discover",
 		`{"profile":"team/operator","region":"eu-west-1"}`)
 	if code != http.StatusOK {
 		t.Fatalf("status = %d, body = %v", code, body)
@@ -331,9 +333,210 @@ func TestTheWizardServesTheDiscovery(t *testing.T) {
 	if body["region"] != "eu-west-1" || placement["network_id"] != "vpc-1" {
 		t.Fatalf("body = %v", body)
 	}
-	code, _ = request(t, handler, server.Token(), http.MethodPost, "/api/aws/discover",
+	code, _ = post(t, server, handler, "/api/aws/discover",
 		`{"profile":"p","region":"nowhere"}`)
 	if code != http.StatusBadRequest {
 		t.Fatalf("status for a region that is not a region = %d", code)
+	}
+}
+
+// post sends a request of the browser to the wizard.
+func post(t *testing.T, server *Server, handler http.Handler, path, body string) (
+	int, map[string]any) {
+	t.Helper()
+	return request(t, handler, server.Token(), http.MethodPost, path, body)
+}
+
+// surveyedServer is a wizard that surveyed the account of accountCLI.
+func surveyedServer(t *testing.T, cfg func(*fakeCLI)) (*Server, http.Handler) {
+	t.Helper()
+	cli := accountCLI()
+	cli.answers["ec2 describe-regions"] = `[]`
+	if cfg != nil {
+		cfg(cli)
+	}
+	server, handler := newServer(t, cli)
+	code, body := post(t, server, handler, "/api/aws/discover",
+		`{"profile":"team/operator","region":"eu-west-1"}`)
+	if code != http.StatusOK {
+		t.Fatalf("survey: status = %d, body = %v", code, body)
+	}
+	return server, handler
+}
+
+func TestPlaceRecordsANetworkOfTheSurvey(t *testing.T) {
+	server, handler := surveyedServer(t, nil)
+	code, body := post(t, server, handler, "/api/aws/place",
+		`{"mode":"existing","network":"vpc-1"}`)
+	if code != http.StatusOK {
+		t.Fatalf("status = %d, body = %v", code, body)
+	}
+	want := State{Region: "eu-west-1", PlaceMode: PlaceExisting, Network: "vpc-1",
+		Subnets: []string{"subnet-a", "subnet-b"}, Access: AccessTailscale}
+	if !reflect.DeepEqual(server.state, want) {
+		t.Fatalf("state = %+v, want %+v", server.state, want)
+	}
+	saved, err := os.ReadFile(server.statePath())
+	if err != nil || !strings.Contains(string(saved), `"network": "vpc-1"`) {
+		t.Fatalf("saved state = %s, error = %v", saved, err)
+	}
+}
+
+func TestPlaceRecordsANewNetworkWithTheFreeRange(t *testing.T) {
+	server, handler := surveyedServer(t, nil)
+	code, body := post(t, server, handler, "/api/aws/place",
+		`{"mode":"new","network":"vpc-1"}`)
+	if code != http.StatusOK {
+		t.Fatalf("status = %d, body = %v", code, body)
+	}
+	want := State{Region: "eu-west-1", PlaceMode: PlaceNew, NetworkCIDR: "10.64.0.0/22",
+		Access: AccessNone}
+	if !reflect.DeepEqual(server.state, want) {
+		t.Fatalf("state = %+v, want %+v", server.state, want)
+	}
+}
+
+func TestPlaceRefusesWhatTheSurveyDoesNotAllow(t *testing.T) {
+	onlyPublic := func(cli *fakeCLI) {
+		cli.answers["ec2 describe-route-tables"] = `[
+			{"vpc":"vpc-1","main":true,"subnets":[null],"nat":null,"gateway":"igw-1"}]`
+		cli.answers["ec2 describe-vpcs"] = `[
+			{"id":"vpc-1","cidr":"10.0.0.0/8","default":false,"tags":null}]`
+	}
+	server, handler := surveyedServer(t, onlyPublic)
+	cases := []struct{ body, want string }{
+		{`{"mode":"existing","network":"vpc-1"}`, "0 availability zones"},
+		{`{"mode":"existing","network":"vpc-9"}`, "not in the survey"},
+		{`{"mode":"new"}`, "no address range is free"},
+		{`{"mode":"somewhere"}`, "does not exist"},
+	}
+	for _, c := range cases {
+		code, body := post(t, server, handler, "/api/aws/place", c.body)
+		message, _ := body["error"].(string)
+		if code != http.StatusBadRequest || !strings.Contains(message, c.want) {
+			t.Errorf("%s: status = %d, error = %q, want %q", c.body, code, message, c.want)
+		}
+	}
+	if server.state.PlaceMode != "" {
+		t.Fatalf("a refused choice was recorded: %+v", server.state)
+	}
+}
+
+func TestPlaceNeedsASurvey(t *testing.T) {
+	server, handler := newServer(t, accountCLI())
+	code, body := post(t, server, handler, "/api/aws/place",
+		`{"mode":"existing","network":"vpc-1"}`)
+	message, _ := body["error"].(string)
+	if code != http.StatusBadRequest || !strings.Contains(message, "survey the account") {
+		t.Fatalf("status = %d, body = %v", code, body)
+	}
+}
+
+func TestSignInWithoutARegionForgetsTheSurveyAndThePlace(t *testing.T) {
+	server, handler := surveyedServer(t, nil)
+	post(t, server, handler, "/api/target", `{"target":"aws","env":"prod"}`)
+	post(t, server, handler, "/api/aws/place", `{"mode":"new"}`)
+	code, body := post(t, server, handler, "/api/aws/signin",
+		`{"profile":"team/operator","region":""}`)
+	if code != http.StatusOK {
+		t.Fatalf("status = %d, body = %v", code, body)
+	}
+	if server.state.Account != "111122223333" || server.state.PlaceMode != "" || server.found != nil {
+		t.Fatalf("state = %+v, survey kept = %v", server.state, server.found != nil)
+	}
+	code, _ = post(t, server, handler, "/api/aws/place", `{"mode":"new"}`)
+	if code != http.StatusBadRequest {
+		t.Fatalf("a place without a new survey: status = %d", code)
+	}
+}
+
+func TestSurveyOnlyRefusesTheReviewAndTheCreationOnAWS(t *testing.T) {
+	cli := accountCLI()
+	server, err := New(context.Background(), Config{DataDir: t.TempDir(), Version: "v9.9.9",
+		CLI: cli.run, EnableAWS: true, SurveyOnly: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler, err := server.Handler("127.0.0.1:7069")
+	if err != nil {
+		t.Fatal(err)
+	}
+	post(t, server, handler, "/api/target", `{"target":"aws","env":"prod"}`)
+	post(t, server, handler, "/api/key", `{"key":""}`)
+	post(t, server, handler, "/api/aws/signin", `{"profile":"p","region":""}`)
+	server.review = []Change{{ID: "x", Type: "y"}}
+	for _, path := range []string{"/api/review", "/api/deploy"} {
+		code, body := post(t, server, handler, path, "")
+		message, _ := body["error"].(string)
+		if code != http.StatusBadRequest ||
+			!strings.Contains(message, "does not create the control plane") {
+			t.Errorf("%s: status = %d, error = %q", path, code, message)
+		}
+	}
+	if cli.called("cloudformation create-change-set") ||
+		cli.called("cloudformation execute-change-set") {
+		t.Fatal("CloudFormation was called")
+	}
+}
+
+func TestRegionsListsEveryEnabledRegionTheMostUsedFirst(t *testing.T) {
+	cli := &fakeCLI{answers: map[string]string{
+		"ec2 describe-regions": `["ap-south-1","eu-west-1","us-east-1"]`}}
+	counts := map[string][2]string{"eu-west-1": {"7", "2"}, "us-east-1": {"0", "1"},
+		"ap-south-1": {"0", "0"}}
+	var lock sync.Mutex
+	run := func(ctx context.Context, args ...string) ([]byte, error) {
+		lock.Lock()
+		defer lock.Unlock()
+		pair := counts[argumentAfter(args, "--region")]
+		cli.answers["ec2 describe-instances"], cli.answers["ec2 describe-vpcs"] = pair[0], pair[1]
+		return cli.run(ctx, args...)
+	}
+	regions, err := AWS{Profile: "p", Run: run}.Regions(context.Background(), "us-east-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []RegionUse{{Name: "eu-west-1", Instances: 7, Networks: 2},
+		{Name: "us-east-1", Networks: 1}, {Name: "ap-south-1"}}
+	if !slices.Equal(regions, want) {
+		t.Fatalf("regions = %+v, want %+v", regions, want)
+	}
+	if got := mostUsed([]RegionUse{{Name: "ap-south-1"}}, "us-east-1"); got != "us-east-1" {
+		t.Fatalf("the region of an account that holds nothing = %q, want the fallback", got)
+	}
+}
+
+func TestSurveyOnlyDoesNotAskForTheTunnelTool(t *testing.T) {
+	names := func(surveyOnly bool) []string {
+		server, err := New(context.Background(), Config{DataDir: t.TempDir(), CLI: accountCLI().run,
+			EnableAWS: true, SurveyOnly: surveyOnly})
+		if err != nil {
+			t.Fatal(err)
+		}
+		handler, err := server.Handler("127.0.0.1:7069")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, body := request(t, handler, server.Token(), http.MethodGet, "/api/checks?target=aws", "")
+		found := []string{}
+		for _, check := range body["checks"].([]any) {
+			found = append(found, check.(map[string]any)["name"].(string))
+		}
+		return found
+	}
+	if got := names(true); !slices.Equal(got, []string{"aws"}) {
+		t.Fatalf("checks of the survey = %v, want only aws", got)
+	}
+	if got := names(false); !slices.Contains(got, tunnelTool) {
+		t.Fatalf("checks of the installation = %v, want %s among them", got, tunnelTool)
+	}
+}
+
+func TestAFailedLoginSaysWhatToDoForAProfileOfAnotherTool(t *testing.T) {
+	cli := &fakeCLI{errors: map[string]error{"sso login": errors.New("no sso_start_url")}}
+	err := AWS{Profile: "team/operator", Run: cli.run}.Login(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "sign in with that tool") ||
+		!strings.Contains(err.Error(), "no sso_start_url") {
+		t.Fatalf("error = %v", err)
 	}
 }

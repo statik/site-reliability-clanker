@@ -14,13 +14,17 @@ import (
 // install the control plane. Every call that makes it only reads.
 type Discovery struct {
 	Identity Identity `json:"identity"`
-	// Regions are the enabled regions that hold something, the most used first.
+	// Regions are the enabled regions of the account. Those that hold something come
+	// first, the most used first; the others follow in the order of their names.
 	Regions []RegionUse `json:"regions"`
 	// Region is the region of Networks and Placement.
 	Region    string    `json:"region"`
 	Networks  []Network `json:"networks"`
 	Placement Placement `json:"placement"`
-	Rights    []Right   `json:"rights"`
+	// NewNetworkCIDR is the address range that a new network would get, for a person who
+	// does not want a network that exists. It is empty when no range is free.
+	NewNetworkCIDR string  `json:"new_network_cidr"`
+	Rights         []Right `json:"rights"`
 	// RightsError says why the rights are not known. The rest of the discovery stands.
 	RightsError string `json:"rights_error,omitempty"`
 }
@@ -114,9 +118,9 @@ func (a AWS) regionUse(ctx context.Context, region string) (RegionUse, error) {
 	return use, err
 }
 
-// RegionsInUse returns the enabled regions of the account that hold a running instance or
-// a VPC of their own, the most used first. start is a region that answers for the list.
-func (a AWS) RegionsInUse(ctx context.Context, start string) ([]RegionUse, error) {
+// Regions returns the enabled regions of the account with what runs in each one, the most
+// used first. start is a region that answers for the list.
+func (a AWS) Regions(ctx context.Context, start string) ([]RegionUse, error) {
 	var names []string
 	if err := a.query(ctx, start, &names, "ec2", "describe-regions",
 		"--query", "Regions[].RegionName"); err != nil {
@@ -136,17 +140,13 @@ func (a AWS) RegionsInUse(ctx context.Context, start string) ([]RegionUse, error
 		}()
 	}
 	wait.Wait()
-	used := []RegionUse{}
-	for index, use := range uses {
+	for index := range uses {
 		if failures[index] != nil {
 			return nil, fmt.Errorf("count what runs in %s: %w", names[index], failures[index])
 		}
-		if use.Instances > 0 || use.Networks > 0 {
-			used = append(used, use)
-		}
 	}
-	sort.Slice(used, func(i, j int) bool { return moreUsed(used[i], used[j]) })
-	return used, nil
+	sort.Slice(uses, func(i, j int) bool { return moreUsed(uses[i], uses[j]) })
+	return uses, nil
 }
 
 // moreUsed orders regions by their instances, then their networks, then their names.
@@ -322,7 +322,7 @@ func (a AWS) Discover(ctx context.Context, start, region string) (Discovery, err
 		return Discovery{}, err
 	}
 	found := Discovery{Identity: identity, Region: region}
-	if found.Regions, err = a.RegionsInUse(ctx, start); err != nil {
+	if found.Regions, err = a.Regions(ctx, start); err != nil {
 		return Discovery{}, err
 	}
 	if found.Region == "" {
@@ -332,6 +332,7 @@ func (a AWS) Discover(ctx context.Context, start, region string) (Discovery, err
 		return Discovery{}, err
 	}
 	found.Placement = Place(found.Networks)
+	found.NewNetworkCIDR = placeNew(found.Networks, nil).CIDR
 	if found.Rights, err = a.Rights(ctx, identity); err != nil {
 		found.RightsError = err.Error()
 	}
@@ -351,9 +352,10 @@ func (a AWS) checkNames(regions ...string) error {
 	return nil
 }
 
-// mostUsed returns the first region of the list, or the fallback for an empty account.
+// mostUsed returns the first region of the list when something is in it, or the fallback
+// for an account that holds nothing.
 func mostUsed(regions []RegionUse, fallback string) string {
-	if len(regions) > 0 {
+	if len(regions) > 0 && (regions[0].Instances > 0 || regions[0].Networks > 0) {
 		return regions[0].Name
 	}
 	return fallback

@@ -11,15 +11,12 @@ const token = window.sessionStorage.getItem(TOKEN_KEY) ?? "";
 const main = document.getElementById("main");
 const stepList = document.getElementById("steps");
 
-const REGIONS = ["us-east-1", "us-east-2", "us-west-2", "ca-central-1", "eu-west-1", "eu-west-2",
-  "eu-central-1", "eu-north-1", "ap-southeast-1", "ap-southeast-2", "ap-northeast-1", "ap-south-1",
-  "sa-east-1"];
-
 const STEPS = [
   { id: "target", title: "Where to run" },
   { id: "checks", title: "Check this machine" },
   { id: "key", title: "Model key" },
   { id: "signin", title: "Sign in", only: "aws" },
+  { id: "where", title: "Network", only: "aws" },
   { id: "review", title: "Review" },
   { id: "create", title: "Create" },
   { id: "handover", title: "Hand over" },
@@ -29,8 +26,8 @@ let view = null;
 let step = "target";
 let message = null;
 let timer = null;
-const form = { target: "", env: "clanker", key: "", profile: "", region: "us-east-1",
-  size: "small", profiles: null, checks: null };
+const form = { target: "", env: "clanker", key: "", profile: "", size: "small", profiles: null,
+  checks: null, found: null, surveying: false, place: "" };
 
 async function call(method, path, body) {
   const response = await fetch(path, {
@@ -153,7 +150,9 @@ function drawTarget() {
     el("div", { class: "choices", role: "radiogroup", "aria-label": "Target" },
       choice("local", "This machine", "A Kubernetes cluster in Docker, with the example application. " +
         "Free. Good for a first look."),
-      choice("aws", "Your AWS account", view.aws_enabled
+      choice("aws", "Your AWS account", view.survey_only
+        ? "The wizard signs in with your AWS command line, reads your account and proposes the network of the control plane. This version creates nothing on AWS."
+        : view.aws_enabled
         ? "One small container for the control plane on Amazon ECS with Fargate, in its own network, with no open port."
         : "The control plane for AWS is being built as a unikernel in an auto scaling group. The wizard does not set up this cloud yet.", awsNote),
       choice("gcp", "Google Cloud", "The stacks exist and are validated. The wizard does not set " +
@@ -253,16 +252,16 @@ async function loadProfiles() {
   try {
     form.profiles = (await call("GET", "/api/aws/profiles")).profiles;
     form.profile = view.state.profile || form.profiles[0] || "";
-    form.region = view.state.region || form.region;
   } catch (error) { form.profiles = []; fail(error); return; }
   draw();
 }
 
 async function signIn() {
-  const body = { profile: form.profile, region: form.region, size: form.size };
+  const body = { profile: form.profile, region: "", size: form.size };
   try {
     await call("POST", "/api/aws/signin", body);
     await refresh();
+    form.found = null;
     message = null;
     draw();
   } catch (error) {
@@ -282,41 +281,175 @@ function drawSignIn() {
     return [el("h1", {}, "Sign in to AWS"), el("p", {}, el("span", { class: "spinner" }), "Reading your profiles…")];
   }
   const state = view.state;
-  const signedIn = Boolean(state.account) && state.profile === form.profile && state.region === form.region;
+  const signedIn = Boolean(state.account) && state.profile === form.profile;
   return [
     el("h1", {}, "Sign in to your AWS account."),
     el("p", { class: "lead" }, "Choose a profile of the AWS command line. The wizard works as you, " +
-      "with your permissions, and only while it runs. You need permission to create a network, " +
-      "IAM roles, a file system and an ECS service."),
+      "with your permissions, and only while it runs. " + (view.survey_only
+      ? "The next step reads your account and changes nothing."
+      : "You need permission to create a network, IAM roles, a file system and an ECS service.")),
     form.profiles.length === 0 ? el("div", { class: "notice notice-warning" },
       "The AWS command line has no profile on this machine. Run ", el("code", {}, "aws configure sso"),
       " in a terminal, then load this page again.") : null,
     el("label", { class: "field" }, "Profile",
       el("select", { onchange: (event) => { form.profile = event.target.value; draw(); } },
         form.profiles.map((name) => el("option", { value: name, selected: name === form.profile }, name)))),
-    el("label", { class: "field" }, "Region",
-      el("select", { onchange: (event) => { form.region = event.target.value; draw(); } },
-        REGIONS.map((name) => el("option", { value: name, selected: name === form.region }, name)))),
-    el("label", { class: "field" }, "Size of the container",
+    view.survey_only ? null : el("label", { class: "field" }, "Size of the container",
       el("select", { onchange: (event) => { form.size = event.target.value; } },
         [["small", "Small: 0.5 vCPU and 1 GB of memory, about 14 USD each month"],
           ["medium", "Medium: 1 vCPU and 2 GB of memory, about 29 USD each month"]].map(([value, label]) =>
           el("option", { value, selected: value === form.size }, label)))),
     signedIn ? el("dl", { class: "facts" },
       el("div", {}, el("dt", {}, "Account"), el("dd", {}, state.account)),
-      el("div", {}, el("dt", {}, "Signed in as"), el("dd", {}, state.principal.split("/").slice(-1)[0])),
-      el("div", {}, el("dt", {}, "Region"), el("dd", {}, state.region))) : null,
+      el("div", {}, el("dt", {}, "Signed in as"), el("dd", {}, state.principal.split("/").slice(-1)[0]))) : null,
     view.job?.name === "login" ? jobBlock() : null,
     notice(),
     buttons(
       button("Back", "secondary", () => go("key")),
       button(signedIn ? "Sign in again" : "Sign in", signedIn ? "secondary" : "primary", signIn,
         jobRunning() || form.profile === ""),
-      button("Continue", "primary", () => go("review"), !signedIn || jobRunning())),
+      button("Continue", "primary", () => go("where"), !signedIn || jobRunning())),
   ];
 }
 
-// ---------------------------------------------------------------- 5. review
+// ---------------------------------------------------------------- 5. network
+
+const NEW_NETWORK = "new";
+
+async function survey(region) {
+  form.surveying = true;
+  message = null;
+  draw();
+  try {
+    form.found = await call("POST", "/api/aws/discover", { profile: view.state.profile, region });
+    const proposal = form.found.placement;
+    form.place = proposal.mode === "existing" ? proposal.network_id : NEW_NETWORK;
+  } catch (error) {
+    form.found = form.found ?? { failed: true };
+    message = { kind: "error", text: error.message };
+  }
+  form.surveying = false;
+  draw();
+}
+
+async function savePlace() {
+  const body = form.place === NEW_NETWORK ? { mode: "new" } : { mode: "existing", network: form.place };
+  try {
+    await call("POST", "/api/aws/place", body);
+    await refresh();
+    if (view.survey_only) {
+      message = { kind: "info", text: "The choice is saved. This version of the wizard stops here: " +
+        "it does not create the control plane on AWS yet." };
+      draw();
+      return;
+    }
+    go("review");
+  } catch (error) { fail(error); }
+}
+
+function zonesOf(network) {
+  return new Set(network.subnets.filter((subnet) => subnet.outbound === "nat").map((subnet) => subnet.zone)).size;
+}
+
+function accessOf(network) {
+  if (!network.router) return "No Tailscale subnet router";
+  return network.router.covers
+    ? `Tailscale subnet router ${network.router.service}`
+    : `Tailscale subnet router ${network.router.service}, which serves only a part of it`;
+}
+
+function networkChoice(network, found) {
+  const rejected = (found.placement.rejected ?? []).find((item) => item.network_id === network.id);
+  const proposed = found.placement.network_id === network.id;
+  const selected = form.place === network.id;
+  const tag = rejected ? "does not fit" : proposed ? "proposed" : null;
+  const tags = Object.entries(network.tags ?? {}).filter(([key]) => key !== "Name" && !key.startsWith("aws:"))
+    .map(([key, value]) => `${key}: ${value}`).join(", ");
+  const facts = `${network.cidr}. ${network.instances} running instances. Private subnets with a NAT ` +
+    `gateway in ${zonesOf(network)} availability zones. ${accessOf(network)}.` +
+    (tags === "" ? "" : ` Tags: ${tags}.`);
+  return el("label", { class: `choice${selected ? " is-selected" : ""}${rejected ? " is-disabled" : ""}` },
+    el("input", { type: "radio", name: "network", value: network.id, checked: selected,
+      disabled: Boolean(rejected), onchange: () => { form.place = network.id; draw(); } }),
+    el("span", { class: "choice-title" }, network.name || network.id, tag ? el("span", { class: "tag" }, tag) : null),
+    el("span", { class: "choice-text" }, facts, rejected ? ` It does not fit because ${rejected.reason}.` : ""));
+}
+
+function newNetworkChoice(found) {
+  const free = found.new_network_cidr !== "";
+  const proposed = found.placement.mode === "new";
+  const selected = form.place === NEW_NETWORK;
+  const tag = !free ? "no free range" : proposed ? "proposed" : null;
+  return el("label", { class: `choice choice-wide${selected ? " is-selected" : ""}${free ? "" : " is-disabled"}` },
+    el("input", { type: "radio", name: "network", value: NEW_NETWORK, checked: selected, disabled: !free,
+      onchange: () => { form.place = NEW_NETWORK; draw(); } }),
+    el("span", { class: "choice-title" }, "A new network", tag ? el("span", { class: "tag" }, tag) : null),
+    el("span", { class: "choice-text" }, free
+      ? `${found.new_network_cidr}, which overlaps no network of ${found.region}. It has private subnets ` +
+        "and its own NAT gateway, which costs more than a network that exists. You then need a private " +
+        "path to it, because the control plane has no public address."
+      : `No address range between 10.64.0.0/22 and 10.255.0.0/22 is free in ${found.region}.`));
+}
+
+function rightsBlock(found) {
+  if (found.rights_error) {
+    return el("div", { class: "notice notice-warning" }, el("strong", {}, "Your permissions are not known."),
+      `The policy simulator did not answer: ${found.rights_error}`);
+  }
+  const refused = (found.rights ?? []).filter((right) => !right.allowed);
+  if (refused.length === 0) {
+    return el("p", { class: "help" }, `Your sign-in can make the ${found.rights.length} kinds of call that the ` +
+      "installation needs, by the policy simulator of IAM. A rule of your organization can still refuse one.");
+  }
+  return el("div", { class: "notice notice-warning" }, el("strong", {}, "Your sign-in cannot make these calls."),
+    refused.map((right) => right.action).join(", "), ". The installation needs them.");
+}
+
+function regionField(found) {
+  const holds = (region) => (region.instances > 0 || region.networks > 0
+    ? `${region.instances} running instances, ${region.networks} networks` : "nothing runs here");
+  return el("label", { class: "field" }, "Region",
+    el("select", { disabled: form.surveying, onchange: (event) => survey(event.target.value) },
+      found.regions.map((region) => el("option", { value: region.name, selected: region.name === found.region },
+        `${region.name}: ${holds(region)}`))),
+    el("span", { class: "help" }, "The regions that are enabled in your account, the most used first."));
+}
+
+function drawWhere() {
+  if (form.found === null) {
+    if (!form.surveying) survey("");
+    return [el("h1", {}, "Looking at your AWS account"),
+      el("p", {}, el("span", { class: "spinner" }), "Reading the regions, the networks and your permissions. " +
+        "This takes about half a minute. It changes nothing.")];
+  }
+  const found = form.found;
+  if (found.failed) {
+    return [el("h1", {}, "The wizard could not read your AWS account."), notice(),
+      buttons(button("Back", "secondary", () => go("signin")),
+        button("Try again", "primary", () => { form.found = null; draw(); }))];
+  }
+  return [
+    el("h1", {}, "Choose the network of the control plane."),
+    el("p", { class: "lead" }, "The control plane has no public address. It needs private subnets with a " +
+      "NAT gateway in two availability zones, and a private path for you to reach it. The wizard read " +
+      "your account and proposes a network. It changed nothing."),
+    regionField(found),
+    form.surveying ? el("p", {}, el("span", { class: "spinner" }), "Reading the region…") : null,
+    el("div", { class: "choices", role: "radiogroup", "aria-label": "Network" },
+      found.networks.map((network) => networkChoice(network, found)), newNetworkChoice(found)),
+    el("h2", {}, "Why the wizard proposes this"),
+    el("ul", {}, found.placement.reasons.map((reason) => el("li", {}, reason))),
+    rightsBlock(found),
+    notice(),
+    buttons(
+      button("Back", "secondary", () => go("signin")),
+      button("Read the account again", "secondary", () => survey(found.region), form.surveying),
+      button(form.place === NEW_NETWORK ? "Use a new network" : "Use this network", "primary", savePlace,
+        form.surveying || form.place === "")),
+  ];
+}
+
+// ---------------------------------------------------------------- 6. review
 
 async function startReview() {
   try {
@@ -362,14 +495,14 @@ function drawReview() {
       "ECS Exec, as the signed-in user.") : null,
     notice(),
     buttons(
-      button("Back", "secondary", () => go(aws ? "signin" : "key")),
+      button("Back", "secondary", () => go(aws ? "where" : "key")),
       reviewJob?.status === "failed" ? button("Try the review again", "secondary", startReview) : null,
       button(aws ? "Create these resources" : "Start the control plane", "primary", startDeploy,
         !reviewed || jobRunning())),
   ];
 }
 
-// ---------------------------------------------------------------- 6. create
+// ---------------------------------------------------------------- 7. create
 
 async function startDeploy() {
   try {
@@ -395,7 +528,7 @@ function drawCreate() {
   ];
 }
 
-// ---------------------------------------------------------------- 7. hand over
+// ---------------------------------------------------------------- 8. hand over
 
 async function startDestroy() {
   if (!window.confirm("Delete the control plane and everything that this wizard created in the account?")) return;
@@ -444,7 +577,7 @@ function drawHandover() {
   ];
 }
 
-const DRAW = { target: drawTarget, checks: drawChecks, key: drawKey, signin: drawSignIn,
+const DRAW = { target: drawTarget, checks: drawChecks, key: drawKey, signin: drawSignIn, where: drawWhere,
   review: drawReview, create: drawCreate, handover: drawHandover };
 
 function draw() {

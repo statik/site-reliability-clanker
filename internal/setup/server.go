@@ -40,6 +40,10 @@ type Config struct {
 	// plane on AWS is being rebuilt as a unikernel, and the code here still creates the
 	// earlier design, a container on ECS. Tests switch it on.
 	EnableAWS bool
+	// SurveyOnly lets the wizard sign in to AWS, survey the account and record where the
+	// control plane goes, and refuses the review and the creation there. The steps after
+	// the survey still create the earlier design.
+	SurveyOnly bool
 }
 
 // State is what the wizard remembers between starts. It holds no secret.
@@ -53,6 +57,14 @@ type State struct {
 	Size      string `json:"size"`
 	KeyChoice string `json:"key_choice"`
 	Deployed  bool   `json:"deployed"`
+	// PlaceMode says whether the control plane goes into a network that exists or into a
+	// new one. Network and Subnets name the network that exists; NetworkCIDR is the
+	// address range of the new one. Access says how a person reaches the control plane.
+	PlaceMode   string   `json:"place_mode"`
+	Network     string   `json:"network"`
+	Subnets     []string `json:"subnets"`
+	NetworkCIDR string   `json:"network_cidr"`
+	Access      string   `json:"access"`
 }
 
 // Server is the wizard. One person uses it, on the loopback address.
@@ -60,10 +72,12 @@ type Server struct {
 	cfg   Config
 	token string
 
-	mu      sync.Mutex
-	state   State
-	key     string
-	review  []Change
+	mu     sync.Mutex
+	state  State
+	key    string
+	review []Change
+	// found is the last survey of the account. A placement must come from it.
+	found   *Discovery
 	job     *job
 	tunnel  context.CancelFunc
 	baseCtx context.Context
@@ -151,6 +165,7 @@ func (s *Server) Handler(listenHost string) (http.Handler, error) {
 	api("GET /api/aws/profiles", s.getProfiles)
 	api("POST /api/aws/signin", s.postSignIn)
 	api("POST /api/aws/discover", s.postDiscover)
+	api("POST /api/aws/place", s.postPlace)
 	api("POST /api/aws/login", s.postLogin)
 	api("POST /api/review", s.postReview)
 	api("POST /api/deploy", s.postDeploy)

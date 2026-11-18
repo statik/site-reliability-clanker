@@ -128,8 +128,11 @@ func (a AWS) WhoAmI(ctx context.Context) (Identity, error) {
 func (a AWS) Login(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	_, err := a.Run(ctx, "sso", "login", "--profile", a.Profile)
-	return err
+	if _, err := a.Run(ctx, "sso", "login", "--profile", a.Profile); err != nil {
+		return fmt.Errorf("%w. If the profile %s gets its credentials from another tool, "+
+			"sign in with that tool and choose \"Sign in\" again", err, a.Profile)
+	}
+	return nil
 }
 
 // PutKey stores the model API key as a SecureString. The key goes to the CLI in a file
