@@ -349,14 +349,14 @@ func (d *Detector) Run(ctx context.Context, envs []string, interval time.Duratio
 	}
 }
 
-// RunChecks runs the release, advisory and health checks once.
+// RunChecks runs the release, advisory, health and storage checks once.
 func (d *Detector) RunChecks(ctx context.Context, env string) {
 	type namedCheck struct {
 		name string
 		run  func(context.Context, string) error
 	}
 	checks := []namedCheck{{"advisory", d.CheckAdvisories}, {"release", d.CheckReleases},
-		{"health", d.CheckHealth}}
+		{"health", d.CheckHealth}, {"storage", d.CheckStorage}}
 	for _, check := range checks {
 		name := check.name
 		if err := check.run(ctx, env); err != nil {

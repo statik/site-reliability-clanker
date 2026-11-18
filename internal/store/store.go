@@ -77,6 +77,11 @@ CREATE TABLE IF NOT EXISTS health (
   p95_ms DOUBLE PRECISION NOT NULL, version TEXT NOT NULL DEFAULT '');
 CREATE INDEX IF NOT EXISTS health_ts ON health(env, ts);
 
+CREATE TABLE IF NOT EXISTS volume_samples (
+  ts TEXT NOT NULL, env TEXT NOT NULL, volume TEXT NOT NULL, used_bytes BIGINT NOT NULL,
+  total_bytes BIGINT NOT NULL);
+CREATE INDEX IF NOT EXISTS volume_samples_ts ON volume_samples(env, volume, ts);
+
 CREATE TABLE IF NOT EXISTS deliveries (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, event_seq BIGINT NOT NULL, channel TEXT NOT NULL,
   target TEXT NOT NULL, status TEXT NOT NULL, attempts BIGINT NOT NULL DEFAULT 0,

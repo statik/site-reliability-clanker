@@ -261,6 +261,11 @@ func (s *Server) future(now string) ([]map[string]any, error) {
 				"kind": "forecast", "title": adv.Title, "advisory": adv.ID})
 		}
 	}
+	storage, err := s.storageForecasts(now)
+	if err != nil {
+		return nil, err
+	}
+	future = append(future, storage...)
 	t := store.ParseTime(now)
 	nextBackup := time.Date(t.Year(), t.Month(), t.Day()+7-int(t.Weekday()), 3, 0, 0, 0, time.UTC)
 	nextDrill := time.Date(t.Year(), t.Month()+1, 1, 4, 0, 0, 0, time.UTC)

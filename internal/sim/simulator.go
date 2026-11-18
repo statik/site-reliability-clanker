@@ -75,6 +75,9 @@ func scenes() []Scene {
 		{Name: "incident", Title: "Incident at 02:00", UseCase: "17, 18",
 			Detail: "Inventory requests start to fail with no change in progress.",
 			run:    (*Simulator).incident},
+		{Name: "storage-growth", Title: "The database volume fills up", UseCase: "12",
+			Detail: "Eight days of steady growth. The forecast proposes a larger volume.",
+			run:    (*Simulator).storageGrowth},
 	}
 }
 

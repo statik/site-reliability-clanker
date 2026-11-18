@@ -241,6 +241,8 @@ export interface FutureItem {
   work_item?: string;
   tier?: string;
   advisory?: string;
+  /** Where a forecast comes from when it has no advisory, for example "Volume samples". */
+  source?: string;
 }
 
 export interface HealthBucket {
