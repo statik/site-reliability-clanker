@@ -207,7 +207,8 @@ export function Shell({ children }: { children: ReactNode }) {
         <SideNavItems>
           {NAV.map((entry) => (
             <SideNavLink key={entry.to} as={RouterLink} to={entry.to} renderIcon={entry.icon}
-              isActive={isActive(pathname, entry.to)} onClick={close}>
+              isActive={isActive(pathname, entry.to)} onClick={close}
+              {...(isActive(pathname, entry.to) ? { "aria-current": "page" as const } : {})}>
               {entry.label}
             </SideNavLink>
           ))}
