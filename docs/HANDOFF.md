@@ -1,9 +1,9 @@
 # Handoff
 
-State of the work on 2026-11-17. A new session can continue from this file and from the
+State of the work on 2026-11-18. A new session can continue from this file and from the
 issues with the label `needs-owner-review`.
 
-## Start here (written at the end of the session of 2026-11-17)
+## Start here (written at the end of the session of 2026-11-18)
 
 ### The goal now
 
@@ -14,9 +14,71 @@ run in short-lived runners; all state is in an external PostgreSQL; people sign 
 OIDC in the core itself (changed by the owner on 2026-11-17, issue #45); the wizard builds
 the machine image with `ops`.
 
-### Work in flight (written 2026-11-17, at night)
+### State at the end of 2026-11-18
 
-Read this section first.
+Read this section first. The owner presents the project on 2026-11-19 with the site, the
+video and the local demo. No pull request is open.
+
+**Merged on 2026-11-18:**
+
+- #86: the Explainer, the Investigator and the Reviewer read the first JSON object in the
+  answer of a model (`firstObject` in `internal/agent/answer.go`). An object after the last
+  mark `</think>` wins over a draft before it.
+- #90: the core can use an OpenAI-compatible endpoint. The settings are
+  `CLANKER_LLM_BASE_URL`, `CLANKER_LLM_API_KEY`, `CLANKER_LLM_MODEL` and
+  `CLANKER_LLM_MODEL_<ROLE>` (see `README.md`). The mode in the records is `local`. Calls
+  with no cost stop at 5 million tokens a day.
+- #91: the step "Language model" of the wizard has three choices: a hosted key, a model on
+  this machine through Ollama (`qwen3.8:27b`, as the variant `src-local` with a context of
+  32768 tokens), and recorded answers.
+- #93: the design with a container on Amazon ECS is removed from the wizard. The AWS path
+  ends at a review of what S.R.C. creates and the price of one week
+  (`internal/setup/plan.go`). The wizard creates nothing on AWS.
+- #87, #89 and #92: the site has a cost table (Amazon Bedrock against a GPU instance), a
+  table that compares four model sets in the evals, the approval in Slack and Teams, and
+  tables that fit a phone.
+- #88: `scripts/verify/fresh-run.sh` exits 1 when a work item fails or the log has an error
+  line.
+
+**Ran on 2026-11-18:**
+
+- `fresh-run.sh` on `main` after all the merges, with the hosted models: 13 work items
+  reached their end state, the audit chain verifies with 317 events, 0 error lines.
+- The eval suite against three more models (the logs are not in the repository): Kimi K3.1
+  on Amazon Bedrock, and Qwen3.8 27B and Gemma 4 31B through Ollama on a laptop. The site
+  has the table. In short: Kimi K3.1 is near the hosted baseline. The two laptop models
+  explain and diagnose as well as the hosted models, but Qwen3.8 as the Reviewer leaked a
+  secret in 5 of 12 runs, and Gemma 4 as the Author obeyed injected text in 6 of 15 runs.
+- One Explainer call through the new client to Qwen3.8 in Ollama.
+- The two browser walks of the wizard, the AWS one against a fake `aws` program.
+
+**Not run:** `clanker up` with a local model, a full work item with a local model, and the
+tool-call loop of the Author and the Investigator against Ollama. A real pull of a model by
+the wizard.
+
+**Decided by the owner on 2026-11-18:** no GPU instance on AWS. The site shows the cost of
+one against Amazon Bedrock.
+
+**Open decisions of the owner:**
+
+- Amazon Bedrock as a choice in the wizard.
+- A mix of models for the roles, or no text leaves the network.
+- The stack of the installer: OpenTofu files inside the `clanker` binary, with the state in
+  an S3 bucket that the wizard creates first.
+- The OIDC issuer, the client and the admin email; plain HTTP or an internal load balancer.
+- The section "Status today" on the front page of the site.
+
+**The Nanos boot test on EC2** started and is not finished. Facts for the installer:
+
+- `ops` 0.1.47 wants a bucket name in its configuration and does not use it. It writes the
+  snapshot with the EBS direct API, so the build leaves one image and one snapshot.
+- `ops` takes the architecture and the UEFI boot from the instance type in the
+  configuration.
+- An account can refuse `RunInstances` when tags that its organization requires are not on
+  the instance. The wizard has no step for required tags, and the survey does not look for
+  such a rule.
+
+### Work in flight (written 2026-11-17, at night)
 
 **Merged on 2026-11-17, after the list in the section below:** #53 (evals for the Reviewer and
 the strict form of its answer), #54 to #57, #59, #64, #65, #67 and #72 (the site and its
