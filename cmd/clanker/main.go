@@ -16,6 +16,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/statik/site-reliability-clanker/internal/awsparams"
 	"github.com/statik/site-reliability-clanker/internal/bundle"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
 	"github.com/statik/site-reliability-clanker/internal/runner"
@@ -344,6 +345,9 @@ func run() error {
 			if err := preflight(setup.TargetLocal); err != nil {
 				return err
 			}
+		}
+		if err := loadParameters(ctx, o, awsparams.NewStore); err != nil {
+			return err
 		}
 		return up(ctx, o)
 	case "destroy":
