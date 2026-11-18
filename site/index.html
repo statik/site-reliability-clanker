@@ -593,13 +593,26 @@ there for a change of tier T2 or lower.</figcaption>
 
     <section class="section closing" aria-labelledby="closing-title">
       <div class="wrap">
-        <h2 id="closing-title">Run it on your own laptop.</h2>
-        <p class="section-lead">The local target needs Docker and no cloud account. One command
-          builds the control plane and the dashboard, and starts them. Then approve the first
-          deployment, and follow the month.</p>
-        <pre class="command"><code>make demo</code></pre>
+        <h2 id="closing-title">Download it and run it on your own laptop.</h2>
+        <p class="section-lead">The download is one file. It holds the setup wizard, the control
+          plane, the dashboard and the example application. The local target needs Docker and
+          no cloud account. These commands are for a Mac with Apple silicon. Then approve the
+          first deployment, and follow the month.</p>
+        <pre class="command command-wide"><code>curl -fsSLo clanker \
+  https://github.com/statik/site-reliability-clanker/releases/latest/download/clanker-darwin-arm64
+chmod +x clanker
+./clanker setup</code></pre>
+        <p class="figure-caption">For another machine, use the file
+          <a href="https://github.com/statik/site-reliability-clanker/releases/latest/download/clanker-darwin-amd64" rel="noopener">clanker-darwin-amd64</a>,
+          <a href="https://github.com/statik/site-reliability-clanker/releases/latest/download/clanker-linux-arm64" rel="noopener">clanker-linux-arm64</a> or
+          <a href="https://github.com/statik/site-reliability-clanker/releases/latest/download/clanker-linux-amd64" rel="noopener">clanker-linux-amd64</a>.
+          The file
+          <a href="https://github.com/statik/site-reliability-clanker/releases/latest/download/checksums.txt" rel="noopener">checksums.txt</a>
+          has the SHA-256 of each one. The files are not signed: macOS blocks a copy from a
+          browser, and a copy from <span class="mono">curl</span> runs.</p>
         <div class="btn-row">
-          <a class="btn btn-primary" href="https://github.com/statik/site-reliability-clanker" rel="noopener">Get the code on GitHub <span aria-hidden="true">&nearr;</span></a>
+          <a class="btn btn-primary" href="https://github.com/statik/site-reliability-clanker/releases/latest" rel="noopener">Download the release <span aria-hidden="true">&nearr;</span></a>
+          <a class="btn btn-tertiary" href="https://github.com/statik/site-reliability-clanker" rel="noopener">Get the code on GitHub <span aria-hidden="true">&nearr;</span></a>
           <a class="btn btn-tertiary" href="walkthrough.html">Walk through one month <span aria-hidden="true">&rarr;</span></a>
           <a class="btn btn-tertiary" href="architecture.html">Architecture <span aria-hidden="true">&rarr;</span></a>
           <a class="btn btn-tertiary" href="screens.html">Live screens <span aria-hidden="true">&rarr;</span></a>

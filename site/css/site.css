@@ -733,6 +733,8 @@ html:not(.js) .chip { border: 0; background: none; padding: 0; cursor: default; 
 .command { margin-top: var(--s-6); padding: var(--s-5); max-width: 32rem; overflow-x: auto;
   background: var(--layer-01); border: 1px solid var(--border-subtle);
   font-family: var(--font-mono); font-size: 1rem; }
+.command-wide { max-width: 56rem; }
+.command code { padding: 0; background: none; }
 section [id] { scroll-margin-top: calc(var(--shell-height) + var(--s-6)); }
 
 /* ------------------------------------------------------------------ notice */
