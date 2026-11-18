@@ -1,7 +1,10 @@
 package scrub_test
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/statik/site-reliability-clanker/internal/scrub"
@@ -59,5 +62,123 @@ func TestTextKeepsOrdinaryText(t *testing.T) {
 		if out := scrub.Text(in); out != in {
 			t.Errorf("ordinary text changed: %q became %q", in, out)
 		}
+	}
+}
+
+func TestTextRemovesSecretsByShape(t *testing.T) {
+	cases := []struct{ name, in, want string }{
+		{"sentence with is", "the new database password is cnry-prose-3307-hd",
+			"the new database password is [REDACTED]"},
+		{"sentence with was", "the old admin credential was cnry-old-8841-rz and must be rotated",
+			"the old admin credential was [REDACTED] and must be rotated"},
+		{"sentence with now", "The API key is now Zx81kq.", "The API key is now [REDACTED]"},
+		{"sentence in JSON", `{"line":"the token is ab12cd34"}`,
+			`{"line":"the token is [REDACTED]"}`},
+		{"redis-cli", "redis-cli -h redis.paperboat.svc -a cnry-arg-2290-vv ping",
+			"redis-cli -h redis.paperboat.svc -a [REDACTED] ping"},
+		{"redis-cli keeps the port", "redis-cli -p 6379 -a hunter2 ping",
+			"redis-cli -p 6379 -a [REDACTED] ping"},
+		{"mysql joined", "mysqldump -uroot -phunter2 paperboat",
+			"mysqldump -uroot -p[REDACTED] paperboat"},
+		{"sshpass", "sshpass -p hunter2 ssh ops@host", "sshpass -p [REDACTED] ssh ops@host"},
+		{"long flag", "tool login --password hunter2 --verbose",
+			"tool login --password [REDACTED] --verbose"},
+		{"long flag with prefix", "tool --access-token abc123", "tool --access-token [REDACTED]"},
+		{"long flag with =", "tool --secret=abc123", "tool --secret=[REDACTED]"},
+	}
+	for _, tc := range cases {
+		if got := scrub.Text(tc.in); got != tc.want {
+			t.Errorf("%s: got %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestTextKeepsOrdinarySentencesAndCommands(t *testing.T) {
+	for _, in := range []string{
+		"the password is required",
+		"the token is expired and the secret is rotated every 90 days",
+		"the token is 5 minutes old",
+		"The credential was rotated on 2026-03-02.",
+		"grep -a file",
+		"ps -p 1234",
+		"tar -a -cf out.tar.gz dir",
+		"cp -a source target",
+		"mkdir -p /var/lib/data1",
+		"ssh -p 2222 ops@host",
+		"redis-cli -p 6379 ping",
+		"mysql -h db1 -P 3306 paperboat",
+		"redis-cli ping | grep -a PONG1",
+		"tool --password --verbose",
+		"tool --token-ttl 30m",
+		"| mail relay | relay.example.com | 587 | cnry-bare-7719-qk |",
+	} {
+		if out := scrub.Text(in); out != in {
+			t.Errorf("ordinary text changed: %q became %q", in, out)
+		}
+	}
+}
+
+func TestTextRemovesKnownValues(t *testing.T) {
+	t.Cleanup(scrub.Forget)
+	scrub.Add("cnry-bare-7719-qk", "abcdefgh12", "gh12345678", "short", `qu"ote<and>&back\slash`)
+	cases := []struct{ name, in, want string }{
+		{"bare table cell", "| relay | 587 | cnry-bare-7719-qk |", "| relay | 587 | [REDACTED] |"},
+		{"inside a word", "xcnry-bare-7719-qky", "x[REDACTED]y"},
+		{"two times", "cnry-bare-7719-qk cnry-bare-7719-qk", "[REDACTED] [REDACTED]"},
+		{"two values that overlap", "see abcdefgh12345678 here", "see [REDACTED] here"},
+		{"a value below the floor", "a short word", "a short word"},
+		{"raw form", `it is qu"ote<and>&back\slash.`, "it is [REDACTED]."},
+		{"no value", "nothing here", "nothing here"},
+	}
+	for _, tc := range cases {
+		if got := scrub.Text(tc.in); got != tc.want {
+			t.Errorf("%s: got %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestTextRemovesTheJSONFormOfAKnownValue(t *testing.T) {
+	t.Cleanup(scrub.Forget)
+	value := `qu"ote<and>&back\slash`
+	scrub.Add(value)
+	encoded, err := json.Marshal(map[string]string{"line": value})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := scrub.Text(string(encoded)); got != `{"line":"[REDACTED]"}` {
+		t.Errorf("the JSON form stays: %s", got)
+	}
+}
+
+func TestAddIgnoresValuesBelowTheFloor(t *testing.T) {
+	t.Cleanup(scrub.Forget)
+	scrub.Add("", "1234567", strings.Repeat("a", scrub.MinKnownLength-1))
+	in := "port 1234567 and aaaaaaa"
+	if out := scrub.Text(in); out != in {
+		t.Errorf("a short value was replaced: %q", out)
+	}
+	scrub.Add(strings.Repeat("a", scrub.MinKnownLength))
+	if out := scrub.Text("x aaaaaaaa y"); out != "x [REDACTED] y" {
+		t.Errorf("a value at the floor was not replaced: %q", out)
+	}
+}
+
+func TestAddAndTextRunConcurrently(t *testing.T) {
+	t.Cleanup(scrub.Forget)
+	var group sync.WaitGroup
+	for i := range 16 {
+		group.Add(2)
+		go func() {
+			defer group.Done()
+			scrub.Add(fmt.Sprintf("known-value-%04d", i))
+		}()
+		go func() {
+			defer group.Done()
+			scrub.Text("the text has known-value-0003 and more")
+		}()
+	}
+	group.Wait()
+	if out := scrub.Text("known-value-0003 known-value-0015"); out != "[REDACTED] [REDACTED]" {
+		t.Errorf("a value that was added concurrently stays: %q", out)
 	}
 }

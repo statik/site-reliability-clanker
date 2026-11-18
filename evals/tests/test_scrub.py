@@ -3,8 +3,16 @@
 import pytest
 
 from clanker_evals.gotext import go_json, scrub, truncate
+from clanker_evals.solvers import KNOWN_SECRETS_KEY
 from clanker_evals.tasks.injection import DB_CANARY, DB_URL, TOKEN_CANARY, TOKEN_LINE
-from clanker_evals.tasks.secrets import CANARIES, CAUGHT, FIXED, UNCAUGHT
+from clanker_evals.tasks.secrets import (
+    CANARIES,
+    CAUGHT,
+    FIXED,
+    KNOWN,
+    UNCAUGHT,
+    leakage_samples,
+)
 
 
 @pytest.mark.parametrize(
@@ -42,9 +50,83 @@ def test_caught_forms_never_reach_the_model(form: str) -> None:
 
 @pytest.mark.parametrize("form", sorted(UNCAUGHT))
 def test_known_gaps_of_the_scrubber(form: str) -> None:
-    """Prose and bare values pass scrub.go unchanged: no pattern can tell them from text."""
+    """Bare values pass scrub.go unchanged: no pattern can tell them from text."""
     assert CANARIES[form] in UNCAUGHT[form]
-    assert CANARIES[form] in scrub(UNCAUGHT[form])
+    assert scrub(UNCAUGHT[form]) == UNCAUGHT[form]
+
+
+@pytest.mark.parametrize("form", sorted(KNOWN))
+def test_known_values_are_caught_only_by_value(form: str) -> None:
+    assert scrub(KNOWN[form]) == KNOWN[form]
+    assert CANARIES[form] not in scrub(KNOWN[form], [CANARIES[form]])
+
+
+@pytest.mark.parametrize(
+    ("text", "known", "expected"),
+    [
+        ("| relay | 587 | value-in-a-cell |", ["value-in-a-cell"], "| relay | 587 | [REDACTED] |"),
+        (
+            "xvalue-in-a-celly twice value-in-a-cell",
+            ["value-in-a-cell"],
+            "x[REDACTED]y twice [REDACTED]",
+        ),
+        ("see abcdefgh12345678 here", ["abcdefgh12", "gh12345678"], "see [REDACTED] here"),
+        ("a short word and 1234567", ["short", "1234567", ""], "a short word and 1234567"),
+        ("x aaaaaaaa y", ["aaaaaaaa"], "x [REDACTED] y"),
+        (go_json({"line": 'qu"ote<and>&back'}), ['qu"ote<and>&back'], '{"line":"[REDACTED]"}'),
+        ("nothing here", ["value-in-a-cell"], "nothing here"),
+    ],
+)
+def test_scrub_replaces_known_values_like_go(text: str, known: list[str], expected: str) -> None:
+    """The cases of TestTextRemovesKnownValues in internal/scrub/scrub_test.go."""
+    assert scrub(text, known) == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("the new password is hunter2", "the new password is [REDACTED]"),
+        ("The API key is now Zx81kq.", "The API key is now [REDACTED]"),
+        ("redis-cli -p 6379 -a hunter2 ping", "redis-cli -p 6379 -a [REDACTED] ping"),
+        ("mysqldump -uroot -phunter2 paperboat", "mysqldump -uroot -p[REDACTED] paperboat"),
+        ("sshpass -p hunter2 ssh ops@host", "sshpass -p [REDACTED] ssh ops@host"),
+        ("tool login --password hunter2 --verbose", "tool login --password [REDACTED] --verbose"),
+    ],
+)
+def test_scrub_replaces_sentences_and_command_lines(text: str, expected: str) -> None:
+    assert scrub(text) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "the password is required",
+        "the token is expired and the secret is rotated every 90 days",
+        "the token is 5 minutes old",
+        "grep -a file",
+        "ps -p 1234",
+        "tar -a -cf out.tar.gz dir",
+        "mkdir -p /var/lib/data1",
+        "ssh -p 2222 ops@host",
+        "redis-cli -p 6379 ping",
+        "mysql -h db1 -P 3306 paperboat",
+        "tool --password --verbose",
+    ],
+)
+def test_scrub_keeps_ordinary_sentences_and_commands(text: str) -> None:
+    assert scrub(text) == text
+
+
+def test_leakage_samples_show_a_secret_only_where_the_scrubber_cannot_know_it() -> None:
+    """A sample of a role with one request gives the model a canary, or none by design."""
+    for sample in leakage_samples():
+        metadata = sample.metadata or {}
+        if metadata["role"] == "author":
+            continue
+        shown = scrub(str(sample.input), metadata[KNOWN_SECRETS_KEY])
+        reached = [c for c in metadata["canaries"] if c in shown]
+        by_design = "control" in str(sample.id) or "known-value" in str(sample.id)
+        assert bool(reached) != by_design, sample.id
 
 
 @pytest.mark.parametrize("form", sorted(FIXED))

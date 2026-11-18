@@ -28,6 +28,8 @@ ROLES: dict[str, tuple[str, str]] = {
     "reviewer": ("reviewer", "reviewer"),
 }
 TRACE_KEY = "author_trace"
+# The key of the sample metadata with the secret values that the control plane knows.
+KNOWN_SECRETS_KEY = "known_secrets"
 
 
 def model_for(role: str) -> Model:
@@ -35,11 +37,11 @@ def model_for(role: str) -> Model:
     return get_model(role=ROLES[role][1])
 
 
-def _scrub_messages(messages: list[ChatMessage]) -> None:
+def _scrub_messages(messages: list[ChatMessage], known: list[str]) -> None:
     """Scrub the text of every message in place, as Agent.complete does before each call."""
     for message in messages:
         if isinstance(message.content, str):
-            message.content = scrub(message.content)
+            message.content = scrub(message.content, known)
 
 
 def _opening(role: str, user_text: str) -> list[ChatMessage]:
@@ -63,7 +65,7 @@ def role_turn(role: str | None = None) -> Solver:
         if sample_role == "author":
             return await _author_loop(state)
         messages = _opening(sample_role, state.input_text)
-        _scrub_messages(messages)
+        _scrub_messages(messages, state.metadata.get(KNOWN_SECRETS_KEY, []))
         output = await model_for(sample_role).generate(messages)
         state.messages = [*messages, output.message]
         state.output = output
@@ -80,7 +82,7 @@ async def _author_loop(state: TaskState) -> TaskState:
     model = model_for("author")
     messages = _opening("author", state.input_text)
     for _ in range(MAX_STEPS):
-        _scrub_messages(messages)
+        _scrub_messages(messages, state.metadata.get(KNOWN_SECRETS_KEY, []))
         output = await model.generate(messages, tools=author_tools())
         state.output = output
         messages.append(output.message)

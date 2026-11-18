@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
-	"github.com/statik/site-reliability-clanker/internal/scrub"
 )
 
 // maxReviewDiff is how much of the diff of a change the Reviewer reads.
@@ -152,11 +151,6 @@ func (a *Agent) Review(ctx context.Context, wi orchestrator.WorkItem, plans []or
 	review, err := parseReview(resp.Message.Content)
 	if err != nil {
 		return orchestrator.Review{}, err
-	}
-	// The concerns go into the audit log and onto the approval page. The prompt tells the
-	// Reviewer not to repeat a secret; the scrubber removes the forms that it knows.
-	for i, concern := range review.Concerns {
-		review.Concerns[i] = scrub.Text(concern)
 	}
 	review.Source = resp.Model
 	return review, nil

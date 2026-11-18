@@ -31,6 +31,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/policy"
 	"github.com/statik/site-reliability-clanker/internal/runbook"
 	"github.com/statik/site-reliability-clanker/internal/runner"
+	"github.com/statik/site-reliability-clanker/internal/scrub"
 	"github.com/statik/site-reliability-clanker/internal/sim"
 	"github.com/statik/site-reliability-clanker/internal/sink"
 	"github.com/statik/site-reliability-clanker/internal/store"
@@ -254,6 +255,7 @@ func build(ctx context.Context, o options) (*components, error) {
 	if err != nil {
 		return nil, err
 	}
+	registerSecrets(secret, os.Getenv)
 	c.writer, err = store.HoldWriter(ctx, secret.databaseURL, func() {
 		slog.Warn("another control plane writes to this database; waiting until it stops")
 	})
@@ -281,6 +283,7 @@ func build(ctx context.Context, o options) (*components, error) {
 		Envs: map[string]orchestrator.EnvConfig{o.env: {Name: o.env, Cloud: o.cloud}}}
 	if o.demo {
 		c.orch.JobVariables = map[string]string{"TF_VAR_admin_token": demoAdminToken}
+		scrub.Add(demoAdminToken)
 	}
 	c.monitor = monitor.New(c.db, c.clock)
 	// The demo users have no way to sign in. They exist only for the user switcher.
