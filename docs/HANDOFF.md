@@ -151,6 +151,33 @@ Merged for this:
 - #83: with `CLANKER_PARAMETER_PATH` and `AWS_REGION`, the core on AWS reads its settings
   from Parameter Store with the role of its instance (issue #40). It ran against a
   stand-in only.
+- The broker has an issuer for AWS (`internal/awstarget`). With `CLANKER_AWS_IDENTITIES` and
+  `AWS_REGION`, `up --cloud aws` exchanges a grant for one STS session. It ran against a
+  stand-in for STS only.
+  - `CLANKER_AWS_IDENTITIES` is the output `identities` of layer `00-bootstrap` as JSON:
+    the role ARN of each identity. It can come from Parameter Store. Without it the core
+    starts and the broker exchanges no grant, as before. A value that is not valid, or no
+    `AWS_REGION`, stops the start.
+  - The broker calls `sts:AssumeRole` with the role of its instance on the role of the
+    identity of the grant: `planner` for a plan, `applier-<layer>` for an apply. The
+    identity `runbook` has no role in the contract, so a runbook grant gets an error.
+  - The session lives as long as the grant has left, but not under 900 seconds and not
+    over one hour. The session name is the work item and the grant ID, for example
+    `WI-0142-G-9f3c1e7a2b4d`. The session tags are `clanker_grant`, `clanker_env`,
+    `clanker_layer`, `clanker_work_item` and `clanker_plan` (12 characters of the plan
+    hash). No approver is in the name or in a tag.
+  - A runner gives the keys to the `tofu` processes of the job as `AWS_ACCESS_KEY_ID`,
+    `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN`. It writes them to no file.
+  - Audit: `credential.issued` (grant, role ARN, session name, expiry) and
+    `credential.left_to_expire` are new. They occur only on AWS.
+  - Limit: the end of a grant does not end its session. STS cannot revoke one session, and
+    the contract gives the broker no permission to change a role. A session works until
+    its expiry, at most 900 seconds after a grant that had less time left.
+  - Limit: the request has no session policy. The permissions are those of the role inside
+    its permission boundary.
+  - Not built: a launcher on AWS, so no job runs there yet. A plan of layers 00 to 20 asks
+    the broker for no credential (`planCredential`), on every target. A runbook job and a
+    diagnose job get no AWS keys.
 
 Ran against a real account, read calls only: `clanker discover` and the browser walk of the
 step "Network". Both proposed the VPC that the owner had chosen by hand.
@@ -620,7 +647,8 @@ What ran on the build of commit `376617b`, the last change to the Go code:
      - To know: the links in the other notifications still use the listen address and not
        `CLANKER_PUBLIC_URL` (`cmd/clanker/up.go`). The chat requests use `CLANKER_PUBLIC_URL`.
 6. **Cloud runner and broker:** a launcher that starts a Fargate task, an S3 state backend
-   in the runner (the job specification has the field `backend`), a broker that uses STS.
+   in the runner (the job specification has the field `backend`). The broker has the issuer
+   for STS; it needs the roles of layer `00-bootstrap` and a run against an account.
 7. **The wizard for AWS:** build the image with `ops`, create the stack (auto scaling group,
    load balancer, RDS). The wizard offers AWS and ends at the review.
 8. **A run in a real account.**

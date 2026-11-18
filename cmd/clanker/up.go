@@ -20,6 +20,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/agent"
 	"github.com/statik/site-reliability-clanker/internal/api"
 	"github.com/statik/site-reliability-clanker/internal/audit"
+	"github.com/statik/site-reliability-clanker/internal/awstarget"
 	"github.com/statik/site-reliability-clanker/internal/broker"
 	"github.com/statik/site-reliability-clanker/internal/detect"
 	"github.com/statik/site-reliability-clanker/internal/dispatch"
@@ -212,8 +213,9 @@ type components struct {
 	chat *chatApps
 }
 
-// target holds the parts that only one kind of target has. On a cloud both are nil now:
-// the broker exchanges no grant and the drift scene reports that it cannot run.
+// target holds the parts that only one kind of target has. On a cloud manualChange is nil:
+// the drift scene reports that it cannot run. On AWS the issuer is nil without the roles
+// of the identities: the broker then exchanges no grant.
 type target struct {
 	issuer       broker.Issuer
 	manualChange func(context.Context, string) error
@@ -268,6 +270,11 @@ func build(ctx context.Context, o options) (*components, error) {
 	}
 	c.log = audit.New(c.db, c.clock)
 	c.forge = forge.New(c.db)
+	if o.cloud == "aws" {
+		if on.issuer, err = awsIssuer(c.log, awstarget.NewSTS); err != nil {
+			return nil, err
+		}
+	}
 	if c.dispatcher, err = newDispatcher(o); err != nil {
 		return nil, err
 	}

@@ -6,8 +6,11 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -258,5 +261,98 @@ func TestASecondResultIsRefused(t *testing.T) {
 	}
 	if status := post(); status != http.StatusUnauthorized && status != http.StatusConflict {
 		t.Fatalf("second result: status %d, want a refusal", status)
+	}
+}
+
+// envTofu stands in for tofu. For `init` and `plan` it appends the AWS variables of its
+// environment to $FAKE_TOFU_ENV. It prints nothing. The other variables stay out of the
+// file, so that a failed test does not print the environment of the machine. Only `init`
+// works, so a plan job stops after these two steps. The runner also asks tofu for its
+// version, which is not a step of the job.
+const envTofu = `#!/bin/sh
+case "$1" in
+init | plan) env | grep '^AWS_' >>"$FAKE_TOFU_ENV" ;;
+esac
+[ "$1" = init ]
+`
+
+// planWithTofuEnv runs a plan job with envTofu and returns the environment that the tofu
+// processes saw, the job log with the error of the job, and the directory of the runner.
+func planWithTofuEnv(t *testing.T, session *jobspec.AWSSession) (string, string, string) {
+	t.Helper()
+	bin, seen := t.TempDir(), filepath.Join(t.TempDir(), "env")
+	if err := os.WriteFile(filepath.Join(bin, "tofu"), []byte(envTofu), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("FAKE_TOFU_ENV", seen)
+	// The runner has keys of its own, as a runner on an instance with a profile has.
+	t.Setenv("AWS_ACCESS_KEY_ID", "AKIARUNNEROWN")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "")
+	t.Setenv("AWS_SESSION_TOKEN", "")
+	d, l, _ := setup(t)
+	var log bytes.Buffer
+	_, err := d.Run(context.Background(), jobspec.Job{Spec: jobspec.Spec{Kind: jobspec.KindPlan,
+		Env: "example", Cloud: "aws", Layer: "10-network", CheckoutID: "WI-0142/abc",
+		AWS: session}, Log: &log, Checkout: scripts(t, map[string]string{
+		"platform/stacks/aws/10-network/main.tf": "# empty\n"})})
+	if err == nil || !strings.Contains(err.Error(), "tofu plan") {
+		t.Fatalf("error = %v, want the failure of the plan step of the stand-in", err)
+	}
+	environment, readErr := os.ReadFile(seen)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	return string(environment), log.String() + err.Error(), l.dir
+}
+
+func TestTheAWSKeysOfAJobAreOnlyInTheEnvironmentOfItsTofuProcesses(t *testing.T) {
+	session := &jobspec.AWSSession{AccessKeyID: "ASIAEXAMPLE",
+		SecretAccessKey: "example-secret-access-key", SessionToken: "example-session-token",
+		Expires: time.Date(2026, 11, 21, 2, 30, 0, 0, time.UTC)}
+	environment, log, dir := planWithTofuEnv(t, session)
+	for _, line := range []string{"AWS_ACCESS_KEY_ID=ASIAEXAMPLE",
+		"AWS_SECRET_ACCESS_KEY=example-secret-access-key",
+		"AWS_SESSION_TOKEN=example-session-token"} {
+		if strings.Count(environment, line+"\n") != 2 {
+			t.Errorf("init and plan must each see %s", line)
+		}
+	}
+	if strings.Contains(environment, "AKIARUNNEROWN") {
+		t.Error("tofu saw the key of the runner, not only the key of the job")
+	}
+	secrets := []string{session.SecretAccessKey, session.SessionToken}
+	for _, secret := range secrets {
+		if strings.Contains(log, secret) {
+			t.Errorf("the job log or the error holds %q: %s", secret, log)
+		}
+	}
+	if os.Getenv("AWS_SESSION_TOKEN") != "" || os.Getenv("AWS_SECRET_ACCESS_KEY") != "" {
+		t.Error("the keys are in the environment of the runner itself")
+	}
+	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return err
+		}
+		text, err := os.ReadFile(path)
+		for _, secret := range secrets {
+			if bytes.Contains(text, []byte(secret)) {
+				t.Errorf("the file %s of the runner holds %q", path, secret)
+			}
+		}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAJobWithoutAWSKeysLeavesTheEnvironmentOfTofuAsItIs(t *testing.T) {
+	environment, _, _ := planWithTofuEnv(t, nil)
+	if strings.Count(environment, "AWS_ACCESS_KEY_ID=AKIARUNNEROWN\n") != 2 {
+		t.Error("tofu did not see the key of the runner in both steps")
+	}
+	if strings.Count(environment, "AWS_SESSION_TOKEN=\n") != 2 {
+		t.Error("tofu got a session token that no job has")
 	}
 }
