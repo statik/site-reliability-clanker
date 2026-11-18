@@ -246,7 +246,7 @@ func (o *Orchestrator) afterApproval(ctx context.Context, wi WorkItem, d Decisio
 		return wi, o.setState(&wi, StateScheduled, "orchestrator",
 			"waits for the window at "+wi.ScheduledFor)
 	}
-	go o.applyInBackground(wi.ID)
+	o.applies.Go(func() { o.applyInBackground(wi.ID) })
 	return wi, nil
 }
 
@@ -268,7 +268,7 @@ func (o *Orchestrator) RunDue() error {
 	now := o.Clock.Now()
 	for _, wi := range items {
 		if wi.State == StateScheduled && !now.Before(store.ParseTime(wi.ScheduledFor)) {
-			go o.applyInBackground(wi.ID)
+			o.applies.Go(func() { o.applyInBackground(wi.ID) })
 		}
 	}
 	return nil
