@@ -203,10 +203,16 @@ type Orchestrator struct {
 	JobVariables map[string]string
 
 	envLocks sync.Map
+	// applies counts the applies that run in the background.
+	applies sync.WaitGroup
 	// decideLocks holds one lock for each work item that somebody decided on.
 	decideLocks sync.Map
 	idMu        sync.Mutex
 }
+
+// WaitForApplies waits until every apply that an approval or a schedule started in the
+// background has ended, with its last audit event written.
+func (o *Orchestrator) WaitForApplies() { o.applies.Wait() }
 
 func (o *Orchestrator) lockEnv(env string) func() {
 	value, _ := o.envLocks.LoadOrStore(env, &sync.Mutex{})
