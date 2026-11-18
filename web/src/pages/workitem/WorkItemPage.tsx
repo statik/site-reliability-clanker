@@ -15,7 +15,7 @@ import {
 import { Link as RouterLink } from "react-router-dom";
 import type { AuditEvent, Plan, WorkItem, WorkItemDetail } from "@/api/types";
 import { AskPanel } from "@/components/AskPanel";
-import { AiMark, Loaded, Section } from "@/components/common";
+import { AiMark, Loaded, ScrollRegion, Section } from "@/components/common";
 import { StateTag, TierTag } from "@/components/status";
 import { useApi } from "@/hooks/useApi";
 import { permissionRequests } from "@/lib/permissions";
@@ -102,26 +102,28 @@ function Permissions({ item }: { item: WorkItem }) {
     return <Tile>This work item asks for no write permission.</Tile>;
   }
   return (
-    <StructuredListWrapper isCondensed aria-label="Permissions requested">
-      <StructuredListHead>
-        <StructuredListRow head>
-          <StructuredListCell head>Identity</StructuredListCell>
-          <StructuredListCell head>What it may do</StructuredListCell>
-          <StructuredListCell head>For how long</StructuredListCell>
-        </StructuredListRow>
-      </StructuredListHead>
-      <StructuredListBody>
-        {requests.map((request) => (
-          <StructuredListRow key={request.identity}>
-            <StructuredListCell noWrap>
-              <span className="app-mono">{request.identity}</span>
-            </StructuredListCell>
-            <StructuredListCell>{request.scope}</StructuredListCell>
-            <StructuredListCell>{request.duration}</StructuredListCell>
+    <ScrollRegion label="Permissions requested">
+      <StructuredListWrapper isCondensed aria-label="Permissions requested">
+        <StructuredListHead>
+          <StructuredListRow head>
+            <StructuredListCell head>Identity</StructuredListCell>
+            <StructuredListCell head>What it may do</StructuredListCell>
+            <StructuredListCell head>For how long</StructuredListCell>
           </StructuredListRow>
-        ))}
-      </StructuredListBody>
-    </StructuredListWrapper>
+        </StructuredListHead>
+        <StructuredListBody>
+          {requests.map((request) => (
+            <StructuredListRow key={request.identity}>
+              <StructuredListCell noWrap>
+                <span className="app-mono">{request.identity}</span>
+              </StructuredListCell>
+              <StructuredListCell>{request.scope}</StructuredListCell>
+              <StructuredListCell>{request.duration}</StructuredListCell>
+            </StructuredListRow>
+          ))}
+        </StructuredListBody>
+      </StructuredListWrapper>
+    </ScrollRegion>
   );
 }
 

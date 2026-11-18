@@ -68,6 +68,27 @@ export function Empty({ icon, children }: { icon: ReactNode; children: ReactNode
   );
 }
 
+/**
+ * Holds content that cannot get narrower than a phone, such as a table. The content scrolls
+ * sideways inside this region and the page does not. The region takes focus, so the arrow
+ * keys scroll it.
+ */
+export function ScrollRegion({ label, className, children }: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  const classes = className === undefined ? "app-scroll-x" : `app-scroll-x ${className}`;
+  return (
+    <div className={classes} role="region" aria-label={`${label}, scrolls sideways`}
+      // A region that scrolls must take focus, or a keyboard cannot scroll it (WCAG 2.1.1).
+      // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+      tabIndex={0}>
+      {children}
+    </div>
+  );
+}
+
 export function WorkItemLink({ id, children }: { id: string; children?: ReactNode }) {
   if (id === "") {
     return <>–</>;

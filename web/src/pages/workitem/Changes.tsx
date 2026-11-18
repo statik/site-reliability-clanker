@@ -15,6 +15,7 @@ import {
 import { Add, Edit, Renew, TrashCan, View } from "@carbon/icons-react";
 import type { Plan, ResourceChange } from "@/api/types";
 import { IconTag } from "@/components/status";
+import { ScrollRegion } from "@/components/common";
 
 type TagType = "green" | "blue" | "red" | "magenta" | "gray";
 
@@ -44,35 +45,37 @@ function countsText(plan: Plan): string {
 
 function ResourceList({ resources }: { resources: ResourceChange[] }) {
   return (
-    <StructuredListWrapper isCondensed aria-label="Resources in this plan">
-      <StructuredListHead>
-        <StructuredListRow head>
-          <StructuredListCell head>Action</StructuredListCell>
-          <StructuredListCell head>Resource</StructuredListCell>
-          <StructuredListCell head>What changes</StructuredListCell>
-        </StructuredListRow>
-      </StructuredListHead>
-      <StructuredListBody>
-        {resources.map((resource) => (
-          <StructuredListRow key={resource.address}>
-            <StructuredListCell><ActionTag action={resource.action} /></StructuredListCell>
-            <StructuredListCell>
-              <span className="app-mono">{resource.address}</span>
-            </StructuredListCell>
-            <StructuredListCell>
-              {(resource.details ?? []).length === 0
-                ? "New resource" : (
-                  <UnorderedList>
-                    {(resource.details ?? []).map((detail) => (
-                      <ListItem key={detail}>{detail}</ListItem>
-                    ))}
-                  </UnorderedList>
-                )}
-            </StructuredListCell>
+    <ScrollRegion label="Resources in this plan">
+      <StructuredListWrapper isCondensed aria-label="Resources in this plan">
+        <StructuredListHead>
+          <StructuredListRow head>
+            <StructuredListCell head>Action</StructuredListCell>
+            <StructuredListCell head>Resource</StructuredListCell>
+            <StructuredListCell head>What changes</StructuredListCell>
           </StructuredListRow>
-        ))}
-      </StructuredListBody>
-    </StructuredListWrapper>
+        </StructuredListHead>
+        <StructuredListBody>
+          {resources.map((resource) => (
+            <StructuredListRow key={resource.address}>
+              <StructuredListCell><ActionTag action={resource.action} /></StructuredListCell>
+              <StructuredListCell>
+                <span className="app-mono">{resource.address}</span>
+              </StructuredListCell>
+              <StructuredListCell>
+                {(resource.details ?? []).length === 0
+                  ? "New resource" : (
+                    <UnorderedList>
+                      {(resource.details ?? []).map((detail) => (
+                        <ListItem key={detail}>{detail}</ListItem>
+                      ))}
+                    </UnorderedList>
+                  )}
+              </StructuredListCell>
+            </StructuredListRow>
+          ))}
+        </StructuredListBody>
+      </StructuredListWrapper>
+    </ScrollRegion>
   );
 }
 

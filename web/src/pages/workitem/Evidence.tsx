@@ -9,7 +9,7 @@ import {
   StructuredListWrapper,
 } from "@carbon/react";
 import type { Finding, PlanJSON, WorkItemDetail } from "@/api/types";
-import { AppLink, Loaded } from "@/components/common";
+import { AppLink, Loaded, ScrollRegion } from "@/components/common";
 import { DiffView } from "@/components/DiffView";
 import { StatusTag } from "@/components/status";
 import { useApi } from "@/hooks/useApi";
@@ -70,42 +70,45 @@ export function Evidence({ detail }: { detail: WorkItemDetail }) {
     .filter((digest) => digest !== "");
   return (
     <div className="app-stack-tight">
-      <StructuredListWrapper isCondensed aria-label="Evidence">
-        <StructuredListBody>
-          <Row label="Trigger">{item.trigger === "" ? "Not recorded" : item.trigger}</Row>
-          <FindingRow workItem={item.id} />
-          {item.rollback_of !== "" && (
-            <Row label="Rolls back">
-              <AppLink to={`/work/${item.rollback_of}`}>{item.rollback_of}</AppLink>
-            </Row>
-          )}
-          <Row label="Pull request">
-            {detail.pull === undefined ? "None. This work item changes no code." : (
-              <span className="app-row">
-                <AppLink to={`/code/pulls/${detail.pull.id}`}>
-                  #{detail.pull.id} {detail.pull.title}
-                </AppLink>
-                <StatusTag status={detail.pull.state} size="sm" />
-              </span>
+      <ScrollRegion label="Evidence">
+        <StructuredListWrapper isCondensed aria-label="Evidence">
+          <StructuredListBody>
+            <Row label="Trigger">{item.trigger === "" ? "Not recorded" : item.trigger}</Row>
+            <FindingRow workItem={item.id} />
+            {item.rollback_of !== "" && (
+              <Row label="Rolls back">
+                <AppLink to={`/work/${item.rollback_of}`}>{item.rollback_of}</AppLink>
+              </Row>
             )}
-          </Row>
-          <Row label="Commit">
-            <span className="app-mono">{item.commit === "" ? "None yet" : item.commit}</span>
-          </Row>
-          <Row label="Policy result">
-            {plans.length === 0 ? `Tier ${item.tier || "not set"}, rule ${item.tier_rule || "none"}`
-              : plans.map((plan) => (
-                <div key={plan.id}>
-                  {plan.layer}: tier {plan.policy.tier} by rule {plan.policy.rule}
-                </div>
-              ))}
-          </Row>
-          <Row label="Tool digest">
-            {digests.length === 0 ? "No job has run yet"
-              : digests.map((digest) => <div key={digest} className="app-mono">{digest}</div>)}
-          </Row>
-        </StructuredListBody>
-      </StructuredListWrapper>
+            <Row label="Pull request">
+              {detail.pull === undefined ? "None. This work item changes no code." : (
+                <span className="app-row">
+                  <AppLink to={`/code/pulls/${detail.pull.id}`}>
+                    #{detail.pull.id} {detail.pull.title}
+                  </AppLink>
+                  <StatusTag status={detail.pull.state} size="sm" />
+                </span>
+              )}
+            </Row>
+            <Row label="Commit">
+              <span className="app-mono">{item.commit === "" ? "None yet" : item.commit}</span>
+            </Row>
+            <Row label="Policy result">
+              {plans.length === 0
+                ? `Tier ${item.tier || "not set"}, rule ${item.tier_rule || "none"}`
+                : plans.map((plan) => (
+                  <div key={plan.id}>
+                    {plan.layer}: tier {plan.policy.tier} by rule {plan.policy.rule}
+                  </div>
+                ))}
+            </Row>
+            <Row label="Tool digest">
+              {digests.length === 0 ? "No job has run yet"
+                : digests.map((digest) => <div key={digest} className="app-mono">{digest}</div>)}
+            </Row>
+          </StructuredListBody>
+        </StructuredListWrapper>
+      </ScrollRegion>
       <Accordion align="start">
         {detail.diff !== undefined && (
           <AccordionItem title="Pull request diff">

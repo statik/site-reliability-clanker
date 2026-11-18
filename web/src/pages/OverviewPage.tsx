@@ -14,8 +14,8 @@ import { CloudOffline, Launch, TaskComplete } from "@carbon/icons-react";
 import { useNavigate } from "react-router-dom";
 import { apiPost, errorMessage } from "@/api/client";
 import type { CatchUp, EnvironmentSummary, Overview, Posture, WorkItem } from "@/api/types";
-import { AiMark, AppLink, Empty, ErrorNote, Loaded, PageHeader, Section }
-  from "@/components/common";
+import { AiMark, AppLink, Empty, ErrorNote,
+  Loaded, PageHeader, ScrollRegion, Section } from "@/components/common";
 import { IconTag, StatusTag, TierTag } from "@/components/status";
 import { anyEvent, useApi } from "@/hooks/useApi";
 import { formatTime, shortHash } from "@/lib/time";
@@ -142,40 +142,42 @@ function NeedsYou({ waiting }: { waiting: WorkItem[] }) {
 
 function PostureMatrix({ posture }: { posture: Posture }) {
   return (
-    <StructuredListWrapper aria-label="Version posture">
-      <StructuredListHead>
-        <StructuredListRow head>
-          <StructuredListCell head>Environment</StructuredListCell>
-          {posture.components.map((component) => (
-            <StructuredListCell head key={component}>
-              {COMPONENT_LABEL[component] ?? component}
-            </StructuredListCell>
-          ))}
-        </StructuredListRow>
-      </StructuredListHead>
-      <StructuredListBody>
-        {posture.rows.map((row) => (
-          <StructuredListRow key={row.env}>
-            <StructuredListCell noWrap>{row.env}</StructuredListCell>
-            {posture.components.map((component) => {
-              const cell = row.cells[component];
-              if (cell === undefined) {
-                return <StructuredListCell key={component}>–</StructuredListCell>;
-              }
-              const behind = cell.status === "behind"
-                ? `Behind: ${cell.current}, latest ${cell.latest}` : undefined;
-              return (
-                <StructuredListCell key={component}>
-                  <StatusTag status={cell.status} size="sm"
-                    {...(behind === undefined ? {} : { label: behind })} />
-                  {cell.status === "current" && <span> {cell.current}</span>}
-                </StructuredListCell>
-              );
-            })}
+    <ScrollRegion label="Version posture">
+      <StructuredListWrapper aria-label="Version posture">
+        <StructuredListHead>
+          <StructuredListRow head>
+            <StructuredListCell head>Environment</StructuredListCell>
+            {posture.components.map((component) => (
+              <StructuredListCell head key={component}>
+                {COMPONENT_LABEL[component] ?? component}
+              </StructuredListCell>
+            ))}
           </StructuredListRow>
-        ))}
-      </StructuredListBody>
-    </StructuredListWrapper>
+        </StructuredListHead>
+        <StructuredListBody>
+          {posture.rows.map((row) => (
+            <StructuredListRow key={row.env}>
+              <StructuredListCell noWrap>{row.env}</StructuredListCell>
+              {posture.components.map((component) => {
+                const cell = row.cells[component];
+                if (cell === undefined) {
+                  return <StructuredListCell key={component}>–</StructuredListCell>;
+                }
+                const behind = cell.status === "behind"
+                  ? `Behind: ${cell.current}, latest ${cell.latest}` : undefined;
+                return (
+                  <StructuredListCell key={component}>
+                    <StatusTag status={cell.status} size="sm"
+                      {...(behind === undefined ? {} : { label: behind })} />
+                    {cell.status === "current" && <span> {cell.current}</span>}
+                  </StructuredListCell>
+                );
+              })}
+            </StructuredListRow>
+          ))}
+        </StructuredListBody>
+      </StructuredListWrapper>
+    </ScrollRegion>
   );
 }
 

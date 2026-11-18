@@ -5,6 +5,7 @@ import { stateSteps, TERMINAL_STATES } from "@/lib/stateDurations";
 import type { StateStep } from "@/lib/stateDurations";
 import { formatDuration } from "@/lib/time";
 import { useServerNow } from "@/state/clock";
+import { ScrollRegion } from "@/components/common";
 
 const BAD_STATES = ["Failed", "RolledBack", "Rejected"];
 
@@ -31,7 +32,7 @@ export function StateProgress({ workItem, events }: {
   const steps = stateSteps(workItem.created_at, events, now);
   const currentIndex = steps.findIndex((step) => step.status === "current");
   return (
-    <div className="app-progress">
+    <ScrollRegion label="Progress through the states" className="app-progress">
       <ProgressIndicator currentIndex={currentIndex} spaceEqually
         aria-label="Progress through the work item states">
         {steps.map((step) => (
@@ -43,6 +44,6 @@ export function StateProgress({ workItem, events }: {
             invalid={BAD_STATES.includes(step.state) && step.status !== "upcoming"} />
         ))}
       </ProgressIndicator>
-    </div>
+    </ScrollRegion>
   );
 }

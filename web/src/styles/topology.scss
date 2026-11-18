@@ -4,7 +4,6 @@
 @use "@carbon/react/scss/type";
 
 .topo-scroll {
-  overflow-x: auto;
   padding: spacing.$spacing-05;
   border: 1px solid theme.$border-subtle-01;
   background: theme.$layer-01;
