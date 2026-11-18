@@ -67,6 +67,7 @@ func (s *Server) getState(r *http.Request) (any, error) {
 		"dashboard_up":  s.dashboardUp(r.Context()),
 		"cost":          costEstimate(SizeOf(state.Size)),
 		"aws_enabled":   s.cfg.EnableAWS,
+		"survey_only":   s.cfg.SurveyOnly,
 	}, nil
 }
 
@@ -136,20 +137,6 @@ func (s *Server) getProfiles(r *http.Request) (any, error) {
 	return map[string]any{"profiles": profiles}, nil
 }
 
-// postDiscover surveys the account of a profile and proposes where the control plane goes.
-// It only reads. With no region it surveys the region that is used most.
-func (s *Server) postDiscover(r *http.Request) (any, error) {
-	var body struct{ Profile, Region string }
-	if err := decode(r, &body); err != nil {
-		return nil, err
-	}
-	account := AWS{Profile: body.Profile, Run: s.cfg.CLI}
-	if err := account.checkNames(body.Region); err != nil {
-		return nil, invalid("%v", err)
-	}
-	return account.Discover(r.Context(), startRegion, body.Region)
-}
-
 func (s *Server) postSignIn(r *http.Request) (any, error) {
 	var body struct{ Profile, Region, Size string }
 	if err := decode(r, &body); err != nil {
@@ -158,7 +145,11 @@ func (s *Server) postSignIn(r *http.Request) (any, error) {
 	s.mu.Lock()
 	candidate := s.aws()
 	s.mu.Unlock()
+	// Without a region the survey of the next step finds the region that is in use.
 	candidate.Profile, candidate.Region = body.Profile, body.Region
+	if body.Region == "" {
+		candidate.Region = startRegion
+	}
 	if err := candidate.Validate(); err != nil {
 		return nil, invalid("%v", err)
 	}
@@ -171,7 +162,8 @@ func (s *Server) postSignIn(r *http.Request) (any, error) {
 	s.state.Profile, s.state.Region = body.Profile, body.Region
 	s.state.Account, s.state.Principal = identity.Account, identity.Arn
 	s.state.Size = SizeOf(body.Size).Name
-	s.review = nil
+	s.review, s.found = nil, nil
+	s.clearPlacement()
 	return s.state, s.save()
 }
 
@@ -184,6 +176,9 @@ func (s *Server) postLogin(r *http.Request) (any, error) {
 	candidate := s.aws()
 	s.mu.Unlock()
 	candidate.Profile, candidate.Region = body.Profile, body.Region
+	if body.Region == "" {
+		candidate.Region = startRegion
+	}
 	if err := candidate.Validate(); err != nil {
 		return nil, invalid("%v", err)
 	}
@@ -207,6 +202,9 @@ func (s *Server) postReview(r *http.Request) (any, error) {
 		s.mu.Unlock()
 		return map[string]bool{"started": false}, nil
 	case TargetAWS:
+		if s.cfg.SurveyOnly {
+			return nil, errSurveyOnly
+		}
 		if state.Account == "" {
 			return nil, invalid("sign in to AWS before the review")
 		}
@@ -248,6 +246,9 @@ func (s *Server) postDeploy(r *http.Request) (any, error) {
 	}
 	work := s.deployLocal
 	if state.Target == TargetAWS {
+		if s.cfg.SurveyOnly {
+			return nil, errSurveyOnly
+		}
 		work = s.deployAWS
 	}
 	err := s.start("deploy", work)

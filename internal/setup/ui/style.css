@@ -115,6 +115,10 @@ main p + p { margin-top: 0.75rem; }
 .choices { display: grid; gap: 1px; margin-top: 1.5rem; background: var(--border-strong);
   border: 1px solid var(--border-strong); }
 @media (min-width: 40rem) { .choices { grid-template-columns: repeat(2, 1fr); } }
+/* The list of networks ends with the choice of a new network, on a row of its own. A last
+   network that would stand alone in its row takes the whole row too. */
+.choices > .choice-wide,
+.choices > .choice:nth-last-child(2):nth-child(odd):has(+ .choice-wide) { grid-column: 1 / -1; }
 .choice { display: block; position: relative; padding: 1rem 1rem 1.5rem;
   background: var(--background); cursor: pointer; border: 2px solid transparent; }
 .choice:hover { background: var(--layer-01); }

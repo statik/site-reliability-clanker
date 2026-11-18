@@ -20,7 +20,10 @@ type Discovery struct {
 	Region    string    `json:"region"`
 	Networks  []Network `json:"networks"`
 	Placement Placement `json:"placement"`
-	Rights    []Right   `json:"rights"`
+	// NewNetworkCIDR is the address range that a new network would get, for a person who
+	// does not want a network that exists. It is empty when no range is free.
+	NewNetworkCIDR string  `json:"new_network_cidr"`
+	Rights         []Right `json:"rights"`
 	// RightsError says why the rights are not known. The rest of the discovery stands.
 	RightsError string `json:"rights_error,omitempty"`
 }
@@ -332,6 +335,7 @@ func (a AWS) Discover(ctx context.Context, start, region string) (Discovery, err
 		return Discovery{}, err
 	}
 	found.Placement = Place(found.Networks)
+	found.NewNetworkCIDR = placeNew(found.Networks, nil).CIDR
 	if found.Rights, err = a.Rights(ctx, identity); err != nil {
 		found.RightsError = err.Error()
 	}
