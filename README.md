@@ -82,6 +82,25 @@ with a key present, set `CLANKER_AGENT_MODE=replay`. The recorded responses pass
 scorers, but nobody ran the full demo in replay mode yet: every run so far used the live
 model. The runtime stops model calls for the day after 5 USD.
 
+The agent can also use an OpenAI-compatible chat endpoint, for example a model server on the
+same host. These settings are environment variables of `clanker up`:
+
+| Setting | Meaning |
+|---|---|
+| `CLANKER_LLM_BASE_URL` | The base address of the endpoint, for example `http://127.0.0.1:11434/v1`. The agent sends requests to `<base>/chat/completions`. With this setting, the agent does not use OpenRouter and needs no `OPENROUTER_API_KEY`. |
+| `CLANKER_LLM_API_KEY` | Optional. The bearer key for the endpoint. |
+| `CLANKER_LLM_MODEL` | The model name for every role. |
+| `CLANKER_LLM_MODEL_<ROLE>` | The model name for one role. `<ROLE>` is `TRIAGE`, `EXPLAINER`, `AUTHOR`, `INVESTIGATOR` or `REVIEWER`. |
+
+If `CLANKER_LLM_BASE_URL` is set and a role has no model name, `clanker up` stops at the
+start with an error. `CLANKER_AGENT_MODE=replay` still forces replay mode. The dashboard and
+the audit log show this mode as `local`. The agent waits 10 minutes for one answer of this
+endpoint and asks for an answer of at most 8192 tokens.
+
+A call to such an endpoint reports no cost, so the limit of 5 USD does not stop it. The
+runtime also stops model calls for the day after 5 million tokens in calls that report no
+cost.
+
 Stop a running control plane before you start `make demo` again: `pkill -f "clanker up"`.
 
 ## What is in the repository

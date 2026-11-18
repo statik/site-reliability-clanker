@@ -68,53 +68,90 @@ type LLM interface {
 	Complete(ctx context.Context, req Request) (Response, error)
 }
 
-// OpenRouter calls the OpenRouter chat completions endpoint.
-type OpenRouter struct {
+// localMaxTokens is the answer limit for an endpoint that the operator runs. The default
+// limit of such an endpoint can cut an answer in the middle of its JSON object.
+const localMaxTokens = 8192
+
+// Chat calls the chat completions route of an OpenAI-compatible endpoint.
+type Chat struct {
 	APIKey  string
 	BaseURL string
-	client  http.Client
+	// name is the name of the endpoint in an error message.
+	name string
+	mode string
+	// openRouter adds the request fields that only OpenRouter reads.
+	openRouter bool
+	// maxTokens is the answer limit in the request. Zero sends no limit.
+	maxTokens int
+	client    http.Client
 }
 
 // NewOpenRouter returns a client for the OpenRouter API.
-func NewOpenRouter(apiKey string) *OpenRouter {
-	return &OpenRouter{APIKey: apiKey, BaseURL: "https://openrouter.ai/api/v1",
-		client: http.Client{Timeout: 120 * time.Second}}
+func NewOpenRouter(apiKey string) *Chat {
+	return &Chat{APIKey: apiKey, BaseURL: "https://openrouter.ai/api/v1", name: "OpenRouter",
+		mode: "openrouter", openRouter: true, client: http.Client{Timeout: 120 * time.Second}}
+}
+
+// NewLocal returns a client for an OpenAI-compatible endpoint at baseURL, for example a
+// model server on the same host. The key is optional. A local model is slow, so the
+// timeout is 10 minutes.
+func NewLocal(baseURL, apiKey string) *Chat {
+	return &Chat{APIKey: apiKey, BaseURL: strings.TrimRight(baseURL, "/"),
+		name: "The model endpoint " + baseURL, mode: "local", maxTokens: localMaxTokens,
+		client: http.Client{Timeout: 10 * time.Minute}}
 }
 
 // Mode implements LLM.
-func (*OpenRouter) Mode() string { return "openrouter" }
+func (c *Chat) Mode() string { return c.mode }
 
-// Complete implements LLM.
-func (o *OpenRouter) Complete(ctx context.Context, req Request) (Response, error) {
-	payload := map[string]any{"model": req.Model, "messages": req.Messages,
-		"usage": map[string]any{"include": true}}
+func (c *Chat) newRequest(ctx context.Context, req Request) (*http.Request, error) {
+	payload := map[string]any{"model": req.Model, "messages": req.Messages}
+	if c.openRouter {
+		payload["usage"] = map[string]any{"include": true}
+	}
+	if c.maxTokens > 0 {
+		payload["max_tokens"] = c.maxTokens
+	}
 	if len(req.Tools) > 0 {
 		payload["tools"] = req.Tools
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return Response{}, fmt.Errorf("encode OpenRouter request: %w", err)
+		return nil, fmt.Errorf("encode the model request: %w", err)
 	}
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		o.BaseURL+"/chat/completions", bytes.NewReader(body))
+		c.BaseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
-		return Response{}, fmt.Errorf("build OpenRouter request: %w", err)
+		return nil, fmt.Errorf("build the model request: %w", err)
 	}
-	httpReq.Header.Set("Authorization", "Bearer "+o.APIKey)
+	if c.APIKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+c.APIKey)
+	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("X-Title", "site-reliability-clanker")
-	resp, err := o.client.Do(httpReq)
+	if c.openRouter {
+		httpReq.Header.Set("X-Title", "site-reliability-clanker")
+	}
+	return httpReq, nil
+}
+
+// Complete implements LLM.
+func (c *Chat) Complete(ctx context.Context, req Request) (Response, error) {
+	httpReq, err := c.newRequest(ctx, req)
 	if err != nil {
-		return Response{}, fmt.Errorf("call OpenRouter with model %s: %w", req.Model, err)
+		return Response{}, err
+	}
+	resp, err := c.client.Do(httpReq)
+	if err != nil {
+		return Response{}, fmt.Errorf("call %s with model %s: %w", c.name, req.Model, err)
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if err != nil {
-		return Response{}, fmt.Errorf("read OpenRouter response: %w", err)
+		return Response{}, fmt.Errorf("read the response of %s: %w", c.name, err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return Response{}, fmt.Errorf("OpenRouter answered %d for model %s: %s. Check the key "+
-			"and the model name", resp.StatusCode, req.Model, truncate(string(raw), 300))
+		return Response{}, fmt.Errorf("%s answered %d for model %s: %s. Check the key "+
+			"and the model name", c.name, resp.StatusCode, req.Model, truncate(string(raw), 300))
 	}
 	var parsed struct {
 		Model   string `json:"model"`
@@ -128,10 +165,14 @@ func (o *OpenRouter) Complete(ctx context.Context, req Request) (Response, error
 		} `json:"usage"`
 	}
 	if err := json.Unmarshal(raw, &parsed); err != nil {
-		return Response{}, fmt.Errorf("decode OpenRouter response: %w", err)
+		return Response{}, fmt.Errorf("decode the response of %s: %w", c.name, err)
 	}
 	if len(parsed.Choices) == 0 {
-		return Response{}, fmt.Errorf("OpenRouter gave no choices for model %s", req.Model)
+		return Response{}, fmt.Errorf("%s gave no choices for model %s", c.name, req.Model)
+	}
+	// The approval page shows the model name as the source of the text.
+	if parsed.Model == "" {
+		parsed.Model = req.Model
 	}
 	return Response{Message: parsed.Choices[0].Message, Model: parsed.Model,
 		PromptTokens: parsed.Usage.PromptTokens, CompletionTokens: parsed.Usage.CompletionTokens,
