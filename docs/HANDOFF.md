@@ -92,7 +92,8 @@ Not built, in the order of the work:
    the ECS design (`controlplane.yaml`, the tunnel, the container size).
 4. The STS issuer and the Fargate launcher. The credential of the broker must carry
    short-lived AWS keys beside the kubeconfig: show the owner that shape first.
-5. Prices from the AWS price list in the wizard.    one US region: 0.0208 USD each hour for `t3.small`, 0.016 for `db.t4g.micro`, 0.0225 for an
+5. Prices from the AWS price list in the wizard. Checked by hand on 2026-11-17 for one US
+   region: 0.0208 USD each hour for `t3.small`, 0.016 for `db.t4g.micro`, 0.0225 for an
    application load balancer, 0.04048 for each vCPU and 0.004445 for each GB of Fargate.
    That is about 7 USD for the week without a load balancer.
 
