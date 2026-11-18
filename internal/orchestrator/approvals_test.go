@@ -3,7 +3,6 @@ package orchestrator
 import (
 	"context"
 	"io/fs"
-	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -50,25 +49,8 @@ func approvalOrchestrator(t *testing.T, settings string) *Orchestrator {
 	o := &Orchestrator{DB: db, Audit: audit.New(db, clock), Forge: f, Broker: b, Clock: clock}
 	// An approval starts the apply in the background. The apply must end before the
 	// database of the test goes away.
-	t.Cleanup(func() { settle(t, o) })
+	t.Cleanup(o.WaitForApplies)
 	return o
-}
-
-// settle waits until no work item is between the approval and the end of its apply.
-func settle(t *testing.T, o *Orchestrator) {
-	t.Helper()
-	moving := []string{StateApproved, StateApplying, StateVerifying}
-	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
-		items, err := o.List()
-		if err == nil && !slices.ContainsFunc(items, func(wi WorkItem) bool {
-			return slices.Contains(moving, wi.State)
-		}) {
-			return
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Error("an apply did not end in 10 seconds")
 }
 
 // tieredItem makes a work item in the given state with one saved plan that changes
