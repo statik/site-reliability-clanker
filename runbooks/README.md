@@ -7,6 +7,7 @@ This directory is the content of the `runbooks` repository in the forge.
 | `jobs/` | One runbook for each pair of files: `<name>.json` is the definition and `<name>.sh` is the script |
 | `policy/` | The rules that give a plan its risk tier (Rego) |
 | `policy/approvals.json` | The number of approvers that a tier T3 change needs |
+| `policy/maintenance-windows.json` | The weekly windows in which a tier T3 change can apply. The file is optional and this directory does not have it |
 | `notifications/routes.json` | Who is told about which event |
 
 ## The approval settings
@@ -30,6 +31,56 @@ Tier T2 always needs one approver. No other tier has a setting.
 The control plane copies this directory into the forge only at the first start. Until a
 pull request on the `runbooks` repository is possible, set the value before the first
 start.
+
+## The maintenance windows
+
+`policy/maintenance-windows.json` has one key, a list of weekly windows:
+
+```json
+{"windows": [
+  {"days": ["sat", "sun"], "start": "02:00", "minutes": 120, "time_zone": "Europe/Dublin"}
+]}
+```
+
+| Key | Value |
+|---|---|
+| `days` | One or more of `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`: the days on which the window starts |
+| `start` | The start as `HH:MM` on a 24-hour clock in the time zone |
+| `minutes` | The length of the window, from 30 to 1440. A window can cross midnight |
+| `time_zone` | An IANA name, for example `Europe/Dublin` or `UTC` |
+
+A repository without the file, or with an empty list, has no windows: an approved tier T3
+change applies at once. This directory has no file, so the first deployment does not wait.
+
+With one window or more, an approved tier T3 change applies only inside a window:
+
+- When the last approval comes outside a window, the work item goes to the state
+  `Scheduled` and waits for the start of the next window.
+- When the last approval comes inside a window with 30 minutes or more left, the change
+  applies at once. With less than 30 minutes left, it waits for the next window. An apply
+  grant lasts 30 minutes, so the grant ends before the window ends.
+- When an approver sets a time for the apply, the change applies at the first moment at or
+  after that time that is inside a window with 30 minutes or more left.
+
+The control plane reads the file at the head of `main` when the last approval comes and
+again when the apply starts. A change that becomes due outside a window waits for the
+next window. This happens when the control plane did not run during the window, or when
+the file changed during the wait. The control plane issues the grant when the apply
+starts, not at the approval. The runner compares the plan with the state at that time. If
+the plan is stale, the work item gets a new plan and waits for approval again.
+
+To cancel a change that waits, an approver or an admin rejects it. No decision starts the
+apply before the window.
+
+A file that is not valid is an error. This includes text that is not JSON, a key that is
+not in the table, a key that comes twice, a missing key, a value outside the table, and
+data after the object. While the file is not valid, no tier T3 work item is approved and
+no tier T3 change that waits is applied.
+
+Tiers T0, T1 and T2 do not wait for a maintenance window.
+
+The rule that the control plane copies this directory only at the first start applies to
+this file too.
 
 ## A runbook
 

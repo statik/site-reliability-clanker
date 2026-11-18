@@ -91,9 +91,12 @@ type WorkItem struct {
 	Summary      string      `json:"summary"`
 	Explanation  Explanation `json:"explanation"`
 	ScheduledFor string      `json:"scheduled_for"`
-	RollbackOf   string      `json:"rollback_of"`
-	CreatedAt    string      `json:"created_at"`
-	UpdatedAt    string      `json:"updated_at"`
+	// MaintenanceWindow is the start of the maintenance window that a scheduled work
+	// item waits for. It is empty when the work item does not wait for a window.
+	MaintenanceWindow string `json:"maintenance_window"`
+	RollbackOf        string `json:"rollback_of"`
+	CreatedAt         string `json:"created_at"`
+	UpdatedAt         string `json:"updated_at"`
 }
 
 // Plan is a saved plan for one layer of a work item.
@@ -224,15 +227,16 @@ func (o *Orchestrator) lockEnv(env string) func() {
 func (o *Orchestrator) now() string { return store.FormatTime(o.Clock.Now()) }
 
 const workItemColumns = `id, title, kind, env, layers, state, tier, tier_rule, trigger, pr_id,
-	commit_sha, base_commit, summary, explanation, scheduled_for, rollback_of, created_at,
-	updated_at`
+	commit_sha, base_commit, summary, explanation, scheduled_for, maintenance_window,
+	rollback_of, created_at, updated_at`
 
 func scanWorkItem(row interface{ Scan(...any) error }) (WorkItem, error) {
 	var wi WorkItem
 	var layers, explanation string
 	err := row.Scan(&wi.ID, &wi.Title, &wi.Kind, &wi.Env, &layers, &wi.State, &wi.Tier,
 		&wi.TierRule, &wi.Trigger, &wi.PRID, &wi.Commit, &wi.BaseCommit, &wi.Summary,
-		&explanation, &wi.ScheduledFor, &wi.RollbackOf, &wi.CreatedAt, &wi.UpdatedAt)
+		&explanation, &wi.ScheduledFor, &wi.MaintenanceWindow, &wi.RollbackOf, &wi.CreatedAt,
+		&wi.UpdatedAt)
 	if err != nil {
 		return WorkItem{}, err
 	}
@@ -280,10 +284,10 @@ func (o *Orchestrator) save(wi WorkItem) error {
 	wi.UpdatedAt = o.now()
 	_, err := o.DB.Exec(`UPDATE work_items SET title=$1, layers=$2, state=$3, tier=$4, tier_rule=$5,
 		pr_id=$6, commit_sha=$7, base_commit=$8, summary=$9, explanation=$10, scheduled_for=$11,
-		rollback_of=$12, updated_at=$13 WHERE id=$14`,
+		rollback_of=$12, updated_at=$13, maintenance_window=$14 WHERE id=$15`,
 		wi.Title, string(layers), wi.State, wi.Tier, wi.TierRule, wi.PRID, wi.Commit,
 		wi.BaseCommit, wi.Summary, string(explanation), wi.ScheduledFor, wi.RollbackOf,
-		wi.UpdatedAt, wi.ID)
+		wi.UpdatedAt, wi.MaintenanceWindow, wi.ID)
 	if err != nil {
 		return fmt.Errorf("save work item %s: %w", wi.ID, err)
 	}

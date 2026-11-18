@@ -16,6 +16,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/audit"
 	"github.com/statik/site-reliability-clanker/internal/broker"
 	"github.com/statik/site-reliability-clanker/internal/jobspec"
+	"github.com/statik/site-reliability-clanker/internal/policy"
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
 
@@ -170,18 +171,13 @@ func (o *Orchestrator) decide(ctx context.Context, id string, d Decision) (WorkI
 		return WorkItem{}, fmt.Errorf("%w: a comment is required to reject or to request "+
 			"changes", ErrInvalid)
 	}
-	if d.ScheduledFor != "" {
-		when := store.ParseTime(d.ScheduledFor)
-		if when.IsZero() {
-			return WorkItem{}, fmt.Errorf("%w: scheduled_for %q is not an RFC 3339 time",
-				ErrInvalid, d.ScheduledFor)
-		}
-		if when.Before(o.Clock.Now()) {
-			return WorkItem{}, fmt.Errorf("%w: scheduled_for %s is in the past; the control "+
-				"plane time is %s", ErrInvalid, d.ScheduledFor, o.now())
-		}
+	if err := o.checkScheduledFor(d.ScheduledFor); err != nil {
+		return WorkItem{}, err
 	}
-	if wi.State != StateAwaitingApproval {
+	// A person can end the wait of a scheduled work item: a reject is the one decision
+	// that it accepts.
+	endsWait := wi.State == StateScheduled && d.Decision == "reject"
+	if wi.State != StateAwaitingApproval && !endsWait {
 		return WorkItem{}, fmt.Errorf("%w: %s is in state %s and does not wait for approval",
 			ErrConflict, id, wi.State)
 	}
@@ -211,6 +207,7 @@ func (o *Orchestrator) decide(ctx context.Context, id string, d Decision) (WorkI
 				return WorkItem{}, err
 			}
 		}
+		wi.MaintenanceWindow = ""
 		return wi, o.setState(&wi, StateRejected, user.Name, d.Comment)
 	case "request_changes":
 		return wi, o.setState(&wi, StateChangesRequested, user.Name, d.Comment)
@@ -226,6 +223,23 @@ func (o *Orchestrator) decide(ctx context.Context, id string, d Decision) (WorkI
 	}
 }
 
+// checkScheduledFor refuses a time for the apply that is not a time or that is past.
+func (o *Orchestrator) checkScheduledFor(scheduledFor string) error {
+	if scheduledFor == "" {
+		return nil
+	}
+	when := store.ParseTime(scheduledFor)
+	if when.IsZero() {
+		return fmt.Errorf("%w: scheduled_for %q is not an RFC 3339 time", ErrInvalid,
+			scheduledFor)
+	}
+	if when.Before(o.Clock.Now()) {
+		return fmt.Errorf("%w: scheduled_for %s is in the past; the control plane time is %s",
+			ErrInvalid, scheduledFor, o.now())
+	}
+	return nil
+}
+
 func (o *Orchestrator) afterApproval(ctx context.Context, wi WorkItem, d Decision) (WorkItem, error) {
 	approvers, err := o.validApprovers(wi)
 	if err != nil {
@@ -238,16 +252,58 @@ func (o *Orchestrator) afterApproval(ctx context.Context, wi WorkItem, d Decisio
 	if len(approvers) < need {
 		return wi, nil
 	}
+	// The windows are read before the state changes: with a windows file that is not
+	// valid, the work item is not approved.
+	windows, err := o.windowsFor(wi.Tier)
+	if err != nil {
+		return WorkItem{}, fmt.Errorf("find the maintenance window of %s: %w", wi.ID, err)
+	}
 	if err := o.setState(&wi, StateApproved, d.User,
 		fmt.Sprintf("%d of %d approvers", len(approvers), need)); err != nil {
 		return WorkItem{}, err
 	}
-	if wi.ScheduledFor != "" && o.Clock.Now().Before(store.ParseTime(wi.ScheduledFor)) {
-		return wi, o.setState(&wi, StateScheduled, "orchestrator",
+	waits, err := o.wait(&wi, windows)
+	if err != nil {
+		return WorkItem{}, err
+	}
+	if !waits {
+		o.applies.Go(func() { o.applyInBackground(wi.ID) })
+	}
+	return wi, nil
+}
+
+// wait puts an approved work item in the state Scheduled when its apply cannot start
+// now, and reports whether it did. The apply starts at the time that an approver asked
+// for, or now when no approver asked or that time is past. With maintenance windows, it
+// starts at the first moment from then that is in a window with policy.WindowReserve
+// left.
+func (o *Orchestrator) wait(wi *WorkItem, windows policy.Windows) (bool, error) {
+	now := o.Clock.Now()
+	from := now
+	if asked := store.ParseTime(wi.ScheduledFor); asked.After(now) {
+		from = asked
+	}
+	at, windowStart := windows.Next(from)
+	if !at.After(now) {
+		return false, nil
+	}
+	wi.ScheduledFor, wi.MaintenanceWindow = store.FormatTime(at), ""
+	if windowStart.IsZero() {
+		return true, o.setState(wi, StateScheduled, "orchestrator",
 			"waits for the window at "+wi.ScheduledFor)
 	}
-	o.applies.Go(func() { o.applyInBackground(wi.ID) })
-	return wi, nil
+	wi.MaintenanceWindow = store.FormatTime(windowStart)
+	if err := o.setState(wi, StateScheduled, "orchestrator",
+		"waits for the maintenance window that starts at "+wi.MaintenanceWindow); err != nil {
+		return false, err
+	}
+	o.emit(audit.Event{Type: "apply.waits_for_window", Actor: "orchestrator", Env: wi.Env,
+		WorkItem: wi.ID,
+		Summary: fmt.Sprintf("%s waits for the maintenance window that starts at %s",
+			wi.Title, wi.MaintenanceWindow),
+		Data: map[string]any{"window_start": wi.MaintenanceWindow,
+			"apply_at": wi.ScheduledFor, "tier": wi.Tier}})
+	return true, nil
 }
 
 func (o *Orchestrator) applyInBackground(id string) {
@@ -259,19 +315,42 @@ func (o *Orchestrator) applyInBackground(id string) {
 	}
 }
 
-// RunDue starts the apply of scheduled work items whose window opened.
+// RunDue starts the apply of scheduled work items whose window opened. It looks at the
+// maintenance windows again, because the control plane can be stopped while a window is
+// open and the windows file can change during the wait. A failure with one work item
+// does not stop the others.
 func (o *Orchestrator) RunDue() error {
 	items, err := o.List()
 	if err != nil {
 		return err
 	}
-	now := o.Clock.Now()
+	var failures []error
 	for _, wi := range items {
-		if wi.State == StateScheduled && !now.Before(store.ParseTime(wi.ScheduledFor)) {
+		if wi.State != StateScheduled {
+			continue
+		}
+		ready, err := o.ready(&wi)
+		if err != nil {
+			failures = append(failures, fmt.Errorf("start scheduled %s: %w", wi.ID, err))
+		} else if ready {
 			o.applies.Go(func() { o.applyInBackground(wi.ID) })
 		}
 	}
-	return nil
+	return errors.Join(failures...)
+}
+
+// ready reports whether the apply of an approved or scheduled work item can start now.
+// A work item that is due outside a maintenance window waits for the next window.
+func (o *Orchestrator) ready(wi *WorkItem) (bool, error) {
+	if wi.State == StateScheduled && o.Clock.Now().Before(store.ParseTime(wi.ScheduledFor)) {
+		return false, nil
+	}
+	windows, err := o.windowsFor(wi.Tier)
+	if err != nil {
+		return false, fmt.Errorf("find the maintenance window of %s: %w", wi.ID, err)
+	}
+	waits, err := o.wait(wi, windows)
+	return !waits, err
 }
 
 // errOutsideEnvelope means that a deferred layer wants to do more than create resources.
@@ -292,10 +371,15 @@ func (o *Orchestrator) Apply(ctx context.Context, id string) (WorkItem, error) {
 	if wi.State != StateApproved && wi.State != StateScheduled {
 		return wi, fmt.Errorf("%s is in state %s and cannot be applied", id, wi.State)
 	}
+	// The apply can wait for the lock of the environment until the window is over.
+	if ready, err := o.ready(&wi); err != nil || !ready {
+		return wi, err
+	}
 	approvers, err := o.validApprovers(wi)
 	if err != nil {
 		return WorkItem{}, err
 	}
+	wi.MaintenanceWindow = ""
 	if err := o.setState(&wi, StateApplying, "orchestrator", "apply started"); err != nil {
 		return WorkItem{}, err
 	}
@@ -317,15 +401,23 @@ func (o *Orchestrator) Apply(ctx context.Context, id string) (WorkItem, error) {
 		}
 	}
 	if wi.PRID != 0 {
-		merged, err := o.Forge.MergePull(wi.PRID, wi.Commit, "clanker-orchestrator", o.now())
-		if err != nil {
+		if err := o.mergeApplied(wi); err != nil {
 			return wi, o.setState(&wi, StateFailed, "forge", err.Error())
 		}
-		o.emit(audit.Event{Type: "pr.merged", Actor: "orchestrator", Env: wi.Env,
-			WorkItem: wi.ID, Summary: fmt.Sprintf("Pull request #%d merged after apply", wi.PRID),
-			Data: map[string]any{"pr": wi.PRID, "merge_commit": merged, "commit": wi.Commit}})
 	}
 	return o.verify(ctx, wi, approvers)
+}
+
+// mergeApplied merges the pull request of a work item whose layers are applied.
+func (o *Orchestrator) mergeApplied(wi WorkItem) error {
+	merged, err := o.Forge.MergePull(wi.PRID, wi.Commit, "clanker-orchestrator", o.now())
+	if err != nil {
+		return err
+	}
+	o.emit(audit.Event{Type: "pr.merged", Actor: "orchestrator", Env: wi.Env,
+		WorkItem: wi.ID, Summary: fmt.Sprintf("Pull request #%d merged after apply", wi.PRID),
+		Data: map[string]any{"pr": wi.PRID, "merge_commit": merged, "commit": wi.Commit}})
+	return nil
 }
 
 // backToApproval handles a plan that no longer matches what was approved. The old approvals
@@ -408,7 +500,7 @@ func (o *Orchestrator) applyPlan(ctx context.Context, wi WorkItem, plan Plan,
 	layer := plan.Layer
 	grant, err := o.Broker.Issue(broker.Request{WorkItem: wi.ID, Env: wi.Env, Layer: layer,
 		Kind: broker.KindApply, Commit: wi.Commit, PlanSHA256: plan.SHA256, Tier: wi.Tier,
-		Approvers: approvers, Duration: 30 * time.Minute})
+		Approvers: approvers, Duration: policy.WindowReserve})
 	if err != nil {
 		return err
 	}

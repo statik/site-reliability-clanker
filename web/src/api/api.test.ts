@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDecision, validApprovers } from "@/api/decision";
+import { buildDecision, validApprovers, waitNote } from "@/api/decision";
 import type { Approval, WorkItem } from "@/api/types";
 import { apiUrl, honoursAsOf, query, serverTime } from "@/api/urls";
 
@@ -91,5 +91,36 @@ describe("validApprovers", () => {
 
   it("returns nobody when there is no approval", () => {
     expect(validApprovers(item, [])).toEqual([]);
+  });
+});
+
+describe("waitNote", () => {
+  const start = "2026-11-21T02:00:00.000Z";
+
+  it("says nothing when no time is set", () => {
+    expect(waitNote({ state: "AwaitingApproval", scheduled_for: "", maintenance_window: "" }))
+      .toBe("");
+  });
+
+  it("names the time that an approver set", () => {
+    expect(waitNote({ state: "Scheduled", scheduled_for: start, maintenance_window: "" }))
+      .toBe("scheduled for 21 Nov 2026, 02:00 UTC");
+  });
+
+  it("names the start of the maintenance window", () => {
+    expect(waitNote({ state: "Scheduled", scheduled_for: start, maintenance_window: start }))
+      .toBe("waits for the maintenance window that starts at 21 Nov 2026, 02:00 UTC");
+  });
+
+  it("names the time of the apply when it is after the start of the window", () => {
+    const note = waitNote({ state: "Scheduled", scheduled_for: "2026-11-21T03:00:00.000Z",
+      maintenance_window: start });
+    expect(note).toBe("waits for the maintenance window that starts at 21 Nov 2026, 02:00 UTC" +
+      "; the apply starts at 21 Nov 2026, 03:00 UTC");
+  });
+
+  it("does not name a window that the work item no longer waits for", () => {
+    expect(waitNote({ state: "Rejected", scheduled_for: start, maintenance_window: start }))
+      .toBe("scheduled for 21 Nov 2026, 02:00 UTC");
   });
 });
