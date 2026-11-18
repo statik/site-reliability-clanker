@@ -273,6 +273,9 @@ OBJECT = '{"diagnosis":"a {brace} in a string","nested":{"n":1}}'
         OBJECT + "\n```json\n" + OBJECT + "\n```",
         OBJECT + '{"diagnosis":"a second object"}',
         OBJECT + " {",
+        '{"diagnosis":"a draft"}\n```\n</think>\n\n' + OBJECT,
+        '{"diagnosis":"a draft"}</think>{"diagnosis":"a second draft"}</think>' + OBJECT,
+        "</think>" + OBJECT,
     ],
 )
 def test_first_object_ignores_the_text_around_the_object(answer: str) -> None:
@@ -289,6 +292,8 @@ def test_first_object_ignores_the_text_around_the_object(answer: str) -> None:
         '{"diagnosis":"the answer stops here',
         '{"diagnosis":"no closing brace"',
         'The set {a, b} is not JSON. {"diagnosis":"too late"}',
+        '{"diagnosis":"only a draft"}</think>',
+        '{"diagnosis":"only a draft"}</think> No object follows.',
     ],
 )
 def test_first_object_refuses_an_answer_with_no_complete_object(answer: str) -> None:
@@ -300,5 +305,7 @@ def test_every_role_reads_the_first_object() -> None:
     for name in ("agent.go", "incident.go", "reviewer.go"):
         assert "firstObject(" in go_source(f"internal/agent/{name}")
     source = go_source("internal/agent/answer.go")
+    assert f'const endOfThinking = "{checks.END_OF_THINKING}"' in source
+    assert "strings.LastIndex(content, endOfThinking)" in source
     assert "start := strings.IndexByte(content, '{')" in source
     assert "json.NewDecoder(strings.NewReader(content[start:])).Decode(&object)" in source

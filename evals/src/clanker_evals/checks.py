@@ -131,11 +131,15 @@ async def confirm(state: TaskState, text: str, verdict: Verdict, concern: str) -
     return (False, f"{verdict[1]}; confirmed by the grader: {answer[-300:]}")
 
 
+END_OF_THINKING = "</think>"
+
+
 def first_object(text: str) -> str | None:
     """Return the first JSON object in an answer, as firstObject does in internal/agent.
 
     The object is the text from the first opening brace to the brace that closes it. The
-    text before and after the object is ignored.
+    text before and after the object is ignored. When the answer has the mark
+    END_OF_THINKING, the answer starts after the last mark.
 
     Args:
         text: The answer of the model.
@@ -144,6 +148,7 @@ def first_object(text: str) -> str | None:
         The text of the object, or None when the answer has no brace or the object that
         starts at the first brace is not complete.
     """
+    text = text.rpartition(END_OF_THINKING)[2]
     start = text.find("{")
     if start < 0:
         return None

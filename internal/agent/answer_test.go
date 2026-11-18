@@ -14,6 +14,9 @@ func TestFirstObjectIgnoresTheTextAroundTheObject(t *testing.T) {
 		object + "\n```json\n" + object + "\n```",
 		object + `{"diagnosis":"a second object"}`,
 		object + " {",
+		`{"diagnosis":"a draft"}` + "\n```\n</think>\n\n" + object,
+		`{"diagnosis":"a draft"}</think>{"diagnosis":"a second draft"}</think>` + object,
+		"</think>" + object,
 	}
 	for _, answer := range answers {
 		got, err := firstObject(answer)
@@ -32,6 +35,8 @@ func TestFirstObjectRefusesAnAnswerWithNoCompleteObject(t *testing.T) {
 		`{"diagnosis":"the answer stops here`,
 		`{"diagnosis":"no closing brace"`,
 		`The set {a, b} is not JSON. {"diagnosis":"too late"}`,
+		`{"diagnosis":"only a draft"}</think>`,
+		`{"diagnosis":"only a draft"}</think> No object follows.`,
 	}
 	for _, answer := range answers {
 		if got, err := firstObject(answer); err == nil {
