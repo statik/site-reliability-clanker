@@ -373,6 +373,9 @@ html:not(.js) .js-only { display: none !important; }
 .data-table thead th { background: var(--layer-accent); font-weight: 600; white-space: nowrap; }
 .data-table tbody th { font-weight: 600; white-space: nowrap; }
 .data-table tbody tr:last-child > * { border-bottom: 0; }
+@media (max-width: 41.999rem) {
+  .data-table tbody th { white-space: normal; max-width: 40vw; }
+}
 .data-table td { color: var(--text-secondary); }
 .status { display: inline-flex; align-items: center; gap: var(--s-3); color: var(--text-primary); white-space: nowrap; }
 .status svg { width: 16px; height: 16px; flex: none; }
@@ -697,6 +700,9 @@ html:not(.js) .chip { border: 0; background: none; padding: 0; cursor: default; 
 .gallery-group { padding: var(--s-8) 0; border-top: 1px solid var(--border-subtle); }
 .gallery { display: grid; gap: var(--s-6); margin-top: var(--s-7); }
 @media (min-width: 66rem) { .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 66rem) {
+  .gallery:has(> :nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 .shot img { width: 100%; border: 1px solid var(--border-subtle); background: var(--layer-01); }
 .shot figcaption { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); margin-top: var(--s-3);
   font-size: 0.875rem; }
@@ -737,7 +743,9 @@ section [id] { scroll-margin-top: calc(var(--shell-height) + var(--s-6)); }
 .notice-card { padding: var(--s-5) var(--s-6); background: var(--background);
   border: 1px solid var(--border-strong); border-left: 4px solid var(--interactive); }
 .notice-card p + p, .notice-facts, .notice-link { margin-top: var(--s-4); }
+.notice-card .notice-decide { margin-top: var(--s-5); }
 .notice-title { font-weight: 600; }
+.notice-decide { display: flex; flex-wrap: wrap; gap: var(--s-3); }
 .notice-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: var(--s-4); }
 .notice-facts dt { color: var(--text-helper); font-size: 0.75rem; }
 .notice-link { display: inline-block; padding: var(--s-3) var(--s-5); border: 1px solid var(--interactive);
