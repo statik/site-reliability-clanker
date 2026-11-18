@@ -15,6 +15,17 @@ const GUTTER = 168;
 const ROW = 28;
 const TOP = 28;
 const TICKS = 6;
+// The room that one full tick label needs, such as "17 Dec 2026, 02:29".
+const TICK_ROOM = 130;
+
+/** The label of a tick. A narrow chart shows the date or the time only, as the window needs. */
+function tickLabel(tick: Date, narrow: boolean, span: number): string {
+  const [date = "", time = ""] = formatTime(tick).slice(0, -4).split(", ");
+  if (!narrow) {
+    return `${date}, ${time}`;
+  }
+  return span > DAY_MS ? date.slice(0, -5) : time;
+}
 
 function grantEnd(grant: Grant, now: Date): Date {
   if (grant.ended_at !== "") {
@@ -41,8 +52,11 @@ export function GrantLanes({ grants, identities, now }: {
   const range: [number, number] = [GUTTER, Math.max(width - 16, GUTTER + 10)];
   const lanes = [...new Set([...identities, ...grants.map((grant) => grant.identity)])];
   const height = TOP + lanes.length * ROW + 8;
-  const ticks = Array.from({ length: TICKS }, (_, index) =>
-    new Date(domain[0].getTime() + (span * index) / (TICKS - 1)));
+  const room = Math.floor((range[1] - GUTTER) / TICK_ROOM);
+  const narrow = room < 2;
+  const count = Math.min(TICKS, Math.max(room, narrow ? 3 : 2));
+  const ticks = Array.from({ length: count }, (_, index) =>
+    new Date(domain[0].getTime() + (span * index) / (count - 1)));
   return (
     <div className="app-stack-tight">
       <ContentSwitcher size="sm" selectedIndex={windowIndex}
@@ -58,11 +72,11 @@ export function GrantLanes({ grants, identities, now }: {
           <g className="tl-axis">
             {ticks.map((tick, index) => {
               const x = timeToX(tick, domain, range);
-              const anchor = index === 0 ? "start" : index === TICKS - 1 ? "end" : "middle";
+              const anchor = index === 0 ? "start" : index === count - 1 ? "end" : "middle";
               return (
                 <g key={tick.getTime()} className="tick">
                   <line x1={x} x2={x} y1={TOP - 6} y2={height} />
-                  <text x={x} y={14} textAnchor={anchor}>{formatTime(tick).slice(0, -4)}</text>
+                  <text x={x} y={14} textAnchor={anchor}>{tickLabel(tick, narrow, span)}</text>
                 </g>
               );
             })}

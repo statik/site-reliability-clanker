@@ -22,8 +22,8 @@ function check(condition, message) {
 }
 
 async function pages(page) {
-  const response = await page.request.get(`${BASE}/api/v1/work-items`);
-  const items = response.ok() ? await response.json() : [];
+  const items = await api(page, "/work-items");
+  const pulls = await api(page, "/forge/pulls");
   const routes = {
     overview: "/", timeline: "/timeline", topology: "/topology", upcoming: "/upcoming",
     approvals: "/approvals", activity: "/activity", code: "/code",
@@ -35,7 +35,33 @@ async function pages(page) {
   if (withPull !== undefined) {
     routes["work-item"] = `/work/${withPull.id}`;
   }
+  if (pulls[0] !== undefined) {
+    routes["code-pull"] = `/code/pulls/${pulls[0].id}`;
+  }
   return Object.entries(routes);
+}
+
+async function api(page, path) {
+  const response = await page.request.get(`${BASE}/api/v1${path}`);
+  return response.ok() ? response.json() : [];
+}
+
+/** Opens what a page keeps folded: a row of a table, the diff, the plan JSON and a job log. */
+async function unfold(page, name) {
+  const folded = {
+    activity: [page.getByRole("button", { name: /expand current row/i }).first()],
+    "work-item": [
+      page.getByRole("button", { name: "Pull request diff" }),
+      page.getByRole("button", { name: /Raw plan JSON/ }).first(),
+      page.locator(".cds--accordion__heading", { hasText: /Job \d+/ }).first(),
+    ],
+  };
+  for (const control of folded[name] ?? []) {
+    if (await control.count() > 0) {
+      await control.click();
+      await page.waitForTimeout(500);
+    }
+  }
 }
 
 async function settle(page) {
@@ -47,6 +73,7 @@ async function widthChecks(page, width) {
   for (const [name, path] of await pages(page)) {
     await page.goto(`${BASE}${path}`);
     await settle(page);
+    await unfold(page, name);
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     check(scrollWidth <= width, `${width} px ${name}: scrollWidth ${scrollWidth}`);
     await page.screenshot({ path: join(OUT, `${name}-${width}.png`), fullPage: true });
