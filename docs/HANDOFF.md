@@ -31,7 +31,41 @@ scrolls in its own region; `pnpm phone-check` in `web/` checks every page at 390
 768 px against a running dashboard) and #75 (a test waits for the applies in the
 background) are merged.
 
+Later on 2026-11-17 the owner answered the first two points of the order of the work, and
+these are merged: #78 (the emails and the chat messages name the product "S.R.C."; the
+full run gave thirteen work items, 316 events and no error line, and an email in Mailpit
+had the new name) and #77 (unit tests for the navigation drawer of the dashboard, with
+`happy-dom` 21.0.4 as the test environment of that one file; CI runs them).
+
+**#79 is merged too.** The owner asked for the figure of the architecture page behind the
+title card of the video. The video built from it (99.0 s) and a copy is in
+`~/Movies/src-explainer/explainer-title-figure.mp4`. The owner has not heard it, and it is
+not uploaded to the release `site-video`, so the public site still has the video without
+the figure. Pushes now go over HTTPS with the `gh` token, as the owner said.
+
+**Step 6 (the cloud runner and broker) is started only as questions.** The owner named an
+AWS profile, wants everything removable at the end of the week of 2026-11-17, wants no
+public load balancer (access is through Tailscale), and asked which VPCs exist. The
+spending limit is 200 USD for that week. Only read calls ran in the account, and nothing
+was made.
+
+- This repository is public. Do not write the profile, the account, or the names of its
+  networks and services here, in an issue or in a pull request. The session keeps them in
+  its memory, and the owner knows them.
+- Credentials: the owner runs `assume --export <profile>` in their own terminal. It fails
+  in a shell that is not interactive. The profile has no region: pass `--region`.
+- The role can create, pass and delete IAM roles and policies, and has no permissions
+  boundary.
+- The account has VPCs with private subnets behind NAT gateways and a running Tailscale
+  subnet router. No new VPC and no new NAT gateway are necessary.
+- Open: which VPC, and how a Fargate runner reaches `/runner/v1/` of the core. A subnet
+  router carries traffic from the tailnet into the VPC, not from the VPC to a laptop.
+
+For the removal: one OpenTofu state, one tag on every resource, one teardown command, and a
+tag query that returns nothing as the proof. Make no change to a VPC that exists.
+
 Worktrees that can be removed, because their work is on the main branch:
+`src-wt-domtests` (branch `dashboard-nav-tests`), `src-wt-titlecard` (branch `title-card-figure`),
 `agent-aa1afd77bc263132f` (branch `chat-approval`, locked), `agent-ae36a6a2b9fad684f` (the
 site and the video), `colours-wizard`, `colours-ios`, `colours-dashboard`, `copy-iac`. Many local branches and
 a few remote ones are merged too. Nothing was removed with force.
@@ -145,8 +179,6 @@ by the Pages workflow; a merge that touches `site/` deploys it). What the owner 
 - The work item detail of the API gives an empty list `valid_approvers` for the first
   deployment after it is done. This was so before this session. It was not examined.
 - `docs/API.md` still says that the prototype has no authentication.
-- The notification emails and the chat messages name the product "Clanker" ("Open in
-  Clanker"). The site, the wizard, the dashboard and the app say "S.R.C.".
 - On the audit page of the dashboard, the text "Server search / Pick a range on the
   timeline" overlaps the heading of the column "Work item".
 - The demo application Paperboat keeps its own look and its boat mark. The owner asked
@@ -154,14 +186,11 @@ by the Pages workflow; a merge that touches `site/` deploys it). What the owner 
 
 **The order of the work now**
 
-1. The product name in the emails and the chat messages, if the owner wants it changed.
-2. Unit tests for the navigation of the dashboard at phone width, if the owner accepts a
-   DOM test environment as a new dependency. Today a browser script checks it, and CI does
-   not run that script.
+1. Let the owner hear the video with the figure behind the title card, then upload it.
+2. Step 6, after the owner answers the questions above. Issue #40 has the decision for
+   its secrets (Parameter Store with the AWS SDK for Go v2).
 3. The pull request path for runbooks, when the owner decides how.
-4. Step 6: the cloud runner and broker. Issue #40 has the decision for the secrets
-   (Parameter Store with the AWS SDK for Go v2).
-5. Issue #51: scrub the input of the model roles before the JSON frame.
+4. Issue #51: scrub the input of the model roles before the JSON frame.
 
 **Things that cost time in this session**
 
