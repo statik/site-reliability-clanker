@@ -14,22 +14,27 @@ run in short-lived runners; all state is in an external PostgreSQL; people sign 
 OIDC in the core itself (changed by the owner on 2026-11-17, issue #45); the wizard builds
 the machine image with `ops`.
 
-### Work in flight (written 2026-11-17, in the evening)
+### Work in flight (written 2026-11-17, at night)
 
 Read this section first.
 
 **Merged on 2026-11-17, after the list in the section below:** #53 (evals for the Reviewer and
-the strict form of its answer), #54 to #57 and #59 (the site), #58 (approval in Slack and
-Teams), #60 (the number of T3 approvers is a setting), #62 (the device flow in the iOS
-app). Step 5 of the next steps is done. No pull request is open.
+the strict form of its answer), #54 to #57, #59, #64, #65, #67 and #72 (the site and its
+pictures), #58 (approval in Slack and Teams), #60 (the number of T3 approvers is a
+setting), #62 (the device flow in the iOS app), #68 (the video on one idea), #66, #69 and
+#70 (the colours and the icon of S.R.C. in the iOS app, the setup wizard and the
+dashboard), #71 (the iOS app is named S.R.C.). Step 5 of the next steps is done.
 
-**No branch waits.** The explainer video on one idea is merged and published (see "The video" below).
+**One branch is not merged.**
+
+| Branch | Where | State | To finish |
+|---|---|---|---|
+| `dashboard-phone-nav` | worktree `.claude/worktrees/colours-dashboard`, not pushed | The dashboard at phone width: the side navigation is closed below a breakpoint and opens from a menu button in the header, and wide content scrolls in its own box. The owner asked for it. A subagent was at work on it when this was written | Read its report. Rebase it onto the main branch (its base is the tip of `colours-dashboard` before the squash merge #70). Build the dashboard, serve it from the control plane, run `web/scripts/screenshots.mjs` and look at the pages at 390 px. Then a pull request |
 
 Worktrees that can be removed, because their work is on the main branch:
-`agent-aa1afd77bc263132f` (branch `chat-approval`, locked), `overview-one-idea`,
-`t3-approvers`, `ios-device-flow`. The remote branches `t3-run`, `ios-device-flow` and
-`ios-device-flow-rebased` and many local branches are also merged. Nothing was removed with
-force.
+`agent-aa1afd77bc263132f` (branch `chat-approval`, locked), `agent-ae36a6a2b9fad684f` (the
+site and the video), `colours-wizard`, `colours-ios`, `copy-iac`. Many local branches and
+a few remote ones are merged too. Nothing was removed with force.
 
 The logs of every live eval round are in `evals/logs/` of the main checkout, which git does
 not track. Keep them: `report.py` needs those logs to write the whole of `RESULTS.md` (the
@@ -60,6 +65,9 @@ by the Pages workflow; a merge that touches `site/` deploys it). What the owner 
 - The architecture page has an isometric figure of the system (`site/lib/machine.mjs`, made
   with the `anatomy` skill). It is not in the video any more. It is not published to a
   gallery; ask the owner first.
+- The pictures of the page "Live screens" come from `site/capture.mjs`, which reads the
+  running demo with GET requests only. The picture of the approval page needs a change
+  that waits for approval (the same hand-written change as for the data, below).
 - The pages are built from `site/data/month.json`. To refresh it: run
   `scripts/verify/fresh-run.sh`, then push one hand-written change that stays in
   `AwaitingApproval` (title "Run two api replicas for the holiday rush", `api_replicas` from
@@ -94,6 +102,15 @@ by the Pages workflow; a merge that touches `site/` deploys it). What the owner 
 - No Swamp. Typed runbooks in this repository (section 5.6 of the plan, #52).
 - Two approvers for tier T3 is a setting: `runbooks/policy/approvals.json`, the value 1 or
   2, two when the file is absent. An invalid file is an error.
+- The wizard, the iOS app and the dashboard have the colours and the icon of the website,
+  dark only. Each has one palette file with the values of `site/css/site.css`:
+  `internal/setup/ui/style.css`, `ios/App/Views/Components/Palette.swift`,
+  `web/src/styles/_palette.scss`. The iOS app and the dashboard have tests that calculate
+  the contrast of every pair.
+- The iOS app is named S.R.C.: target `SRC`, bundle identifier `dev.clanker.src`. A person
+  with an earlier build removes it and signs in again.
+- The site and the video describe the product as designed. They do not say "in progress".
+  Reports, pull requests and this file still say what ran and what did not.
 - The owner has a free Slack workspace as its admin. A test with the real Slack is possible
   now: the owner creates the app from `ops/chat/slack/manifest.yaml` and puts
   `CLANKER_SLACK_SIGNING_SECRET`, `CLANKER_SLACK_BOT_TOKEN` and `CLANKER_SLACK_CHANNEL` in
@@ -103,9 +120,6 @@ by the Pages workflow; a merge that touches `site/` deploys it). What the owner 
 
 **Questions that wait for the owner**
 
-- Do the setup wizard, the iOS app and the dashboard also get the new colours and the new
-  icon? The iOS app still shows the paper boat mark. The recommendation was yes, the
-  dashboard last, because it needs a Carbon theme.
 - How is a pull request on the `runbooks` repository tiered and approved? Until that
   exists, a runbook and the policy rules cannot change after the first seed.
 - A change to `policy/approvals.json` must not be approvable under the rule that it
@@ -131,13 +145,17 @@ by the Pages workflow; a merge that touches `site/` deploys it). What the owner 
 - The work item detail of the API gives an empty list `valid_approvers` for the first
   deployment after it is done. This was so before this session. It was not examined.
 - `docs/API.md` still says that the prototype has no authentication.
+- The notification emails and the chat messages name the product "Clanker" ("Open in
+  Clanker"). The site, the wizard, the dashboard and the app say "S.R.C.".
+- On the audit page of the dashboard, the text "Server search / Pick a range on the
+  timeline" overlaps the heading of the column "Work item".
+- The demo application Paperboat keeps its own look and its boat mark. The owner asked
+  only that the product has no fish or boat as a mark.
 
 **The order of the work now**
 
-1. Make the dashboard screenshots of the site again after the dashboard has the new colours
-   (`site/capture.mjs`; it did not run since the click-through tours were removed).
-2. The new colours and icon for the wizard, the iOS app and the dashboard, if the owner
-   says yes.
+1. The dashboard at phone width (the table above).
+2. The product name in the emails and the chat messages, if the owner wants it changed.
 3. The pull request path for runbooks, when the owner decides how.
 4. Step 6: the cloud runner and broker. Issue #40 has the decision for the secrets
    (Parameter Store with the AWS SDK for Go v2).
