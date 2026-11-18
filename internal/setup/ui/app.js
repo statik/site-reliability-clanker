@@ -472,9 +472,10 @@ function rightsBlock(found) {
     refused.map((right) => right.action).join(", "), ". The installation needs them.");
 }
 
+const holds = (region) => (region.instances > 0 || region.networks > 0
+  ? `${region.instances} running instances, ${region.networks} networks` : "nothing runs here");
+
 function regionField(found) {
-  const holds = (region) => (region.instances > 0 || region.networks > 0
-    ? `${region.instances} running instances, ${region.networks} networks` : "nothing runs here");
   return el("label", { class: "field" }, "Region",
     el("select", { disabled: form.surveying, onchange: (event) => survey(event.target.value) },
       found.regions.map((region) => el("option", { value: region.name, selected: region.name === found.region },
