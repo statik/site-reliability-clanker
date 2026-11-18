@@ -15,6 +15,9 @@ type job struct {
 	status string
 	failed string
 	lines  []string
+	// completed and total are the bytes of a download. total is 0 for other work.
+	completed int64
+	total     int64
 }
 
 // JobView is what the page sees of a job.
@@ -23,6 +26,9 @@ type JobView struct {
 	Status string   `json:"status"`
 	Error  string   `json:"error"`
 	Lines  []string `json:"lines"`
+	// Completed and Total are the bytes of a download. Total is 0 for other work.
+	Completed int64 `json:"completed"`
+	Total     int64 `json:"total"`
 }
 
 func (j *job) view() *JobView {
@@ -32,7 +38,20 @@ func (j *job) view() *JobView {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	return &JobView{Name: j.name, Status: j.status, Error: j.failed,
-		Lines: append([]string{}, j.lines...)}
+		Lines: append([]string{}, j.lines...), Completed: j.completed, Total: j.total}
+}
+
+// setProgress records how far the download of the current job is.
+func (s *Server) setProgress(completed, total int64) {
+	s.mu.Lock()
+	current := s.job
+	s.mu.Unlock()
+	if current == nil {
+		return
+	}
+	current.mu.Lock()
+	defer current.mu.Unlock()
+	current.completed, current.total = completed, total
 }
 
 func (j *job) log(line string) {

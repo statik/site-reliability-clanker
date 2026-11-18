@@ -462,7 +462,7 @@ func TestSurveyOnlyRefusesTheReviewAndTheCreationOnAWS(t *testing.T) {
 		t.Fatal(err)
 	}
 	post(t, server, handler, "/api/target", `{"target":"aws","env":"prod"}`)
-	post(t, server, handler, "/api/key", `{"key":""}`)
+	post(t, server, handler, "/api/model", `{"choice":"recorded"}`)
 	post(t, server, handler, "/api/aws/signin", `{"profile":"p","region":""}`)
 	server.review = []Change{{ID: "x", Type: "y"}}
 	for _, path := range []string{"/api/review", "/api/deploy"} {

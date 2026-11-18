@@ -47,8 +47,9 @@ if (await page.getByRole("button", { name: "Continue", exact: true }).isDisabled
 }
 await press("Continue");
 
-await heading("Give S.R.C. a language model.");
-await press("Continue without a key");
+await heading("Choose the language model of S.R.C.");
+await page.getByRole("radio", { name: /^Recorded answers/ }).check({ force: true });
+await press("Use recorded answers and continue");
 
 await heading("Sign in to your AWS account.");
 await page.getByLabel("Profile").selectOption(profile);

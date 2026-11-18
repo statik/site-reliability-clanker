@@ -47,9 +47,42 @@ if (first === "Where do you want S.R.C. to run?") {
   await shoot("checks");
   await press("Continue");
 
-  await heading("Give S.R.C. a language model.");
-  await shoot("key");
-  await press("Continue without a key");
+  // Each choice of the language model, one after the other. The last one stays.
+  const model = "Choose the language model of S.R.C.";
+  const review = "This is what the wizard will create.";
+  const choose = (name) => page.getByRole("radio", { name }).check({ force: true });
+  const reviewShows = async (name) => {
+    await heading(review);
+    const shown = await page.locator(".facts dd").first().textContent();
+    if (shown !== name) problems.push(`the review shows the model "${shown}", want "${name}"`);
+  };
+  await heading(model);
+  await shoot("model");
+  await choose(/^A hosted key/);
+  await page.getByLabel("OpenRouter API key").fill("sk-or-v1-0000000000000000000000-walk");
+  await shoot("model-hosted");
+  await press("Save the key and continue");
+  await reviewShows("A hosted key");
+  await press("Back");
+
+  await heading(model);
+  await choose(/^A model on this machine/);
+  await page.getByRole("heading", { level: 2, name: "What the model on this machine needs" }).waitFor();
+  await shoot("model-local");
+  // The walk does not download 18 GB. It uses the model only when Ollama already holds it.
+  if (await page.getByRole("button", { name: "Use this model and continue", exact: true }).count() === 1) {
+    await press("Use this model and continue");
+    await reviewShows("A model on this machine");
+    await press("Back");
+    await heading(model);
+  } else {
+    console.log("setup wizard: the model is not on this machine; the walk skips this choice");
+  }
+
+  await choose(/^Recorded answers/);
+  await shoot("model-recorded");
+  await press("Use recorded answers and continue");
+  await reviewShows("Recorded answers");
 
   await heading("This is what the wizard will create.");
   await shoot("review");

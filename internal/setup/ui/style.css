@@ -119,6 +119,7 @@ main p + p { margin-top: 0.75rem; }
    network that would stand alone in its row takes the whole row too. */
 .choices > .choice-wide,
 .choices > .choice:nth-last-child(2):nth-child(odd):has(+ .choice-wide) { grid-column: 1 / -1; }
+.choices.choices-list { grid-template-columns: 1fr; max-width: 52rem; }
 .choice { display: block; position: relative; padding: 1rem 1rem 1.5rem;
   background: var(--background); cursor: pointer; border: 2px solid transparent; }
 .choice:hover { background: var(--layer-01); }
@@ -186,6 +187,10 @@ tfoot td { font-weight: 600; }
   .spinner { animation: spin 0.9s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 }
+.progress { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 1rem;
+  font-size: 0.875rem; color: var(--text-secondary); }
+.progress progress { flex: 1 1 12rem; max-width: 28rem; height: 0.5rem;
+  accent-color: var(--interactive); }
 .facts { display: grid; gap: 1px; margin-top: 1rem; max-width: 52rem;
   background: var(--border-subtle); border: 1px solid var(--border-subtle); }
 @media (min-width: 40rem) { .facts { grid-template-columns: repeat(3, 1fr); } }

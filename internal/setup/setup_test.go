@@ -132,7 +132,8 @@ func TestStateIsSavedWithoutTheKey(t *testing.T) {
 	token := server.Token()
 	const key = "sk-or-v1-0123456789abcdef0123456789"
 	request(t, handler, token, http.MethodPost, "/api/target", `{"target":"aws","env":"prod-1"}`)
-	if status, _ := request(t, handler, token, http.MethodPost, "/api/key", `{"key":"`+key+`"}`); status != 200 {
+	if status, _ := request(t, handler, token, http.MethodPost, "/api/model",
+		`{"choice":"live","key":"`+key+`"}`); status != 200 {
 		t.Fatalf("key: status %d", status)
 	}
 	saved, err := os.ReadFile(filepath.Join(server.cfg.DataDir, "setup.json"))
@@ -153,9 +154,9 @@ func TestStateIsSavedWithoutTheKey(t *testing.T) {
 
 func TestKeyThatIsNotAKeyIsRefused(t *testing.T) {
 	server, handler := newServer(t, &fakeCLI{})
-	for _, key := range []string{"short", `"sk-or-v1-0123456789abcdef0123456789"`, "two words that are long enough"} {
-		body, _ := json.Marshal(map[string]string{"key": key})
-		if status, _ := request(t, handler, server.Token(), http.MethodPost, "/api/key", string(body)); status != 400 {
+	for _, key := range []string{"", "short", `"sk-or-v1-0123456789abcdef0123456789"`, "two words that are long enough"} {
+		body, _ := json.Marshal(map[string]string{"choice": "live", "key": key})
+		if status, _ := request(t, handler, server.Token(), http.MethodPost, "/api/model", string(body)); status != 400 {
 			t.Errorf("key %q: status %d, want 400", key, status)
 		}
 	}
