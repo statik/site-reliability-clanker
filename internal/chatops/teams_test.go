@@ -145,7 +145,7 @@ func TestTeamsAnswersAClickWithACardForThatPerson(t *testing.T) {
 		title, _ := action["title"].(string)
 		titles = append(titles, title)
 	}
-	want := "Approve, Reject, Open in Clanker, Link the account"
+	want := "Approve, Reject, Open in S.R.C., Link the account"
 	if got := strings.Join(titles, ", "); got != want {
 		t.Errorf("the actions of the private card: %s", got)
 	}

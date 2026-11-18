@@ -160,7 +160,7 @@ func (s *Service) refuse(c Click, actor, reason string) Answer {
 		Summary: "Decision in chat refused: " + reason, Data: data}); err != nil {
 		slog.Error("chat approval", "error", err)
 	}
-	return Answer{Text: reason, URL: s.workLink(c.WorkItem), URLTitle: "Open in Clanker"}
+	return Answer{Text: reason, URL: s.workLink(c.WorkItem), URLTitle: "Open in S.R.C."}
 }
 
 // plain removes the name of the error class from an error of the orchestrator.
@@ -217,13 +217,13 @@ func (s *Service) record(ctx context.Context, c Click, user orchestrator.User) A
 	_, err := s.orch.Decide(context.WithoutCancel(ctx), c.WorkItem, d)
 	if errors.Is(err, orchestrator.ErrForbidden) || errors.Is(err, orchestrator.ErrConflict) ||
 		errors.Is(err, orchestrator.ErrInvalid) {
-		return Answer{Text: plain(err), URL: s.workLink(c.WorkItem), URLTitle: "Open in Clanker"}
+		return Answer{Text: plain(err), URL: s.workLink(c.WorkItem), URLTitle: "Open in S.R.C."}
 	}
 	if err != nil {
 		slog.Error("chat approval: decide", "work_item", c.WorkItem, "error", err)
 		return Answer{Text: "The control plane could not record the decision. Open the page " +
 			"of the change to see its state.", URL: s.workLink(c.WorkItem),
-			URLTitle: "Open in Clanker"}
+			URLTitle: "Open in S.R.C."}
 	}
 	return Answer{Decided: true, Text: fmt.Sprintf("Your decision on %s is recorded: %s, as %s.",
 		c.WorkItem, c.Decision, user.Display)}

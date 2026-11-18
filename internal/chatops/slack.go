@@ -158,7 +158,7 @@ func slackBlocks(request Request, outcome string) []map[string]any {
 		blocks = append(blocks, slackSection("Decide on the page that shows the whole plan. "+
 			"A change of this tier cannot be decided here."))
 	}
-	open := slackButton("Open in Clanker", "clanker_open", "", request.WorkItem)
+	open := slackButton("Open in S.R.C.", "clanker_open", "", request.WorkItem)
 	open["url"] = request.Link
 	return append(blocks, map[string]any{"type": "actions", "elements": append(elements, open)})
 }
@@ -306,7 +306,7 @@ func (s *Slack) decide(ctx context.Context, click Click, responseURL string) {
 	defer cancel()
 	answer := Answer{Text: "This app is installed for a whole organization, which the control " +
 		"plane does not support: the request names no workspace. Decide on the dashboard.",
-		URL: s.service.workLink(click.WorkItem), URLTitle: "Open in Clanker"}
+		URL: s.service.workLink(click.WorkItem), URLTitle: "Open in S.R.C."}
 	if click.Account.Workspace != "" && click.Account.ID != "" {
 		answer = s.service.Decide(ctx, click)
 	}

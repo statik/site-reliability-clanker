@@ -6,11 +6,11 @@ _metadata:
   major_version: 2
   minor_version: 1
 display_information:
-  name: Clanker approvals
+  name: S.R.C. approvals
   description: Requests for approval of infrastructure changes
 features:
   bot_user:
-    display_name: Clanker
+    display_name: S.R.C.
     always_online: false
 oauth_config:
   scopes:

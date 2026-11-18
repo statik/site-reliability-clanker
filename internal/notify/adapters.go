@@ -85,7 +85,7 @@ func (Slack) Payload(m Message) map[string]any {
 		blocks = append(blocks, map[string]any{"type": "section", "fields": fields[start:end]})
 	}
 	blocks = append(blocks, map[string]any{"type": "actions", "elements": []map[string]any{{
-		"type": "button", "text": map[string]any{"type": "plain_text", "text": "Open in Clanker"},
+		"type": "button", "text": map[string]any{"type": "plain_text", "text": "Open in S.R.C."},
 		"url": m.Link}}})
 	return map[string]any{"text": m.Title, "blocks": blocks}
 }
@@ -120,7 +120,7 @@ func (Teams) Payload(m Message) map[string]any {
 	card := map[string]any{
 		"$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
 		"type":    "AdaptiveCard", "version": "1.4", "body": body,
-		"actions": []map[string]any{{"type": "Action.OpenUrl", "title": "Open in Clanker",
+		"actions": []map[string]any{{"type": "Action.OpenUrl", "title": "Open in S.R.C.",
 			"url": m.Link}},
 	}
 	return map[string]any{"type": "message", "attachments": []map[string]any{{
@@ -154,7 +154,7 @@ func (Discord) Payload(m Message) map[string]any {
 			"inline": len(f[1]) < 40})
 	}
 	_, color := severityColor(m.Severity)
-	return map[string]any{"username": "Clanker", "embeds": []map[string]any{{
+	return map[string]any{"username": "S.R.C.", "embeds": []map[string]any{{
 		"title": truncate(m.Title, 250), "description": m.Body, "url": m.Link, "color": color,
 		"fields": fields}}}
 }
@@ -200,18 +200,18 @@ func (e Email) Body(to []string, m Message) []byte {
 			`<td style="padding:6px 0;color:#161616">%s</td></tr>`, html.EscapeString(f[0]),
 			html.EscapeString(f[1]))
 	}
-	text.WriteString("\nOpen in Clanker: " + m.Link + "\n")
+	text.WriteString("\nOpen in S.R.C.: " + m.Link + "\n")
 	htmlBody := fmt.Sprintf(`<div style="font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;`+
 		`max-width:640px;border-top:4px solid %s;background:#f4f4f4;padding:24px">`+
 		`<h2 style="font-weight:400;color:#161616;margin:0 0 12px">%s</h2>`+
 		`<p style="color:#161616;line-height:1.5">%s</p>`+
 		`<table style="border-collapse:collapse;font-size:14px;margin:16px 0">%s</table>`+
 		`<a href="%s" style="display:inline-block;background:#0f62fe;color:#ffffff;`+
-		`padding:12px 16px;text-decoration:none">Open in Clanker</a></div>`,
+		`padding:12px 16px;text-decoration:none">Open in S.R.C.</a></div>`,
 		accent, html.EscapeString(m.Title), html.EscapeString(m.Body), rows.String(),
 		html.EscapeString(m.Link))
 	var msg strings.Builder
-	fmt.Fprintf(&msg, "From: Clanker <%s>\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\n"+
+	fmt.Fprintf(&msg, "From: S.R.C. <%s>\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\n"+
 		"Content-Type: multipart/alternative; boundary=%s\r\n\r\n", e.From,
 		strings.Join(to, ", "), truncate(m.Title, 200), boundary)
 	fmt.Fprintf(&msg, "--%s\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n%s\r\n", boundary,
