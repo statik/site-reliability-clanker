@@ -39,6 +39,8 @@ export interface WorkItem {
   summary: string;
   explanation: Explanation;
   scheduled_for: string;
+  /** The start of the maintenance window that a scheduled work item waits for, or "". */
+  maintenance_window: string;
   rollback_of: string;
   created_at: string;
   updated_at: string;

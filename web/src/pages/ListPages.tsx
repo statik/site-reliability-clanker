@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ClickableTile, Dropdown, Tag } from "@carbon/react";
 import { TaskComplete } from "@carbon/icons-react";
+import { waitNote } from "@/api/decision";
 import type { WorkItem } from "@/api/types";
 import { Empty, Loaded, PageHeader, WorkItemLink } from "@/components/common";
 import { SimpleTable } from "@/components/SimpleTable";
@@ -90,7 +91,7 @@ function Expanded({ item }: { item: WorkItem }) {
       <p className="app-label">
         Trigger: {item.trigger || "not recorded"} · layers:{" "}
         {(item.layers ?? []).join(", ") || "none"} · rule: {item.tier_rule || "none"}
-        {item.scheduled_for !== "" && ` · scheduled for ${formatTime(item.scheduled_for)}`}
+        {waitNote(item) !== "" && ` · ${waitNote(item)}`}
       </p>
       <WorkItemLink id={item.id}>Open {item.id}: plan, diff, logs and approvals</WorkItemLink>
     </div>

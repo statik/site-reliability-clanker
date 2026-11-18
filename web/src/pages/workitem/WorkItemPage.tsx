@@ -13,6 +13,7 @@ import {
   UnorderedList,
 } from "@carbon/react";
 import { Link as RouterLink } from "react-router-dom";
+import { waitNote } from "@/api/decision";
 import type { AuditEvent, Plan, WorkItem, WorkItemDetail } from "@/api/types";
 import { AskPanel } from "@/components/AskPanel";
 import { AiMark, Loaded, ScrollRegion, Section } from "@/components/common";
@@ -142,7 +143,7 @@ function Heading({ item }: { item: WorkItem }) {
         <Tag type="outline">{item.kind}</Tag>
         <span className="app-label">
           Opened {formatTime(item.created_at)} · updated {formatTime(item.updated_at)}
-          {item.scheduled_for !== "" && ` · scheduled for ${formatTime(item.scheduled_for)}`}
+          {waitNote(item) !== "" && ` · ${waitNote(item)}`}
         </span>
       </div>
     </header>

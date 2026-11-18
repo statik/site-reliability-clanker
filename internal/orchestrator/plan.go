@@ -152,6 +152,29 @@ func (o *Orchestrator) ApproversRequired(tier string) (int, error) {
 	return approvals.Required(tier), nil
 }
 
+// MaintenanceWindows reads the maintenance windows from the runbooks repository of f. A
+// repository that has no windows file has no windows. A file that is not valid, and each
+// other failure to read, is an error.
+func MaintenanceWindows(f *forge.Forge) (policy.Windows, error) {
+	source, err := f.ReadFile(RunbooksRepo, "main", policy.WindowsPath)
+	if errors.Is(err, forge.ErrFileNotFound) {
+		return policy.Windows{}, nil
+	}
+	if err != nil {
+		return policy.Windows{}, fmt.Errorf("read the maintenance windows: %w", err)
+	}
+	return policy.ParseWindows([]byte(source))
+}
+
+// windowsFor returns the maintenance windows that a change of the tier must wait for
+// now. Only tier T3 waits for a window. It reads the windows file at each call.
+func (o *Orchestrator) windowsFor(tier string) (policy.Windows, error) {
+	if tier != "T3" {
+		return policy.Windows{}, nil
+	}
+	return MaintenanceWindows(o.Forge)
+}
+
 // layerApplied reports whether the layer was applied and has outputs.
 func (o *Orchestrator) layerApplied(env, layer string) bool {
 	outputs, err := store.LayerOutputs(o.DB, env, layer)

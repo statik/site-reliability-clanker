@@ -29,7 +29,10 @@ CREATE TABLE IF NOT EXISTS work_items (
   commit_sha TEXT NOT NULL DEFAULT '', base_commit TEXT NOT NULL DEFAULT '',
   summary TEXT NOT NULL DEFAULT '', explanation TEXT NOT NULL DEFAULT '{}',
   scheduled_for TEXT NOT NULL DEFAULT '', rollback_of TEXT NOT NULL DEFAULT '',
+  maintenance_window TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+-- A database from before 2026-11-18 has the table without this column.
+ALTER TABLE work_items ADD COLUMN IF NOT EXISTS maintenance_window TEXT NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS plans (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, work_item TEXT NOT NULL, layer TEXT NOT NULL,

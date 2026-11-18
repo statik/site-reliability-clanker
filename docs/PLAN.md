@@ -438,6 +438,14 @@ is approved and the broker issues no apply grant until the file is correct. The
 orchestrator and the broker each read the file when they need the number. No other tier
 has a setting.
 
+The maintenance windows for tier T3 come from the file `policy/maintenance-windows.json`
+of the `runbooks` repository. Each window is weekly: days, a start time, a length in
+minutes and an IANA time zone. A repository without the file has no windows, and an
+approved tier T3 change applies at once. With windows, an approved tier T3 change waits in
+the state `Scheduled` for the start of the next window. It applies at once when the last
+approval comes inside a window with 30 minutes or more left. The grant is issued when the
+apply starts. `runbooks/README.md` has the format and the rules.
+
 ### 6.4 Bootstrap
 
 One command, run once per cloud by a human administrator using their own credentials:

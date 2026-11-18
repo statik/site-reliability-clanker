@@ -16,7 +16,7 @@ log and the snapshots as of that time.
 | `GET /me`, `POST /me/seen`, `GET /users` | Current user; mark the visit for the catch-up panel; demo users |
 | `GET /overview` | Environments with health and versions, counts, waiting items, catch-up, chain status |
 | `GET /work-items`, `GET /work-items/{id}` | List; detail with plans, approvals, jobs, grants, pull request, diff and events |
-| `POST /work-items/{id}/decision` | Body `{"decision": "approve" \| "reject" \| "request_changes", "comment": "", "scheduled_for": ""}` |
+| `POST /work-items/{id}/decision` | Body `{"decision": "approve" \| "reject" \| "request_changes", "comment": "", "scheduled_for": ""}`. A work item in the state `Scheduled` accepts only `reject`, which cancels the apply. The field `maintenance_window` of a work item is the start of the maintenance window that it waits for, or `""` |
 | `GET /work-items/{id}/plans/{layer}` | Plan JSON for one layer, without state values |
 | `GET /jobs/{id}/log` | Log of a plan, apply, runbook or debug job |
 | `GET /events` | Audit events. Filters: `from`, `to`, `env`, `work_item`, `types`, `type_prefix`, `q`, `after`, `limit`, `order` |

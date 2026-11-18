@@ -1,4 +1,5 @@
 import { serverTime } from "@/api/urls";
+import { formatTime } from "@/lib/time";
 import type { Approval, WorkItem } from "@/api/types";
 
 export type DecisionAction = "approve" | "schedule" | "request_changes" | "reject";
@@ -54,6 +55,30 @@ export function buildDecision(
       scheduled_for: scheduledFor,
     },
   };
+}
+
+/**
+ * Says what a work item with a scheduled time waits for. A tier T3 change can wait for a
+ * maintenance window of the runbooks repository. The apply can start after the start of
+ * that window, when an approver asked for a later time inside it.
+ *
+ * @returns Text without a capital letter or a full stop, or "" when no time is set.
+ */
+export function waitNote(
+  item: Pick<WorkItem, "state" | "scheduled_for" | "maintenance_window">,
+): string {
+  if (item.scheduled_for === "") {
+    return "";
+  }
+  if (item.state !== "Scheduled" || item.maintenance_window === "") {
+    return `scheduled for ${formatTime(item.scheduled_for)}`;
+  }
+  const note =
+    `waits for the maintenance window that starts at ${formatTime(item.maintenance_window)}`;
+  if (item.scheduled_for === item.maintenance_window) {
+    return note;
+  }
+  return `${note}; the apply starts at ${formatTime(item.scheduled_for)}`;
 }
 
 /** Lists the distinct approvers whose approval is for the current commit of the work item. */

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button, InlineNotification, Modal, ProgressBar, TextArea, TextInput, Tile }
   from "@carbon/react";
 import { apiPost, errorMessage } from "@/api/client";
-import { ACTION_LABEL, buildDecision, validApprovers } from "@/api/decision";
+import { ACTION_LABEL, buildDecision, validApprovers, waitNote } from "@/api/decision";
 import type { DecisionAction, DecisionRequest } from "@/api/decision";
 import type { WorkItem, WorkItemDetail } from "@/api/types";
 import { AiMark, ErrorNote } from "@/components/common";
@@ -81,6 +81,8 @@ export function Decide({ detail, onDecided }: { detail: WorkItemDetail; onDecide
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const waiting = item.state === "AwaitingApproval";
+  const scheduled = item.state === "Scheduled";
+  const note = waitNote(item);
 
   const start = (action: DecisionAction) => {
     setDone(null);
@@ -120,7 +122,13 @@ export function Decide({ detail, onDecided }: { detail: WorkItemDetail; onDecide
           </p>
         </div>
       )}
-      {!waiting && (
+      {scheduled && (
+        <InlineNotification kind="info" lowContrast hideCloseButton className="app-note"
+          title={`${note.charAt(0).toUpperCase()}${note.slice(1)}.`}
+          subtitle={"To cancel the apply, an approver or an admin can reject this work item. " +
+            "The server refuses the other decisions."} />
+      )}
+      {!waiting && !scheduled && (
         <InlineNotification kind="info" lowContrast hideCloseButton className="app-note"
           title={`This work item is ${stateLabel(item.state)}.`}
           subtitle="It does not wait for a decision, so the server will refuse one." />
