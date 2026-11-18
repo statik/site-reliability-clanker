@@ -18,6 +18,9 @@ const (
 	StorageMinSamples = 6
 	// StorageWarningHorizon is how far ahead a full volume raises a finding.
 	StorageWarningHorizon = 30 * 24 * time.Hour
+	// StorageQuietPeriod is the time after a storage finding in which the check raises no
+	// other one. It stops a new finding at once after a person rejects the change.
+	StorageQuietPeriod = 7 * 24 * time.Hour
 	// StorageRunwayDays is the number of days of growth that the proposed size must hold.
 	StorageRunwayDays = 90
 
@@ -134,10 +137,22 @@ func (d *Detector) storageFindingWaits(env string) (bool, error) {
 	return waiting > 0, nil
 }
 
+// storageIsQuiet reports whether the newest storage finding of env is younger than the
+// quiet period.
+func (d *Detector) storageIsQuiet(env string, now time.Time) (bool, error) {
+	var newest string
+	err := d.DB.QueryRow(`SELECT COALESCE(max(at), '') FROM findings
+		WHERE detector = 'storage' AND env = $1`, env).Scan(&newest)
+	if err != nil {
+		return false, fmt.Errorf("read the newest storage finding of %s: %w", env, err)
+	}
+	return newest != "" && now.Sub(store.ParseTime(newest)) < StorageQuietPeriod, nil
+}
+
 // CheckStorage opens one finding when the forecast says that the database volume is full
-// inside the warning horizon. Code computes the size to propose; no model does. The key
-// holds the size now, so one size gives one finding, and a finding whose work item is not
-// finished stops a second one.
+// inside the warning horizon. Code computes the size to propose; no model does. A finding
+// whose work item is not finished stops a second one. After the work item ends, also by a
+// rejection, the check stays quiet until the quiet period after the finding is over.
 func (d *Detector) CheckStorage(ctx context.Context, env string) error {
 	forecast, ok, err := d.StorageWarning(env)
 	if err != nil || !ok {
@@ -147,9 +162,15 @@ func (d *Detector) CheckStorage(ctx context.Context, env string) error {
 	if err != nil || waits {
 		return err
 	}
+	now := d.Clock.Now()
+	quiet, err := d.storageIsQuiet(env, now)
+	if err != nil || quiet {
+		return err
+	}
 	return d.open(ctx, Finding{Detector: "storage", Env: env,
-		Key: fmt.Sprintf("storage:%s:%s:%dGi", env, monitor.DatabaseVolume,
-			forecast.SizeGB()),
+		// The day is in the key so that a later finding for the same size is a new one.
+		Key: fmt.Sprintf("storage:%s:%s:%dGi:%s", env, monitor.DatabaseVolume,
+			forecast.SizeGB(), now.UTC().Format("2006-01-02")),
 		Title: StorageTitle(env, forecast),
 		Detail: map[string]any{"kind": StorageKind, "layer": "30-data",
 			"variable": StorageVariable, "value": strconv.Itoa(forecast.GrownSizeGB()),

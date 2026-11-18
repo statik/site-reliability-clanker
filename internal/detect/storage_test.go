@@ -150,6 +150,11 @@ func (s storageFixture) record(t *testing.T, samples []monitor.VolumeSample) {
 	}
 }
 
+// later moves the clock of the detector forward.
+func (s storageFixture) later(d time.Duration) {
+	s.detector.Clock = fixedClock{s.detector.Clock.Now().Add(d)}
+}
+
 func (s storageFixture) check(t *testing.T) []Finding {
 	t.Helper()
 	if err := s.detector.CheckStorage(context.Background(), "local"); err != nil {
@@ -191,7 +196,7 @@ func TestCheckStorageRaisesOneFindingWithTheNumbers(t *testing.T) {
 		t.Fatalf("findings = %d, want 1", len(findings))
 	}
 	raised := <-fixture.raised
-	if raised.Key != "storage:local:postgres-data:2Gi" {
+	if raised.Key != "storage:local:postgres-data:2Gi:2026-11-08" {
 		t.Errorf("key = %q", raised.Key)
 	}
 	// 1508 MiB + 90 x 40 MiB = 5108 MiB, which needs 5 GiB.
@@ -241,11 +246,37 @@ func TestCheckStorageWaitsForTheOpenWorkItem(t *testing.T) {
 		t.Errorf("with an open work item: %d findings, want 1", len(findings))
 	}
 	fixture.workItem(t, "wi-1", "Done", first[0].Key)
+	fixture.later(StorageQuietPeriod + time.Hour)
 	findings := fixture.check(t)
 	if len(findings) != 2 {
 		t.Fatalf("after the work item is done: %d findings, want 2", len(findings))
 	}
-	if findings[0].Key != "storage:local:postgres-data:3Gi" {
+	if findings[0].Key != "storage:local:postgres-data:3Gi:2026-11-15" {
+		t.Errorf("key of the new finding = %q", findings[0].Key)
+	}
+}
+
+func TestCheckStorageIsQuietForAWeekAfterARejection(t *testing.T) {
+	fixture := newStorageFixture(t, fillsIn13Days())
+	first := fixture.check(t)
+	if len(first) != 1 {
+		t.Fatalf("findings = %d, want 1", len(first))
+	}
+	fixture.workItem(t, "wi-1", "Rejected", first[0].Key)
+	if findings := fixture.check(t); len(findings) != 1 {
+		t.Errorf("at once after the rejection: %d findings, want 1", len(findings))
+	}
+	fixture.later(StorageQuietPeriod - time.Hour)
+	if findings := fixture.check(t); len(findings) != 1 {
+		t.Errorf("one hour before the end of the quiet period: %d findings, want 1",
+			len(findings))
+	}
+	fixture.later(2 * time.Hour)
+	findings := fixture.check(t)
+	if len(findings) != 2 {
+		t.Fatalf("after the quiet period: %d findings, want 2", len(findings))
+	}
+	if findings[0].Key != "storage:local:postgres-data:2Gi:2026-11-15" {
 		t.Errorf("key of the new finding = %q", findings[0].Key)
 	}
 }

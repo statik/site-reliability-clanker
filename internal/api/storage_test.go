@@ -66,7 +66,7 @@ func TestStorageForecastIsOnTheFutureList(t *testing.T) {
 	if err := detector.CheckStorage(context.Background(), "local"); err != nil {
 		t.Fatal(err)
 	}
-	if err := detector.SetWorkItem("storage:local:postgres-data:2Gi", "wi-7", "drafted"); err != nil {
+	if err := detector.SetWorkItem("storage:local:postgres-data:2Gi:2026-11-08", "wi-7", "drafted"); err != nil {
 		t.Fatal(err)
 	}
 	entries, err = server.storageForecasts(store.FormatTime(now))
