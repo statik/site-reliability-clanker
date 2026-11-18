@@ -138,8 +138,9 @@ def first_object(text: str) -> str | None:
     """Return the first JSON object in an answer, as firstObject does in internal/agent.
 
     The object is the text from the first opening brace to the brace that closes it. The
-    text before and after the object is ignored. When the answer has the mark
-    END_OF_THINKING, the answer starts after the last mark.
+    text before and after the object is ignored. When an object starts after the last mark
+    END_OF_THINKING, that object is read. When no object starts after the last mark, the
+    text before the mark is read.
 
     Args:
         text: The answer of the model.
@@ -148,7 +149,9 @@ def first_object(text: str) -> str | None:
         The text of the object, or None when the answer has no brace or the object that
         starts at the first brace is not complete.
     """
-    text = text.rpartition(END_OF_THINKING)[2]
+    before, mark, after = text.rpartition(END_OF_THINKING)
+    if mark:
+        text = after if "{" in after else before
     start = text.find("{")
     if start < 0:
         return None
