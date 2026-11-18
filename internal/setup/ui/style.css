@@ -155,9 +155,6 @@ button { min-height: 3rem; padding: 0.75rem 3rem 0.75rem 1rem; border: 1px solid
 .btn-secondary { background: transparent; color: var(--link-primary);
   border-color: var(--interactive); }
 .btn-secondary:hover { background: var(--interactive); color: var(--text-on-color); }
-.btn-danger { background: transparent; color: var(--support-error);
-  border-color: var(--support-error); }
-.btn-danger:hover { background: var(--hover); }
 button:disabled, button:disabled:hover { background: var(--layer-01); color: var(--text-helper);
   border-color: var(--border-subtle); cursor: not-allowed; }
 
@@ -193,7 +190,9 @@ tfoot td { font-weight: 600; }
   accent-color: var(--interactive); }
 .facts { display: grid; gap: 1px; margin-top: 1rem; max-width: 52rem;
   background: var(--border-subtle); border: 1px solid var(--border-subtle); }
-@media (min-width: 40rem) { .facts { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 40rem) {
+  .facts { grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
+}
 .facts div { padding: 0.75rem 1rem; background: var(--background); }
 .facts dt { font-size: 0.75rem; color: var(--text-helper); }
 .facts dd { margin-top: 0.2rem; font-family: var(--font-mono); font-size: 0.875rem;
