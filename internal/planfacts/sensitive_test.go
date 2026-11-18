@@ -21,3 +21,18 @@ func TestParseRegistersSensitiveValuesWithTheScrubber(t *testing.T) {
 		t.Errorf("want only the value with the sensitive mark replaced, got %q", got)
 	}
 }
+
+func TestParseKeepsTheNameOfASensitiveSetting(t *testing.T) {
+	plan := `{"resource_changes":[{"address":"a.b","type":"a","name":"b","change":{
+	 "actions":["update"],
+	 "before":{"set_sensitive":[{"name":"settingName","value":"before-value-3310"}]},
+	 "after":{"set_sensitive":[{"name":"settingName","value":"after-value-3311"}]},
+	 "before_sensitive":{"set_sensitive":true},"after_sensitive":{"set_sensitive":true}}}]}`
+	if _, err := planfacts.Parse([]byte(plan)); err != nil {
+		t.Fatal(err)
+	}
+	line := "settingName changed from before-value-3310 to after-value-3311"
+	if got := scrub.Text(line); got != "settingName changed from [REDACTED] to [REDACTED]" {
+		t.Errorf("want the two values replaced and the name kept, got %q", got)
+	}
+}

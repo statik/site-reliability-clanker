@@ -184,25 +184,29 @@ func registerSensitive(value, mark any) {
 			registerStrings(value)
 		}
 	case map[string]any:
-		if fields, ok := value.(map[string]any); ok {
-			for name, child := range m {
-				registerSensitive(fields[name], child)
-			}
+		fields, _ := value.(map[string]any)
+		for name, child := range m {
+			registerSensitive(fields[name], child)
 		}
 	case []any:
-		if items, ok := value.([]any); ok {
-			for i := 0; i < len(m) && i < len(items); i++ {
-				registerSensitive(items[i], m[i])
-			}
+		items, _ := value.([]any)
+		for i := range min(len(m), len(items)) {
+			registerSensitive(items[i], m[i])
 		}
 	}
 }
 
+// registerStrings registers every string below a value. A block with a name and a value,
+// such as an entry of set_sensitive of a Helm release, has one mark for both. Its name is
+// the name of a setting and is in the chart and in the code, so only its value is a secret.
 func registerStrings(value any) {
 	switch v := value.(type) {
 	case string:
 		scrub.Add(v)
 	case map[string]any:
+		if _, named := v["name"].(string); named {
+			v = map[string]any{"value": v["value"]}
+		}
 		for _, child := range v {
 			registerStrings(child)
 		}
