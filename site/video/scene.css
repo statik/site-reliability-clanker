@@ -83,6 +83,12 @@ body { background: var(--background); color: var(--text-primary); font-family: v
 .lockup-line { font-size: 52px; font-weight: 300; line-height: 1.2; text-align: center; }
 .does { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
 
+/* The title card has the figure of the architecture page behind it, over the whole frame. */
+.pic-title > * { position: relative; }
+.pic-title > .backdrop { position: absolute; left: -96px; top: -24px; width: 1440px; height: 810px;
+  opacity: 0.45; }
+.backdrop svg { display: block; width: 100%; height: 100%; }
+
 .terminal { align-self: center; padding: 28px 56px; background: var(--layer-01);
   border: 2px solid var(--honey); font-family: var(--font-mono); font-size: 72px; }
 .terminal span { color: var(--text-helper); }
