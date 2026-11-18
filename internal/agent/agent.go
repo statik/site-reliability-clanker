@@ -110,8 +110,8 @@ func (a *Agent) budgetReached(used usage) (summary string, err error) {
 	return "", nil
 }
 
-// complete sends one request for a role, enforces the budget, scrubs the input and records
-// the call with its transcript.
+// complete sends one request for a role, enforces the budget, scrubs the input and the
+// answer, and records the call with its transcript.
 func (a *Agent) complete(ctx context.Context, role, workItem string, req Request) (Response, error) {
 	spent, err := a.spentToday()
 	if err != nil {
@@ -133,6 +133,14 @@ func (a *Agent) complete(ctx context.Context, role, workItem string, req Request
 	resp, err := a.LLM.Complete(ctx, req)
 	if err != nil {
 		return Response{}, err
+	}
+	// Every role gets its answer from here, and the transcript below is the stored record.
+	// A model can repeat a secret that passed the scrubber on the way in, so the answer and
+	// the arguments of each tool call are scrubbed before any other code reads them.
+	resp.Message.Content = scrubAnswer(resp.Message.Content)
+	for i := range resp.Message.ToolCalls {
+		call := &resp.Message.ToolCalls[i]
+		call.Function.Arguments = scrubAnswer(call.Function.Arguments)
 	}
 	transcript, _ := json.Marshal(map[string]any{"request": req.Messages,
 		"response": resp.Message, "replay_key": req.ReplayKey, "step": req.Step})

@@ -28,6 +28,15 @@ def test_scrub_rules_match_go() -> None:
     assert rules, "no rule found in scrub.go; the parser of this test needs an update"
     assert len(rules) == source.count("regexp.MustCompile(")
     assert rules == gotext.GO_SCRUB_RULES
+    assert f"const MinKnownLength = {gotext.MIN_KNOWN_LENGTH}\n" in source
+    assert f'const knownReplacement = "{gotext.KNOWN_REPLACEMENT}"\n' in source
+    assert "s = replaceKnown(s)\n\tfor _, r := range rules {" in source
+
+
+def test_every_answer_is_scrubbed_in_one_place() -> None:
+    source = go_source("internal/agent/agent.go")
+    assert "resp.Message.Content = scrubAnswer(resp.Message.Content)" in source
+    assert "call.Function.Arguments = scrubAnswer(call.Function.Arguments)" in source
 
 
 def test_tfvar_patterns_match_go() -> None:

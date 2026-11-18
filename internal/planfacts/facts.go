@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/statik/site-reliability-clanker/internal/scrub"
 )
 
 // ResourceChange is one changed resource, taken from the plan JSON.
@@ -91,6 +93,8 @@ func Parse(raw []byte) (Facts, error) {
 		}
 		change := ResourceChange{Address: rc.Address, Type: rc.Type, Name: rc.Name,
 			Action: action, Details: []string{}}
+		registerSensitive(rc.Change.Before, rc.Change.BeforeSensitive)
+		registerSensitive(rc.Change.After, rc.Change.AfterSensitive)
 		if action == "update" || action == "replace" {
 			sensitive := sensitivePaths(rc.Change.BeforeSensitive, rc.Change.AfterSensitive)
 			change.Details = diffAttributes(rc.Change.Before, rc.Change.After, sensitive)
@@ -167,6 +171,50 @@ func yamlLeaves(text string) map[string]string {
 			strings.TrimSpace(value)
 	}
 	return leaves
+}
+
+// registerSensitive gives the scrubber each string that the plan marks sensitive. The
+// details of a plan never show such a value, but the same value can be in a log line or
+// in a file that a role reads later. The mark has the structure of the value, with true
+// in the place of a sensitive part.
+func registerSensitive(value, mark any) {
+	switch m := mark.(type) {
+	case bool:
+		if m {
+			registerStrings(value)
+		}
+	case map[string]any:
+		fields, _ := value.(map[string]any)
+		for name, child := range m {
+			registerSensitive(fields[name], child)
+		}
+	case []any:
+		items, _ := value.([]any)
+		for i := range min(len(m), len(items)) {
+			registerSensitive(items[i], m[i])
+		}
+	}
+}
+
+// registerStrings registers every string below a value. A block with a name and a value,
+// such as an entry of set_sensitive of a Helm release, has one mark for both. Its name is
+// the name of a setting and is in the chart and in the code, so only its value is a secret.
+func registerStrings(value any) {
+	switch v := value.(type) {
+	case string:
+		scrub.Add(v)
+	case map[string]any:
+		if _, named := v["name"].(string); named {
+			v = map[string]any{"value": v["value"]}
+		}
+		for _, child := range v {
+			registerStrings(child)
+		}
+	case []any:
+		for _, child := range v {
+			registerStrings(child)
+		}
+	}
 }
 
 func sensitivePaths(values ...any) map[string]bool {

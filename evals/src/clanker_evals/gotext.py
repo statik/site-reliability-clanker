@@ -2,6 +2,7 @@
 
 import json
 import re
+from collections.abc import Iterable
 from typing import Any
 
 # The rules of internal/scrub/scrub.go: the Go pattern and the Go replacement, unchanged.
@@ -20,10 +21,31 @@ GO_SCRUB_RULES: list[tuple[str, str]] = [
         "$1[REDACTED]",
     ),
     (
+        r"""(?i)(--[a-z0-9-]*(?:password|passwd|token|secret|api-?key) +"?)"""
+        r"""[^\s",}-][^\s",}]*""",
+        "$1[REDACTED]",
+    ),
+    (r"""(\bredis-cli\b[^\n|;&\\]*?\s(?:-a|--pass)[ =]"?)[^\s",}]+""", "$1[REDACTED]"),
+    (
+        r"""(\b(?:sshpass|mysql|mysqldump|mysqladmin|mariadb|mongosh|mongodump)\b"""
+        r"""[^\n|;&\\]*?\s-p ?"?)[^\s",}]+""",
+        "$1[REDACTED]",
+    ),
+    (
+        r"""(?i)((?:password|passwd|passphrase|credential|secret|token|api[ _-]?key)"""
+        r"""s?\s+(?:is|was)\s+(?:now\s+)?"?)[^\s",}]*(?:[a-z][^\s",}]*[0-9]|[0-9][^\s",}]*[a-z])"""
+        r"""[^\s",}]*""",
+        "$1[REDACTED]",
+    ),
+    (
         r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
         "[REDACTED-PRIVATE-KEY]",
     ),
 ]
+
+# MinKnownLength and knownReplacement of scrub.go.
+MIN_KNOWN_LENGTH = 8
+KNOWN_REPLACEMENT = "[REDACTED]"
 
 _GO_GROUP = re.compile(r"\$(\d)")
 # re.ASCII gives \b, \s and \w the RE2 meaning.
@@ -33,8 +55,42 @@ _SCRUB_RULES = [
 ]
 
 
-def scrub(text: str) -> str:
-    """Return text with every secret pattern replaced, as scrub.Text does in Go."""
+def _known_forms(known: Iterable[str]) -> set[str]:
+    """Return each known value and its JSON form, as Add stores them in scrub.go."""
+    forms: set[str] = set()
+    for value in known:
+        if len(value.encode("utf-8")) < MIN_KNOWN_LENGTH:
+            continue
+        forms.add(value)
+        forms.add(go_json(value)[1:-1])
+    return forms
+
+
+def _replace_known(text: str, known: Iterable[str]) -> str:
+    """Replace every occurrence of a known value, as replaceKnown does in scrub.go."""
+    spans: list[tuple[int, int]] = []
+    for value in _known_forms(known):
+        at = text.find(value)
+        while at >= 0:
+            spans.append((at, at + len(value)))
+            at = text.find(value, at + 1)
+    parts: list[str] = []
+    end = 0
+    for start, stop in sorted(spans):
+        if start >= end:
+            parts += [text[end:start], KNOWN_REPLACEMENT]
+        end = max(end, stop)
+    return "".join([*parts, text[end:]])
+
+
+def scrub(text: str, known: Iterable[str] = ()) -> str:
+    """Return text with every known value and secret pattern replaced, as scrub.Text does.
+
+    Args:
+        text: The text that leaves the control plane.
+        known: The secret values that the control plane registered with scrub.Add.
+    """
+    text = _replace_known(text, known)
     for pattern, replacement in _SCRUB_RULES:
         text = pattern.sub(replacement, text)
     return text
