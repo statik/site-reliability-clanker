@@ -30,6 +30,8 @@ const usage = `clanker runs the Site Reliability Clanker control plane.
 Usage:
   clanker setup                     open the first-run wizard in the browser
   clanker preflight                 check that the required tools are installed
+  clanker discover --profile NAME   survey an AWS account and propose where to install; it
+                                    only reads. --region NAME surveys that region
   clanker bootstrap --cloud local   apply layer 00-bootstrap with your own credentials
   clanker up                        start the control plane and the dashboard
   clanker destroy --env local       destroy every layer of an environment
@@ -59,6 +61,9 @@ type options struct {
 	demo      bool
 	setupAddr string
 	noBrowser bool
+	// profile and region are the AWS CLI profile and the region of `clanker discover`.
+	profile string
+	region  string
 }
 
 func parse(command string, args []string) (options, error) {
@@ -73,6 +78,8 @@ func parse(command string, args []string) (options, error) {
 	flags.StringVar(&o.env, "env", "local", "environment name")
 	flags.StringVar(&o.cloud, "cloud", "local", "cloud of the environment")
 	flags.BoolVar(&o.demo, "demo", true, "demo mode: simulator, local mail and webhook sink")
+	flags.StringVar(&o.profile, "profile", "", "AWS CLI profile of the account to survey")
+	flags.StringVar(&o.region, "region", "", "region to survey (default: the most used one)")
 	if err := flags.Parse(args); err != nil {
 		return options{}, err
 	}
@@ -319,6 +326,8 @@ func run() error {
 	switch command {
 	case "setup":
 		return runSetup(ctx, o)
+	case "discover":
+		return runDiscover(ctx, o)
 	case "preflight":
 		if err := preflight(setup.TargetLocal); err != nil {
 			return err

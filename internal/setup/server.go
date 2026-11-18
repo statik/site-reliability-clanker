@@ -150,6 +150,7 @@ func (s *Server) Handler(listenHost string) (http.Handler, error) {
 	api("POST /api/key", s.postKey)
 	api("GET /api/aws/profiles", s.getProfiles)
 	api("POST /api/aws/signin", s.postSignIn)
+	api("POST /api/aws/discover", s.postDiscover)
 	api("POST /api/aws/login", s.postLogin)
 	api("POST /api/review", s.postReview)
 	api("POST /api/deploy", s.postDeploy)
