@@ -25,15 +25,15 @@ setting), #62 (the device flow in the iOS app), #68 (the video on one idea), #66
 #70 (the colours and the icon of S.R.C. in the iOS app, the setup wizard and the
 dashboard), #71 (the iOS app is named S.R.C.). Step 5 of the next steps is done.
 
-**One branch is not merged.**
-
-| Branch | Where | State | To finish |
-|---|---|---|---|
-| `dashboard-phone-nav` | worktree `.claude/worktrees/colours-dashboard`, not pushed | The dashboard at phone width: the side navigation is closed below a breakpoint and opens from a menu button in the header, and wide content scrolls in its own box. The owner asked for it. A subagent was at work on it when this was written | Read its report. Rebase it onto the main branch (its base is the tip of `colours-dashboard` before the squash merge #70). Build the dashboard, serve it from the control plane, run `web/scripts/screenshots.mjs` and look at the pages at 390 px. Then a pull request |
+**No branch waits and no pull request is open.** After the list above, #74 (the dashboard
+fits a phone: below 1056 px the side navigation opens from a menu button, and wide content
+scrolls in its own region; `pnpm phone-check` in `web/` checks every page at 390 px and
+768 px against a running dashboard) and #75 (a test waits for the applies in the
+background) are merged.
 
 Worktrees that can be removed, because their work is on the main branch:
 `agent-aa1afd77bc263132f` (branch `chat-approval`, locked), `agent-ae36a6a2b9fad684f` (the
-site and the video), `colours-wizard`, `colours-ios`, `copy-iac`. Many local branches and
+site and the video), `colours-wizard`, `colours-ios`, `colours-dashboard`, `copy-iac`. Many local branches and
 a few remote ones are merged too. Nothing was removed with force.
 
 The logs of every live eval round are in `evals/logs/` of the main checkout, which git does
@@ -154,8 +154,10 @@ by the Pages workflow; a merge that touches `site/` deploys it). What the owner 
 
 **The order of the work now**
 
-1. The dashboard at phone width (the table above).
-2. The product name in the emails and the chat messages, if the owner wants it changed.
+1. The product name in the emails and the chat messages, if the owner wants it changed.
+2. Unit tests for the navigation of the dashboard at phone width, if the owner accepts a
+   DOM test environment as a new dependency. Today a browser script checks it, and CI does
+   not run that script.
 3. The pull request path for runbooks, when the owner decides how.
 4. Step 6: the cloud runner and broker. Issue #40 has the decision for the secrets
    (Parameter Store with the AWS SDK for Go v2).
@@ -189,8 +191,12 @@ by the Pages workflow; a merge that touches `site/` deploys it). What the owner 
 - CI does not run the tests of `evals/`, of the site or of the iOS app. Run
   `uv run pytest -q` in `evals/` when Go code that the evals mirror changes.
 - A test that ends while an apply still runs in the background can close its database
-  under the apply. The chat tests wait for the last audit event of the apply
-  (`settle` in `internal/chatops/harness_test.go`).
+  under the apply, and the Go job then fails on a pull request that changed no Go code. A
+  test that approves a change must end with `Orchestrator.WaitForApplies` (#75).
+- The dashboard at phone width was checked in Chromium only, not on a phone, in Safari or
+  with a screen reader. Each region that scrolls sideways is a tab stop at desktop width too.
+- The change that waits for approval in the demo ("holiday rush") was applied in a live
+  check after the pictures of the site were taken. Push it again before the next capture.
 
 ### State of the next steps
 
