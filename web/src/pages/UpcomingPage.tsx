@@ -12,7 +12,8 @@ const KIND = {
   scheduled: { label: "Scheduled work", icon: Calendar, type: "cyan",
     why: "Approved. It waits for its maintenance window." },
   forecast: { label: "Forecast", icon: ChartLineData, type: "purple",
-    why: "A date from an advisory, such as the end of support of a version." },
+    why: "A date from an advisory or from a measured trend: the end of support of a "
+      + "version, or the day a volume is full." },
   window: { label: "Maintenance window", icon: EventSchedule, type: "teal",
     why: "A routine job that runs on a schedule under a standing approval." },
 } as const;
@@ -32,9 +33,10 @@ function futureColumns(now: Date): Column<FutureItem>[] {
     { key: "why", header: "Why", value: (row) => KIND[row.kind].why },
     { key: "tier", header: "Tier", value: (row) => row.tier ?? "",
       render: (row) => (row.tier ? <TierTag tier={row.tier} size="sm" /> : "–") },
-    { key: "source", header: "Source", value: (row) => row.work_item ?? row.advisory ?? "",
+    { key: "source", header: "Source",
+      value: (row) => row.work_item ?? row.advisory ?? row.source ?? "",
       render: (row) => (row.work_item
-        ? <WorkItemLink id={row.work_item} /> : row.advisory ?? "Schedule") },
+        ? <WorkItemLink id={row.work_item} /> : row.advisory ?? row.source ?? "Schedule") },
   ];
 }
 

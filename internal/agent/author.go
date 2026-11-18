@@ -57,6 +57,8 @@ type draft struct {
 	branch  string
 	edits   int
 	pull    *forge.PullRequest
+	// typed is true when code wrote the change and no model took part.
+	typed bool
 }
 
 func (a *Agent) toolReadFile(args map[string]string) (string, error) {
@@ -154,10 +156,14 @@ func (a *Agent) runAuthorTool(d *draft, call ToolCall) string {
 	return result
 }
 
+// draftBranch names the branch of the change for a finding.
+func draftBranch(f detect.Finding) string {
+	return "agent/" + strings.Trim(slugChars.ReplaceAllString(strings.ToLower(f.Key), "-"), "-")
+}
+
 // Draft is the Author role. It turns a finding into a pull request and a planned work item.
 func (a *Agent) Draft(ctx context.Context, f detect.Finding) (orchestrator.WorkItem, error) {
-	d := &draft{finding: f, cloud: a.Orch.Envs[f.Env].Cloud,
-		branch: "agent/" + strings.Trim(slugChars.ReplaceAllString(strings.ToLower(f.Key), "-"), "-")}
+	d := &draft{finding: f, cloud: a.Orch.Envs[f.Env].Cloud, branch: draftBranch(f)}
 	messages := []ChatMessage{
 		{Role: "system", Content: authorSystem},
 		{Role: "user", Content: frame(map[string]any{"finding": f, "cloud": d.cloud,
@@ -201,10 +207,14 @@ func (a *Agent) submit(ctx context.Context, d *draft) (orchestrator.WorkItem, er
 	if err != nil {
 		return orchestrator.WorkItem{}, err
 	}
+	writer, mode := "Author", a.LLM.Mode()
+	if d.typed {
+		writer, mode = "A typed change", "typed"
+	}
 	a.emit(audit.Event{Type: "agent.drafted", Actor: RoleAuthor, Env: wi.Env, WorkItem: wi.ID,
-		Summary: fmt.Sprintf("Author opened pull request #%d for: %s", d.pull.ID,
+		Summary: fmt.Sprintf("%s opened pull request #%d for: %s", writer, d.pull.ID,
 			d.finding.Title),
-		Data: map[string]any{"finding": d.finding.Key, "pr": d.pull.ID, "mode": a.LLM.Mode()}})
+		Data: map[string]any{"finding": d.finding.Key, "pr": d.pull.ID, "mode": mode}})
 	if _, err := a.DB.Exec(`UPDATE agent_calls SET work_item = $1 WHERE work_item = '' AND
 		role = $2`, wi.ID, RoleAuthor); err != nil {
 		return orchestrator.WorkItem{}, fmt.Errorf("link Author calls to %s: %w", wi.ID, err)
@@ -219,8 +229,9 @@ func (a *Agent) submit(ctx context.Context, d *draft) (orchestrator.WorkItem, er
 	return a.Orch.PlanWorkItem(ctx, wi.ID)
 }
 
-// HandleFinding routes a new finding: an incident goes to the Investigator, a finding with a
-// fix goes to the Author. It is the OnFinding callback of the detector.
+// HandleFinding routes a new finding: an incident goes to the Investigator, a storage
+// forecast becomes a typed change, and another finding with a fix goes to the Author. It is
+// the OnFinding callback of the detector.
 func (a *Agent) HandleFinding(ctx context.Context, f detect.Finding) {
 	var err error
 	switch f.Detail["kind"] {
@@ -228,6 +239,8 @@ func (a *Agent) HandleFinding(ctx context.Context, f detect.Finding) {
 		err = a.HandleIncident(ctx, f)
 	case "drift":
 		return
+	case detect.StorageKind:
+		_, err = a.DraftStorageGrowth(ctx, f)
 	default:
 		_, err = a.Draft(ctx, f)
 	}
