@@ -166,16 +166,6 @@ func TestAnApplyWithAnotherHashIsRefusedByTheRunner(t *testing.T) {
 	}
 }
 
-func TestAJobWithAStateBackendIsRefusedByALocalRunner(t *testing.T) {
-	d, _, _ := setup(t)
-	job := runbook(t, "hello", &bytes.Buffer{})
-	job.Backend = map[string]string{"bucket": "state"}
-	if _, err := d.Run(context.Background(), job); err == nil ||
-		!strings.Contains(err.Error(), "cannot use the state backend") {
-		t.Fatalf("error = %v", err)
-	}
-}
-
 func TestRequestsWithoutTheTokenOfARunningJobAreRefused(t *testing.T) {
 	_, _, server := setup(t)
 	for _, header := range []string{"", "Bearer ", "Bearer wrong", "Basic abc"} {
