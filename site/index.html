@@ -383,6 +383,42 @@ for WI-0003, as the control plane sends it to Slack and to Teams.</figcaption>
               stored with its role, model, tokens and cost.</p>
           </div>
         </div>
+        <p class="section-lead">A model with open weights can run in two ways in your own cloud
+          account. A managed service such as Amazon Bedrock charges for each token and costs
+          nothing while the model is idle. A GPU instance charges for each hour, with work or
+          without. The control plane sends few tokens, so the price for each token is the lower
+          one.</p>
+        <div class="table-scroll" tabindex="0" role="region"
+          aria-label="Cost of a model on Amazon Bedrock and on a GPU instance">
+          <table class="data-table">
+            <thead>
+              <tr><th scope="col">Where the model runs</th><th scope="col">Model</th>
+                <th scope="col">List price</th><th scope="col">One day, one eval run</th>
+                <th scope="col">One week, one eval run each day</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Amazon Bedrock</th><td>Qwen3 32B</td>
+                <td>0.15 US dollars for a million input tokens, 0.60 for a million output
+                  tokens</td><td>0.25 US dollars</td><td>1.78 US dollars</td></tr>
+              <tr><th scope="row">Amazon Bedrock</th><td>Qwen3 235B</td>
+                <td>0.22 US dollars for a million input tokens, 0.88 for a million output
+                  tokens</td><td>0.37 US dollars</td><td>2.61 US dollars</td></tr>
+              <tr><th scope="row">GPU instance <span class="mono">g6.xlarge</span>, 24 GB of GPU
+                  memory</th><td>Qwen3.8 27B, with a short context</td>
+                <td>0.8048 US dollars for each hour</td><td>19.32 US dollars</td>
+                <td>135.21 US dollars</td></tr>
+              <tr><th scope="row">GPU instance <span class="mono">g6e.xlarge</span>, 48 GB of GPU
+                  memory</th><td>Qwen3.8 27B, with a context of 32,000 tokens</td>
+                <td>1.861 US dollars for each hour</td><td>44.66 US dollars</td>
+                <td>312.65 US dollars</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="figure-caption">List prices on demand for the region US West (Oregon), read from
+          the AWS price list on 18 Nov 2026. One eval run is the measured volume of the full eval
+          suite on one model: 523,000 input tokens and 293,000 output tokens. Amazon Bedrock does
+          not offer Qwen3.8, so the models in the rows are not the same. The smaller instance
+          costs as much in one day as 76 eval runs on Qwen3 32B.</p>
       </div>
     </section>
 
