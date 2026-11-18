@@ -1,5 +1,5 @@
 {
- "captured_at": "2026-11-17T23:54:55.622Z",
+ "captured_at": "2026-11-18T02:09:12.957Z",
  "shots": [
   {
    "file": "dashboard-overview.png",
@@ -22,11 +22,11 @@
   {
    "file": "dashboard-work-item.png",
    "width": 1440,
-   "height": 3518,
+   "height": 3377,
    "group": "dashboard",
-   "title": "Work item page, after the decision",
-   "note": "A finished change: the summary, the impact, the tier, the plan, and who approved it. No change waited for a decision when this picture was taken.",
-   "alt": "The S.R.C. dashboard: work item page, after the decision."
+   "title": "Approval page",
+   "note": "A change that waits for a decision: the summary, the impact, the tier, the plan, and the buttons to decide.",
+   "alt": "The S.R.C. dashboard: approval page."
   },
   {
    "file": "dashboard-topology.png",
@@ -115,7 +115,7 @@
    "height": 900,
    "group": "notifications",
    "title": "Webhook sink",
-   "note": "A local stand-in for Slack, Microsoft Teams and Discord, with the real payloads. This picture is from an earlier run: the sink was empty when the other pictures were taken.",
+   "note": "A local stand-in for Slack, Microsoft Teams and Discord, with the real payloads.",
    "alt": "The webhook sink page: a list of the chat notifications that S.R.C. sent."
   }
  ],
