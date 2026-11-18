@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/statik/site-reliability-clanker/internal/jobspec"
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
 
@@ -14,7 +15,11 @@ type Credential struct {
 	// KubeConfig is the text of a kubeconfig with a short-lived token. It is empty for a
 	// layer that needs no cluster credential. The broker keeps no copy.
 	KubeConfig string
-	// Mechanism says in plain words what the credential is.
+	// AWS holds the keys of an STS session. It is nil on a target that is not AWS. The
+	// broker keeps no copy.
+	AWS *jobspec.AWSSession
+	// Mechanism says in plain words what the credential is. It goes into the job log and
+	// the audit log, so it must hold no secret.
 	Mechanism string
 }
 

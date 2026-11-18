@@ -276,7 +276,7 @@ func (o *Orchestrator) planLayer(ctx context.Context, wi WorkItem, layer string)
 	if err != nil {
 		return Plan{}, err
 	}
-	spec.KubeConfig, spec.Log = cred.KubeConfig, logFile
+	spec.KubeConfig, spec.AWS, spec.Log = cred.KubeConfig, cred.AWS, logFile
 	plan, err := o.runPlan(ctx, wi, layer, spec, &job, logFile)
 	o.endJob(job, logFile, err)
 	if err != nil {

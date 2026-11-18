@@ -178,7 +178,7 @@ func (c *Client) execute(ctx context.Context, spec jobspec.Spec, log io.Writer) 
 		checkout.Archive = archive
 	}
 	job := Job{Env: spec.Env, Cloud: spec.Cloud, Layer: spec.Layer, Checkout: checkout,
-		KubeConfig: spec.KubeConfig, Backend: spec.Backend, Log: log}
+		KubeConfig: spec.KubeConfig, AWS: spec.AWS, Backend: spec.Backend, Log: log}
 	switch spec.Kind {
 	case jobspec.KindPlan:
 		plan, err := c.Runner.Plan(ctx, job)

@@ -472,7 +472,7 @@ func (o *Orchestrator) runApply(ctx context.Context, wi WorkItem, plan Plan, gra
 		WorkItem: wi.ID, Summary: fmt.Sprintf("Apply of %s started", plan.Layer),
 		Data: map[string]any{"grant": grant.ID, "credential": cred.Mechanism,
 			"plan_sha256": plan.SHA256}})
-	spec.KubeConfig, spec.Log = cred.KubeConfig, logFile
+	spec.KubeConfig, spec.AWS, spec.Log = cred.KubeConfig, cred.AWS, logFile
 	spec.Plan, spec.PlanSHA256 = planFile, grant.PlanSHA256
 	result, err := o.run(ctx, job, spec)
 	if err != nil {

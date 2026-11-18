@@ -91,6 +91,8 @@ type Job struct {
 	// KubeConfig is the text of the credential file from the access broker. It is empty
 	// when the layer needs no cluster credential.
 	KubeConfig string
+	// AWS is the AWS credential from the access broker. It is nil when the job has none.
+	AWS *jobspec.AWSSession
 	// Backend holds the settings of a remote state backend, as `tofu init -backend-config`
 	// takes them. When it is empty the state is a file in the state directory.
 	Backend map[string]string
@@ -236,6 +238,13 @@ func (r *Runner) prepare(j Job) (run, func(), error) {
 		env = append(env, "KUBE_CONFIG_PATH="+kubeconfig, "KUBECONFIG="+kubeconfig)
 	} else {
 		env = append(env, "KUBE_CONFIG_PATH=", "KUBECONFIG=/dev/null")
+	}
+	if j.AWS != nil {
+		// The keys exist only in the environment of the tofu processes of this job. They
+		// come last, so they replace keys that the runner itself has. No file holds them.
+		env = append(env, "AWS_ACCESS_KEY_ID="+j.AWS.AccessKeyID,
+			"AWS_SECRET_ACCESS_KEY="+j.AWS.SecretAccessKey,
+			"AWS_SESSION_TOKEN="+j.AWS.SessionToken)
 	}
 	return run{job: j, stack: stack, environ: env}, remove, nil
 }

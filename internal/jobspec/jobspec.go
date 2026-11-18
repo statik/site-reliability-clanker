@@ -8,6 +8,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"log/slog"
+	"time"
 )
 
 // Kinds of job.
@@ -33,6 +35,28 @@ const (
 // ErrStalePlan means that the state changed after the plan was saved.
 var ErrStalePlan = errors.New("the saved plan is stale")
 
+// AWSSession holds the keys of one STS session: the AWS credential of one job, from the
+// access broker. The JSON form carries the keys, because that is how a runner gets them.
+// The text and log forms carry only the key ID and the expiry, so that a log line or an
+// error message with a session in it holds no secret.
+type AWSSession struct {
+	AccessKeyID     string    `json:"access_key_id"`
+	SecretAccessKey string    `json:"secret_access_key"`
+	SessionToken    string    `json:"session_token"`
+	Expires         time.Time `json:"expires"`
+}
+
+// String returns the key ID and the expiry.
+func (s AWSSession) String() string {
+	return "AWS session " + s.AccessKeyID + ", expires " + s.Expires.UTC().Format(time.RFC3339)
+}
+
+// GoString is what the verb %#v prints.
+func (s AWSSession) GoString() string { return s.String() }
+
+// LogValue is what a structured log prints.
+func (s AWSSession) LogValue() slog.Value { return slog.StringValue(s.String()) }
+
 // Spec is the part of a job that travels as JSON.
 type Spec struct {
 	Kind  string `json:"kind"`
@@ -45,6 +69,9 @@ type Spec struct {
 	// KubeConfig is the text of the credential of this job, from the access broker. It is
 	// in the specification of this job only.
 	KubeConfig string `json:"kubeconfig,omitempty"`
+	// AWS is the AWS credential of this job, from the access broker. It is nil when the
+	// job has none. It is in the specification of this job only.
+	AWS *AWSSession `json:"aws,omitempty"`
 	// PlanSHA256 is the approved hash of the plan of an apply job.
 	PlanSHA256 string `json:"plan_sha256,omitempty"`
 	// Runbook is the name of the script of a runbook job, and Params are its parameters.
@@ -57,6 +84,16 @@ type Spec struct {
 	// Backend holds the settings of the state backend, as `tofu init -backend-config`
 	// takes them. It is empty on the local target, where the runner keeps the state.
 	Backend map[string]string `json:"backend,omitempty"`
+}
+
+// LogValue is what a structured log prints: the specification without its credentials. A
+// log handler would otherwise print the JSON form, which carries them.
+func (s Spec) LogValue() slog.Value {
+	// The type without methods stops the log from asking for the value again.
+	type withoutCredentials Spec
+	printed := withoutCredentials(s)
+	printed.KubeConfig, printed.AWS = "", nil
+	return slog.AnyValue(printed)
 }
 
 // Job is a specification with its large parts and the place for its log.

@@ -30,7 +30,12 @@ boundary and a maximum session of one hour.
 | `applier-<layer>` | No | Session tags `clanker_grant` (not empty), `clanker_env` and `clanker_layer` = `<layer>` |
 
 The broker passes the session tags in `sts:AssumeRole`. The broker's own IAM policy decides
-when it can do so. The session tags are in CloudTrail for each call.
+when it can do so. The session tags are in CloudTrail for each call. The broker also passes
+`clanker_work_item` and `clanker_plan`, the first 12 characters of the plan hash, which no
+condition reads. The role session name is the work item and the grant ID.
+
+The control plane reads the role ARNs from the setting `CLANKER_AWS_IDENTITIES`: the output
+`identities` of `00-bootstrap` as JSON.
 
 The permission boundary allows only the services that the platform uses. It denies IAM users
 and access keys, roles without the boundary, changes to the boundary and to the agent roles,
