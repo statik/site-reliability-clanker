@@ -121,29 +121,39 @@ type streamLine struct {
 	Completed int64
 }
 
-// stream posts a request and gives each line of the answer to onLine. Ollama can answer
-// HTTP 200 and report the failure in a later line, so stream reads to the end.
-func (o ollama) stream(ctx context.Context, path string, body any,
-	onLine func(streamLine)) error {
+// post sends a request and returns the open answer. The caller closes the body.
+func (o ollama) post(ctx context.Context, path string, body any) (*http.Response, error) {
 	encoded, err := json.Marshal(body)
 	if err != nil {
-		return fmt.Errorf("encode the request for Ollama: %w", err)
+		return nil, fmt.Errorf("encode the request for Ollama: %w", err)
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, o.base+path,
 		bytes.NewReader(encoded))
 	if err != nil {
-		return fmt.Errorf("build the request for Ollama: %w", err)
+		return nil, fmt.Errorf("build the request for Ollama: %w", err)
 	}
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		return fmt.Errorf("ask Ollama at %s: %w", o.base, err)
+		return nil, fmt.Errorf("ask Ollama at %s: %w", o.base, err)
 	}
-	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
+		defer response.Body.Close()
 		text, _ := io.ReadAll(io.LimitReader(response.Body, 600))
-		return fmt.Errorf("Ollama answered HTTP %d for %s: %s", response.StatusCode, path,
+		return nil, fmt.Errorf("Ollama answered HTTP %d for %s: %s", response.StatusCode, path,
 			strings.TrimSpace(string(text)))
 	}
+	return response, nil
+}
+
+// stream posts a request and gives each line of the answer to onLine. Ollama can answer
+// HTTP 200 and report the failure in a later line, so stream reads to the end.
+func (o ollama) stream(ctx context.Context, path string, body any,
+	onLine func(streamLine)) error {
+	response, err := o.post(ctx, path, body)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
 	lines := bufio.NewScanner(response.Body)
 	lines.Buffer(make([]byte, 0, 64<<10), 1<<20)
 	for lines.Scan() {
@@ -380,10 +390,7 @@ func (s *Server) saveModelSettings(choice, key string) error {
 			return fmt.Errorf("set %s for this process: %w", name, err)
 		}
 	}
-	content := ""
-	if len(lines) > 0 {
-		content = strings.Join(lines, "\n") + "\n"
-	}
+	content := strings.Join(append(lines, ""), "\n")
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		return fmt.Errorf("save the model settings in %s: %w", path, err)
 	}
