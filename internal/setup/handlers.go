@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 var localCreates = []Change{
@@ -45,7 +47,7 @@ func (s *Server) getChecks(r *http.Request) (any, error) {
 }
 
 func (s *Server) postTarget(r *http.Request) (any, error) {
-	var body struct{ Target, Env string }
+	var body struct{ Target, Env, Operator string }
 	if err := decode(r, &body); err != nil {
 		return nil, err
 	}
@@ -60,6 +62,10 @@ func (s *Server) postTarget(r *http.Request) (any, error) {
 		return nil, invalid("the environment name %q is not valid: use 3 to 24 lowercase "+
 			"letters, digits or hyphens, and start with a letter", body.Env)
 	}
+	operator, err := operatorFor(body.Target, body.Operator)
+	if err != nil {
+		return nil, err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.state.Deployed && (s.state.Target != body.Target || s.state.Env != body.Env) {
@@ -67,8 +73,26 @@ func (s *Server) postTarget(r *http.Request) (any, error) {
 			"you set up another", s.state.Env, s.state.Target)
 	}
 	s.state.Target, s.state.Env = body.Target, body.Env
+	// The users of an environment that exists do not change with a new name here.
+	if !s.state.Deployed {
+		s.state.Operator = operator
+	}
 	s.review = nil
 	return s.state, s.save()
+}
+
+// operatorFor returns the name of the person who sets up the target. Only the local
+// target needs it: on a cloud a person signs in.
+func operatorFor(target, name string) (string, error) {
+	if target != TargetLocal {
+		return "", nil
+	}
+	name = strings.Join(strings.Fields(name), " ")
+	if utf8.RuneCountInString(name) > 60 || !strings.ContainsFunc(name, unicode.IsLetter) {
+		return "", invalid("give your name, in at most 60 characters. The dashboard " +
+			"shows it when you approve a change")
+	}
+	return name, nil
 }
 
 // postModel records which language model the control plane uses: a hosted key, the model
@@ -217,6 +241,7 @@ func (s *Server) deployLocal(ctx context.Context, log func(string)) error {
 	}
 	s.mu.Lock()
 	key, env, choice, chosen := s.key, s.state.Env, s.state.KeyChoice, s.modelChosen
+	operator := s.state.Operator
 	s.mu.Unlock()
 	if chosen {
 		if err := s.saveModelSettings(choice, key); err != nil {
@@ -228,7 +253,7 @@ func (s *Server) deployLocal(ctx context.Context, log func(string)) error {
 		log("The control plane already runs on this machine.")
 	} else {
 		log("Starting the control plane on this machine.")
-		if err := s.cfg.StartLocal(ctx, env); err != nil {
+		if err := s.cfg.StartLocal(ctx, env, operator); err != nil {
 			return err
 		}
 		if err := s.waitDashboard(ctx, 2*time.Minute); err != nil {

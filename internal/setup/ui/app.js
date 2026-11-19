@@ -26,7 +26,7 @@ let view = null;
 let step = "target";
 let message = null;
 let timer = null;
-const form = { target: "", env: "clanker", key: "", model: "", local: null, profile: "", profiles: null,
+const form = { target: "", env: "clanker", operator: "", key: "", model: "", local: null, profile: "", profiles: null,
   checks: null, found: null, surveying: false, place: "" };
 
 async function call(method, path, body) {
@@ -166,10 +166,16 @@ function drawTarget() {
         oninput: (event) => { form.env = event.target.value; } }),
       el("span", { class: "help" }, "3 to 24 lowercase letters, digits or hyphens. It becomes part " +
         "of the names of the resources.")) : null,
+    form.target === "local" ? el("label", { class: "field" }, "Your name",
+      el("input", { type: "text", value: form.operator, autocomplete: "name", maxlength: "60",
+        oninput: (event) => { form.operator = event.target.value; } }),
+      el("span", { class: "help" }, "The dashboard shows this name when you approve a change. " +
+        "It stays on this machine.")) : null,
     notice(),
     buttons(button("Continue", "primary", async () => {
       try {
-        await call("POST", "/api/target", { target: form.target, env: form.env });
+        await call("POST", "/api/target",
+          { target: form.target, env: form.env, operator: form.operator });
         form.checks = null;
         await refresh();
         go("checks");
@@ -686,6 +692,7 @@ async function start() {
   }
   form.target = view.state.target;
   form.env = view.state.env || form.env;
+  form.operator = view.state.operator || form.operator;
   if (view.state.deployed && view.state.target === "local") {
     step = "handover";
     if (view.in_app && !jobRunning()) {

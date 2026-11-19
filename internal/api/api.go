@@ -41,6 +41,11 @@ type Server struct {
 	// Runners serves the runners of the jobs, below /runner/v1/. Each request carries the
 	// token of one job. The user header means nothing there.
 	Runners http.Handler
+	// DefaultUser is the user of the person who set up a control plane with no sign-in.
+	// The dashboard starts as this user, and a request that names a user who does not
+	// exist acts as this user: a browser can still hold the name of a demo user from
+	// another environment. Empty means that such a request is refused.
+	DefaultUser string
 	// Identify returns the user behind a request, or ErrNotSignedIn. When it is set, every
 	// route needs a user except the health path, the sign-in and the runner path. Nil is
 	// the demo: the dashboard names its user in a header, which is not authentication.
@@ -143,6 +148,9 @@ func (s *Server) currentUser(r *http.Request) (orchestrator.User, error) {
 		name = "dave"
 	}
 	user, err := s.Orch.GetUser(name)
+	if err != nil && s.DefaultUser != "" {
+		user, err = s.Orch.GetUser(s.DefaultUser)
+	}
 	if err != nil {
 		return orchestrator.User{}, forbidden(err)
 	}
@@ -235,7 +243,7 @@ func (s *Server) chatRoutes(mux *http.ServeMux) {
 
 // getAuth tells the dashboard whether people sign in or the demo names the user.
 func (s *Server) getAuth(*http.Request) (any, error) {
-	return map[string]bool{"sign_in": s.Identify != nil}, nil
+	return map[string]any{"sign_in": s.Identify != nil, "default_user": s.DefaultUser}, nil
 }
 
 // open reports whether a path needs no signed-in user: the health path, the sign-in, the

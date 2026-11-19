@@ -34,7 +34,8 @@ type Config struct {
 	InApp bool
 	// StartLocal starts the control plane for the local target in this process. It
 	// returns at once; the wizard waits for the dashboard.
-	StartLocal func(ctx context.Context, env string) error
+	// The operator is the person who ran the wizard.
+	StartLocal func(ctx context.Context, env, operator string) error
 	// CLI runs the aws program. Nil means the real program.
 	CLI CLI
 	// OllamaURL is where Ollama answers on this machine. Empty means its usual address.
@@ -43,8 +44,11 @@ type Config struct {
 
 // State is what the wizard remembers between starts. It holds no secret.
 type State struct {
-	Target    string `json:"target"`
-	Env       string `json:"env"`
+	Target string `json:"target"`
+	Env    string `json:"env"`
+	// Operator is the name of the person who sets up the local target. The control
+	// plane there has no sign-in, so this name is its first approver.
+	Operator  string `json:"operator"`
 	Profile   string `json:"profile"`
 	Region    string `json:"region"`
 	Account   string `json:"account"`

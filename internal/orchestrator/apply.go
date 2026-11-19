@@ -27,13 +27,17 @@ type User struct {
 	Role     string `json:"role"`
 	Email    string `json:"email"`
 	LastSeen string `json:"last_seen"`
+	// SelfDeclared says that the person gave the name and no identity provider
+	// confirmed it.
+	SelfDeclared bool `json:"self_declared"`
 }
 
 // GetUser returns one user.
 func (o *Orchestrator) GetUser(name string) (User, error) {
 	var u User
-	err := o.DB.QueryRow(`SELECT name, display, role, email, last_seen FROM users
-		WHERE name = $1`, name).Scan(&u.Name, &u.Display, &u.Role, &u.Email, &u.LastSeen)
+	err := o.DB.QueryRow(`SELECT name, display, role, email, last_seen, self_declared
+		FROM users WHERE name = $1`, name).Scan(&u.Name, &u.Display, &u.Role, &u.Email,
+		&u.LastSeen, &u.SelfDeclared)
 	if err != nil {
 		return User{}, fmt.Errorf("user %q is not known: %w", name, err)
 	}
@@ -44,9 +48,9 @@ func (o *Orchestrator) GetUser(name string) (User, error) {
 // same.
 func (o *Orchestrator) GetUserByEmail(email string) (User, error) {
 	var u User
-	err := o.DB.QueryRow(`SELECT name, display, role, email, last_seen FROM users
-		WHERE lower(email) = lower($1)`, email).Scan(&u.Name, &u.Display, &u.Role, &u.Email,
-		&u.LastSeen)
+	err := o.DB.QueryRow(`SELECT name, display, role, email, last_seen, self_declared
+		FROM users WHERE lower(email) = lower($1)`, email).Scan(&u.Name, &u.Display, &u.Role,
+		&u.Email, &u.LastSeen, &u.SelfDeclared)
 	if err != nil {
 		return User{}, fmt.Errorf("no user has the email address %q: %w", email, err)
 	}

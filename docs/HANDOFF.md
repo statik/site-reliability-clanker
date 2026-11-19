@@ -34,6 +34,13 @@ video and the local demo. No pull request is open.
 - #93: the design with a container on Amazon ECS is removed from the wizard. The AWS path
   ends at a review of what S.R.C. creates and the price of one week
   (`internal/setup/plan.go`). The wizard creates nothing on AWS.
+- The wizard asks the person for a name when the target is this machine. The control plane
+  seeds that person as an approver in the place of the demo user `alice`; `bob`, `carol` and
+  `dave` stay. The dashboard starts as that person and shows the tag "Unverified" next to
+  the name, because no identity provider confirmed it (`users.self_declared`). A request
+  that names a user who does not exist acts as that person. `clanker up` with no wizard
+  seeds the four demo users as before. Ran on 2026-11-19: the wizard through its API on
+  other ports, then the dashboard in a browser. Not run: the macOS app with this change.
 - #87, #89 and #92: the site has a cost table (Amazon Bedrock against a GPU instance), a
   table that compares four model sets in the evals, the approval in Slack and Teams, and
   tables that fit a phone.

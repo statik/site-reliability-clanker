@@ -9,6 +9,7 @@ import { AiMark, ErrorNote } from "@/components/common";
 import { stateLabel } from "@/components/status";
 import { formatTime, toLocalInput } from "@/lib/time";
 import { useServerNow } from "@/state/clock";
+import { UnverifiedTag } from "@/components/Unverified";
 import { useSession } from "@/state/session";
 
 interface Pending {
@@ -19,10 +20,13 @@ interface Pending {
 function ApproverProgress({ detail }: { detail: WorkItemDetail }) {
   const names = validApprovers(detail.work_item, detail.approvals ?? []);
   const needed = detail.approvers_required;
+  const { users } = useSession();
   if (needed === 0) {
     return <p>Policy requires no approver for this tier.</p>;
   }
-  const helper = names.length === 0 ? "No approver yet" : `Approved by ${names.join(", ")}`;
+  const shown = names.map((name) =>
+    users.some((user) => user.name === name && user.self_declared) ? `${name} (unverified)` : name);
+  const helper = shown.length === 0 ? "No approver yet" : `Approved by ${shown.join(", ")}`;
   return (
     <ProgressBar label={`${Math.min(names.length, needed)} of ${needed} approvers`}
       helperText={helper} value={Math.min(names.length, needed)} max={needed}
@@ -48,7 +52,8 @@ function ConfirmModal({ pending, workItem, busy, onClose, onConfirm }: {
       onRequestClose={onClose} onRequestSubmit={onConfirm}>
       <div className="app-stack-tight">
         <p>
-          You decide as {user?.display ?? userName} ({user?.role ?? "unknown role"}). The
+          You decide as {user?.display ?? userName} ({user?.role ?? "unknown role"})
+          {user?.self_declared === true && <> <UnverifiedTag /></>}. The
           decision is recorded in the audit log against commit{" "}
           <span className="app-mono">{workItem.commit.slice(0, 10) || "none"}</span> and the
           hashes of the saved plans.

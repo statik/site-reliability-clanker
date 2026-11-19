@@ -109,12 +109,14 @@ func TestPagesAreServedWithoutTheToken(t *testing.T) {
 func TestTargetIsValidated(t *testing.T) {
 	server, handler := newServer(t, &fakeCLI{})
 	cases := map[string]int{
-		`{"target":"gcp","env":"prod-1"}`:    400,
-		`{"target":"aws","env":"X"}`:         400,
-		`{"target":"aws","env":"bad name"}`:  400,
-		`{"target":"aws","env":"prod-1"}`:    200,
-		`{"target":"local","env":"ignored"}`: 200,
-		`not json`:                           400,
+		`{"target":"gcp","env":"prod-1"}`:                         400,
+		`{"target":"aws","env":"X"}`:                              400,
+		`{"target":"aws","env":"bad name"}`:                       400,
+		`{"target":"aws","env":"prod-1"}`:                         200,
+		`{"target":"local","env":"ignored","operator":"Sam Lee"}`: 200,
+		`{"target":"local"}`:                                      400,
+		`{"target":"local","operator":"42"}`:                      400,
+		`not json`:                                                400,
 	}
 	for body, want := range cases {
 		if status, _ := request(t, handler, server.Token(), http.MethodPost, "/api/target", body); status != want {
@@ -193,7 +195,8 @@ func TestSignInRefusesNamesThatAreNotNames(t *testing.T) {
 
 func TestDeployNeedsAReview(t *testing.T) {
 	server, handler := newServer(t, &fakeCLI{})
-	request(t, handler, server.Token(), http.MethodPost, "/api/target", `{"target":"local"}`)
+	request(t, handler, server.Token(), http.MethodPost, "/api/target",
+		`{"target":"local","operator":"Sam Lee"}`)
 	status, body := request(t, handler, server.Token(), http.MethodPost, "/api/deploy", "")
 	if status != 400 || !strings.Contains(body["error"].(string), "review") {
 		t.Fatalf("status %d, error %v", status, body["error"])
