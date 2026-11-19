@@ -66,9 +66,11 @@ await heading("Choose the language model of S.R.C.");
 if (!(await page.getByRole("radio", { name: /^A model on this machine/ }).isDisabled())) {
   problems.push("the model on this machine is offered for AWS");
 }
-await page.getByRole("radio", { name: /^Recorded answers/ }).check({ force: true });
+await page.getByRole("radio", { name: /^A hosted key/ }).check({ force: true });
+// The AWS path ends at the review and starts no control plane, so the key is never used.
+await page.getByLabel("OpenRouter API key").fill("sk-or-v1-0000000000000000000000-walk");
 await shoot("model");
-await press("Use recorded answers and continue");
+await press("Save the key and continue");
 
 await heading("Sign in to your AWS account.");
 await page.getByLabel("Profile").selectOption("fixture-operator");

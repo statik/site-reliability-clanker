@@ -2,6 +2,8 @@
 // Usage: node scripts/setup-wizard-check.mjs <wizard address with token> [screenshot directory]
 // Start the wizard first: clanker setup --no-browser
 // The script stops at the hand-over page. It does not approve anything.
+// The control plane starts with the key in OPENROUTER_API_KEY. With no key in the environment
+// the walk types a key that is not real, and the control plane that it starts cannot reach a model.
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { chromium } from "playwright";
@@ -41,6 +43,7 @@ const first = await page.getByRole("heading", { level: 1 }).first().textContent(
 if (first === "Where do you want S.R.C. to run?") {
   await shoot("target");
   await page.getByText("This machine", { exact: true }).click();
+  await page.getByLabel("Your name").fill("Sam Lee");
   await press("Continue");
 
   await heading(/This machine is ready|needs a few things/);
@@ -58,14 +61,6 @@ if (first === "Where do you want S.R.C. to run?") {
   };
   await heading(model);
   await shoot("model");
-  await choose(/^A hosted key/);
-  await page.getByLabel("OpenRouter API key").fill("sk-or-v1-0000000000000000000000-walk");
-  await shoot("model-hosted");
-  await press("Save the key and continue");
-  await reviewShows("A hosted key");
-  await press("Back");
-
-  await heading(model);
   await choose(/^A model on this machine/);
   await page.getByRole("heading", { level: 2, name: "What the model on this machine needs" }).waitFor();
   await shoot("model-local");
@@ -79,10 +74,13 @@ if (first === "Where do you want S.R.C. to run?") {
     console.log("setup wizard: the model is not on this machine; the walk skips this choice");
   }
 
-  await choose(/^Recorded answers/);
-  await shoot("model-recorded");
-  await press("Use recorded answers and continue");
-  await reviewShows("Recorded answers");
+  if (await page.getByRole("radio").count() !== 2) problems.push("the step does not have two choices");
+  await choose(/^A hosted key/);
+  await page.getByLabel("OpenRouter API key")
+    .fill(process.env.OPENROUTER_API_KEY ?? "sk-or-v1-0000000000000000000000-walk");
+  await shoot("model-hosted");
+  await press("Save the key and continue");
+  await reviewShows("A hosted key");
 
   await heading("This is what the wizard will create.");
   await shoot("review");

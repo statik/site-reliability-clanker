@@ -224,7 +224,6 @@ function drawChecks() {
 const MODELS = {
   live: "A hosted key",
   local: "A model on this machine",
-  recorded: "Recorded answers",
 };
 const LOCAL_LIMITS = "In our evals, this model explained changes and diagnosed incidents as well as " +
   "the hosted models. As the Author it scored 0.85 and 0.80 against 0.92 and 1.00, and as the " +
@@ -281,7 +280,6 @@ function hostedKeyBlock() {
 function modelButton() {
   const busy = jobRunning();
   if (form.model === "live") return button("Save the key and continue", "primary", saveModel, busy);
-  if (form.model === "recorded") return button("Use recorded answers and continue", "primary", saveModel, busy);
   if (form.model !== "local") return button("Continue", "primary", saveModel, true);
   if (form.local === null || !form.local.ready) {
     return button("Check again", "secondary", () => { form.local = null; draw(); }, form.local === null);
@@ -303,9 +301,7 @@ function drawKey() {
         "at 5 USD each day."),
       modelChoice("local", ["Ollama runs qwen3.8:27b on this machine. It needs no key, and no text " +
         "leaves the machine. It needs 32 GB of memory and about 18 GB of disk.", LOCAL_LIMITS],
-        aws ? "A control plane on AWS cannot reach a model on this machine." : null),
-      modelChoice("recorded", "S.R.C. answers from recordings, with no model and no key. The " +
-        "recordings fit the example application only.")),
+        aws ? "A control plane on AWS cannot reach a model on this machine." : null)),
     form.model === "live" ? hostedKeyBlock() : null,
     form.model === "local" ? localModelBlock() : null,
     notice(),
@@ -693,7 +689,12 @@ async function start() {
   form.target = view.state.target;
   form.env = view.state.env || form.env;
   form.operator = view.state.operator || form.operator;
-  if (view.state.deployed && view.state.target === "local") {
+  if (view.state.deployed && view.state.target === "local" && !view.state.key_choice) {
+    // The saved choice is one that this version does not have.
+    step = "key";
+    message = { kind: "error", text: "Choose a language model. S.R.C. needs one to start " +
+      "the control plane." };
+  } else if (view.state.deployed && view.state.target === "local") {
     step = "handover";
     if (view.in_app && !jobRunning()) {
       await resume();

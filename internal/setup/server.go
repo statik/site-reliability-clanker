@@ -107,6 +107,7 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 				s.statePath(), err)
 		}
 	}
+	s.state.KeyChoice = knownChoice(s.state.KeyChoice)
 	return s, nil
 }
 

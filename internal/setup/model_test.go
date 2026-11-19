@@ -301,13 +301,13 @@ func TestEachChoiceRemovesTheSettingsOfTheOthers(t *testing.T) {
 		t.Fatalf("secrets.env has mode %o, want 600", info.Mode().Perm())
 	}
 
-	post(t, server, handler, "/api/model", `{"choice":"recorded"}`)
-	want = []string{"CLANKER_SIGNING_KEY=keep"}
+	post(t, server, handler, "/api/model", `{"choice":"live","key":"`+key+`"}`)
+	want = []string{"CLANKER_SIGNING_KEY=keep", "OPENROUTER_API_KEY=" + key}
 	if lines := deploy(t, server, handler); !slices.Equal(lines, want) {
-		t.Fatalf("recorded answers: secrets.env = %v, want %v", lines, want)
+		t.Fatalf("hosted key again: secrets.env = %v, want %v", lines, want)
 	}
 	if _, set := os.LookupEnv("CLANKER_LLM_BASE_URL"); set {
-		t.Fatal("recorded answers: the address of the local model is still set")
+		t.Fatal("hosted key again: the address of the local model is still set")
 	}
 }
 

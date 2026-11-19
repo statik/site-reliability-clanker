@@ -14,7 +14,7 @@ func TestAWSPathEndsAtTheReviewAndOnlyReads(t *testing.T) {
 	server, handler := newServer(t, cli)
 	steps := []struct{ path, body string }{
 		{"/api/target", `{"target":"aws","env":"prod-1"}`},
-		{"/api/model", `{"choice":"recorded"}`},
+		{"/api/model", `{"choice":"live","key":"sk-or-v1-0123456789abcdef0123456789"}`},
 		{"/api/aws/signin", `{"profile":"team/operator","region":""}`},
 		{"/api/aws/discover", `{"profile":"team/operator","region":"eu-west-1"}`},
 		{"/api/aws/place", `{"mode":"existing","network":"vpc-1"}`},
