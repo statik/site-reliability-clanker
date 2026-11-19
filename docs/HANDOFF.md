@@ -39,8 +39,45 @@ video and the local demo. No pull request is open.
   tables that fit a phone.
 - #88: `scripts/verify/fresh-run.sh` exits 1 when a work item fails or the log has an error
   line.
+- #97: the broker has an issuer for AWS (`internal/awstarget/credentials.go`). It exchanges
+  a grant for one STS session with five session tags. It ran against a stand-in for STS
+  only.
+- #99: the scrubber removes values that the control plane knows (`scrub.Add`, 8 bytes or
+  more), reads more shapes (a password flag of a command line, "the password is X"), and
+  scrubs each answer of a model before it is stored.
+- #100: a tier T3 change waits for a maintenance window. The file
+  `policy/maintenance-windows.json` in the runbooks repository has the windows. An approved
+  change has the state `Scheduled` until the window opens. With no file, the change applies
+  at once.
+- #98: the core records the size of the database volume, forecasts the day it is full, and
+  proposes a tier T3 change that grows it (scene `storage-growth`, not in the default list).
+- The scrubber also reads a JSON key with a secret inside a JSON string, where each quote
+  has a backslash before it. A log line of that form reached the model before.
+
+**Limits of the work above:**
+
+- The maintenance window ran in unit tests only. The file can be set only before the first
+  start, because the runbooks repository cannot change after it is seeded. With a window
+  set, the first deployment (tier T3) waits too. The owner must decide if the first
+  deployment is exempt.
+- The local target has no live probe for the size of the volume. The scene writes the
+  samples.
+- A secret with no known value and no shape (a bare value in a table, a sentence with no
+  word that names a secret, an argument with no flag) still reaches the model. The evals
+  keep these forms to measure what a model does with them.
+- The release `v0.1.0` does not have #97 to #100.
 
 **Ran on 2026-11-18:**
+
+- `fresh-run.sh` on the sum of #98, #99 and #100: 13 work items reached their end state, 0
+  error lines. The scene `storage-growth` raised one finding and a tier T3 change from 2 GiB
+  to 6 GiB, which applied and verified. The evidence pack (`GET /api/v1/audit/evidence`)
+  held 13 changes, 357 events and a chain that verifies.
+- The eval `secret_leakage` with the scrubber of #99, 78 runs for each model set. The hosted
+  models leaked in 0 runs. Qwen3.8 leaked in 10 runs: 7 of 15 as the Reviewer, 2 of 18 as
+  the Investigator, 1 of 21 as Ask. Nine of the ten were a secret with no shape. One was the
+  JSON form with backslashes, which the scrubber reads now. The evals did not run again
+  after that fix.
 
 - `fresh-run.sh` on `main` after all the merges, with the hosted models: 13 work items
   reached their end state, the audit chain verifies with 317 events, 0 error lines.
@@ -822,12 +859,14 @@ Limits:
 
 ## What is not built
 
-- The access broker paths for the three clouds (STS, service account impersonation, Entra).
+- The access broker paths for Google Cloud and Azure (service account impersonation, Entra).
+  The path for AWS exists and ran against a stand-in only.
 - A pull request for a change to a runbook: the main branch of the `runbooks` repository
   cannot change after it is seeded. Section 5.6 of the plan has the open decision.
-- Use cases 7, 8, 12 and 23 on a real target. Use case 7 is a forecast on the timeline.
+- Use cases 7, 8, 12 and 23 on a real target. Use case 7 (the storage forecast) runs on the
+  local target from samples that a scene writes.
 - A page to manage users, and a way to end one token.
-- A "defer" decision, and enforcement of a maintenance window for tier T3.
+- A "defer" decision. A way to change the maintenance windows after the first start.
 - Quiet hours, escalation and threading for notifications.
 - A test of the approval in chat against the real Slack and the real Teams (issue #49).
 - The move of the control plane into a cloud (bootstrap and pivot).

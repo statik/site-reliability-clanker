@@ -97,8 +97,11 @@ var rules = []rule{
 	{regexp.MustCompile(`(?i)https?://[^\s"']*(webhook|hooks)[^\s"']*`), "[REDACTED-WEBHOOK]"},
 	// A name that says it holds a secret, then = or :, then the value. The name can have a
 	// prefix or suffix (ADMIN_TOKEN, SMTP_PASS, PGPASSWORD, ADMIN_KEY, Pwd) and JSON quotes.
+	// The quotes can have a backslash before them: a JSON log line inside a JSON string.
+	// The value stops before an escaped quote, so the outer JSON stays correct.
 	{regexp.MustCompile(`(?i)([a-z0-9_.-]*(?:password|passwd|_pass|pwd|secret|token|api[_-]?key|_key)` +
-		`[a-z0-9_.-]*"?\s*[=:]\s*"?)[^\s",}]+`), "$1[REDACTED]"},
+		`[a-z0-9_.-]*(?:\\*")?\s*[=:]\s*(?:\\*")?)(?:\\[^"\s]|[^\s",}\\])+`),
+		"$1[REDACTED]"},
 	// A long flag of a command line that names a secret, then a space, then the value. The
 	// rule above reads the form with =. A value that starts with - is the next flag.
 	{regexp.MustCompile(`(?i)(--[a-z0-9-]*(?:password|passwd|token|secret|api-?key) +"?)` +
