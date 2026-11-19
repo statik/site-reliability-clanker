@@ -1,4 +1,4 @@
-.PHONY: build web demo test lint lint-core destroy clean-data bundle release
+.PHONY: build web demo test lint lint-core destroy clean-data bundle release dmg
 
 build:
 	go build -o bin/clanker ./cmd/clanker
@@ -29,6 +29,12 @@ release: bundle
 	done
 	cd dist && shasum -a 256 clanker-* > checksums.txt
 
+# The macOS app in a disk image, dist/SRC.dmg. docs/MACOS-RELEASE.md has the settings
+# for a signed and notarized image. Without them the image is for a local test only.
+dmg: release
+	scripts/macos/package.sh $(VERSION)
+	cd dist && shasum -a 256 clanker-* SRC.dmg > checksums.txt
+
 test:
 	go test ./...
 	cd apps/paperboat && go test ./...
@@ -47,7 +53,7 @@ lint: lint-core
 	tofu fmt -check -recursive platform
 	opa check runbooks/policy
 	shellcheck runbooks/jobs/*.sh apps/paperboat/build.sh ops/run-local.sh scripts/*.sh \
-		scripts/verify/*.sh
+		scripts/verify/*.sh scripts/macos/*.sh
 	shfmt -i 2 -d runbooks/jobs apps/paperboat/build.sh ops/run-local.sh scripts
 
 destroy: build

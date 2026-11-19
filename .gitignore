@@ -12,3 +12,4 @@ site/out/
 internal/bundle/bundle.tar*
 web/test-results/
 .claude/worktrees/
+build/
