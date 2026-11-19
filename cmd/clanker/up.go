@@ -409,7 +409,7 @@ func firstRun(ctx context.Context, c *components, o options) error {
 		}
 	}
 	wi, err := c.orch.Create(orchestrator.NewWorkItem{
-		Title: "Blank-slate deployment of " + o.env, Kind: "blank-slate", Env: o.env,
+		Title: "Blank-slate deployment of " + o.env, Kind: orchestrator.KindBlankSlate, Env: o.env,
 		Layers: orchestrator.Layers, Trigger: "First run: no layer of this environment exists",
 		Actor: "orchestrator"})
 	if err != nil {

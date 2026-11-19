@@ -78,7 +78,8 @@ not in the table, a key that comes twice, a missing key, a value outside the tab
 data after the object. While the file is not valid, no tier T3 work item is approved and
 no tier T3 change that waits is applied.
 
-Tiers T0, T1 and T2 do not wait for a maintenance window.
+Tiers T0, T1 and T2 do not wait for a maintenance window. The first deployment of an
+environment does not wait for one: nothing runs there yet.
 
 The rule that the control plane copies this directory only at the first start applies to
 this file too.

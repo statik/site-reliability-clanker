@@ -254,7 +254,7 @@ func (o *Orchestrator) afterApproval(ctx context.Context, wi WorkItem, d Decisio
 	}
 	// The windows are read before the state changes: with a windows file that is not
 	// valid, the work item is not approved.
-	windows, err := o.windowsFor(wi.Tier)
+	windows, err := o.windowsFor(wi)
 	if err != nil {
 		return WorkItem{}, fmt.Errorf("find the maintenance window of %s: %w", wi.ID, err)
 	}
@@ -345,7 +345,7 @@ func (o *Orchestrator) ready(wi *WorkItem) (bool, error) {
 	if wi.State == StateScheduled && o.Clock.Now().Before(store.ParseTime(wi.ScheduledFor)) {
 		return false, nil
 	}
-	windows, err := o.windowsFor(wi.Tier)
+	windows, err := o.windowsFor(*wi)
 	if err != nil {
 		return false, fmt.Errorf("find the maintenance window of %s: %w", wi.ID, err)
 	}
