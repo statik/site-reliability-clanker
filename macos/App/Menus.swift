@@ -41,6 +41,10 @@ enum Menus {
         ))
         menu.addItem(item("Show All", #selector(NSApplication.unhideAllApplications(_:))))
         menu.addItem(.separator())
+        menu.addItem(item(
+            "Reset Demo Environment…", #selector(AppDelegate.resetDemoEnvironment(_:))
+        ))
+        menu.addItem(.separator())
         menu.addItem(item("Quit S.R.C.", #selector(NSApplication.terminate(_:)), "q"))
         return menu
     }

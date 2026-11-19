@@ -62,11 +62,10 @@ takes about ten minutes, because it downloads the cluster image.
    The deployment is tier T3, so it needs two approvers.
 3. Open the **Demo** page and run the scenes of the scripted month in order.
 
-To remove everything:
+To remove the environment, its history and its saved setup:
 
 ```
-make destroy
-make clean-data
+./bin/clanker reset
 ```
 
 ## The agent and the model
@@ -107,7 +106,7 @@ Stop a running control plane before you start `make demo` again: `pkill -f "clan
 
 | Path | Content |
 |---|---|
-| `cmd/clanker` | The CLI: `preflight`, `bootstrap`, `up`, `destroy`, `sink` |
+| `cmd/clanker` | The CLI: `preflight`, `bootstrap`, `up`, `destroy`, `reset`, `sink` |
 | `internal/` | The control plane: orchestrator, runner, policy, access broker, audit log, forge, notifier, agent, detectors, simulator, HTTP API |
 | `web/` | The dashboard (React, Carbon Design System) |
 | `platform/` | OpenTofu modules and stacks for `local`, `aws`, `gcp`, `azure` |

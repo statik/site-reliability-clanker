@@ -39,6 +39,8 @@ Usage:
   clanker bootstrap --cloud local   apply layer 00-bootstrap with your own credentials
   clanker up                        start the control plane and the dashboard
   clanker destroy --env local       destroy every layer of an environment
+  clanker reset                     destroy the local environment and remove its history
+                                    and its saved setup; the next start begins again
   clanker sink                      run the local webhook sink alone
   clanker login --server URL        sign this machine in to a control plane, for git and scripts
   clanker token --server URL        print the token of this machine, for a script
@@ -433,6 +435,8 @@ func run() error {
 		return up(ctx, o)
 	case "destroy":
 		return destroy(ctx, o)
+	case "reset":
+		return newResetter(os.Stdout).run(ctx, o)
 	case "sink":
 		return runSink(ctx, o.sinkAddr)
 	default:

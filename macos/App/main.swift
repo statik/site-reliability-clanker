@@ -2,11 +2,12 @@ import AppKit
 import WebKit
 
 /// Starts the program `clanker setup` from the bundle and shows its wizard in a window.
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private let backend = Backend()
     private var windows: [WebWindow] = []
     private var main: WebWindow?
     private var quitting = false
+    private var resetting = false
     private var signals: [DispatchSourceSignal] = []
 
     func applicationDidFinishLaunching(_: Notification) {
@@ -46,7 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case let .ready(url):
             mainWindow().load(url, retries: 20)
         case let .exited(status, output):
-            if quitting { return }
+            if quitting || resetting { return }
             mainWindow().showMessage(
                 title: "S.R.C. stopped",
                 body: "The program ended with status \(status). Its last lines are below. The "
@@ -94,7 +95,64 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
+    /// The menu item Reset Demo Environment. After a confirmation it stops the program,
+    /// removes the local environment with its history and its saved setup, and starts
+    /// the program again, which then shows the wizard from its first step.
+    @objc func resetDemoEnvironment(_: Any?) {
+        guard !resetting, !quitting, confirmReset() else { return }
+        resetting = true
+        mainWindow().showMessage(
+            title: "S.R.C. resets the demo environment",
+            body: "The app removes the local cluster, the work items, the audit log and the "
+                + "saved setup. This can take some minutes. The setup wizard opens after that."
+        )
+        backend.stop { [weak self] in
+            self?.backend.reset { status, output in self?.afterReset(status, output) }
+        }
+    }
+
+    private func confirmReset() -> Bool {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Reset the demo environment?"
+        alert.informativeText = "This removes the local environment, all work items, the "
+            + "audit log and the saved setup with the key of the model. You cannot undo it."
+        alert.addButton(withTitle: "Reset").hasDestructiveAction = true
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    private func afterReset(_ status: Int32, _ output: String) {
+        resetting = false
+        guard status == 0 else {
+            mainWindow().showMessage(
+                title: "The reset did not finish",
+                body: "The last lines of the reset are below. The full log is in "
+                    + "\(backend.logURL.path). Quit the app and open it again, then try the "
+                    + "reset again.",
+                detail: output
+            )
+            return
+        }
+        mainWindow().showMessage(
+            title: "S.R.C. starts", body: "The setup wizard opens in a moment."
+        )
+        do {
+            try backend.start()
+        } catch {
+            mainWindow().showMessage(
+                title: "S.R.C. did not start", body: error.localizedDescription
+            )
+        }
+    }
+
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        item.action != #selector(resetDemoEnvironment(_:)) || !resetting
+    }
+
     func applicationShouldTerminate(_: NSApplication) -> NSApplication.TerminateReply {
+        // A quit in the middle of a reset would leave the environment half removed.
+        if resetting { return .terminateCancel }
         guard backend.isRunning else { return .terminateNow }
         quitting = true
         backend.stop { NSApp.reply(toApplicationShouldTerminate: true) }

@@ -635,17 +635,14 @@ function drawHandover() {
         button("Open the first approval", "primary", () => {})) : null,
       up ? null : button("Start the control plane", "primary", startDeploy, jobRunning())),
     view.in_app ? appHelp() : el("p", { class: "help" }, "To stop, press Ctrl+C in the terminal. To start again later, run ",
-      el("code", {}, "clanker up"), ". To remove the local environment, run ", el("code", {}, "clanker destroy --env local"), "."),
+      el("code", {}, "clanker up"), ". To remove the local environment and its history, run ", el("code", {}, "clanker reset"), "."),
   ];
 }
 
-// The program is inside the app, so the commands of a terminal need its full path.
-const APP_PROGRAM = '"/Applications/Site Reliability Clanker.app/Contents/MacOS/clanker"';
-
 function appHelp() {
   return el("p", { class: "help" }, "To stop the control plane, quit this app. To start it again, open the app: " +
-    "it starts the control plane and shows the dashboard. To remove the local environment, quit the app and run ",
-    el("code", {}, `${APP_PROGRAM} destroy --env local`), " in a terminal.");
+    "it starts the control plane and shows the dashboard. To remove the local environment and start again, " +
+    "choose Reset Demo Environment in the S.R.C. menu.");
 }
 
 // In the app, a setup that is finished starts the control plane and shows the dashboard.
