@@ -3,7 +3,7 @@
 
 import { plateHtml } from "./anatomy/iso-kit.mjs";
 import { clock, day, dayYear, duration, html, list, plural, raw, shortHash } from "./html.mjs";
-import { renderMachineSvg } from "./machine.mjs";
+import { renderSystemSvg } from "./system.mjs";
 import { displayName, grantViews, incidentRefusal } from "./month.mjs";
 import { tierTag } from "./render-walkthrough.mjs";
 
@@ -29,53 +29,50 @@ function flowStops(month) {
   const review = find("review.completed");
   const policy = find("policy.evaluated");
   const stops = [
-    ["Detector", "the feeler", finding],
-    ["Author, a model", "the press", find("agent.drafted")],
-    ["Runner: the plan", "the gauge", find("plan.created")],
-    ["Policy engine", "the tier pointer", policy],
-    ["Adversarial review, a model", "the pawl", review ?? {
+    ["Detector", finding],
+    ["Author, a model", find("agent.drafted")],
+    ["Runner: the plan", find("plan.created")],
+    ["Policy engine", policy],
+    ["Adversarial review, a model", review ?? {
       summary: "This export of the month is older than the review, so it has no record of one", ts: policy.ts,
     }],
-    ["Approver, a person", "the key and the barrier", find("approval.recorded")],
-    ["Access broker", "the timer", find("grant.issued")],
-    ["Runner: the apply", "the lift and one drawer", find("apply.succeeded")],
-    ["Verification", "the gauge on the cabinet", find("verify.passed")],
-    ["Audit log", "the chain", {
+    ["Approver, a person", find("approval.recorded")],
+    ["Access broker", find("grant.issued")],
+    ["Runner: the apply", find("apply.succeeded")],
+    ["Verification", find("verify.passed")],
+    ["Audit log", {
       summary: `${plural(own.length, "record")} for ${id}, each with the hash of the record before it`, ts: own.at(-1).ts,
     }],
   ];
   return {
     detail, created, stops,
+    approvers: own.filter((event) => event.type === "approval.recorded").length || 1,
     tier: policy.data.tier,
     raisedTo: review?.data?.tier ?? policy.data.tier,
   };
 }
 
 export function renderMachine(month) {
-  const { detail, tier, raisedTo } = flowStops(month);
-  const svg = renderMachineSvg({ tier, raisedTo, layer: detail.work_item.layers[0] });
+  const { detail, tier, raisedTo, approvers } = flowStops(month);
+  const svg = renderSystemSvg({ tier, raisedTo, layer: detail.work_item.layers[0], approvers });
   return raw(plateHtml({
     fig: "Fig 1",
-    title: "One change through S.R.C.",
+    title: "The parts of S.R.C.",
     hint: "Step through the stops",
-    readout: "stop 1 of 10 · detect",
+    readout: "stop 1 of 10 · detector",
     keys: [
-      { mark: "lit", label: "The change, and what moves for it: the tier pointer, the timer, the gauge" },
-      { mark: "raised", label: "The bench: the core of the control plane. It starts no program and keeps no file" },
-      { mark: "edge", label: "The cabinet: one target, six drawers for the six layers" },
-      { mark: "dim", label: "Behind the bench: the database that holds all state, and the model provider" },
+      { mark: "lit", label: "The work item" },
+      { mark: "raised", label: "The core of the control plane: one process" },
+      { mark: "edge", label: "Outside the core" },
     ],
-    caption: "The pawl of the review can lift the tier pointer and cannot lower it. The barrier opens when the "
-      + "approvers that the tier needs turn their keys. The timer is the grant: while it runs, the lift may open "
-      + "one drawer. The chain along the front edge is the audit log, and each stop adds links.",
     body: `<div class="iso-stage" id="machine-stage">${svg}</div>`,
   }));
 }
 
 export function renderFlowSteps(month) {
   const { detail, created, stops } = flowStops(month);
-  const items = stops.map(([where, part, event], index) => html`<li data-stop="${index}">
-      <span class="flow-where">${where} <span class="flow-part">${part}</span></span>
+  const items = stops.map(([where, event], index) => html`<li data-stop="${index}">
+      <span class="flow-where">${where}</span>
       <span class="flow-what">${event.summary}</span>
       <time class="mono" datetime="${event.ts}">${clock(event.ts)}</time></li>`);
   return html`<p class="figure-source">The steps below are the real events of work item

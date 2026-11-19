@@ -227,7 +227,7 @@ const MODELS = {
 };
 const LOCAL_LIMITS = "In our evals, this model explained changes and diagnosed incidents as well as " +
   "the hosted models. As the Author it scored 0.85 and 0.80 against 0.92 and 1.00, and as the " +
-  "Reviewer it copied a secret into its answer in 5 of 12 runs. Use a hosted model for the Author " +
+  "Reviewer it copied a secret into its answer in 1 of 15 runs. Use a hosted model for the Author " +
   "and the Reviewer when the environment matters.";
 
 function modelChoice(value, text, disabledNote) {

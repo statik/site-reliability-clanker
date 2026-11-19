@@ -580,7 +580,8 @@ kbd { display: inline-block; min-width: 1.5rem; padding: 0 var(--s-2); border: 1
 .figure-controls .btn { min-height: 2.5rem; padding: var(--s-3) var(--s-5); }
 .flow-layout { display: grid; gap: var(--s-6); align-items: start; }
 .flow-layout > div { min-width: 0; }
-@media (min-width: 82rem) { .flow-layout { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); } }
+@media (min-width: 62rem) { .flow-steps { column-count: 2; column-gap: var(--s-7); } }
+.flow-steps li { break-inside: avoid; }
 .flow-steps { counter-reset: flow; margin-top: var(--s-4); border-top: 1px solid var(--border-subtle); }
 .flow-steps li { counter-increment: flow; display: grid; grid-template-columns: 1.75rem 1fr auto; gap: 0 var(--s-3);
   padding: var(--s-3) var(--s-3); border-bottom: 1px solid var(--border-subtle); border-left: 3px solid transparent;
@@ -776,10 +777,6 @@ section [id] { scroll-margin-top: calc(var(--shell-height) + var(--s-6)); }
 .iso-figure { margin: 0; }
 .iso-plate-corner { font-size: 0.8125rem; }
 .iso-legend { font-size: 0.875rem; }
-/* The barrier is the one part with a state colour: closed, then open. */
-.machine .m-barrier .iso-edge { stroke: var(--live); transition: stroke 300ms var(--ease); }
-.machine[data-open] .m-barrier .iso-edge { stroke: var(--sage); }
-.flow-part { color: var(--text-helper); font-weight: 400; }
 
 /* ------------------------------------------------------------------ presentation mode */
 
