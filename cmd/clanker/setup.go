@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"runtime"
 	"time"
@@ -25,8 +26,11 @@ func runSetup(ctx context.Context, o options) error {
 		return fmt.Errorf("--setup-addr must be a loopback address such as 127.0.0.1:7069: "+
 			"the wizard acts with your cloud sign-in, so it does not listen on %s", host)
 	}
+	if o.app {
+		ctx = stopWithParent(ctx)
+	}
 	wizard, err := setup.New(ctx, setup.Config{
-		DataDir: o.dataDir, Version: version, DashboardURL: "http://" + o.addr,
+		DataDir: o.dataDir, Version: version, DashboardURL: "http://" + o.addr, InApp: o.app,
 		StartLocal: func(ctx context.Context, env string) error {
 			local := o
 			local.env, local.cloud, local.demo = env, "local", true
@@ -53,7 +57,7 @@ func runSetup(ctx context.Context, o options) error {
 	address := fmt.Sprintf("http://%s/?token=%s", o.setupAddr, wizard.Token())
 	fmt.Printf("The setup wizard runs. Open this address in your browser:\n\n  %s\n\n"+
 		"Press Ctrl+C to stop.\n", address)
-	if !o.noBrowser {
+	if !o.noBrowser && !o.app {
 		openBrowser(address)
 	}
 	server := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
@@ -69,6 +73,31 @@ func runSetup(ctx context.Context, o options) error {
 		return fmt.Errorf("wizard on %s: %w", o.setupAddr, err)
 	}
 	return nil
+}
+
+// stopWithParent returns a context that ends when the program that started this one is
+// gone. The macOS app is that program: after a forced quit of the app, the wizard and the
+// control plane must not stay and hold their ports.
+func stopWithParent(ctx context.Context) context.Context {
+	ctx, cancel := context.WithCancel(ctx)
+	parent := os.Getppid()
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if os.Getppid() != parent {
+					slog.Warn("the app that started the wizard is gone; stopping")
+					cancel()
+					return
+				}
+			}
+		}
+	}()
+	return ctx
 }
 
 // openBrowser shows the address in the default browser. A failure is not an error: the

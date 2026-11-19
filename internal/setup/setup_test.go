@@ -231,3 +231,21 @@ func TestChecksReportWhatIsMissingAndHowToFixIt(t *testing.T) {
 		t.Fatal("no error for a target that does not exist")
 	}
 }
+
+func TestStateSaysWhenTheAppShowsTheWizard(t *testing.T) {
+	for _, inApp := range []bool{false, true} {
+		server, err := New(context.Background(), Config{DataDir: t.TempDir(),
+			DashboardURL: "http://127.0.0.1:1", InApp: inApp})
+		if err != nil {
+			t.Fatal(err)
+		}
+		handler, err := server.Handler("127.0.0.1:7069")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, state := request(t, handler, server.Token(), http.MethodGet, "/api/state", "")
+		if state["in_app"] != inApp {
+			t.Errorf("in_app is %v, want %v", state["in_app"], inApp)
+		}
+	}
+}

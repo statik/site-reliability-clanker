@@ -32,6 +32,7 @@ func (s *Server) getState(r *http.Request) (any, error) {
 		"dashboard_url": s.cfg.DashboardURL,
 		"dashboard_up":  s.dashboardUp(r.Context()),
 		"aws_plan":      awsPlan(state),
+		"in_app":        s.cfg.InApp,
 	}, nil
 }
 

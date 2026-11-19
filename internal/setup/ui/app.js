@@ -632,9 +632,36 @@ function drawHandover() {
       up ? el("a", { href: `${view.dashboard_url}/approvals`, target: "_blank", rel: "noopener" },
         button("Open the first approval", "primary", () => {})) : null,
       up ? null : button("Start the control plane", "primary", startDeploy, jobRunning())),
-    el("p", { class: "help" }, "To stop, press Ctrl+C in the terminal. To start again later, run ",
+    view.in_app ? appHelp() : el("p", { class: "help" }, "To stop, press Ctrl+C in the terminal. To start again later, run ",
       el("code", {}, "clanker up"), ". To remove the local environment, run ", el("code", {}, "clanker destroy --env local"), "."),
   ];
+}
+
+// The program is inside the app, so the commands of a terminal need its full path.
+const APP_PROGRAM = '"/Applications/Site Reliability Clanker.app/Contents/MacOS/clanker"';
+
+function appHelp() {
+  return el("p", { class: "help" }, "To stop the control plane, quit this app. To start it again, open the app: " +
+    "it starts the control plane and shows the dashboard. To remove the local environment, quit the app and run ",
+    el("code", {}, `${APP_PROGRAM} destroy --env local`), " in a terminal.");
+}
+
+// In the app, a setup that is finished starts the control plane and shows the dashboard.
+async function resume() {
+  const showDashboard = () => window.location.assign(view.dashboard_url);
+  if (view.dashboard_up) {
+    showDashboard();
+    return;
+  }
+  try {
+    await call("POST", "/api/deploy");
+    await refresh();
+    go("create");
+    watchJob(showDashboard);
+  } catch (error) {
+    draw();
+    fail(error);
+  }
 }
 
 const DRAW = { target: drawTarget, checks: drawChecks, key: drawKey, signin: drawSignIn, where: drawWhere,
@@ -659,7 +686,13 @@ async function start() {
   }
   form.target = view.state.target;
   form.env = view.state.env || form.env;
-  if (view.state.deployed && view.state.target === "local") step = "handover";
+  if (view.state.deployed && view.state.target === "local") {
+    step = "handover";
+    if (view.in_app && !jobRunning()) {
+      await resume();
+      return;
+    }
+  }
   if (jobRunning()) {
     step = { deploy: "create", model: "key" }[view.job.name] ?? step;
     watchJob();
