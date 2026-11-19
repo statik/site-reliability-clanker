@@ -95,9 +95,9 @@ func operatorFor(target, name string) (string, error) {
 	return name, nil
 }
 
-// postModel records which language model the control plane uses: a hosted key, the model
-// on this machine, or the recorded answers. The model on this machine needs a job, which
-// downloads it when Ollama does not hold it.
+// postModel records which language model the control plane uses: a hosted key or the
+// model on this machine. The model on this machine needs a job, which downloads it when
+// Ollama does not hold it.
 func (s *Server) postModel(r *http.Request) (any, error) {
 	var body struct{ Choice, Key string }
 	if err := decode(r, &body); err != nil {
@@ -111,21 +111,19 @@ func (s *Server) postModel(r *http.Request) (any, error) {
 				"with no quotes or spaces")
 		}
 		return map[string]bool{"started": false}, s.chooseModel(ModelHosted, key)
-	case ModelRecorded:
-		return map[string]bool{"started": false}, s.chooseModel(ModelRecorded, "")
 	case ModelLocal:
 		s.mu.Lock()
 		target := s.state.Target
 		s.mu.Unlock()
 		if target != TargetLocal {
 			return nil, invalid("a control plane in the cloud cannot reach a model on this " +
-				"machine: use a hosted key or the recorded answers")
+				"machine: use a hosted key")
 		}
 		err := s.start("model", s.prepareLocalModel)
 		return map[string]bool{"started": err == nil}, err
 	default:
-		return nil, invalid("the choice %q does not exist: use %s, %s or %s", body.Choice,
-			ModelHosted, ModelLocal, ModelRecorded)
+		return nil, invalid("the choice %q does not exist: use %s or %s", body.Choice,
+			ModelHosted, ModelLocal)
 	}
 }
 
@@ -266,9 +264,8 @@ func (s *Server) deployLocal(ctx context.Context, log func(string)) error {
 
 // modelSaved says what the start of the control plane wrote for each choice.
 var modelSaved = map[string]string{
-	ModelHosted:   "The model key is saved on this machine, readable only by you.",
-	ModelLocal:    "The control plane is set to use the model on this machine.",
-	ModelRecorded: "The control plane is set to use the recorded answers.",
+	ModelHosted: "The model key is saved on this machine, readable only by you.",
+	ModelLocal:  "The control plane is set to use the model on this machine.",
 }
 
 func (s *Server) markDeployed() error {

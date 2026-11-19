@@ -28,9 +28,12 @@ video and the local demo. No pull request is open.
   `CLANKER_LLM_BASE_URL`, `CLANKER_LLM_API_KEY`, `CLANKER_LLM_MODEL` and
   `CLANKER_LLM_MODEL_<ROLE>` (see `README.md`). The mode in the records is `local`. Calls
   with no cost stop at 5 million tokens a day.
-- #91: the step "Language model" of the wizard has three choices: a hosted key, a model on
-  this machine through Ollama (`qwen3.8:27b`, as the variant `src-local` with a context of
-  32768 tokens), and recorded answers.
+- #91: the step "Language model" of the wizard has two choices: a hosted key, and a model
+  on this machine through Ollama (`qwen3.8:27b`, as the variant `src-local` with a context
+  of 32768 tokens). The third choice, the recorded answers, is removed (decided by the
+  owner on 2026-11-19: Ask gave confusing answers with it). The wizard does not start the
+  control plane with no choice, and a saved choice of the recorded answers makes the
+  person choose again. `clanker up` with no key still runs in replay mode.
 - #93: the design with a container on Amazon ECS is removed from the wizard. The AWS path
   ends at a review of what S.R.C. creates and the price of one week
   (`internal/setup/plan.go`). The wizard creates nothing on AWS.

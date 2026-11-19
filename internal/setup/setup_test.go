@@ -252,3 +252,45 @@ func TestStateSaysWhenTheAppShowsTheWizard(t *testing.T) {
 		}
 	}
 }
+
+func TestTheRecordedAnswersAreNotAChoice(t *testing.T) {
+	server, handler := newServer(t, &fakeCLI{})
+	token := server.Token()
+	request(t, handler, token, http.MethodPost, "/api/target",
+		`{"target":"local","operator":"Sam Lee"}`)
+	status, body := request(t, handler, token, http.MethodPost, "/api/model",
+		`{"choice":"recorded"}`)
+	if status != 400 || !strings.Contains(body["error"].(string), "does not exist") {
+		t.Fatalf("status %d, error %v", status, body["error"])
+	}
+	request(t, handler, token, http.MethodPost, "/api/review", "")
+	status, body = request(t, handler, token, http.MethodPost, "/api/deploy", "")
+	if status != 400 || !strings.Contains(body["error"].(string), "choose a language model") {
+		t.Fatalf("deploy with no choice: status %d, error %v", status, body["error"])
+	}
+}
+
+func TestASavedChoiceOfTheRecordedAnswersMakesThePersonChooseAgain(t *testing.T) {
+	dir := t.TempDir()
+	saved := `{"target":"local","env":"local","key_choice":"recorded","deployed":true}`
+	if err := os.WriteFile(filepath.Join(dir, "setup.json"), []byte(saved), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	server, err := New(context.Background(), Config{DataDir: dir,
+		DashboardURL: "http://127.0.0.1:1", CLI: (&fakeCLI{}).run})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler, err := server.Handler("127.0.0.1:7069")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, view := request(t, handler, server.Token(), http.MethodGet, "/api/state", "")
+	if choice := view["state"].(map[string]any)["key_choice"]; choice != "" {
+		t.Fatalf("the choice is %q, want none", choice)
+	}
+	status, body := request(t, handler, server.Token(), http.MethodPost, "/api/deploy", "")
+	if status != 400 || !strings.Contains(body["error"].(string), "choose a language model") {
+		t.Fatalf("status %d, error %v", status, body["error"])
+	}
+}

@@ -20,10 +20,19 @@ import (
 
 // The choices of the step "Language model". They are the values of State.KeyChoice.
 const (
-	ModelHosted   = "live"
-	ModelLocal    = "local"
-	ModelRecorded = "recorded"
+	ModelHosted = "live"
+	ModelLocal  = "local"
 )
+
+// knownChoice returns the choice when this version has it, and no choice when it does
+// not. An earlier version had a third choice, the recorded answers; a saved state with
+// that value makes the person choose again.
+func knownChoice(choice string) string {
+	if choice == ModelHosted || choice == ModelLocal {
+		return choice
+	}
+	return ""
+}
 
 // The model on this machine. Ollama serves it. The variant is the same model with a larger
 // context: with its small default context, Ollama cuts a long prompt and reports nothing.
