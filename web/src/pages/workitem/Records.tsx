@@ -6,6 +6,7 @@ import { Loaded } from "@/components/common";
 import { SimpleTable } from "@/components/SimpleTable";
 import type { Column } from "@/components/SimpleTable";
 import { StatusTag } from "@/components/status";
+import { UserName } from "@/components/Unverified";
 import { useApi } from "@/hooks/useApi";
 import { formatDuration, formatTime } from "@/lib/time";
 
@@ -71,7 +72,8 @@ function Jobs({ jobs }: { jobs: Job[] }) {
 
 const APPROVAL_COLUMNS: Column<Approval>[] = [
   { key: "at", header: "Time", value: (row) => row.at, render: (row) => formatTime(row.at) },
-  { key: "approver", header: "Who", value: (row) => row.approver },
+  { key: "approver", header: "Who", value: (row) => row.approver,
+    render: (row) => <UserName name={row.approver} /> },
   { key: "decision", header: "Decision", value: (row) => row.decision.replace("_", " ") },
   { key: "comment", header: "Comment", value: (row) => row.comment },
   { key: "commit", header: "Commit", value: (row) => row.commit.slice(0, 10) },

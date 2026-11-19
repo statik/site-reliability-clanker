@@ -32,8 +32,8 @@ func (s *Server) postSeen(r *http.Request) (any, error) {
 }
 
 func (s *Server) getUsers(*http.Request) (any, error) {
-	rows, err := s.Orch.DB.Query(`SELECT name, display, role, email, last_seen FROM users
-		ORDER BY name`)
+	rows, err := s.Orch.DB.Query(`SELECT name, display, role, email, last_seen, self_declared
+		FROM users ORDER BY name`)
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
 	}
@@ -41,7 +41,8 @@ func (s *Server) getUsers(*http.Request) (any, error) {
 	users := []orchestrator.User{}
 	for rows.Next() {
 		var u orchestrator.User
-		if err := rows.Scan(&u.Name, &u.Display, &u.Role, &u.Email, &u.LastSeen); err != nil {
+		if err := rows.Scan(&u.Name, &u.Display, &u.Role, &u.Email, &u.LastSeen,
+			&u.SelfDeclared); err != nil {
 			return nil, fmt.Errorf("scan user: %w", err)
 		}
 		users = append(users, u)

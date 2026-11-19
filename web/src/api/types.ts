@@ -6,6 +6,8 @@ export interface User {
   role: Role;
   email: string;
   last_seen: string;
+  /** The person gave the name; no identity provider confirmed it. */
+  self_declared: boolean;
 }
 
 export interface Explanation {

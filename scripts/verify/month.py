@@ -16,6 +16,10 @@ def call(method, path, body=None, user="carol"):
     except urllib.error.HTTPError as err:
         return {"error": err.read().decode()}
 
+def first_approver():
+    """Return the user who approves first: the person from the wizard, or the demo user."""
+    return call("GET", "/auth").get("default_user") or "alice"
+
 def items():
     return {w["id"]: w for w in call("GET", "/work-items")}
 
@@ -29,7 +33,7 @@ def settle(known, timeout=1500):
         for wid, w in current.items():
             if w["state"] == "AwaitingApproval":
                 busy = True
-                approvers = ["alice", "bob"] if w["tier"] == "T3" else ["alice"]
+                approvers = [first_approver(), "bob"] if w["tier"] == "T3" else [first_approver()]
                 for a in approvers:
                     r = call("POST", f"/work-items/{wid}/decision", {"decision": "approve", "comment": "scripted month"}, user=a)
                     print(f"  approve {wid} ({w['tier']}) by {a}: {r.get('state', r)}", flush=True)

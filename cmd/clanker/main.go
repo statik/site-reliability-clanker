@@ -54,12 +54,14 @@ type options struct {
 	sourceDir string
 	// source holds the files of this repository: a checkout, or the files that a released
 	// binary carries.
-	source    fs.FS
-	addr      string
-	sinkAddr  string
-	env       string
-	cloud     string
-	demo      bool
+	source   fs.FS
+	addr     string
+	sinkAddr string
+	env      string
+	cloud    string
+	demo     bool
+	// operator is the name of the person who ran the wizard for the local target.
+	operator  string
 	setupAddr string
 	noBrowser bool
 	// app says that the macOS app started the wizard and shows it in its own window.

@@ -31,9 +31,10 @@ func runSetup(ctx context.Context, o options) error {
 	}
 	wizard, err := setup.New(ctx, setup.Config{
 		DataDir: o.dataDir, Version: version, DashboardURL: "http://" + o.addr, InApp: o.app,
-		StartLocal: func(ctx context.Context, env string) error {
+		StartLocal: func(ctx context.Context, env, operator string) error {
 			local := o
 			local.env, local.cloud, local.demo = env, "local", true
+			local.operator = operator
 			go func() {
 				if err := up(ctx, local); err != nil {
 					slog.Error("control plane stopped", "error", err)

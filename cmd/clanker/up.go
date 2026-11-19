@@ -94,10 +94,60 @@ var demoUsers = []orchestrator.User{
 	{Name: "dave", Display: "Dave Lindqvist", Role: "viewer", Email: "dave@example.com"},
 }
 
-func seedUsers(db *sql.DB) error {
+// demoApprover is the demo user whose place the person who ran the wizard takes.
+const demoApprover = "alice"
+
+// localUsers returns the users of a control plane with no sign-in: the demo users, or,
+// when the wizard gave the name of a person, that person in the place of the first
+// demo approver.
+func localUsers(operator string) []orchestrator.User {
+	if operator == "" {
+		return demoUsers
+	}
+	name := operatorUserName(operator)
+	users := []orchestrator.User{{Name: name, Display: operator, Role: "approver",
+		Email: name + "@example.com", SelfDeclared: true}}
 	for _, u := range demoUsers {
-		if _, err := db.Exec(`INSERT INTO users (name, display, role, email)
-			VALUES ($1,$2,$3,$4) ON CONFLICT (name) DO NOTHING`, u.Name, u.Display, u.Role, u.Email); err != nil {
+		if u.Name != demoApprover {
+			users = append(users, u)
+		}
+	}
+	return users
+}
+
+// operatorUserName makes the short name of a user from the name of a person: the
+// ASCII letters and digits of the first word that has one, in lower case. The
+// dashboard sends this name in a header, which carries only ASCII. A name that a
+// demo user keeps gets a digit, so the two stay different users.
+func operatorUserName(operator string) string {
+	name := "operator"
+	for _, word := range strings.Fields(strings.ToLower(operator)) {
+		letters := strings.Map(asciiLetterOrDigit, word)
+		if letters != "" {
+			name = letters
+			break
+		}
+	}
+	for _, u := range demoUsers {
+		if u.Name == name && u.Name != demoApprover {
+			return name + "1"
+		}
+	}
+	return name
+}
+
+func asciiLetterOrDigit(r rune) rune {
+	if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+		return r
+	}
+	return -1
+}
+
+func seedUsers(db *sql.DB, users []orchestrator.User) error {
+	for _, u := range users {
+		if _, err := db.Exec(`INSERT INTO users (name, display, role, email, self_declared)
+			VALUES ($1,$2,$3,$4,$5) ON CONFLICT (name) DO NOTHING`, u.Name, u.Display, u.Role,
+			u.Email, u.SelfDeclared); err != nil {
 			return fmt.Errorf("seed user %s: %w", u.Name, err)
 		}
 	}
@@ -295,7 +345,7 @@ func build(ctx context.Context, o options) (*components, error) {
 	c.monitor = monitor.New(c.db, c.clock)
 	// The demo users have no way to sign in. They exist only for the user switcher.
 	if o.demo {
-		if err := seedUsers(c.db); err != nil {
+		if err := seedUsers(c.db, localUsers(o.operator)); err != nil {
 			return nil, err
 		}
 	}
@@ -496,6 +546,9 @@ func up(ctx context.Context, o options) error {
 	server := &api.Server{Orch: c.orch, Audit: c.log, Forge: c.forge, Broker: c.broker,
 		Monitor: c.monitor, Notifier: c.notifier, Agent: c.agent, Detector: c.detector,
 		Sim: c.sim, Clock: c.clock, Runners: c.dispatcher.Handler()}
+	if o.demo && o.operator != "" {
+		server.DefaultUser = operatorUserName(o.operator)
+	}
 	if _, err := fs.Stat(o.source, "web/dist/index.html"); err == nil {
 		if server.Web, err = fs.Sub(o.source, "web/dist"); err != nil {
 			return fmt.Errorf("open the built dashboard: %w", err)

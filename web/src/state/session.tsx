@@ -24,12 +24,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [userName, setUserName] = useState(storedUser);
   const [asOf, setAsOf] = useState<Date | null>(null);
   const [signIn, setSignIn] = useState(false);
+  const [defaultUser, setDefaultUser] = useState("");
 
   useEffect(() => {
     // With a sign-in the server knows who this is. The stored choice of the demo is not used.
-    apiGet<{ sign_in: boolean }>("/auth")
+    apiGet<{ sign_in: boolean; default_user?: string }>("/auth")
       .then((auth) => {
         setSignIn(auth.sign_in);
+        setDefaultUser(auth.default_user ?? "");
         return auth.sign_in ? apiGet<User>("/me") : null;
       })
       .then(
@@ -57,18 +59,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setUserName(name);
   }, []);
 
+  // The stored choice can name a demo user that this control plane does not have. The
+  // server then acts as its default user, so the dashboard shows that user.
+  const known = users.some((candidate) => candidate.name === userName);
+  const shownName = known || defaultUser === "" ? userName : defaultUser;
+
   const value = useMemo<Session>(
     () => ({
       users,
-      user: users.find((candidate) => candidate.name === userName) ?? null,
-      userName,
+      user: users.find((candidate) => candidate.name === shownName) ?? null,
+      userName: shownName,
       usersError,
       setUser,
       signIn,
       asOf,
       setAsOf,
     }),
-    [users, userName, usersError, setUser, signIn, asOf],
+    [users, shownName, usersError, setUser, signIn, asOf],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

@@ -100,7 +100,7 @@ func modelServer(t *testing.T, ollamaURL string) (*Server, http.Handler) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	post(t, server, handler, "/api/target", `{"target":"local"}`)
+	post(t, server, handler, "/api/target", `{"target":"local","operator":"Sam Lee"}`)
 	return server, handler
 }
 

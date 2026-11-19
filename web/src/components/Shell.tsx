@@ -37,6 +37,7 @@ import mark from "@/assets/icon.svg";
 import { AsOfBanner, AsOfControl } from "@/components/AsOf";
 import { ErrorNote } from "@/components/common";
 import { IconTag, StatusTag } from "@/components/status";
+import { UnverifiedTag } from "@/components/Unverified";
 import { useClockError } from "@/state/clock";
 import { useLive } from "@/state/live";
 import { useSession } from "@/state/session";
@@ -98,7 +99,7 @@ function UserPanel({ expanded, onPick }: { expanded: boolean; onPick: () => void
               setUser(user.name);
               onPick();
             }}>
-            {user.display} ({user.role})
+            {user.display} ({user.role}){user.self_declared && <> <UnverifiedTag /></>}
           </SwitcherItem>
         ))}
         <SwitcherDivider />
@@ -125,6 +126,7 @@ function GlobalBar() {
             <IconTag type="outline" size="sm" icon={UserAvatar}>
               {user?.display ?? userName} · {user?.role ?? "unknown role"}
             </IconTag>
+            {user?.self_declared === true && <UnverifiedTag />}
           </span>
         </div>
         <AsOfControl />
