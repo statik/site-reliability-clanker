@@ -4,6 +4,7 @@ Every file is read at run time, so the evals test the text that production sends
 """
 
 import json
+import os
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -17,7 +18,15 @@ MANIFEST_NAME = "pack.json"
 
 
 def _find_pack() -> Path:
-    """Return the directory of the one application pack, as pack.Discover does in Go."""
+    """Return the directory of the application pack that the evals test.
+
+    CLANKER_PACK names it. With no value it is the one pack of this checkout, as
+    pack.Discover finds it in Go.
+    """
+    if named := os.environ.get("CLANKER_PACK"):
+        if not (Path(named) / MANIFEST_NAME).is_file():
+            raise RuntimeError(f"CLANKER_PACK is {named}, which has no {MANIFEST_NAME}")
+        return Path(named).resolve()
     found = sorted(path.parent for path in PACKS_DIR.glob(f"*/{MANIFEST_NAME}"))
     if len(found) != 1:
         raise RuntimeError(f"{PACKS_DIR} must have one application pack, found {len(found)}")
@@ -98,6 +107,9 @@ def _seed() -> Repos:
     _read_tree(chart, f"{PACK['mount']}/{PACK['chart']}", platform)
     runbooks: dict[str, str] = {}
     _read_tree(ROOT / "runbooks", "", runbooks)
+    # The runbooks of the application come from the pack, into the directory of the jobs.
+    if "runbooks" in PACK:
+        _read_tree(PACK_DIR / PACK["runbooks"], "jobs", runbooks)
     releases: dict[str, str] = {}
     _read_tree(RELEASES_DIR, PACK["releases"]["directory"], releases)
     _read_tree(chart, PACK["chart"], releases)

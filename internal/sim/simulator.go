@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/fs"
 	"net/http"
 	"time"
 
@@ -32,8 +31,6 @@ type Simulator struct {
 	Orch     *orchestrator.Orchestrator
 	Monitor  *monitor.Monitor
 	Notifier *notify.Notifier
-	// Source holds the files of this repository. Release notes are published from it.
-	Source fs.FS
 	// App is the application pack. The scenes publish its releases.
 	App pack.Pack
 	// AdminToken is the fault-injection token of the application.
@@ -150,8 +147,8 @@ func (s *Simulator) Advance(ctx context.Context, d time.Duration) error {
 
 // commitRelease puts the release note of a version into the repository of the application.
 func (s *Simulator) commitRelease(version string) error {
-	path := s.App.SourcePath(s.App.ReleaseNote(version))
-	note, err := fs.ReadFile(s.Source, path)
+	path := s.App.ReleaseNote(version)
+	note, err := s.App.ReadReleaseNote(version)
 	if err != nil {
 		return fmt.Errorf("read release note %s: %w", path, err)
 	}

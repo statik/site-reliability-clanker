@@ -3,9 +3,11 @@
 package packtest
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/fstest"
 
 	"github.com/statik/site-reliability-clanker/internal/pack"
 )
@@ -63,4 +65,30 @@ func load(t testing.TB, root, dir string) pack.Pack {
 		t.Fatal(err)
 	}
 	return p
+}
+
+// Runbooks returns the content of the runbooks repository as a start of the control plane
+// seeds it: the policies and routes of the core, and in the directory of the jobs the
+// runbooks of the example pack, with the files of each tree in extra added to them.
+func Runbooks(t testing.TB, extra ...fs.FS) map[string]fs.FS {
+	t.Helper()
+	jobs, err := Example(t).RunbookFiles()
+	if err != nil || jobs == nil {
+		t.Fatalf("the example pack has no runbooks: %v", err)
+	}
+	merged := fstest.MapFS{}
+	for _, tree := range append([]fs.FS{jobs}, extra...) {
+		names, err := fs.Glob(tree, "*")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range names {
+			data, err := fs.ReadFile(tree, name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			merged[name] = &fstest.MapFile{Data: data, Mode: 0o755}
+		}
+	}
+	return map[string]fs.FS{".": os.DirFS(filepath.Join(Root(t), "runbooks")), "jobs": merged}
 }

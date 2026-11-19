@@ -16,6 +16,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/broker"
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/jobspec"
+	"github.com/statik/site-reliability-clanker/internal/pack/packtest"
 	"github.com/statik/site-reliability-clanker/internal/policy"
 	"github.com/statik/site-reliability-clanker/internal/store"
 	"github.com/statik/site-reliability-clanker/internal/store/storetest"
@@ -91,8 +92,7 @@ func windowOrchestrator(t *testing.T, windows string) windowHarness {
 	db := storetest.Open(t)
 	clock := &movingClock{now: wednesday}
 	f := forge.New(db)
-	if err := f.Seed(RunbooksRepo, map[string]fs.FS{".": os.DirFS("../../runbooks")},
-		"Seed runbooks"); err != nil {
+	if err := f.Seed(RunbooksRepo, packtest.Runbooks(t), "Seed runbooks"); err != nil {
 		t.Fatal(err)
 	}
 	code := fstest.MapFS{"README.md": {Data: []byte("Platform\n")}}

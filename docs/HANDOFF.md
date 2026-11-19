@@ -62,9 +62,34 @@ video and the local demo. No pull request is open.
     had the same files. No approval was given.
   - Not run: a deployment with this change. The scripted month did not run.
   - Not done: the stacks (`platform/stacks/*/50-app`, `platform/modules/shared/app`), the
-    runbooks, the scenes of the simulator and the recorded answers still belong to
-    Paperboat. No command validates, imports or evaluates a pack. A pack cannot change
-    after the first start, because the forge is seeded one time.
+    scenes of the simulator and the recorded answers still belong to Paperboat. A pack
+    cannot change after the first start, because the forge is seeded one time.
+- A pack has two more parts, and there are commands for a pack (`apps/paperboat/PACK.md`):
+  - The runbooks of the application are in the pack (`apps/paperboat/runbooks/`, before
+    `runbooks/jobs/`). The control plane seeds them into `jobs/` of the runbooks
+    repository, so that repository has the same files as before. A pack cannot bring a
+    policy.
+  - The pack has eval cases (`apps/paperboat/evals/investigator_diagnosis.json`). The task
+    `investigator_diagnosis` reads its 12 samples from there; a test compares them with a
+    copy of the samples from before. `./run.sh pack DIR` runs the tasks that a pack has
+    cases for. The other tasks have their samples in the code of the suite.
+  - `clanker pack validate DIR` checks a pack and prints one line for each check.
+  - `clanker pack import URL --tag TAG` clones a tag with the `git` program, checks the
+    pack and copies it to `<data>/packs/<name>/<version>/` with a lock file (address, tag,
+    commit, SHA-256). `clanker up --pack DIR` starts with it and refuses a pack whose files
+    changed. A start writes the audit event `pack.loaded`.
+  - Ran on 2026-11-19: `go test ./...`, `make lint-core`, the tests and the mock run of
+    the evals, `./run.sh pack ../apps/paperboat`, and three starts of `clanker up` on other
+    ports with recorded answers: `main`, this change, and this change with `--pack` on an
+    imported copy of the Paperboat pack. In all three the first work item waited for
+    approval and the three repositories of the forge had the same trees. No approval was
+    given. The import tests use a git repository on the disk.
+  - Not run: an import from an https or ssh address. A pack for another application in a
+    start of the control plane (only in tests, to the seed of the forge). The wizard with
+    `--pack`. `./run.sh pack` with live models. A deployment with this change.
+  - Not done: a pack for another application cannot deploy, because the stacks of the
+    application layer still name Paperboat. The core on a cloud reads only the pack that
+    it carries. Only one eval task reads its samples from the pack.
 - #87, #89 and #92: the site has a cost table (Amazon Bedrock against a GPU instance), a
   table that compares four model sets in the evals, the approval in Slack and Teams, and
   tables that fit a phone.
@@ -508,7 +533,7 @@ event. The approval page shows the review and its concerns.
 Also built in that session: typed runbooks (section 5.6 of the plan). The owner decided not
 to use Swamp, because of its licence and its account dependency, and to build the same
 ideas in this repository. Each runbook has a definition file beside its script
-(`runbooks/jobs/<name>.json`) with its tier, its inputs with the values that each one
+(`jobs/<name>.json` in the runbooks repository) with its tier, its inputs with the values that each one
 permits, and its typed outputs. The control plane refuses a request that does not fit the
 definition before a work item or a grant exists, and records the outputs of each run.
 

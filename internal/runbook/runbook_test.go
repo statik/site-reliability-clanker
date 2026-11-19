@@ -177,7 +177,7 @@ func TestCheckOutputs(t *testing.T) {
 // TestEveryRunbookOfTheRepositoryHasADefinition reads the real files. A script without a
 // definition cannot run, and a definition without a script fails when it runs.
 func TestEveryRunbookOfTheRepositoryHasADefinition(t *testing.T) {
-	dir := filepath.Join("..", "..", "runbooks", "jobs")
+	dir := filepath.Join("..", "..", "apps", "paperboat", "runbooks")
 	scripts, err := filepath.Glob(filepath.Join(dir, "*.sh"))
 	if err != nil || len(scripts) == 0 {
 		t.Fatalf("no scripts in %s: %v", dir, err)

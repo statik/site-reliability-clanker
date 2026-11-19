@@ -62,6 +62,10 @@ const PlatformRepo = "platform-live"
 // RunbooksRepo is the forge repository with runbook jobs and policies.
 const RunbooksRepo = "runbooks"
 
+// RunbookJobsDir is the directory of that repository with one definition and one script
+// for each runbook. The runbooks of the application pack go there.
+const RunbookJobsDir = "jobs"
+
 // Explanation is the prose on the approval page. The facts next to it come from the plan.
 type Explanation struct {
 	Sentence     string   `json:"sentence"`

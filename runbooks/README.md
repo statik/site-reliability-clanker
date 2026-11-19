@@ -4,7 +4,7 @@ This directory is the content of the `runbooks` repository in the forge.
 
 | Path | Content |
 |---|---|
-| `jobs/` | One runbook for each pair of files: `<name>.json` is the definition and `<name>.sh` is the script |
+| `jobs/` | One runbook for each pair of files: `<name>.json` is the definition and `<name>.sh` is the script. This directory is empty here: the runbooks come from the application pack (`apps/paperboat/runbooks/` for the example application), and the control plane puts them in `jobs/` when it seeds the repository |
 | `policy/` | The rules that give a plan its risk tier (Rego) |
 | `policy/approvals.json` | The number of approvers that a tier T3 change needs |
 | `policy/maintenance-windows.json` | The weekly windows in which a tier T3 change can apply. The file is optional and this directory does not have it |
@@ -150,6 +150,6 @@ not report a declared output, or reports text for an integer.
 
 ## Checks
 
-`go test ./internal/runbook/ ./internal/runner/` reads the files in `jobs/`. It fails when
+`go test ./internal/runbook/ ./internal/runner/` reads the runbooks of the example pack. It fails when
 a script has no definition, a definition is not valid, or a script does not use an input
 or an output of its definition.

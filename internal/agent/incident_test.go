@@ -2,8 +2,6 @@ package agent
 
 import (
 	"errors"
-	"io/fs"
-	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -26,8 +24,8 @@ func agentWithRunbooks(t *testing.T) *Agent {
 	t.Helper()
 	db := storetest.Open(t)
 	f := forge.New(db)
-	if err := f.Seed(orchestrator.RunbooksRepo, map[string]fs.FS{
-		".": os.DirFS("../../runbooks"), "jobs": scaleDown}, "Seed runbooks"); err != nil {
+	if err := f.Seed(orchestrator.RunbooksRepo, packtest.Runbooks(t, scaleDown),
+		"Seed runbooks"); err != nil {
 		t.Fatal(err)
 	}
 	return &Agent{App: packtest.Example(t), Orch: &orchestrator.Orchestrator{DB: db, Forge: f}}
@@ -65,7 +63,7 @@ func TestTheDefinitionDecidesWhichMitigationRuns(t *testing.T) {
 }
 
 // TestTheInvestigatorPromptOffersOnlyMitigationsThatExist compares the fixed text of the
-// prompt with the definitions in runbooks/jobs of this repository.
+// prompt with the definitions of the example pack of this repository.
 func TestTheInvestigatorPromptOffersOnlyMitigationsThatExist(t *testing.T) {
 	a := agentWithRunbooks(t)
 	definitions, err := a.Orch.Runbooks()

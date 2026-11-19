@@ -3,7 +3,6 @@ package detect
 import (
 	"context"
 	"io/fs"
-	"os"
 	"testing"
 	"time"
 
@@ -63,8 +62,7 @@ func TestTheReleaseCheckUsesTheNamesOfThePack(t *testing.T) {
 // notesOf returns the release notes of the pack, as the content of its releases repository.
 func notesOf(t *testing.T, app pack.Pack) map[string]fs.FS {
 	t.Helper()
-	notes, err := fs.Sub(os.DirFS(packtest.SecondSource(t)),
-		app.SourcePath(app.Releases.Directory))
+	notes, err := fs.Sub(app.Files(), app.Releases.Directory)
 	if err != nil {
 		t.Fatal(err)
 	}

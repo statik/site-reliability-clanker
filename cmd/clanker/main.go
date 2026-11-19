@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/bundle"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
 	"github.com/statik/site-reliability-clanker/internal/pack"
+	"github.com/statik/site-reliability-clanker/internal/packstore"
 	"github.com/statik/site-reliability-clanker/internal/runner"
 	"github.com/statik/site-reliability-clanker/internal/setup"
 )
@@ -40,12 +42,17 @@ Usage:
   clanker sink                      run the local webhook sink alone
   clanker login --server URL        sign this machine in to a control plane, for git and scripts
   clanker token --server URL        print the token of this machine, for a script
+  clanker pack validate DIR         check the application pack in a directory
+  clanker pack import URL --tag TAG copy a version of a pack from a git repository to the
+                                    data directory; --dir NAME is its directory there
 
 Common flags:
   --data DIR     data directory of the control plane (default .clanker in a checkout,
                  ~/.clanker for a released binary)
   --source DIR   checkout of this repository (default . in a checkout; a released binary
                  carries the files and needs no checkout)
+  --pack DIR     application pack of setup and up (default: the pack that comes with the
+                 control plane)
 `
 
 // options are the settings shared by the commands.
@@ -61,10 +68,14 @@ type options struct {
 	env      string
 	cloud    string
 	demo     bool
-	// packDir is the directory of the application pack in the source files. Empty means
-	// the one pack in the directory apps. app is the pack that was read from it.
-	packDir string
-	app     pack.Pack
+	// packDir is the directory of the application pack: in the source files, or on this
+	// machine. Empty means the one pack in the directory apps of the source files. app is
+	// the pack that was read from it, packOrigin says where it came from, and packDisk is
+	// its directory on this machine (empty for the core on a cloud, which has no disk).
+	packDir    string
+	app        pack.Pack
+	packOrigin packstore.Origin
+	packDisk   string
 	// operator is the name of the person who ran the wizard for the local target.
 	operator  string
 	setupAddr string
@@ -88,8 +99,8 @@ func parse(command string, args []string) (options, error) {
 	flags.StringVar(&o.addr, "addr", "127.0.0.1:7070", "listen address of the control plane")
 	flags.StringVar(&o.sinkAddr, "sink-addr", "127.0.0.1:7071", "listen address of the sink")
 	flags.StringVar(&o.env, "env", "local", "environment name")
-	flags.StringVar(&o.packDir, "pack", "", "directory of the application pack in the "+
-		"source files (default: the one pack in apps)")
+	flags.StringVar(&o.packDir, "pack", "", "directory of the application pack, in the "+
+		"source files or on this machine (default: the one pack in apps)")
 	flags.StringVar(&o.cloud, "cloud", "local", "cloud of the environment")
 	flags.BoolVar(&o.demo, "demo", true, "demo mode: simulator, local mail and webhook sink")
 	flags.StringVar(&o.profile, "profile", "", "AWS CLI profile of the account to survey")
@@ -108,12 +119,43 @@ func parse(command string, args []string) (options, error) {
 		return options{}, fmt.Errorf("the files of this repository are not at %q: run clanker "+
 			"from the repository root or set --source", o.sourceDir)
 	}
-	app, err := loadPack(o.source, o.packDir)
-	if err != nil {
+	if err := locatePack(&o); err != nil {
 		return options{}, err
 	}
-	o.app = app
 	return o, nil
+}
+
+// locatePack reads the application pack of this start. A directory that the source files
+// have is the pack that comes with the control plane. Any other directory is a pack on
+// this machine, for example one that `clanker pack import` put in the data directory.
+func locatePack(o *options) error {
+	inSource := o.packDir == ""
+	if !inSource && fs.ValidPath(o.packDir) {
+		_, err := fs.Stat(o.source, path.Join(o.packDir, pack.ManifestName))
+		inSource = err == nil
+	}
+	if !inSource {
+		app, origin, err := packstore.Open(o.packDir)
+		if err != nil {
+			return err
+		}
+		o.app, o.packOrigin = app, origin
+		o.packDisk, err = filepath.Abs(o.packDir)
+		return err
+	}
+	app, err := loadPack(o.source, o.packDir)
+	if err != nil {
+		return err
+	}
+	hash, err := pack.Hash(app.Files())
+	if err != nil {
+		return err
+	}
+	o.app, o.packOrigin = app, packstore.Origin{Source: packstore.BuiltIn, SHA256: hash}
+	if o.sourceDir != "" {
+		o.packDisk = filepath.Join(o.sourceDir, filepath.FromSlash(app.Dir()))
+	}
+	return nil
 }
 
 // packsRoot is the directory of the source files that holds the application packs.
@@ -331,8 +373,13 @@ func run() error {
 		defer stop()
 		return runRunner(ctx, args[1:])
 	}
-	// These commands talk to a control plane somewhere else. They need no checkout.
+	// These commands talk to a control plane somewhere else, or read a pack. They need no
+	// checkout.
 	switch command {
+	case "pack":
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		return runPack(ctx, args[1:], os.Stdout)
 	case "login":
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()

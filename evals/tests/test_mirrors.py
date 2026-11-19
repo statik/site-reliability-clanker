@@ -8,6 +8,7 @@ import pytest
 from clanker_evals import author_tools, checks, gotext, inputs, solvers
 from clanker_evals.repo import (
     PACK,
+    PACK_DIR,
     PLATFORM_REPO,
     PROMPTS_DIR,
     RELEASES_REPO,
@@ -108,7 +109,7 @@ def test_layers_and_repos_match_go() -> None:
 def test_mitigations_match_the_runbook_definitions() -> None:
     definitions = {
         path.stem: json.loads(path.read_text(encoding="utf-8"))
-        for path in sorted((ROOT / "runbooks" / "jobs").glob("*.json"))
+        for path in sorted((PACK_DIR / PACK["runbooks"]).glob("*.json"))
     }
     mitigations = [name for name, d in definitions.items() if d.get("incident_mitigation")]
     assert mitigations == checks.RUNBOOKS
