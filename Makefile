@@ -52,9 +52,9 @@ lint: lint-core
 	cd apps/paperboat && go vet ./...
 	tofu fmt -check -recursive platform
 	opa check runbooks/policy
-	shellcheck runbooks/jobs/*.sh apps/paperboat/build.sh ops/run-local.sh scripts/*.sh \
+	shellcheck apps/paperboat/runbooks/*.sh apps/paperboat/build.sh ops/run-local.sh scripts/*.sh \
 		scripts/verify/*.sh scripts/macos/*.sh
-	shfmt -i 2 -d runbooks/jobs apps/paperboat/build.sh ops/run-local.sh scripts
+	shfmt -i 2 -d apps/paperboat/runbooks apps/paperboat/build.sh ops/run-local.sh scripts
 
 destroy: build
 	./bin/clanker destroy --env local

@@ -8,7 +8,7 @@ from inspect_ai.dataset import Sample
 from inspect_ai.scorer import Score, Scorer, Target, mean, scorer
 from inspect_ai.solver import TaskState
 
-from clanker_evals import transcripts
+from clanker_evals import pack_cases
 from clanker_evals.checks import (
     ALLOWED_MITIGATIONS,
     NO_MITIGATION,
@@ -23,10 +23,13 @@ from clanker_evals.checks import (
     to_score,
 )
 from clanker_evals.inputs import finding, investigator_input
+from clanker_evals.repo import PACK
 from clanker_evals.solvers import role_turn
 
 FIELDS = ["diagnosis", "evidence", "proposed_runbook", "deployment", "write_up"]
-POD_NAME = re.compile(r"\b((?:paperboat-[a-z]+-[a-z0-9]{8,10}-[a-z0-9]{5})|postgres-\d)\b")
+POD_NAME = re.compile(
+    rf"\b((?:{re.escape(PACK['name'])}-[a-z]+-[a-z0-9]{{8,10}}-[a-z0-9]{{5}})|postgres-\d)\b"
+)
 GRADER_NOTE = (
     "The criterion names the true cause of the incident. The submission meets it when its "
     "diagnosis names that cause, or says plainly that the evidence does not show a cause "
@@ -39,193 +42,44 @@ def alert(failed: int = 9, version: str = "1.0.0") -> dict[str, Any]:
     return finding(
         "health",
         "incident:local:2026-03-02T08:57:00Z",
-        f"Paperboat in local fails {failed} of 20 inventory requests",
+        f"{PACK['title']} in local fails {failed} of 20 {PACK['health']['probe_name']} requests",
         {"kind": "incident", "ok": 20 - failed, "total": 20, "p95_ms": 41, "version": version},
     )
 
 
-CREATED = "WI-0001 Create environment local: Done, 288h0m0s ago"
-HISTORY: dict[str, list[str]] = {
-    # The newest change comes first, as recentChanges writes it.
-    "bad-release-healthy-pods": [
-        "WI-0008 Upgrade Paperboat to 1.2.0 (inventory snapshot): Done, 6m0s ago",
-        "WI-0006 Patch Paperboat to 1.1.1 (base image security fix): Done, 143h0m0s ago",
-        CREATED,
-    ],
-    "crash-loop-after-deploy": [
-        "WI-0008 Upgrade Paperboat to 1.2.0 (inventory snapshot): Verifying, 7m0s ago",
-        "WI-0006 Patch Paperboat to 1.1.1 (base image security fix): Done, 143h0m0s ago",
-        CREATED,
-    ],
-    "image-pull-failure": [
-        "WI-0009 Upgrade Paperboat to 1.1.2: Verifying, 8m0s ago",
-        CREATED,
-    ],
-    "oom-kills": [
-        "WI-0006 Patch Paperboat to 1.1.1 (base image security fix): Done, 216h0m0s ago",
-        CREATED,
-    ],
-    "memory-fault-with-old-noise": [
-        "WI-0003 Restart paperboat-worker: Done, 72h0m0s ago",
-        "WI-0001 Create environment local: Done, 216h0m0s ago",
-    ],
-    "debug-session-failed": ["no change is on record"],
+# The fields of one case of the application pack, in <evals>/investigator_diagnosis.json:
+# the transcript of the debug session, the true cause (the criterion for the grader), the
+# acceptable mitigation ("restart:<deployment>", "none", or "either:<deployment>" when a
+# restart of that deployment and no mitigation are both acceptable), patterns of the
+# evidence in the transcript (the answer must cite one), and the arguments of alert(). The
+# optional field "history" has the lines of the change history, newest first.
+CASE_FIELDS: dict[str, type] = {
+    "transcript": str,
+    "cause": str,
+    "expect": str,
+    "evidence": list,
+    "alert": dict,
 }
 
 
-def incident_sample(
-    name: str, transcript: str, cause: str, expect: str, evidence: list[str], **alert_args: Any
-) -> Sample:
-    """Build one Investigator sample.
-
-    Args:
-        name: The sample ID.
-        transcript: The debug-session transcript.
-        cause: The true cause, as the criterion for the grader.
-        expect: The acceptable mitigation: "restart:<deployment>", "none", or
-            "either:<deployment>" when a restart of that deployment and no mitigation are
-            both acceptable.
-        evidence: Patterns of the evidence in the transcript. The answer must cite one.
-        **alert_args: Arguments for alert().
-    """
+def incident_sample(case: pack_cases.Case) -> Sample:
+    """Build one Investigator sample from a case of the application pack."""
+    name, transcript, evidence = case["id"], case["transcript"], case["evidence"]
     missing = [p for p in evidence if not re.search(p, transcript, re.IGNORECASE)]
     if missing:
         raise ValueError(f"sample {name}: evidence {missing} is not in its transcript")
     return Sample(
         id=name,
-        input=investigator_input(alert(**alert_args), transcript, HISTORY.get(name)),
-        target=cause,
-        metadata={"role": "investigator", "expect": expect, "evidence": evidence},
+        input=investigator_input(alert(**case["alert"]), transcript, case.get("history")),
+        target=case["cause"],
+        metadata={"role": "investigator", "expect": case["expect"], "evidence": evidence},
     )
-
-
-def _application_samples() -> list[Sample]:
-    old_restart: transcripts.Row = (
-        "3d",
-        "Normal",
-        "Killing",
-        f"pod/{transcripts.WORKER_POD}",
-        "Stopping container worker",
-    )
-    return [
-        incident_sample(
-            "memory-fault-healthy-pods",
-            transcripts.memory_fault(),
-            "A fault inside the running api process (in-memory fault state): pods are healthy "
-            "and not restarted, no deploy happened, yet inventory requests answer 500.",
-            "restart:paperboat-api",
-            [r"request handler failed", r"/api/inventory", r"\b500\b"],
-        ),
-        incident_sample(
-            "memory-fault-with-old-noise",
-            transcripts.memory_fault(extra_events=(old_restart,)),
-            "A fault inside the running api process (in-memory fault state). The worker "
-            "restart three days ago is unrelated.",
-            "restart:paperboat-api",
-            [r"request handler failed", r"/api/inventory", r"\b500\b"],
-        ),
-        incident_sample(
-            "bad-release-healthy-pods",
-            transcripts.bad_release(),
-            "The release 1.2.0-bad that rolled out minutes ago has a bug in the inventory code "
-            "(build tank snapshot: index out of range). The pods are healthy, so a restart "
-            "gives the same code and does not help; the release must be rolled back.",
-            "none",
-            [r"index out of range", r"1\.2\.0-bad", r"snapshot"],
-            version="1.2.0-bad",
-        ),
-        incident_sample(
-            "crash-loop-after-deploy",
-            transcripts.crash_loop_after_deploy(),
-            "The new release 1.2.0-bad crashes at start with a nil pointer panic, so the new "
-            "api pod is in CrashLoopBackOff after the deploy. A restart does not help; the "
-            "release must be rolled back or fixed.",
-            "none",
-            [r"CrashLoopBackOff", r"panic", r"1\.2\.0-bad", r"nil pointer"],
-            version="1.2.0-bad",
-        ),
-    ]
-
-
-def _platform_samples() -> list[Sample]:
-    return [
-        incident_sample(
-            "database-unreachable",
-            transcripts.database_unreachable(),
-            "The Postgres database is down (its pod cannot mount its volume), so the api "
-            "cannot connect to the database. Restarting an application deployment does not "
-            "help.",
-            "none",
-            [r"connection refused", r"postgres-0", r"FailedMount", r"5432"],
-            failed=20,
-        ),
-        incident_sample(
-            "image-pull-failure",
-            transcripts.image_pull_failure(),
-            "The api pod cannot pull its image (tag 1.1.2 is not in the registry: manifest "
-            "unknown), so no api pod runs. A restart does not help.",
-            "none",
-            [r"ImagePullBackOff", r"ErrImagePull", r"manifest unknown", r"pull"],
-            failed=20,
-        ),
-        incident_sample(
-            "healthy-system-false-alarm",
-            transcripts.healthy_system(),
-            "The debug session shows no fault: all pods are healthy and every request "
-            "succeeds. The evidence does not show a cause; the alert may be a false alarm or "
-            "the fault has cleared.",
-            "none",
-            [r"\b200\b", r"Running", r"1/1"],
-        ),
-        incident_sample(
-            "oom-kills",
-            transcripts.oom_kills(),
-            "The api container runs out of memory and is OOM-killed again and again (heap "
-            "near the 256 MB limit).",
-            "either:paperboat-api",
-            [r"OOMKill", r"out of memory", r"limit_mb"],
-            failed=14,
-            version="1.1.1",
-        ),
-        incident_sample(
-            "shared-volume-full",
-            transcripts.volume_full(),
-            "The shared volume is full (no space left on device), so writes fail. A restart "
-            "does not free space.",
-            "none",
-            [r"no space left on device", r"100% used"],
-        ),
-        incident_sample(
-            "pod-unschedulable",
-            transcripts.unschedulable(),
-            "The api pod is Pending because no node has enough CPU (FailedScheduling: "
-            "Insufficient cpu). A restart does not help.",
-            "none",
-            [r"Pending", r"Insufficient cpu", r"FailedScheduling"],
-            failed=20,
-        ),
-        incident_sample(
-            "web-readiness-fails",
-            transcripts.web_not_ready(),
-            "The web pod fails its readiness probe (timeout) while the api answers every "
-            "request; the fault is in the web deployment, not in the api.",
-            "either:paperboat-web",
-            [r"Readiness probe failed", transcripts.WEB_POD, r"paperboat-web"],
-        ),
-        incident_sample(
-            "debug-session-failed",
-            transcripts.session_failed(),
-            "The debug session could not reach the cluster, so there is no evidence of the "
-            "cause. The diagnosis must say that the cause is unknown.",
-            "none",
-            [r"Unable to connect", r"connection refused", r"6443"],
-        ),
-    ]
 
 
 def diagnosis_samples() -> list[Sample]:
-    """Return the samples of investigator_diagnosis."""
-    return [*_application_samples(), *_platform_samples()]
+    """Return the samples of investigator_diagnosis: the incident cases of the pack."""
+    cases = pack_cases.load("investigator_diagnosis", CASE_FIELDS)
+    return [incident_sample(case) for case in cases]
 
 
 def _mitigation_verdicts(state: TaskState) -> dict[str, Verdict]:

@@ -5,6 +5,8 @@
 #   ./run.sh live            every task with the production model of each role
 #   ./run.sh live --limit 2  more arguments go to each `inspect eval` call
 #   ./run.sh rescore         score the logs in logs/live again, without new answers
+#   ./run.sh pack DIR        the tasks that the application pack in DIR has eval cases for,
+#                            with mockllm/model; ./run.sh pack DIR live uses the live models
 #
 # Models (override with the environment variables):
 #   CLANKER_AUTHOR_MODEL, CLANKER_INVESTIGATOR_MODEL, CLANKER_EXPLAINER_MODEL,
@@ -23,6 +25,22 @@ extra=("$@")
 tasks_dir="src/clanker_evals/tasks"
 epochs="${CLANKER_ADVERSARIAL_EPOCHS:-3}"
 log_dir="logs/${mode}"
+
+# An application pack brings its own eval cases. The tasks read them from CLANKER_PACK.
+pack_dir=""
+if [[ "$mode" == "pack" ]]; then
+  pack_dir="${1:?give the directory of the application pack}"
+  shift
+  CLANKER_PACK="$(cd "$pack_dir" && pwd)"
+  export CLANKER_PACK
+  mode="mock"
+  if [[ "${1:-}" == "live" ]]; then
+    mode="live"
+    shift
+  fi
+  extra=("$@")
+  log_dir="logs/pack-$(basename "$CLANKER_PACK")-${mode}"
+fi
 
 read_key_from() {
   local file="$1" line
@@ -96,6 +114,15 @@ run() {
     --model-role "grader=${grader}" --log-dir "$log_dir" --display plain \
     --no-fail-on-error "$@" ${extra[@]+"${extra[@]}"}
 }
+
+if [[ -n "$pack_dir" ]]; then
+  cases="$(uv run python -m clanker_evals.pack_cases)"
+  while read -r file name; do
+    run "$file" "$name" "$(model_of "$file")"
+  done <<<"$cases"
+  uv run python report.py "$log_dir" --out "${log_dir}/RESULTS.md"
+  exit 0
+fi
 
 run author author_correctness "$author"
 run author author_minimality_and_refusal "$author"

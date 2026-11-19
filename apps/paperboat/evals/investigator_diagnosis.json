@@ -1,0 +1,190 @@
+{
+  "schema": 1,
+  "task": "investigator_diagnosis",
+  "samples": [
+    {
+      "id": "memory-fault-healthy-pods",
+      "alert": {},
+      "cause": "A fault inside the running api process (in-memory fault state): pods are healthy and not restarted, no deploy happened, yet inventory requests answer 500.",
+      "expect": "restart:paperboat-api",
+      "evidence": [
+        "request handler failed",
+        "/api/inventory",
+        "\\b500\\b"
+      ],
+      "transcript": "$ kubectl get pods -n paperboat -o wide\nNAME                                READY   STATUS             RESTARTS       AGE\npaperboat-api-6d9f7c5b8-x2k4q       1/1     Running            0              9d\npaperboat-web-5b8c6d7f9-h7j3w       1/1     Running            0              9d\npaperboat-worker-84c5d6b7f-q9t5z    1/1     Running            0              9d\npostgres-0                          1/1     Running            0              12d\n$ kubectl get deployments -n paperboat\nNAME               READY   UP-TO-DATE   AVAILABLE   AGE\npaperboat-api      1/1     1            1           9d\npaperboat-web      1/1     1            1           9d\npaperboat-worker   1/1     1            1           9d\n$ kubectl get events -n paperboat --sort-by=.lastTimestamp\nNo resources found in paperboat namespace.\n$ kubectl logs -n paperboat deployment/paperboat-api --tail=40\n{\"ts\":\"2026-03-02T08:55:01Z\",\"level\":\"error\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":500,\"error\":\"request handler failed\"}\n{\"ts\":\"2026-03-02T08:55:02Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/healthz\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:03Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:04Z\",\"level\":\"error\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":500,\"error\":\"request handler failed\"}\n{\"ts\":\"2026-03-02T08:55:06Z\",\"level\":\"error\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":500,\"error\":\"request handler failed\"}\n{\"ts\":\"2026-03-02T08:55:07Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/healthz\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:08Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:09Z\",\"level\":\"error\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":500,\"error\":\"request handler failed\"}\n"
+    },
+    {
+      "id": "memory-fault-with-old-noise",
+      "alert": {},
+      "cause": "A fault inside the running api process (in-memory fault state). The worker restart three days ago is unrelated.",
+      "expect": "restart:paperboat-api",
+      "evidence": [
+        "request handler failed",
+        "/api/inventory",
+        "\\b500\\b"
+      ],
+      "transcript": "$ kubectl get pods -n paperboat -o wide\nNAME                                READY   STATUS             RESTARTS       AGE\npaperboat-api-6d9f7c5b8-x2k4q       1/1     Running            0              9d\npaperboat-web-5b8c6d7f9-h7j3w       1/1     Running            0              9d\npaperboat-worker-84c5d6b7f-q9t5z    1/1     Running            0              9d\npostgres-0                          1/1     Running            0              12d\n$ kubectl get deployments -n paperboat\nNAME               READY   UP-TO-DATE   AVAILABLE   AGE\npaperboat-api      1/1     1            1           9d\npaperboat-web      1/1     1            1           9d\npaperboat-worker   1/1     1            1           9d\n$ kubectl get events -n paperboat --sort-by=.lastTimestamp\nLAST SEEN   TYPE      REASON      OBJECT                                  MESSAGE\n3d          Normal    Killing     pod/paperboat-worker-84c5d6b7f-q9t5z    Stopping container worker\n$ kubectl logs -n paperboat deployment/paperboat-api --tail=40\n{\"ts\":\"2026-03-02T08:55:01Z\",\"level\":\"error\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":500,\"error\":\"request handler failed\"}\n{\"ts\":\"2026-03-02T08:55:02Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/healthz\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:03Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:04Z\",\"level\":\"error\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":500,\"error\":\"request handler failed\"}\n{\"ts\":\"2026-03-02T08:55:06Z\",\"level\":\"error\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":500,\"error\":\"request handler failed\"}\n{\"ts\":\"2026-03-02T08:55:07Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/healthz\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:08Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:09Z\",\"level\":\"error\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":500,\"error\":\"request handler failed\"}\n",
+      "history": [
+        "WI-0003 Restart paperboat-worker: Done, 72h0m0s ago",
+        "WI-0001 Create environment local: Done, 216h0m0s ago"
+      ]
+    },
+    {
+      "id": "bad-release-healthy-pods",
+      "alert": {
+        "version": "1.2.0-bad"
+      },
+      "cause": "The release 1.2.0-bad that rolled out minutes ago has a bug in the inventory code (build tank snapshot: index out of range). The pods are healthy, so a restart gives the same code and does not help; the release must be rolled back.",
+      "expect": "none",
+      "evidence": [
+        "index out of range",
+        "1\\.2\\.0-bad",
+        "snapshot"
+      ],
+      "transcript": "$ kubectl get pods -n paperboat -o wide\nNAME                                READY   STATUS             RESTARTS       AGE\npaperboat-api-7c4d9b6f5-m8n2p       1/1     Running            0              6m\npaperboat-web-5b8c6d7f9-h7j3w       1/1     Running            0              6m\npaperboat-worker-84c5d6b7f-q9t5z    1/1     Running            0              6m\npostgres-0                          1/1     Running            0              12d\n$ kubectl get deployments -n paperboat\nNAME               READY   UP-TO-DATE   AVAILABLE   AGE\npaperboat-api      1/1     1            1           9d\npaperboat-web      1/1     1            1           9d\npaperboat-worker   1/1     1            1           9d\n$ kubectl get events -n paperboat --sort-by=.lastTimestamp\nLAST SEEN   TYPE      REASON      OBJECT                                  MESSAGE\n6m          Normal    ScalingUp   deployment/paperboat-api                Scaled up replica set paperboat-api-7c4d9b6f5 to 1\n6m          Normal    Pulled      pod/paperboat-api-7c4d9b6f5-m8n2p       Container image \"registry.local:5001/paperboat:1.2.0-bad\" already present on machine\n5m          Normal    ScalingDown deployment/paperboat-api                Scaled down replica set paperboat-api-6d9f7c5b8 to 0\n$ kubectl logs -n paperboat deployment/paperboat-api --tail=40\n{\"ts\":\"2026-03-02T08:55:01Z\",\"level\":\"error\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":500,\"error\":\"inventory: build tank snapshot: index out of range\"}\n{\"ts\":\"2026-03-02T08:55:02Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/healthz\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:03Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:04Z\",\"level\":\"error\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":500,\"error\":\"inventory: build tank snapshot: index out of range\"}\n{\"ts\":\"2026-03-02T08:55:05Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/rentals\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:06Z\",\"level\":\"error\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":500,\"error\":\"inventory: build tank snapshot: index out of range\"}\n{\"ts\":\"2026-03-02T08:55:07Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/healthz\",\"status\":200}\n",
+      "history": [
+        "WI-0008 Upgrade Paperboat to 1.2.0 (inventory snapshot): Done, 6m0s ago",
+        "WI-0006 Patch Paperboat to 1.1.1 (base image security fix): Done, 143h0m0s ago",
+        "WI-0001 Create environment local: Done, 288h0m0s ago"
+      ]
+    },
+    {
+      "id": "crash-loop-after-deploy",
+      "alert": {
+        "version": "1.2.0-bad"
+      },
+      "cause": "The new release 1.2.0-bad crashes at start with a nil pointer panic, so the new api pod is in CrashLoopBackOff after the deploy. A restart does not help; the release must be rolled back or fixed.",
+      "expect": "none",
+      "evidence": [
+        "CrashLoopBackOff",
+        "panic",
+        "1\\.2\\.0-bad",
+        "nil pointer"
+      ],
+      "transcript": "$ kubectl get pods -n paperboat -o wide\nNAME                                READY   STATUS             RESTARTS       AGE\npaperboat-api-6d9f7c5b8-x2k4q       1/1     Running            0              9d\npaperboat-api-7c4d9b6f5-m8n2p       0/1     CrashLoopBackOff   6 (40s ago)    7m\npaperboat-web-5b8c6d7f9-h7j3w       1/1     Running            0              9d\npaperboat-worker-84c5d6b7f-q9t5z    1/1     Running            0              9d\npostgres-0                          1/1     Running            0              12d\n$ kubectl get deployments -n paperboat\nNAME               READY   UP-TO-DATE   AVAILABLE   AGE\npaperboat-api      1/1     1            1           9d\npaperboat-web      1/1     1            1           9d\npaperboat-worker   1/1     1            1           9d\n$ kubectl get events -n paperboat --sort-by=.lastTimestamp\nLAST SEEN   TYPE      REASON      OBJECT                                  MESSAGE\n7m          Normal    ScalingUp   deployment/paperboat-api                Scaled up replica set paperboat-api-7c4d9b6f5 to 1\n7m          Normal    Pulled      pod/paperboat-api-7c4d9b6f5-m8n2p       Container image \"registry.local:5001/paperboat:1.2.0-bad\" already present on machine\n40s         Warning   BackOff     pod/paperboat-api-7c4d9b6f5-m8n2p       Back-off restarting failed container api\n$ kubectl logs -n paperboat deployment/paperboat-api --tail=40\nFound 2 pods, using pod/paperboat-api-7c4d9b6f5-m8n2p\n{\"ts\":\"2026-03-02T08:54:11Z\",\"level\":\"info\",\"msg\":\"starting\",\"version\":\"1.2.0-bad\"}\npanic: runtime error: invalid memory address or nil pointer dereference\ngoroutine 1 [running]:\nmain.buildTankSnapshots(...)\n\t/src/internal/inventory/snapshot.go:41 +0x1c\nmain.main()\n\t/src/main.go:88 +0x2e4\n",
+      "history": [
+        "WI-0008 Upgrade Paperboat to 1.2.0 (inventory snapshot): Verifying, 7m0s ago",
+        "WI-0006 Patch Paperboat to 1.1.1 (base image security fix): Done, 143h0m0s ago",
+        "WI-0001 Create environment local: Done, 288h0m0s ago"
+      ]
+    },
+    {
+      "id": "database-unreachable",
+      "alert": {
+        "failed": 20
+      },
+      "cause": "The Postgres database is down (its pod cannot mount its volume), so the api cannot connect to the database. Restarting an application deployment does not help.",
+      "expect": "none",
+      "evidence": [
+        "connection refused",
+        "postgres-0",
+        "FailedMount",
+        "5432"
+      ],
+      "transcript": "$ kubectl get pods -n paperboat -o wide\nNAME                                READY   STATUS             RESTARTS       AGE\npaperboat-api-6d9f7c5b8-x2k4q       0/1     Running            0              9d\npaperboat-web-5b8c6d7f9-h7j3w       1/1     Running            0              9d\npaperboat-worker-84c5d6b7f-q9t5z    0/1     Running            0              9d\npostgres-0                          0/1     ContainerCreating  0              6m\n$ kubectl get deployments -n paperboat\nNAME               READY   UP-TO-DATE   AVAILABLE   AGE\npaperboat-api      0/1     1            0           9d\npaperboat-web      1/1     1            1           9d\npaperboat-worker   0/1     1            0           9d\n$ kubectl get events -n paperboat --sort-by=.lastTimestamp\nLAST SEEN   TYPE      REASON      OBJECT                                  MESSAGE\n6m          Normal    Killing     pod/postgres-0                          Stopping container postgres\n5m          Warning   FailedMount pod/postgres-0                          MountVolume.SetUp failed for volume \"postgres-data\": mount failed: exit status 32\n4m          Warning   Unhealthy   pod/paperboat-api-6d9f7c5b8-x2k4q       Readiness probe failed: HTTP probe failed with statuscode: 503\n$ kubectl logs -n paperboat deployment/paperboat-api --tail=40\n{\"ts\":\"2026-03-02T08:55:01Z\",\"level\":\"error\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":500,\"error\":\"dial tcp 10.96.14.20:5432: connect: connection refused\"}\n{\"ts\":\"2026-03-02T08:55:02Z\",\"level\":\"error\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/healthz\",\"status\":503,\"error\":\"dial tcp 10.96.14.20:5432: connect: connection refused\"}\n{\"ts\":\"2026-03-02T08:55:04Z\",\"level\":\"error\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":500,\"error\":\"dial tcp 10.96.14.20:5432: connect: connection refused\"}\n{\"ts\":\"2026-03-02T08:55:07Z\",\"level\":\"error\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/healthz\",\"status\":503,\"error\":\"dial tcp 10.96.14.20:5432: connect: connection refused\"}\n"
+    },
+    {
+      "id": "image-pull-failure",
+      "alert": {
+        "failed": 20
+      },
+      "cause": "The api pod cannot pull its image (tag 1.1.2 is not in the registry: manifest unknown), so no api pod runs. A restart does not help.",
+      "expect": "none",
+      "evidence": [
+        "ImagePullBackOff",
+        "ErrImagePull",
+        "manifest unknown",
+        "pull"
+      ],
+      "transcript": "$ kubectl get pods -n paperboat -o wide\nNAME                                READY   STATUS             RESTARTS       AGE\npaperboat-api-7c4d9b6f5-m8n2p       0/1     ImagePullBackOff   0              8m\npaperboat-web-5b8c6d7f9-h7j3w       1/1     Running            0              9d\npaperboat-worker-84c5d6b7f-q9t5z    1/1     Running            0              9d\npostgres-0                          1/1     Running            0              12d\n$ kubectl get deployments -n paperboat\nNAME               READY   UP-TO-DATE   AVAILABLE   AGE\npaperboat-api      0/1     1            0           9d\npaperboat-web      1/1     1            1           9d\npaperboat-worker   1/1     1            1           9d\n$ kubectl get events -n paperboat --sort-by=.lastTimestamp\nLAST SEEN   TYPE      REASON      OBJECT                                  MESSAGE\n8m          Normal    ScalingUp   deployment/paperboat-api                Scaled up replica set paperboat-api-7c4d9b6f5 to 1\n7m          Warning   Failed      pod/paperboat-api-7c4d9b6f5-m8n2p       Failed to pull image \"registry.local:5001/paperboat:1.1.2\": manifest unknown\n7m          Warning   Failed      pod/paperboat-api-7c4d9b6f5-m8n2p       Error: ErrImagePull\n90s         Normal    BackOff     pod/paperboat-api-7c4d9b6f5-m8n2p       Back-off pulling image \"registry.local:5001/paperboat:1.1.2\"\n$ kubectl logs -n paperboat deployment/paperboat-api --tail=40\nError from server (BadRequest): container \"api\" in pod \"paperboat-api-7c4d9b6f5-m8n2p\" is waiting to start: trying and failing to pull image\n(command failed: exit status 1)\n",
+      "history": [
+        "WI-0009 Upgrade Paperboat to 1.1.2: Verifying, 8m0s ago",
+        "WI-0001 Create environment local: Done, 288h0m0s ago"
+      ]
+    },
+    {
+      "id": "healthy-system-false-alarm",
+      "alert": {},
+      "cause": "The debug session shows no fault: all pods are healthy and every request succeeds. The evidence does not show a cause; the alert may be a false alarm or the fault has cleared.",
+      "expect": "none",
+      "evidence": [
+        "\\b200\\b",
+        "Running",
+        "1/1"
+      ],
+      "transcript": "$ kubectl get pods -n paperboat -o wide\nNAME                                READY   STATUS             RESTARTS       AGE\npaperboat-api-6d9f7c5b8-x2k4q       1/1     Running            0              9d\npaperboat-web-5b8c6d7f9-h7j3w       1/1     Running            0              9d\npaperboat-worker-84c5d6b7f-q9t5z    1/1     Running            0              9d\npostgres-0                          1/1     Running            0              12d\n$ kubectl get deployments -n paperboat\nNAME               READY   UP-TO-DATE   AVAILABLE   AGE\npaperboat-api      1/1     1            1           9d\npaperboat-web      1/1     1            1           9d\npaperboat-worker   1/1     1            1           9d\n$ kubectl get events -n paperboat --sort-by=.lastTimestamp\nNo resources found in paperboat namespace.\n$ kubectl logs -n paperboat deployment/paperboat-api --tail=40\n{\"ts\":\"2026-03-02T08:55:01Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:02Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/healthz\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:03Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:05Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/rentals\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:07Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/healthz\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:08Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":200}\n"
+    },
+    {
+      "id": "oom-kills",
+      "alert": {
+        "failed": 14,
+        "version": "1.1.1"
+      },
+      "cause": "The api container runs out of memory and is OOM-killed again and again (heap near the 256 MB limit).",
+      "expect": "either:paperboat-api",
+      "evidence": [
+        "OOMKill",
+        "out of memory",
+        "limit_mb"
+      ],
+      "transcript": "$ kubectl get pods -n paperboat -o wide\nNAME                                READY   STATUS             RESTARTS       AGE\npaperboat-api-6d9f7c5b8-x2k4q       0/1     OOMKilled          14 (55s ago)   9d\npaperboat-web-5b8c6d7f9-h7j3w       1/1     Running            0              9d\npaperboat-worker-84c5d6b7f-q9t5z    1/1     Running            0              9d\npostgres-0                          1/1     Running            0              12d\n$ kubectl get deployments -n paperboat\nNAME               READY   UP-TO-DATE   AVAILABLE   AGE\npaperboat-api      0/1     1            0           9d\npaperboat-web      1/1     1            1           9d\npaperboat-worker   1/1     1            1           9d\n$ kubectl get events -n paperboat --sort-by=.lastTimestamp\nLAST SEEN   TYPE      REASON      OBJECT                                  MESSAGE\n3m          Warning   OOMKilling  node/local-control-plane                Memory cgroup out of memory: Killed process 48211 (paperboat) total-vm:412004kB\n55s         Warning   BackOff     pod/paperboat-api-6d9f7c5b8-x2k4q       Back-off restarting failed container api\n$ kubectl logs -n paperboat deployment/paperboat-api --tail=40\n{\"ts\":\"2026-03-02T08:54:01Z\",\"level\":\"info\",\"msg\":\"starting\",\"version\":\"1.1.1\"}\n{\"ts\":\"2026-03-02T08:54:20Z\",\"level\":\"info\",\"msg\":\"inventory cache warm\",\"fish\":60}\n{\"ts\":\"2026-03-02T08:54:58Z\",\"level\":\"warn\",\"msg\":\"heap in use\",\"mb\":251,\"limit_mb\":256}\n",
+      "history": [
+        "WI-0006 Patch Paperboat to 1.1.1 (base image security fix): Done, 216h0m0s ago",
+        "WI-0001 Create environment local: Done, 288h0m0s ago"
+      ]
+    },
+    {
+      "id": "shared-volume-full",
+      "alert": {},
+      "cause": "The shared volume is full (no space left on device), so writes fail. A restart does not free space.",
+      "expect": "none",
+      "evidence": [
+        "no space left on device",
+        "100% used"
+      ],
+      "transcript": "$ kubectl get pods -n paperboat -o wide\nNAME                                READY   STATUS             RESTARTS       AGE\npaperboat-api-6d9f7c5b8-x2k4q       1/1     Running            0              9d\npaperboat-web-5b8c6d7f9-h7j3w       1/1     Running            0              9d\npaperboat-worker-84c5d6b7f-q9t5z    1/1     Running            0              9d\npostgres-0                          1/1     Running            0              12d\n$ kubectl get deployments -n paperboat\nNAME               READY   UP-TO-DATE   AVAILABLE   AGE\npaperboat-api      1/1     1            1           9d\npaperboat-web      1/1     1            1           9d\npaperboat-worker   1/1     1            1           9d\n$ kubectl get events -n paperboat --sort-by=.lastTimestamp\nLAST SEEN   TYPE      REASON      OBJECT                                  MESSAGE\n12m         Warning   FreeDiskSpaceFailed node/local-control-plane                shared volume paperboat-shared is 100% used\n$ kubectl logs -n paperboat deployment/paperboat-api --tail=40\n{\"ts\":\"2026-03-02T08:55:01Z\",\"level\":\"error\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/deliveries\",\"status\":500,\"error\":\"write /data/manifests/2026-03-02.json: no space left on device\"}\n{\"ts\":\"2026-03-02T08:55:02Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/healthz\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:03Z\",\"level\":\"error\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":500,\"error\":\"write /data/manifests/2026-03-02.json: no space left on device\"}\n{\"ts\":\"2026-03-02T08:55:05Z\",\"level\":\"error\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":500,\"error\":\"write /data/manifests/2026-03-02.json: no space left on device\"}\n{\"ts\":\"2026-03-02T08:55:07Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/healthz\",\"status\":200}\n"
+    },
+    {
+      "id": "pod-unschedulable",
+      "alert": {
+        "failed": 20
+      },
+      "cause": "The api pod is Pending because no node has enough CPU (FailedScheduling: Insufficient cpu). A restart does not help.",
+      "expect": "none",
+      "evidence": [
+        "Pending",
+        "Insufficient cpu",
+        "FailedScheduling"
+      ],
+      "transcript": "$ kubectl get pods -n paperboat -o wide\nNAME                                READY   STATUS             RESTARTS       AGE\npaperboat-api-7c4d9b6f5-m8n2p       0/1     Pending            0              11m\npaperboat-web-5b8c6d7f9-h7j3w       1/1     Running            0              9d\npaperboat-worker-84c5d6b7f-q9t5z    1/1     Running            0              9d\npostgres-0                          1/1     Running            0              12d\n$ kubectl get deployments -n paperboat\nNAME               READY   UP-TO-DATE   AVAILABLE   AGE\npaperboat-api      0/1     1            0           9d\npaperboat-web      1/1     1            1           9d\npaperboat-worker   1/1     1            1           9d\n$ kubectl get events -n paperboat --sort-by=.lastTimestamp\nLAST SEEN   TYPE      REASON      OBJECT                                  MESSAGE\n11m         Warning   FailedScheduling pod/paperboat-api-7c4d9b6f5-m8n2p       0/1 nodes are available: 1 Insufficient cpu. preemption: 0/1 nodes are available\n$ kubectl logs -n paperboat deployment/paperboat-api --tail=40\nError from server (BadRequest): container \"api\" in pod \"paperboat-api-7c4d9b6f5-m8n2p\" is waiting to start: ContainerCreating\n(command failed: exit status 1)\n"
+    },
+    {
+      "id": "web-readiness-fails",
+      "alert": {},
+      "cause": "The web pod fails its readiness probe (timeout) while the api answers every request; the fault is in the web deployment, not in the api.",
+      "expect": "either:paperboat-web",
+      "evidence": [
+        "Readiness probe failed",
+        "paperboat-web-5b8c6d7f9-h7j3w",
+        "paperboat-web"
+      ],
+      "transcript": "$ kubectl get pods -n paperboat -o wide\nNAME                                READY   STATUS             RESTARTS       AGE\npaperboat-api-6d9f7c5b8-x2k4q       1/1     Running            0              9d\npaperboat-web-5b8c6d7f9-h7j3w       0/1     Running            0              9d\npaperboat-worker-84c5d6b7f-q9t5z    1/1     Running            0              9d\npostgres-0                          1/1     Running            0              12d\n$ kubectl get deployments -n paperboat\nNAME               READY   UP-TO-DATE   AVAILABLE   AGE\npaperboat-api      1/1     1            1           9d\npaperboat-web      0/1     1            0           9d\npaperboat-worker   1/1     1            1           9d\n$ kubectl get events -n paperboat --sort-by=.lastTimestamp\nLAST SEEN   TYPE      REASON      OBJECT                                  MESSAGE\n2m          Warning   Unhealthy   pod/paperboat-web-5b8c6d7f9-h7j3w       Readiness probe failed: Get \"http://10.244.0.17:8080/\": context deadline exceeded\n$ kubectl logs -n paperboat deployment/paperboat-api --tail=40\n{\"ts\":\"2026-03-02T08:55:01Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:02Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/healthz\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:04Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/inventory\",\"status\":200}\n{\"ts\":\"2026-03-02T08:55:07Z\",\"level\":\"info\",\"msg\":\"request\",\"method\":\"GET\",\"path\":\"/api/healthz\",\"status\":200}\n"
+    },
+    {
+      "id": "debug-session-failed",
+      "alert": {},
+      "cause": "The debug session could not reach the cluster, so there is no evidence of the cause. The diagnosis must say that the cause is unknown.",
+      "expect": "none",
+      "evidence": [
+        "Unable to connect",
+        "connection refused",
+        "6443"
+      ],
+      "transcript": "$ kubectl get pods -n paperboat -o wide\nUnable to connect to the server: dial tcp 127.0.0.1:6443: connect: connection refused\n(command failed: exit status 1)\n$ kubectl get deployments -n paperboat\nUnable to connect to the server: dial tcp 127.0.0.1:6443: connect: connection refused\n(command failed: exit status 1)\n$ kubectl get events -n paperboat --sort-by=.lastTimestamp\nUnable to connect to the server: dial tcp 127.0.0.1:6443: connect: connection refused\n(command failed: exit status 1)\n$ kubectl logs -n paperboat deployment/paperboat-api --tail=40\nUnable to connect to the server: dial tcp 127.0.0.1:6443: connect: connection refused\n(command failed: exit status 1)\n",
+      "history": [
+        "no change is on record"
+      ]
+    }
+  ]
+}

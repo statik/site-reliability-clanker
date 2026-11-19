@@ -89,7 +89,7 @@ case "$*" in
 esac
 `
 
-// runRepositoryRunbook runs a script of runbooks/jobs in this repository with fakeKubectl.
+// runRepositoryRunbook runs a runbook of the example pack of this repository with fakeKubectl.
 func runRepositoryRunbook(t *testing.T, name string, params map[string]string) (
 	map[string]any, string, error) {
 	t.Helper()
@@ -98,8 +98,10 @@ func runRepositoryRunbook(t *testing.T, name string, params map[string]string) (
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
-	runbooks, err := filepath.Abs(filepath.Join("..", "..", "runbooks"))
-	if err != nil {
+	// A checkout of the runbooks repository has the runbooks of the pack in its jobs.
+	runbooks := t.TempDir()
+	jobs := filepath.Join("..", "..", "apps", "paperboat", "runbooks")
+	if err := os.CopyFS(filepath.Join(runbooks, "jobs"), os.DirFS(jobs)); err != nil {
 		t.Fatal(err)
 	}
 	var log bytes.Buffer

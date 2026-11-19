@@ -64,9 +64,18 @@ type Pack struct {
 	DebugCommands [][]string `json:"debug_commands"`
 	Health        Health     `json:"health"`
 	Topology      Topology   `json:"topology"`
+	// Runbooks is the directory of the runbooks of the application, inside the pack: one
+	// definition and one script for each. The core puts them in the directory of the jobs
+	// of the runbooks repository. A pack can have none.
+	Runbooks string `json:"runbooks,omitempty"`
+	// Evals is the directory of the eval cases of the application, inside the pack: one
+	// file `<task>.json` for each task of the eval suite. A pack can have none.
+	Evals string `json:"evals,omitempty"`
 
-	// dir is the directory of the pack in the file system that Load read it from.
-	dir string
+	// dir is the directory of the pack in the file system that Load read it from, and
+	// files are the files of that directory.
+	dir   string
+	files fs.FS
 }
 
 // Releases says where the releases of the application are published.
@@ -131,10 +140,17 @@ func Load(fsys fs.FS, dir string) (Pack, error) {
 	if err := p.Validate(); err != nil {
 		return Pack{}, fmt.Errorf("%s: %w", file, err)
 	}
-	for _, name := range []string{p.Chart, p.Build, path.Join(p.Releases.Directory,
-		p.Releases.First+".md")} {
-		if _, err := fs.Stat(fsys, path.Join(dir, name)); err != nil {
+	if p.files, err = fs.Sub(fsys, dir); err != nil {
+		return Pack{}, fmt.Errorf("open the application pack in %s: %w", dir, err)
+	}
+	for _, name := range []string{p.Chart, p.Build, p.ReleaseNote(p.Releases.First)} {
+		if _, err := fs.Stat(p.files, name); err != nil {
 			return Pack{}, fmt.Errorf("%s names %s, which the pack does not have", file, name)
+		}
+	}
+	for _, part := range p.CheckParts() {
+		if part.Problem != "" {
+			return Pack{}, fmt.Errorf("%s: %s: %s", file, part.Name, part.Problem)
 		}
 	}
 	return p, nil
@@ -166,9 +182,6 @@ func Discover(fsys fs.FS, root string) (string, error) {
 
 // Dir returns the directory of the pack in the file system that Load read it from.
 func (p Pack) Dir() string { return p.dir }
-
-// SourcePath returns the path, in the file system of the pack, of a path inside the pack.
-func (p Pack) SourcePath(inside string) string { return path.Join(p.dir, inside) }
 
 // ChartMount returns the path of the chart in the platform repository.
 func (p Pack) ChartMount() string { return path.Join(p.Mount, p.Chart) }
@@ -258,7 +271,14 @@ func (p Pack) checkValues() error {
 func (p Pack) checkPaths() error {
 	paths := map[string]string{"releases.directory": p.Releases.Directory, "chart": p.Chart,
 		"mount": p.Mount, "build": p.Build}
-	for _, field := range []string{"build", "chart", "mount", "releases.directory"} {
+	fields := []string{"build", "chart", "mount", "releases.directory"}
+	if p.Runbooks != "" {
+		paths["runbooks"], fields = p.Runbooks, append(fields, "runbooks")
+	}
+	if p.Evals != "" {
+		paths["evals"], fields = p.Evals, append(fields, "evals")
+	}
+	for _, field := range fields {
 		value := paths[field]
 		if !pathPattern.MatchString(value) || path.Clean(value) != value ||
 			slices.Contains(strings.Split(value, "/"), "..") {
