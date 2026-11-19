@@ -1,5 +1,5 @@
 // Package bundle carries the files that the control plane reads from a checkout of the
-// repository (platform, runbooks, the Paperboat sources and the built dashboard), so that
+// repository (platform, runbooks, the application pack and the built dashboard), so that
 // one downloaded binary can run without a checkout.
 //
 // The archive is embedded only in a build with the tag `bundle` (see `make release`). A

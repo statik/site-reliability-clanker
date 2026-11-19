@@ -25,6 +25,8 @@ var uiFiles embed.FS
 type Config struct {
 	// DataDir is the data directory of the control plane on this machine.
 	DataDir string
+	// Application is the title of the application pack that the local target deploys.
+	Application string
 	// Version is the release of this binary, or "dev".
 	Version string
 	// DashboardURL is where the dashboard answers on this machine.

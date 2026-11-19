@@ -15,6 +15,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/broker"
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/jobspec"
+	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/planfacts"
 	"github.com/statik/site-reliability-clanker/internal/policy"
 	"github.com/statik/site-reliability-clanker/internal/store"
@@ -202,6 +203,8 @@ type Orchestrator struct {
 	Runners Executor
 	Broker  *broker.Broker
 	Clock   Clock
+	// App is the application pack of the environments.
+	App pack.Pack
 	// DataDir is the data directory of the control plane. The API hides it in job logs.
 	DataDir string
 	Envs    map[string]EnvConfig

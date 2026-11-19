@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
 
@@ -21,8 +22,10 @@ type Clock interface{ Now() time.Time }
 
 // Monitor probes environments.
 type Monitor struct {
-	DB     *sql.DB
-	Clock  Clock
+	DB    *sql.DB
+	Clock Clock
+	// App is the application pack. It names the layer, the outputs and the checks.
+	App    pack.Pack
 	client *http.Client
 }
 
@@ -33,11 +36,11 @@ func New(db *sql.DB, clock Clock) *Monitor {
 
 // AppURL returns the URL of the application in env, or "" when it is not deployed.
 func (m *Monitor) AppURL(env string) string {
-	outputs, err := store.LayerOutputs(m.DB, env, "50-app")
+	outputs, err := store.LayerOutputs(m.DB, env, m.App.Layer)
 	if err != nil {
 		return ""
 	}
-	url, _ := outputs["app_url"].(string)
+	url, _ := outputs[m.App.URLOutput].(string)
 	return url
 }
 
@@ -73,7 +76,7 @@ type Sample struct {
 	Version string  `json:"version"`
 }
 
-// Probe sends count requests to the inventory endpoint and reads the version.
+// Probe sends count requests to the probe path of the application and reads the version.
 func (m *Monitor) Probe(ctx context.Context, env string, count int) (Sample, error) {
 	base := m.AppURL(env)
 	if base == "" {
@@ -83,13 +86,13 @@ func (m *Monitor) Probe(ctx context.Context, env string, count int) (Sample, err
 	var version struct {
 		Version string `json:"version"`
 	}
-	if _, err := m.getJSON(ctx, base+"/api/version", &version); err == nil {
+	if _, err := m.getJSON(ctx, base+m.App.Health.VersionPath, &version); err == nil {
 		sample.Version = version.Version
 	}
 	durations := []float64{}
 	for range count {
 		start := time.Now()
-		status, err := m.getJSON(ctx, base+"/api/inventory", nil)
+		status, err := m.getJSON(ctx, base+m.App.Health.ProbePath, nil)
 		durations = append(durations, float64(time.Since(start).Microseconds())/1000)
 		if err == nil && status == http.StatusOK {
 			sample.OK++
@@ -158,15 +161,15 @@ func (m *Monitor) History(env, from, to string, limit int) ([]Sample, error) {
 }
 
 // Verify is the check after an apply. When the application is deployed it must answer the
-// health check, report the version that the 50-app layer declares, and serve the inventory
-// with an error rate under ten percent.
+// health check, report the version that the application layer declares, and answer the
+// probe with an error rate under ten percent.
 func (m *Monitor) Verify(ctx context.Context, wi orchestrator.WorkItem) (orchestrator.VerifyResult, error) {
-	outputs, err := store.LayerOutputs(m.DB, wi.Env, "50-app")
+	outputs, err := store.LayerOutputs(m.DB, wi.Env, m.App.Layer)
 	if err != nil {
 		return orchestrator.VerifyResult{}, err
 	}
-	base, _ := outputs["app_url"].(string)
-	want, _ := outputs["paperboat_version"].(string)
+	base, _ := outputs[m.App.URLOutput].(string)
+	want, _ := outputs[m.App.VersionVariable].(string)
 	if base == "" {
 		return orchestrator.VerifyResult{OK: true,
 			Checks: []string{"the application layer is not applied; no application check"}}, nil
@@ -174,11 +177,11 @@ func (m *Monitor) Verify(ctx context.Context, wi orchestrator.WorkItem) (orchest
 	result := orchestrator.VerifyResult{}
 	deadline := time.Now().Add(90 * time.Second)
 	for {
-		status, err := m.getJSON(ctx, base+"/api/healthz", nil)
+		status, err := m.getJSON(ctx, base+m.App.Health.ReadyPath, nil)
 		var version struct {
 			Version string `json:"version"`
 		}
-		_, versionErr := m.getJSON(ctx, base+"/api/version", &version)
+		_, versionErr := m.getJSON(ctx, base+m.App.Health.VersionPath, &version)
 		if err == nil && status == http.StatusOK && versionErr == nil && version.Version == want {
 			result.Checks = append(result.Checks, "health check answers 200",
 				"running version is "+want)
@@ -199,8 +202,8 @@ func (m *Monitor) Verify(ctx context.Context, wi orchestrator.WorkItem) (orchest
 		return orchestrator.VerifyResult{}, err
 	}
 	errorRate := 100 * float64(sample.Total-sample.OK) / float64(sample.Total)
-	check := fmt.Sprintf("canary: %d of %d inventory requests succeeded (error rate %.0f%%)",
-		sample.OK, sample.Total, errorRate)
+	check := fmt.Sprintf("canary: %d of %d %s requests succeeded (error rate %.0f%%)",
+		sample.OK, sample.Total, m.App.Health.ProbeName, errorRate)
 	result.Checks = append(result.Checks, check)
 	if errorRate >= 10 {
 		result.Reason = fmt.Sprintf("canary failed: error rate %.0f%% is over the 10%% limit "+

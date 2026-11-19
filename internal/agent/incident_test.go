@@ -10,6 +10,7 @@ import (
 
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/pack/packtest"
 	"github.com/statik/site-reliability-clanker/internal/store/storetest"
 )
 
@@ -29,7 +30,7 @@ func agentWithRunbooks(t *testing.T) *Agent {
 		".": os.DirFS("../../runbooks"), "jobs": scaleDown}, "Seed runbooks"); err != nil {
 		t.Fatal(err)
 	}
-	return &Agent{Orch: &orchestrator.Orchestrator{DB: db, Forge: f}}
+	return &Agent{App: packtest.Example(t), Orch: &orchestrator.Orchestrator{DB: db, Forge: f}}
 }
 
 func TestTheDefinitionDecidesWhichMitigationRuns(t *testing.T) {
@@ -71,9 +72,10 @@ func TestTheInvestigatorPromptOffersOnlyMitigationsThatExist(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	prompt := a.App.Render(investigatorSystem)
 	mitigations := 0
 	for _, d := range definitions {
-		named := strings.Contains(investigatorSystem, d.Name)
+		named := strings.Contains(prompt, d.Name)
 		if named != d.IncidentMitigation {
 			t.Errorf("runbook %s: named in the prompt = %v, mitigation in its definition = %v",
 				d.Name, named, d.IncidentMitigation)
@@ -83,7 +85,7 @@ func TestTheInvestigatorPromptOffersOnlyMitigationsThatExist(t *testing.T) {
 		}
 		mitigations++
 		for _, value := range d.Inputs["deployment"].Values {
-			if !strings.Contains(investigatorSystem, value) {
+			if !strings.Contains(prompt, value) {
 				t.Errorf("the prompt does not name the deployment %s of runbook %s", value, d.Name)
 			}
 		}

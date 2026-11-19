@@ -19,6 +19,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/awsparams"
 	"github.com/statik/site-reliability-clanker/internal/bundle"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/runner"
 	"github.com/statik/site-reliability-clanker/internal/setup"
 )
@@ -60,12 +61,16 @@ type options struct {
 	env      string
 	cloud    string
 	demo     bool
+	// packDir is the directory of the application pack in the source files. Empty means
+	// the one pack in the directory apps. app is the pack that was read from it.
+	packDir string
+	app     pack.Pack
 	// operator is the name of the person who ran the wizard for the local target.
 	operator  string
 	setupAddr string
 	noBrowser bool
-	// app says that the macOS app started the wizard and shows it in its own window.
-	app bool
+	// inApp says that the macOS app started the wizard and shows it in its own window.
+	inApp bool
 	// profile and region are the AWS CLI profile and the region of `clanker discover`.
 	profile string
 	region  string
@@ -78,11 +83,13 @@ func parse(command string, args []string) (options, error) {
 	flags.StringVar(&o.sourceDir, "source", "", "checkout of this repository")
 	flags.StringVar(&o.setupAddr, "setup-addr", "127.0.0.1:7069", "listen address of the wizard")
 	flags.BoolVar(&o.noBrowser, "no-browser", false, "do not open the wizard in the browser")
-	flags.BoolVar(&o.app, "app", false, "the macOS app shows the wizard: open no browser, "+
+	flags.BoolVar(&o.inApp, "app", false, "the macOS app shows the wizard: open no browser, "+
 		"and stop when the app is gone")
 	flags.StringVar(&o.addr, "addr", "127.0.0.1:7070", "listen address of the control plane")
 	flags.StringVar(&o.sinkAddr, "sink-addr", "127.0.0.1:7071", "listen address of the sink")
 	flags.StringVar(&o.env, "env", "local", "environment name")
+	flags.StringVar(&o.packDir, "pack", "", "directory of the application pack in the "+
+		"source files (default: the one pack in apps)")
 	flags.StringVar(&o.cloud, "cloud", "local", "cloud of the environment")
 	flags.BoolVar(&o.demo, "demo", true, "demo mode: simulator, local mail and webhook sink")
 	flags.StringVar(&o.profile, "profile", "", "AWS CLI profile of the account to survey")
@@ -101,7 +108,28 @@ func parse(command string, args []string) (options, error) {
 		return options{}, fmt.Errorf("the files of this repository are not at %q: run clanker "+
 			"from the repository root or set --source", o.sourceDir)
 	}
+	app, err := loadPack(o.source, o.packDir)
+	if err != nil {
+		return options{}, err
+	}
+	o.app = app
 	return o, nil
+}
+
+// packsRoot is the directory of the source files that holds the application packs.
+const packsRoot = "apps"
+
+// loadPack reads the application pack. With no directory it reads the one pack in the
+// directory of the packs.
+func loadPack(source fs.FS, dir string) (pack.Pack, error) {
+	if dir == "" {
+		found, err := pack.Discover(source, packsRoot)
+		if err != nil {
+			return pack.Pack{}, err
+		}
+		dir = found
+	}
+	return pack.Load(source, dir)
 }
 
 // locateCore fills in the source files of the core on a cloud. That core has no disk to

@@ -7,12 +7,15 @@ import pytest
 
 from clanker_evals import author_tools, checks, gotext, inputs, solvers
 from clanker_evals.repo import (
-    PAPERBOAT_REPO,
+    PACK,
     PLATFORM_REPO,
     PROMPTS_DIR,
+    RELEASES_REPO,
     ROOT,
     RUNBOOKS_REPO,
+    one_of,
     prompt,
+    render,
 )
 from clanker_evals.tasks import reviewer
 
@@ -60,6 +63,11 @@ def test_tool_definitions_match_go() -> None:
         assert f'tool("{tool.name}", "{tool.description}"' in source
         for name, param in tool.parameters.properties.items():
             assert f'"{name}":' in source
+            if name == "repo":
+                # Go builds this description from the same format and the same three names.
+                assert f'const readableRepos = "{author_tools.READABLE_REPOS_FORMAT}"' in source
+                assert param.description == f"{PLATFORM_REPO}, {RELEASES_REPO} or {RUNBOOKS_REPO}"
+                continue
             assert f'stringProp("{param.description}")' in source
         required = ", ".join(f'"{name}"' for name in tool.parameters.required)
         assert f"}}, {required})" in source
@@ -91,7 +99,10 @@ def test_layers_and_repos_match_go() -> None:
     assert re.findall(r'"([^"]+)"', layers.group(1)) == author_tools.LAYERS
     assert f'const PlatformRepo = "{PLATFORM_REPO}"' in types
     assert f'const RunbooksRepo = "{RUNBOOKS_REPO}"' in types
-    assert f'const PaperboatRepo = "{PAPERBOAT_REPO}"' in go_source("internal/detect/detect.go")
+    # The repository of the releases is a name of the application pack, in Go and here.
+    assert "d.Forge.Tree(app.Releases.Repository," in go_source("internal/detect/detect.go")
+    assert "a.App.Releases.Repository," in go_source("internal/agent/author.go")
+    assert PACK["releases"]["repository"] == RELEASES_REPO
 
 
 def test_mitigations_match_the_runbook_definitions() -> None:
@@ -150,9 +161,31 @@ def test_builders_frame_like_go() -> None:
 
 
 def test_prompts_are_read_from_the_go_tree() -> None:
+    measured = ROOT / "internal" / "agent" / "testdata" / "prompts"
     for name in ["author", "explainer", "investigator", "ask", "reviewer"]:
-        assert prompt(name) == (PROMPTS_DIR / f"{name}.txt").read_text(encoding="utf-8")
+        template = (PROMPTS_DIR / f"{name}.txt").read_text(encoding="utf-8")
+        assert prompt(name) == render(template)
+        # The Go test TestThePromptsOfTheExamplePackAreTheMeasuredText holds the Go rendering
+        # to the same files, so the two renderings are the same text.
+        assert prompt(name) == (measured / f"{name}.txt").read_text(encoding="utf-8")
+        assert "{{" not in prompt(name)
         assert f"prompts/{name}.txt" in go_source("internal/agent/prompts.go")
+
+
+def test_the_placeholders_of_a_prompt_match_go() -> None:
+    source = go_source("internal/pack/prompt.go")
+    for placeholder, field in {
+        "{{releases_repository}}": "p.Releases.Repository",
+        "{{releases_directory}}": "p.Releases.Directory",
+        "{{deployments}}": "oneOf(p.Deployments)",
+    }.items():
+        assert f'"{placeholder}", {field},' in source
+    assert 'strings.Join(names[:last], ", ") + " or " + names[last]' in source
+    assert one_of(["a"]) == "a"
+    assert one_of(["a", "b", "c"]) == "a, b or c"
+    assert render("{{releases_repository}} {{releases_directory}} {{deployments}}") == (
+        f"{RELEASES_REPO} {PACK['releases']['directory']} {one_of(PACK['deployments'])}"
+    )
 
 
 def json_fields(path: str, struct: str) -> list[str]:

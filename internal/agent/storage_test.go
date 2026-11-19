@@ -11,6 +11,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/detect"
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/pack/packtest"
 	"github.com/statik/site-reliability-clanker/internal/store/storetest"
 )
 
@@ -35,8 +36,9 @@ func agentWithDataLayer(t *testing.T) *Agent {
 		"Seed platform"); err != nil {
 		t.Fatal(err)
 	}
-	return &Agent{DB: db, Forge: f, Clock: wallClock{}, Orch: &orchestrator.Orchestrator{
-		DB: db, Forge: f, Envs: map[string]orchestrator.EnvConfig{"local": {Cloud: "local"}}}}
+	return &Agent{App: packtest.Example(t), DB: db, Forge: f, Clock: wallClock{},
+		Orch: &orchestrator.Orchestrator{
+			DB: db, Forge: f, Envs: map[string]orchestrator.EnvConfig{"local": {Cloud: "local"}}}}
 }
 
 func storageFinding(running, value string) detect.Finding {

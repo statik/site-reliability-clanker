@@ -13,6 +13,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/detect"
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/scrub"
 )
 
@@ -29,10 +30,15 @@ func stringProp(description string) map[string]any {
 	return map[string]any{"type": "string", "description": description}
 }
 
-func authorTools() []Tool {
+// readableRepos describes the repositories that the Author can read: the platform, the
+// releases of the application and the runbooks.
+const readableRepos = "%s, %s or %s"
+
+func authorTools(app pack.Pack) []Tool {
 	return []Tool{
 		tool("read_file", "Read a file from a repository on the main branch.",
-			map[string]any{"repo": stringProp("platform-live, paperboat or runbooks"),
+			map[string]any{"repo": stringProp(fmt.Sprintf(readableRepos,
+				orchestrator.PlatformRepo, app.Releases.Repository, orchestrator.RunbooksRepo)),
 				"path": stringProp("path inside the repository")}, "repo", "path"),
 		tool("set_tfvar", "Set one variable in the terraform.tfvars file of a layer.",
 			map[string]any{"layer": stringProp("layer, for example 50-app"),
@@ -63,7 +69,7 @@ type draft struct {
 
 func (a *Agent) toolReadFile(args map[string]string) (string, error) {
 	repo := args["repo"]
-	if !slices.Contains([]string{orchestrator.PlatformRepo, detect.PaperboatRepo,
+	if !slices.Contains([]string{orchestrator.PlatformRepo, a.App.Releases.Repository,
 		orchestrator.RunbooksRepo}, repo) {
 		return "", fmt.Errorf("repository %q is not readable by the Author role", repo)
 	}
@@ -165,13 +171,13 @@ func draftBranch(f detect.Finding) string {
 func (a *Agent) Draft(ctx context.Context, f detect.Finding) (orchestrator.WorkItem, error) {
 	d := &draft{finding: f, cloud: a.Orch.Envs[f.Env].Cloud, branch: draftBranch(f)}
 	messages := []ChatMessage{
-		{Role: "system", Content: authorSystem},
+		{Role: "system", Content: a.App.Render(authorSystem)},
 		{Role: "user", Content: frame(map[string]any{"finding": f, "cloud": d.cloud,
 			"tfvars_path": "platform/stacks/" + d.cloud + "/<layer>/terraform.tfvars"})},
 	}
 	for step := range 8 {
 		resp, err := a.complete(ctx, RoleAuthor, "", Request{ReplayKey: "author_" + f.Key,
-			Step: step, Messages: messages, Tools: authorTools()})
+			Step: step, Messages: messages, Tools: authorTools(a.App)})
 		if errors.Is(err, ErrNoRecording) && d.pull == nil {
 			return orchestrator.WorkItem{}, fmt.Errorf("replay mode has no Author recording "+
 				"for finding %s: set OPENROUTER_API_KEY or CLANKER_LLM_BASE_URL for a live "+

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/broker"
+	"github.com/statik/site-reliability-clanker/internal/pack"
 )
 
 //go:embed identities.yaml
@@ -32,6 +33,8 @@ var clusterLayers = map[string]bool{"30-data": true, "40-platform": true, "50-ap
 type Credentials struct {
 	// AdminKubeconfig returns the path of the administrator kubeconfig of an environment.
 	AdminKubeconfig func(env string) (string, error)
+	// App is the application pack. Its namespaces get the bindings of the identities.
+	App pack.Pack
 }
 
 func kubectl(ctx context.Context, kubeconfig string, stdin []byte, args ...string) (string, error) {
@@ -51,15 +54,22 @@ func kubectl(ctx context.Context, kubeconfig string, stdin []byte, args ...strin
 	return stdout.String(), nil
 }
 
+// appIdentities returns the bindings of the identities in the namespaces of the
+// application. The names are from the pack, which checked them against a pattern.
+func appIdentities(app pack.Pack) []byte {
+	return []byte(strings.NewReplacer("{{namespace}}", app.Namespace,
+		"{{data_namespace}}", app.DataNamespace).Replace(string(appIdentitiesManifest)))
+}
+
 // ensureIdentities creates the service accounts and bindings on the cluster.
-func ensureIdentities(ctx context.Context, admin, env string) error {
+func ensureIdentities(ctx context.Context, admin, env string, app pack.Pack) error {
 	if _, err := kubectl(ctx, admin, identitiesManifest, "apply", "-f", "-"); err != nil {
 		return fmt.Errorf("create broker identities on %s: %w", env, err)
 	}
-	if _, err := kubectl(ctx, admin, nil, "get", "namespace", "paperboat"); err != nil {
+	if _, err := kubectl(ctx, admin, nil, "get", "namespace", app.Namespace); err != nil {
 		return nil
 	}
-	if _, err := kubectl(ctx, admin, appIdentitiesManifest, "apply", "-f", "-"); err != nil {
+	if _, err := kubectl(ctx, admin, appIdentities(app), "apply", "-f", "-"); err != nil {
 		return fmt.Errorf("create namespace bindings on %s: %w", env, err)
 	}
 	return nil
@@ -77,7 +87,7 @@ func (c Credentials) Issue(ctx context.Context, g broker.Grant, remaining time.D
 	if err != nil {
 		return broker.Credential{}, err
 	}
-	if err := ensureIdentities(ctx, admin, g.Env); err != nil {
+	if err := ensureIdentities(ctx, admin, g.Env, c.App); err != nil {
 		return broker.Credential{}, err
 	}
 	account := "clanker-" + g.Identity
@@ -143,19 +153,20 @@ func (c Credentials) Withdraw(ctx context.Context, g broker.Grant) error {
 		identityNamespace, "--ignore-not-found"); err != nil {
 		return fmt.Errorf("revoke tokens of %s for grant %s: %w", account, g.ID, err)
 	}
-	return ensureIdentities(ctx, admin, g.Env)
+	return ensureIdentities(ctx, admin, g.Env, c.App)
 }
 
 // ManualChange returns a function that changes the cluster of an environment outside the
-// pipeline, as a person with kubectl would. The simulator uses it to cause drift.
-func ManualChange(adminKubeconfig func(env string) (string, error)) func(context.Context,
-	string) error {
+// pipeline, as a person with kubectl would. The simulator uses it to cause drift. The
+// change is in the namespace of the data services of the application.
+func ManualChange(adminKubeconfig func(env string) (string, error), namespace string) func(
+	context.Context, string) error {
 	return func(ctx context.Context, env string) error {
 		admin, err := adminKubeconfig(env)
 		if err != nil {
 			return err
 		}
-		_, err = kubectl(ctx, admin, nil, "-n", "paperboat-data", "patch", "configmap",
+		_, err = kubectl(ctx, admin, nil, "-n", namespace, "patch", "configmap",
 			"backup-policy", "--type=merge", "-p", `{"data":{"retention_days":"1"}}`)
 		return err
 	}

@@ -310,14 +310,6 @@ func (o *Orchestrator) execRunbook(ctx context.Context, wi WorkItem,
 	return runErr
 }
 
-// diagnosticCommands are the only commands of a debug session. All of them read.
-var diagnosticCommands = [][]string{
-	{"get", "pods", "-n", "paperboat", "-o", "wide"},
-	{"get", "deployments", "-n", "paperboat"},
-	{"logs", "-n", "paperboat", "deployment/paperboat-api", "--tail=30"},
-	{"get", "events", "-n", "paperboat", "--sort-by=.lastTimestamp"},
-}
-
 // maxCommandOutput is the most text that one diagnostic command adds to the transcript. The
 // newest lines are at the end of logs and events, so the end is what is kept.
 const maxCommandOutput = 2800
@@ -334,7 +326,8 @@ func lastPart(text string) string {
 }
 
 // DebugSession opens a time-boxed, read-only session with the debugger identity, runs the
-// fixed diagnostic commands and records every command and its output. It returns the
+// diagnostic commands of the application pack and records every command and its output.
+// The pack can name only commands that read, and the core adds the namespace. It returns the
 // scrubbed transcript.
 func (o *Orchestrator) DebugSession(ctx context.Context, wi WorkItem, actor, reason string) (
 	string, error) {
@@ -346,8 +339,8 @@ func (o *Orchestrator) DebugSession(ctx context.Context, wi WorkItem, actor, rea
 	}
 	o.emit(audit.Event{Type: "grant.debug_issued", Actor: "broker", Env: wi.Env,
 		WorkItem: wi.ID,
-		Summary: fmt.Sprintf("Debug grant %s for %s: read-only, namespace paperboat, until %s",
-			grant.ID, actor, grant.Expires),
+		Summary: fmt.Sprintf("Debug grant %s for %s: read-only, namespace %s, until %s",
+			grant.ID, actor, o.App.Namespace, grant.Expires),
 		Data: map[string]any{"grant": grant.ID, "identity": grant.Identity, "kind": grant.Kind,
 			"reason": reason, "expires": grant.Expires, "not_before": grant.NotBefore,
 			"tier": "T1", "approvers": grant.Approvers}})
@@ -356,6 +349,7 @@ func (o *Orchestrator) DebugSession(ctx context.Context, wi WorkItem, actor, rea
 		return "", err
 	}
 	var transcript strings.Builder
+	diagnosticCommands := o.App.DebugArgs()
 	runErr := func() error {
 		cred, err := o.Broker.Exchange(ctx, grant, broker.Presentation{})
 		if err != nil {

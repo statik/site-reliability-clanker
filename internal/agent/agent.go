@@ -13,6 +13,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/monitor"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/scrub"
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
@@ -38,6 +39,8 @@ type Agent struct {
 	Monitor *monitor.Monitor
 	Clock   Clock
 	LLM     LLM
+	// App is the application pack. Its names go into the prompts of the roles.
+	App pack.Pack
 	// Models maps a role to the name of a model on the endpoint of the LLM.
 	Models map[string]string
 	// DailyBudgetUSD stops model calls for the day when the spend reaches it.
@@ -262,7 +265,8 @@ func (a *Agent) Explain(ctx context.Context, wi orchestrator.WorkItem,
 	input := map[string]any{"title": wi.Title, "kind": wi.Kind, "env": wi.Env,
 		"layers": wi.Layers, "tier": wi.Tier, "tier_rule": wi.TierRule, "trigger": wi.Trigger,
 		"plans": plans, "deferred_layers": deferred}
-	if note, err := a.Forge.ReadFile("paperboat", "main", "releases/"+detail+".md"); err == nil {
+	note, err := a.Forge.ReadFile(a.App.Releases.Repository, "main", a.App.ReleaseNote(detail))
+	if err == nil {
 		input["release_note"] = truncate(note, 4000)
 	}
 	key := "explain_" + wi.Kind

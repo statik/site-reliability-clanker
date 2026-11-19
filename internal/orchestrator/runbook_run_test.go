@@ -15,6 +15,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/broker"
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/jobspec"
+	"github.com/statik/site-reliability-clanker/internal/pack/packtest"
 	"github.com/statik/site-reliability-clanker/internal/store/storetest"
 )
 
@@ -67,6 +68,7 @@ func runbookOrchestrator(t *testing.T, extra fs.FS) (*Orchestrator, *fakeRunners
 	}
 	runners := &fakeRunners{}
 	return &Orchestrator{DB: db, Audit: audit.New(db, clock), Forge: f, Broker: b, Clock: clock,
+		App:     packtest.Example(t),
 		Runners: runners, Envs: map[string]EnvConfig{"local": {Name: "local", Cloud: "local"}},
 	}, runners
 }

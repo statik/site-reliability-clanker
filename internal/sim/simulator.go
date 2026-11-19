@@ -16,6 +16,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/monitor"
 	"github.com/statik/site-reliability-clanker/internal/notify"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
 
@@ -33,6 +34,8 @@ type Simulator struct {
 	Notifier *notify.Notifier
 	// Source holds the files of this repository. Release notes are published from it.
 	Source fs.FS
+	// App is the application pack. The scenes publish its releases.
+	App pack.Pack
 	// AdminToken is the fault-injection token of the application.
 	AdminToken string
 	// ManualChange changes the environment outside the pipeline, as a person would. The
@@ -51,15 +54,15 @@ type Scene struct {
 	run     func(s *Simulator, ctx context.Context) error
 }
 
-func scenes() []Scene {
+func scenes(app pack.Pack) []Scene {
 	return []Scene{
 		{Name: "quiet-week", Title: "A quiet week", UseCase: "3, 13",
 			Detail: "Seven days pass. The scheduled backup runs.", run: (*Simulator).quietWeek},
-		{Name: "feature-release", Title: "Paperboat 1.1.0 is published", UseCase: "4",
+		{Name: "feature-release", Title: app.Title + " 1.1.0 is published", UseCase: "4",
 			Detail: "A feature release with a schema migration.", run: (*Simulator).featureRelease},
 		{Name: "cve", Title: "A base image CVE is announced", UseCase: "5",
 			Detail: "Advisory PB-2026-014. The fix is release 1.1.1.", run: (*Simulator).cve},
-		{Name: "bad-release", Title: "Paperboat 1.2.0 is published", UseCase: "6",
+		{Name: "bad-release", Title: app.Title + " 1.2.0 is published", UseCase: "6",
 			Detail: "A faulty release. The canary check must catch it.", run: (*Simulator).badRelease},
 		{Name: "kubernetes-eol", Title: "Kubernetes end-of-support forecast", UseCase: "7",
 			Detail: "A forecast on the timeline. The local target cannot upgrade in place.",
@@ -94,7 +97,7 @@ type State struct {
 // State returns the virtual time and the progress through the scripted month.
 func (s *Simulator) State() (State, error) {
 	state := State{Now: store.FormatTime(s.Clock.Now()),
-		OffsetSeconds: int64(s.Clock.Offset() / time.Second), Scenes: scenes()}
+		OffsetSeconds: int64(s.Clock.Offset() / time.Second), Scenes: scenes(s.App)}
 	for i := range state.Scenes {
 		done, err := store.GetKV(s.DB, sceneKey(state.Scenes[i].Name))
 		if err != nil {
@@ -117,7 +120,7 @@ func (s *Simulator) emit(eventType, summary string, data map[string]any) {
 
 // RunScene runs one scene of the scripted month.
 func (s *Simulator) RunScene(ctx context.Context, name string) error {
-	for _, scene := range scenes() {
+	for _, scene := range scenes(s.App) {
 		if scene.Name != name {
 			continue
 		}
@@ -147,14 +150,15 @@ func (s *Simulator) Advance(ctx context.Context, d time.Duration) error {
 
 // commitRelease puts the release note of a version into the repository of the application.
 func (s *Simulator) commitRelease(version string) error {
-	path := "apps/paperboat/releases/" + version + ".md"
+	path := s.App.SourcePath(s.App.ReleaseNote(version))
 	note, err := fs.ReadFile(s.Source, path)
 	if err != nil {
 		return fmt.Errorf("read release note %s: %w", path, err)
 	}
-	_, err = s.Forge.Commit(forge.CommitRequest{Repo: detect.PaperboatRepo, Branch: "main",
-		Base: "main", Author: "paperboat-release-bot", Message: "Release " + version,
-		Files: map[string]string{"releases/" + version + ".md": string(note)}})
+	_, err = s.Forge.Commit(forge.CommitRequest{Repo: s.App.Releases.Repository,
+		Branch: "main", Base: "main", Author: s.App.Name + "-release-bot",
+		Message: "Release " + version,
+		Files:   map[string]string{s.App.ReleaseNote(version): string(note)}})
 	return err
 }
 
@@ -162,7 +166,7 @@ func (s *Simulator) publishRelease(ctx context.Context, version string) error {
 	if err := s.commitRelease(version); err != nil {
 		return err
 	}
-	s.emit("sim.release_published", "Paperboat "+version+" is published",
+	s.emit("sim.release_published", s.App.Title+" "+version+" is published",
 		map[string]any{"version": version})
 	s.Detector.RunChecks(ctx, s.Env)
 	return nil
@@ -218,8 +222,9 @@ func (s *Simulator) cve(ctx context.Context) error {
 		return err
 	}
 	return s.addAdvisory(ctx, detect.Advisory{ID: "PB-2026-014", Kind: "base-image-cve",
-		Severity: "high", Layer: "50-app", Variable: "paperboat_version", Value: "1.1.1",
-		Title: "Advisory PB-2026-014: vulnerability in the base image of Paperboat 1.1.0; " +
+		Severity: "high", Layer: s.App.Layer, Variable: s.App.VersionVariable, Value: "1.1.1",
+		Title: "Advisory PB-2026-014: vulnerability in the base image of " + s.App.Title +
+			" 1.1.0; " +
 			"fixed in 1.1.1"})
 }
 
@@ -281,7 +286,8 @@ func (s *Simulator) drift(ctx context.Context) error {
 		return fmt.Errorf("simulate a manual change: %w", err)
 	}
 	s.emit("sim.manual_change", "Someone set the backup retention to 1 day with kubectl",
-		map[string]any{"resource": "configmap/backup-policy", "namespace": "paperboat-data"})
+		map[string]any{"resource": "configmap/backup-policy",
+			"namespace": s.App.DataNamespace})
 	_, err := s.Detector.CheckDrift(ctx, s.Env)
 	return err
 }
