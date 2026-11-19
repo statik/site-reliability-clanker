@@ -63,7 +63,7 @@ func TestTheDefinitionDecidesWhichMitigationRuns(t *testing.T) {
 }
 
 // TestTheInvestigatorPromptOffersOnlyMitigationsThatExist compares the fixed text of the
-// prompt with the definitions in runbooks/jobs of this repository.
+// prompt with the definitions of the example pack of this repository.
 func TestTheInvestigatorPromptOffersOnlyMitigationsThatExist(t *testing.T) {
 	a := agentWithRunbooks(t)
 	definitions, err := a.Orch.Runbooks()

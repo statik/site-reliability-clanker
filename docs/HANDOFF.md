@@ -533,7 +533,7 @@ event. The approval page shows the review and its concerns.
 Also built in that session: typed runbooks (section 5.6 of the plan). The owner decided not
 to use Swamp, because of its licence and its account dependency, and to build the same
 ideas in this repository. Each runbook has a definition file beside its script
-(`runbooks/jobs/<name>.json`) with its tier, its inputs with the values that each one
+(`jobs/<name>.json` in the runbooks repository) with its tier, its inputs with the values that each one
 permits, and its typed outputs. The control plane refuses a request that does not fit the
 definition before a work item or a grant exists, and records the outputs of each run.
 
