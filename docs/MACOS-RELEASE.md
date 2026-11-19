@@ -12,8 +12,10 @@ The app is a small window around the `clanker` program.
   `macos/App`.
 - `Contents/MacOS/clanker` is the same program as `dist/clanker-darwin-*`, for both
   processor types.
-- When the app starts, it runs `clanker setup --no-browser` and shows the wizard in its
-  window. The dashboard opens in a second window.
+- When the app starts, it runs `clanker setup --app` and shows the wizard in its window.
+  The dashboard opens in a second window.
+- When the setup is finished, a later start of the app starts the control plane and shows
+  the dashboard. The wizard does not start again.
 - The app gives the program a search path with the login shell path and the usual install
   directories (`/opt/homebrew/bin`, `/usr/local/bin`, `~/.docker/bin`). An app that Finder
   starts gets only the system directories, and then the wizard does not find `docker`.
@@ -106,6 +108,9 @@ Open the image, move the app to Applications, and open the app with a double-cli
 
 ## Limits
 
-- A forced quit of the app leaves the `clanker` program. Stop it with
-  `pkill -INT -f "clanker setup"`.
+- After a forced quit of the app, the `clanker` program sees that the app is gone and
+  stops by itself in some seconds. The next start of the app also ends a program that an
+  earlier start left.
+- To remove the local environment, quit the app and run
+  `"/Applications/Site Reliability Clanker.app/Contents/MacOS/clanker" destroy --env local`.
 - The app has no update function. A new release is a new download.

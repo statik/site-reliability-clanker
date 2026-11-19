@@ -43,6 +43,7 @@ final class Backend {
         guard let binary = Bundle.main.url(forAuxiliaryExecutable: "clanker") else {
             throw BackendError.missingBinary
         }
+        endLeftovers()
         var fds: [Int32] = [0, 0]
         guard pipe(&fds) == 0 else { throw BackendError.spawn(errno) }
         let child = try spawn(binary: binary.path, output: fds[1])
@@ -78,6 +79,41 @@ final class Backend {
         }
     }
 
+    /// Ends a program that an earlier start of the app left, for example after a forced
+    /// quit. Such a program holds the ports, and a new one cannot start beside it.
+    private func endLeftovers() {
+        let old = Backend.pids(matching: "MacOS/clanker setup --app")
+        guard !old.isEmpty else { return }
+        old.forEach { Backend.signal($0, SIGINT) }
+        let deadline = Date().addingTimeInterval(15)
+        while Date() < deadline, old.contains(where: { kill($0, 0) == 0 }) {
+            usleep(200_000)
+        }
+        old.filter { kill($0, 0) == 0 }.forEach { Backend.signal($0, SIGKILL) }
+    }
+
+    /// Sends a signal to the process group of a program, or to the program when it has
+    /// no group of its own.
+    private static func signal(_ pid: pid_t, _ number: Int32) {
+        if kill(-pid, number) != 0 {
+            kill(pid, number)
+        }
+    }
+
+    private static func pids(matching pattern: String) -> [pid_t] {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+        process.arguments = ["-f", pattern]
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return [] }
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return String(decoding: data, as: UTF8.self).split(separator: "\n")
+            .compactMap { pid_t($0) }
+    }
+
     private func spawn(binary: String, output: Int32) throws -> pid_t {
         var actions: posix_spawn_file_actions_t?
         posix_spawn_file_actions_init(&actions)
@@ -102,7 +138,7 @@ final class Backend {
 
         var environment = ProcessInfo.processInfo.environment
         environment["PATH"] = ToolPath.value()
-        let arguments = [binary, "setup", "--no-browser"]
+        let arguments = [binary, "setup", "--app"]
         var argv = arguments.map { strdup($0) } + [nil]
         var envp = environment.map { strdup("\($0.key)=\($0.value)") } + [nil]
         defer {

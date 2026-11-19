@@ -29,6 +29,9 @@ type Config struct {
 	Version string
 	// DashboardURL is where the dashboard answers on this machine.
 	DashboardURL string
+	// InApp says that the macOS app shows the wizard in its own window. The pages then
+	// say how to stop and start with the app, not with a terminal.
+	InApp bool
 	// StartLocal starts the control plane for the local target in this process. It
 	// returns at once; the wizard waits for the dashboard.
 	StartLocal func(ctx context.Context, env string) error
