@@ -1,5 +1,6 @@
 // Draws the picture behind the icons in the window of the disk image: a dark band with
-// the name, a light area for the two icons, and an arrow from the app to Applications.
+// the name, a light area for the two icons, an arrow from the app to Applications, and
+// one small line with the version and the date of the release.
 // scripts/macos/package.sh runs this file. The output is one TIFF file with the picture at
 // 1x and at 2x, so Finder shows a sharp picture on each display.
 //
@@ -83,7 +84,7 @@ func drawArrow(in context: CGContext) {
     context.strokePath()
 }
 
-func render(scale: Int) -> CGImage {
+func render(scale: Int, label: String) -> CGImage {
     guard let context = CGContext(
         data: nil, width: Int(width) * scale, height: Int(height) * scale, bitsPerComponent: 8,
         bytesPerRow: 0, space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
@@ -101,19 +102,20 @@ func render(scale: Int) -> CGImage {
         "Drag the app to Applications. Then open it there.", size: 14, weight: .medium,
         hex: Palette.seaDeep, centerY: 340, in: context
     )
+    drawText(label, size: 11, weight: .regular, hex: Palette.seaDeep, centerY: 376, in: context)
     guard let image = context.makeImage() else {
         fatalError("dmg-background: could not render at \(scale)x")
     }
     return image
 }
 
-guard CommandLine.arguments.count == 2 else {
-    FileHandle.standardError.write(Data("usage: dmg-background <out.tiff>\n".utf8))
+guard CommandLine.arguments.count == 3 else {
+    FileHandle.standardError.write(Data("usage: dmg-background <out.tiff> <label>\n".utf8))
     exit(2)
 }
 let picture = NSImage(size: NSSize(width: width, height: height))
 for scale in [1, 2] {
-    let rep = NSBitmapImageRep(cgImage: render(scale: scale))
+    let rep = NSBitmapImageRep(cgImage: render(scale: scale, label: CommandLine.arguments[2]))
     rep.size = NSSize(width: width, height: height)
     picture.addRepresentation(rep)
 }

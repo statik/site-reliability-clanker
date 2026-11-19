@@ -194,6 +194,17 @@ notarize() {
   fi
 }
 
+# The line in the picture of the disk image: the version and the date of this build.
+image_label() {
+  local today
+  today="$(date +%Y-%m-%d)"
+  if [[ "$version" =~ ^v?([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+    echo "Version ${BASH_REMATCH[1]}, released $today"
+  else
+    echo "Test build $version, $today"
+  fi
+}
+
 notarize_app() {
   local zip="$work/app.zip"
   discard "$zip"
@@ -207,7 +218,7 @@ notarize_app() {
 build_dmg() {
   local venv="$work/venv" requirements="scripts/macos/dmg/requirements.txt"
   xcrun swiftc -O -swift-version 5 macos/art/dmg-background.swift -o "$work/dmg-background"
-  "$work/dmg-background" "$work/background.tiff"
+  "$work/dmg-background" "$work/background.tiff" "$(image_label)"
   if ! cmp -s "$requirements" "$venv/.requirements"; then
     discard "$venv"
     uv venv --quiet --python 3.13 "$venv"
