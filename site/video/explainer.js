@@ -4,7 +4,7 @@
 // and numbers of data/month.json.
 
 import { clock, duration } from "../lib/html.mjs";
-import { renderMachineSvg } from "../lib/machine.mjs";
+import { renderSystemSvg } from "../lib/system.mjs";
 import { displayName, grantViews, totals } from "../lib/month.mjs";
 
 const COUNT_SECONDS = 1.2;
@@ -93,7 +93,7 @@ function fill(month) {
   const grant = need(grantViews(month).find((one) => one.work_item === written.work_item.id
     && one.kind === "apply" && one.held_seconds !== null), "ended grant");
   put("access-scope", `Layer ${grant.layer}, and no other`);
-  document.getElementById("title-figure").innerHTML = renderMachineSvg({ tier, layer: grant.layer });
+  document.getElementById("title-figure").innerHTML = renderSystemSvg({ tier, layer: grant.layer });
   put("access-issued", `${clock(grant.issued_at)} UTC`);
   put("access-revoked", `${clock(grant.ended_at)} UTC`);
   put("access-held", duration(grant.held_seconds));
