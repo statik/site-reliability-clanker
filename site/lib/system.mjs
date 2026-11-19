@@ -1,6 +1,7 @@
 // The architecture figure: the parts of S.R.C. and the path of one change through them.
 // The core of the control plane is one chassis with one module for each component. Outside
-// it stand the model provider, the database, the approver, the runner and the environment.
+// it stand the model provider, the application pack, the database, the approver, the runner
+// and the environment.
 // A lit carriage, the work item, rides the rail of the orchestrator from module to module.
 // Built once here with the Anatomy kit (lib/anatomy/iso-kit.mjs); js/machine.js moves and
 // fades the parts between the states that this module works out for each stop.
@@ -33,13 +34,15 @@ const ITEM_AT = [centre(0), centre(1), centre(2), centre(3), centre(1), centre(4
   RAIL_END, RAIL_END, centre(7)];
 // Which parts act at each stop. The names are the keys of `glow` below.
 const ACTIVE = [
-  ["m0"], ["m1", "model", "m2"], ["m2", "runner", "env"], ["m3"], ["m1", "model"],
-  ["m4", "m5", "person", "chat"], ["m6"], ["runner", "env"], ["runner", "env"], ["m7"],
+  ["m0", "pack"], ["m1", "model", "m2"], ["m2", "runner", "env"], ["m3"], ["m1", "model"],
+  ["m4", "m5", "person", "chat"], ["m6"], ["runner", "env"], ["runner", "env", "pack"], ["m7"],
 ];
 const RECORDS_PER_STOP = 2;
 
-const MODEL = { x: -114, y: -122, w: 62, d: 40, r: 4 };
+const MODEL = { x: -128, y: -122, w: 62, d: 40, r: 4 };
 const MODEL_TOP = 10;
+const PACK = { x: -58, y: -122, w: 66, d: 40, r: 4 };
+const PACK_TOP = 2;
 const DATABASE = [-178, 58];
 const DATABASE_R = 25;
 const DATABASE_TOP = 12;
@@ -54,7 +57,7 @@ const BASE_TOP = FLOOR + 4;
 function projection() {
   return k.fitProjection(
     [
-      ...k.boxCorners(CORE, FLOOR, 24), ...k.boxCorners(MODEL, FLOOR, MODEL_TOP),
+      ...k.boxCorners(CORE, FLOOR, 24), ...k.boxCorners(MODEL, FLOOR, MODEL_TOP), ...k.boxCorners(PACK, FLOOR, PACK_TOP + 6),
       ...k.boxCorners({ x: DATABASE[0] - DATABASE_R, y: DATABASE[1] - DATABASE_R, w: 2 * DATABASE_R, d: 2 * DATABASE_R },
         FLOOR, DATABASE_TOP),
       ...k.boxCorners(DESK, FLOOR, 8), ...k.boxCorners(CHAT, FLOOR, 0), ...k.boxCorners(DOCK, FLOOR, 12),
@@ -138,6 +141,14 @@ function build({ tier, raisedTo, layer, approvers }) {
     out.push(L(vents.join(""), { tone: "lo" }), D([[MODEL.x + 46, face, 0], [MODEL.x + 52, face, 0]], { size: 0.6, tone: "mid" }));
     out.push(text("Model provider", [MODEL.x + 6, MODEL.y + 24], MODEL_TOP));
     out.push(glow("model", outline(MODEL, MODEL_TOP, 3)));
+    // The application pack: a case with the files that describe one application.
+    out.push(halo(PACK), cabinet(PACK, PACK_TOP));
+    const files = [0, 1, 2, 3].map((index) => ({ x: PACK.x + 8 + index * 13, y: PACK.y + 5, w: 10, d: 13, r: 0.8 }));
+    for (const file of files) {
+      out.push(S(k.slabOf(file, PACK_TOP, 5 - (file.x % 2), P, 2, 0.3), { tone: "mid" }));
+    }
+    out.push(text("Application pack", [PACK.x + 4, PACK.y + 33], PACK_TOP, { size: 5.4 }));
+    out.push(glow("pack", outline(PACK, PACK_TOP, 3)));
     const [x, y] = DATABASE;
     const plan = { x: x - DATABASE_R, y: y - DATABASE_R, w: 2 * DATABASE_R, d: 2 * DATABASE_R, r: DATABASE_R };
     out.push(halo(plan), S(k.cylinder(x, y, DATABASE_R + 1.5, FLOOR, 3, P, 48), { tone: "lo" }));
@@ -161,14 +172,17 @@ function build({ tier, raisedTo, layer, approvers }) {
     return out.join("");
   }
 
-  // The one cable of the model provider goes to the agent runtime and to no other module.
-  function modelCable() {
-    const socket = [moduleX(1) + 18, MODULE_Y[0] + 5, MODULE_H[1] + 1.4];
-    const port = [socket[0], MODEL.y + MODEL.d, MODEL_TOP - 9];
+  // A cable through the air from a unit behind the core to a socket on one module. The model
+  // provider has one, to the agent runtime. The application pack has one, to the git forge.
+  function airCable(name, module, face, z) {
+    const socket = [moduleX(module) + 18, MODULE_Y[0] + 5, MODULE_H[module] + 1.4];
+    const port = [socket[0], face, z];
     const plug = { x: socket[0] - 2.4, y: socket[1] - 2.4, w: 4.8, d: 4.8, r: 1 };
     const wire = (tone, flow) => k.wireSvg(at(port), at(socket), { tone, flow, size: 1.5 });
-    return S(k.slabOf(plug, MODULE_H[1], 1.4, P, 3, 0.3), { tone: "mid" }) + wire("mid", false) + glow("model", wire("hi", true));
+    return S(k.slabOf(plug, MODULE_H[module], 1.4, P, 3, 0.3), { tone: "mid" }) + wire("mid", false) + glow(name, wire("hi", true));
   }
+  const modelCable = () => airCable("model", 1, MODEL.y + MODEL.d, MODEL_TOP - 9)
+    + airCable("pack", 2, PACK.y + PACK.d, PACK_TOP - 6);
 
   function modules() {
     const out = [];
@@ -312,7 +326,7 @@ function build({ tier, raisedTo, layer, approvers }) {
     label: "The parts of S.R.C. The core of the control plane is one chassis with eight modules: detector, "
       + "agent runtime, git forge, policy engine, dashboard, notifier, access broker and audit log. A work item "
       + "moves along the orchestrator from module to module. Cables join the agent runtime to the model "
-      + "provider, the core to PostgreSQL, the dashboard to the approver, the notifier to chat and email, and "
+      + "provider, the git forge to the application pack, the core to PostgreSQL, the dashboard to the approver, the notifier to chat and email, and "
       + "the core to the runner. Only the runner has a cable to the environment, which has six layers.",
     body,
   });

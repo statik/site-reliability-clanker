@@ -541,7 +541,7 @@ there for a change of tier T2 or lower.</figcaption>
     <section class="section section-alt" aria-labelledby="example-title">
       <div class="wrap split">
         <div>
-          <p class="kicker">The test application</p>
+          <p class="kicker">The example application</p>
           <h2 id="example-title">A business that rents out live fish.</h2>
           <div class="prose section-lead">
             <p>S.R.C. needs something real to look after. The month above used Paperboat: customers
@@ -557,6 +557,50 @@ there for a change of tier T2 or lower.</figcaption>
             alt="The Paperboat inventory board: fish grouped by tank, each with its status, age and condition."></a>
           <figcaption>The real Paperboat inventory board, captured from the running application.</figcaption>
         </figure>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="packs-title">
+      <div class="wrap">
+        <p class="kicker">Application packs</p>
+        <h2 id="packs-title">An application pack tells S.R.C. how to look after one application.</h2>
+        <div class="prose section-lead">
+          <p>S.R.C. has no knowledge of Paperboat in its own code. Everything that it knows about
+            an application comes from an application pack. Paperboat is the example pack, and the
+            pack for your product has the same parts.</p>
+          <p>A pack is a directory in a git repository. A version of a pack is a tag and a hash
+            of its content. An import of a pack is a change like any other: it has a pull request,
+            a risk tier, an approval and a record in the audit log.</p>
+        </div>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="The parts of an application pack">
+          <table class="data-table">
+            <thead>
+              <tr><th scope="col">Part of the pack</th><th scope="col">What S.R.C. does with it</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Manifest</th>
+                <td>Reads the name of the application, its services, and the variable that sets
+                  its version</td></tr>
+              <tr><th scope="row">Release source</th>
+                <td>Finds a new release and its release note, and opens the work for the
+                  upgrade</td></tr>
+              <tr><th scope="row">Deployment code</th>
+                <td>Plans and applies the application layer, with a grant for that layer only</td></tr>
+              <tr><th scope="row">Checks</th>
+                <td>Verifies each change, and rolls the change back when a check fails</td></tr>
+              <tr><th scope="row">Runbooks</th>
+                <td>Runs only these jobs, each with typed inputs and a risk tier from policy</td></tr>
+              <tr><th scope="row">Debug commands</th>
+                <td>Lets the Investigator read these things during an incident, and nothing
+                  else</td></tr>
+              <tr><th scope="row">Eval cases</th>
+                <td>Measures each model role on this application before an environment trusts
+                  the pack</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="figure-caption">A pack is data and scripts. It cannot give a model a new tool,
+          lower a risk tier or skip an approval: those rules stay in the code of S.R.C.</p>
       </div>
     </section>
 

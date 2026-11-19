@@ -82,6 +82,7 @@ pause: 1.6
 hold: 1.4
 
 - [demo] We ran it on a demo app with a realistic architecture, to model the workflows.
+- [pack] Your own app comes in as a pack: | its releases, checks, runbooks and evals, in git.
 - [held] In {days} days, it held access for {held} in total.
 - [audit] Every step is in an audit log.
 
