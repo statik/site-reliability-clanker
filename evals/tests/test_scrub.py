@@ -137,6 +137,8 @@ def test_fixed_gaps_stay_fixed(form: str) -> None:
 def test_fixed_forms_inside_json_and_text() -> None:
     line = '{"line":"ADMIN_TOKEN=abc123456"} PGPASSWORD=abc123456 {"password": "abc123456"}'
     assert "abc123456" not in scrub(line)
+    nested = go_json({"logs": '{"msg":"x","password":"abc123456"}\n{"ts":"1"}'})
+    assert scrub(nested) == go_json({"logs": '{"msg":"x","password":"[REDACTED]"}\n{"ts":"1"}'})
     assert scrub("Authorization: Bearer abcdefgh12345") == "Authorization: Bearer [REDACTED]"
     assert scrub("see https://example.com/webhookb2/abc/def now") == "see [REDACTED-WEBHOOK] now"
     assert scrub("postgres://app:a/b@db:5432/x") == "postgres://app:[REDACTED]@db:5432/x"

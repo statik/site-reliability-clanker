@@ -17,7 +17,7 @@ GO_SCRUB_RULES: list[tuple[str, str]] = [
     (r"""(?i)https?://[^\s"']*(webhook|hooks)[^\s"']*""", "[REDACTED-WEBHOOK]"),
     (
         r"""(?i)([a-z0-9_.-]*(?:password|passwd|_pass|pwd|secret|token|api[_-]?key|_key)"""
-        r"""[a-z0-9_.-]*"?\s*[=:]\s*"?)[^\s",}]+""",
+        r"""[a-z0-9_.-]*(?:\\*")?\s*[=:]\s*(?:\\*")?)(?:\\[^"\s]|[^\s",}\\])+""",
         "$1[REDACTED]",
     ),
     (
