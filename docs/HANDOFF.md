@@ -65,7 +65,6 @@ video and the local demo. No pull request is open.
 - A secret with no known value and no shape (a bare value in a table, a sentence with no
   word that names a secret, an argument with no flag) still reaches the model. The evals
   keep these forms to measure what a model does with them.
-- The release `v0.1.0` does not have #97 to #100.
 
 **Ran on 2026-11-18:**
 
@@ -112,9 +111,20 @@ UEFI firmware, the address and the first line of the probe, with no error line. 
 instance, the image, the snapshot and the security group are removed. The real core did not
 run there, and no database was part of the test.
 
-A release exists: `v0.1.0` has the `clanker` binary for four platforms (`make release`), and
-the front page of the site gives the download (#95). The wizard from the downloaded binary
-did not run through to a created local environment.
+The release `v0.2.0` has a macOS app in a disk image (`SRC.dmg`, #103) and the `clanker`
+binary for four platforms. The front page of the site gives the image as the download
+(#104). `docs/MACOS-RELEASE.md` has the build: `make dmg` signs through the cloud-managed
+Developer ID certificate of Xcode, and notarizes and staples the app and the image.
+
+- Ran: a fresh download of the published image passed the notarization check with the
+  quarantine mark set, and Gatekeeper accepts the app inside. From the app with a test
+  signature: the wizard to a created local environment, the first deployment to Done, Quit,
+  and a second start that shows the dashboard. The steps of the wizard were driven through
+  its HTTP API.
+- Not run: a click through the wizard in the window of the app, the Intel half, and the
+  scripted month from the app.
+- The site has a presentation mode (#104): the key P turns it on, and the four pages run
+  as one deck. `site/README.md` has the keys. It ran in Chromium only.
 
 Facts for the installer:
 
