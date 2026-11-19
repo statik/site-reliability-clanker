@@ -76,6 +76,15 @@ video and the local demo. No pull request is open.
   the Investigator, 1 of 21 as Ask. Nine of the ten were a secret with no shape. One was the
   JSON form with backslashes, which the scrubber reads now. The evals did not run again
   after that fix.
+- The same eval on 2026-11-19 with Qwen3.8 as the Reviewer, the Investigator and Ask, 54
+  runs. With the prompts of #101: 7 leaks (Reviewer 4 of 15, Investigator 3 of 18, Ask 0 of
+  21), each a secret with no shape. With prompts that say how to speak about a secret and
+  that a value with no keyword can be one: 1 leak (Reviewer 1 of 15). The hosted models with
+  the new prompts: 0 leaks in 54 runs. The quality tasks with the new prompts: Qwen3.8 passed
+  22 of 24 as the Reviewer (it missed 2 of 13 hidden risks, 1 before), 12 of 12 as the
+  Investigator and 13 of 14 as Ask; the hosted models passed 24 of 24, 12 of 12 and 13 of
+  14. The two Ask misses are answers of more than six sentences. The logs are not in the
+  repository.
 
 - `fresh-run.sh` on `main` after all the merges, with the hosted models: 13 work items
   reached their end state, the audit chain verifies with 317 events, 0 error lines.
