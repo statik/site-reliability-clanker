@@ -367,8 +367,8 @@ own format:
 1. **The model works when a runbook is written and reviewed, not each time it runs.** At run
    time the control plane selects a reviewed runbook by name and fills in checked values. No
    model writes a command.
-2. **Each runbook has a typed definition.** `runbooks/jobs/<name>.json` is beside the script
-   `<name>.sh`. It holds a description, the tier that the runbook needs, the inputs with the
+2. **Each runbook has a typed definition.** `jobs/<name>.json` in the runbooks repository is
+   beside the script `<name>.sh`. The files come from the application pack (section 5.7). It holds a description, the tier that the runbook needs, the inputs with the
    list of values that each one permits, and the typed outputs. `runbooks/README.md` has the
    format.
 3. **The control plane checks a request before anything exists.** A request for a runbook
