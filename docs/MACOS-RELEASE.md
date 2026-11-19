@@ -112,6 +112,8 @@ Open the image, move the app to Applications, and open the app with a double-cli
 - After a forced quit of the app, the `clanker` program sees that the app is gone and
   stops by itself in some seconds. The next start of the app also ends a program that an
   earlier start left.
-- To remove the local environment, quit the app and run
-  `"/Applications/Site Reliability Clanker.app/Contents/MacOS/clanker" destroy --env local`.
+- To remove the local environment and start again, choose **Reset Demo Environment** in
+  the S.R.C. menu. The app asks for a confirmation, runs `clanker reset` and shows the
+  wizard from its first step. The reset removes the local cluster, the database of the
+  control plane and the saved setup with the key of the model.
 - The app has no update function. A new release is a new download.

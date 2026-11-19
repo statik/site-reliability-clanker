@@ -51,6 +51,9 @@ final class Backend {
         lock.lock()
         pid = child
         running = true
+        // A start after a reset must find the address of the new wizard, not the old one.
+        announced = false
+        tail = ""
         lock.unlock()
         let reader = FileHandle(fileDescriptor: fds[0], closeOnDealloc: true)
         Thread.detachNewThread { [weak self] in self?.pump(reader, child: child) }
@@ -76,6 +79,43 @@ final class Backend {
                 kill(-group, SIGKILL)
             }
             DispatchQueue.main.async(execute: done)
+        }
+    }
+
+    /// Runs `clanker reset`, which removes the local environment, the database of the
+    /// control plane and the saved setup. Call it when the program does not run. `done`
+    /// gets the exit status and the last part of the output, on the main queue.
+    func reset(then done: @escaping (Int32, String) -> Void) {
+        guard let binary = Bundle.main.url(forAuxiliaryExecutable: "clanker") else {
+            done(-1, BackendError.missingBinary.localizedDescription)
+            return
+        }
+        let process = Process()
+        process.executableURL = binary
+        process.arguments = ["reset"]
+        var environment = ProcessInfo.processInfo.environment
+        environment["PATH"] = ToolPath.value()
+        process.environment = environment
+        process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+        let output = Pipe()
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = output
+        process.standardError = output
+        let log = self.log
+        DispatchQueue.global().async {
+            var status: Int32 = -1
+            var text = ""
+            do {
+                try process.run()
+                let data = output.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                log?.write(data)
+                status = process.terminationStatus
+                text = String(String(decoding: data, as: UTF8.self).suffix(4000))
+            } catch {
+                text = error.localizedDescription
+            }
+            DispatchQueue.main.async { done(status, text) }
         }
     }
 
