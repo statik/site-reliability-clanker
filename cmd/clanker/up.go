@@ -173,22 +173,35 @@ func subtrees(source fs.FS, paths ...string) ([]fs.FS, error) {
 // not exist yet. The chart of the application pack goes into the platform repository at
 // the path that the stacks read it from.
 func seedForge(f *forge.Forge, source fs.FS, app pack.Pack) error {
-	trees, err := subtrees(source, "platform", app.SourcePath(app.Chart), "runbooks")
+	trees, err := subtrees(source, "platform", "runbooks")
 	if err != nil {
 		return err
 	}
-	platform, chart, runbooks := trees[0], trees[1], trees[2]
+	platform, runbooks := trees[0], map[string]fs.FS{".": trees[1]}
+	chart, err := app.ChartFiles()
+	if err != nil {
+		return fmt.Errorf("open the chart of the application pack: %w", err)
+	}
+	// The runbooks of the application come from the pack. They can go only into the
+	// directory of the jobs, so a pack cannot bring a policy or a notification route.
+	jobs, err := app.RunbookFiles()
+	if err != nil {
+		return fmt.Errorf("open the runbooks of the application pack: %w", err)
+	}
+	if jobs != nil {
+		runbooks[orchestrator.RunbookJobsDir] = jobs
+	}
 	if err := f.Seed(orchestrator.PlatformRepo, map[string]fs.FS{
 		"platform": platform, app.ChartMount(): chart,
 	}, "Seed platform code and the "+app.Title+" chart"); err != nil {
 		return err
 	}
-	if err := f.Seed(orchestrator.RunbooksRepo, map[string]fs.FS{".": runbooks},
+	if err := f.Seed(orchestrator.RunbooksRepo, runbooks,
 		"Seed runbooks, policies and notification routes"); err != nil {
 		return err
 	}
 	first := app.Releases.First
-	note, err := fs.ReadFile(source, app.SourcePath(app.ReleaseNote(first)))
+	note, err := app.ReadReleaseNote(first)
 	if err != nil {
 		return fmt.Errorf("read the %s release note: %w", first, err)
 	}
@@ -383,7 +396,7 @@ func build(ctx context.Context, o options) (*components, error) {
 		Monitor: c.monitor, Clock: c.clock, OnFinding: c.agent.HandleFinding, App: o.app}
 	c.sim = &sim.Simulator{DB: c.db, Clock: c.clock, Audit: c.log, Forge: c.forge,
 		Detector: c.detector, Orch: c.orch, Monitor: c.monitor, Notifier: c.notifier,
-		Source: o.source, AdminToken: demoAdminToken, ManualChange: on.manualChange,
+		AdminToken: demoAdminToken, ManualChange: on.manualChange,
 		Env: o.env, App: o.app}
 	c.orch.Hooks = orchestrator.Hooks{Explain: c.agent.Explain, Review: c.agent.Review,
 		Verify: c.monitor.Verify,
@@ -423,7 +436,7 @@ func publishImages(ctx context.Context, c *components, o options) error {
 		return fmt.Errorf("create image build log: %w", err)
 	}
 	defer logFile.Close()
-	build := filepath.Join(o.sourceDir, filepath.FromSlash(o.app.SourcePath(o.app.Build)))
+	build := filepath.Join(o.packDisk, filepath.FromSlash(o.app.Build))
 	cmd := exec.CommandContext(ctx, build, registry)
 	cmd.Stdout, cmd.Stderr = logFile, logFile
 	if err := cmd.Run(); err != nil {
@@ -550,6 +563,9 @@ func up(ctx context.Context, o options) error {
 		}
 	}()
 	if err := reconcile(ctx, c); err != nil {
+		return err
+	}
+	if err := recordPack(c.db, c.log, o); err != nil {
 		return err
 	}
 	server := &api.Server{App: o.app, Orch: c.orch, Audit: c.log, Forge: c.forge,

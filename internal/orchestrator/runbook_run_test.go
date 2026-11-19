@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -55,9 +54,9 @@ func runbookOrchestrator(t *testing.T, extra fs.FS) (*Orchestrator, *fakeRunners
 		t.Fatal(err)
 	}
 	f := forge.New(db)
-	sources := map[string]fs.FS{".": os.DirFS("../../runbooks")}
+	sources := packtest.Runbooks(t)
 	if extra != nil {
-		sources["jobs"] = extra
+		sources = packtest.Runbooks(t, extra)
 	}
 	if err := f.Seed(RunbooksRepo, sources, "Seed runbooks"); err != nil {
 		t.Fatal(err)

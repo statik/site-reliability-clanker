@@ -21,8 +21,8 @@ func TestTheExamplePackAndTheSecondPackLoad(t *testing.T) {
 	if got := second.ChartMount(); got != "apps/harbor/chart" {
 		t.Errorf("ChartMount() = %q", got)
 	}
-	if got := second.SourcePath(second.ReleaseNote("3.5.0")); got != "harbor/notes/3.5.0.md" {
-		t.Errorf("the path of a release note is %q", got)
+	if note, err := second.ReadReleaseNote("3.5.0"); err != nil || len(note) == 0 {
+		t.Errorf("the note of release 3.5.0: %d bytes, %v", len(note), err)
 	}
 	if got := second.ReleaseOf("3.5.0.md"); got != "3.5.0" {
 		t.Errorf("ReleaseOf = %q", got)
@@ -78,6 +78,10 @@ func packFiles(raw []byte) fstest.MapFS {
 		"p/chart/Chart.yaml": {Data: []byte("name: x\n")},
 		"p/build.sh":         {Data: []byte("#!/bin/sh\n")},
 		"p/notes/3.4.0.md":   {Data: []byte("# 3.4.0\n")},
+		"p/jobs/restart-deployment.json": {Data: []byte(`{"description": "Restart one ` +
+			`deployment.", "tier": "T1", "incident_mitigation": true, "inputs": {"deployment": ` +
+			`{"type": "string", "description": "The deployment.", "values": ["harbor-ui"]}}}`)},
+		"p/jobs/restart-deployment.sh": {Data: []byte("#!/bin/sh\n"), Mode: 0o755},
 	}
 }
 

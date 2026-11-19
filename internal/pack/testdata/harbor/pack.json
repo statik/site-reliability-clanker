@@ -15,6 +15,7 @@
   "chart": "chart",
   "mount": "apps/harbor",
   "build": "build.sh",
+  "runbooks": "jobs",
   "namespace": "harbor",
   "data_namespace": "harbor-store",
   "deployments": ["harbor-gateway", "harbor-ui", "harbor-jobs"],

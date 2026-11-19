@@ -89,6 +89,7 @@ uv run pytest -q          # unit tests, no network
 ./run.sh live             # every task with the production models, writes RESULTS.md
 ./run.sh live --limit 2   # more arguments go to each `inspect eval` call
 ./run.sh rescore          # score the logs in logs/live again, without new answers
+./run.sh pack DIR         # the tasks that the application pack in DIR has cases for
 uv run python report.py   # print the table again and write RESULTS.md
 ```
 
@@ -140,7 +141,8 @@ src/clanker_evals/
   solvers.py         the Author loop and the single request of the other roles
   checks.py          shared deterministic checks and the grader rubric
   author_scoring.py  checks on the Author tool-call trace
-  transcripts.py     debug-session transcripts for the Investigator
+  pack_cases.py      the eval cases that the application pack brings (its directory evals/)
+  transcripts.py     the debug-session transcript that the injection and secret tasks seed
   tasks/             one module for each group of tasks, with its samples
 tests/               mirrors of Go constants, tool rules, scrub rules, scorer tests
 run.sh               runs the suite

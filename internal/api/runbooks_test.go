@@ -2,16 +2,15 @@ package api
 
 import (
 	"encoding/json"
-	"io/fs"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/pack/packtest"
 	"github.com/statik/site-reliability-clanker/internal/store"
 	"github.com/statik/site-reliability-clanker/internal/store/storetest"
 )
@@ -22,8 +21,7 @@ func withRunbooks(t *testing.T) (http.Handler, *orchestrator.Orchestrator) {
 	t.Helper()
 	db := storetest.Open(t)
 	f := forge.New(db)
-	if err := f.Seed(orchestrator.RunbooksRepo, map[string]fs.FS{
-		".": os.DirFS("../../runbooks")}, "Seed runbooks"); err != nil {
+	if err := f.Seed(orchestrator.RunbooksRepo, packtest.Runbooks(t), "Seed runbooks"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`INSERT INTO users (name, display, role, email) VALUES
