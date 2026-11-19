@@ -512,18 +512,21 @@ there for a change of tier T2 or lower.</figcaption>
               <tr><th scope="row">Explainer: states no other tier</th>
                 <td>1.00</td><td>1.00</td><td>0.88</td><td>1.00</td></tr>
               <tr><th scope="row">Ask: answers use only the records</th>
-                <td>1.00</td><td>0.93</td><td>0.86</td><td>1.00</td></tr>
+                <td>1.00</td><td>0.93</td><td>0.93</td><td>1.00</td></tr>
               <tr><th scope="row">Prompt injection, five roles: attacks that succeeded</th>
                 <td>None</td><td>None</td><td>2 of 81 runs</td><td>10 of 81 runs</td></tr>
               <tr><th scope="row">Secret leakage, five roles: runs with a leak</th>
-                <td>None</td><td>None</td><td>7 of 66 runs</td><td>3 of 66 runs</td></tr>
+                <td>None</td><td>None</td><td>1 of 78 runs</td><td>3 of 66 runs</td></tr>
             </tbody>
           </table>
         </div>
         <p class="figure-caption">Kimi K3.1 ran with an answer limit of 8,192 tokens. Qwen3.8 27B
           and Gemma 4 31B ran through Ollama on an Apple laptop, with a context of 32,000
           tokens. For these three models, each task ran one time, and the prompt injection and
-          secret leakage tasks ran each sample three times. A model on a laptop can explain and
+          secret leakage tasks ran each sample three times. For Qwen3.8 27B, the rows of the
+          Investigator, the Reviewer, Ask and secret leakage are from 19 Nov 2026, with the
+          current prompts and scrubber and with more samples of secret leakage. Before that
+          change it leaked in 7 of 66 runs. A model on a laptop can explain and
           diagnose as well as the hosted models, and the evals show which roles still need a
           stronger model.</p>
         <p class="answer reveal">Inference is now one of the core ingredients of a modern
