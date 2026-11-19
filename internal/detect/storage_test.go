@@ -8,6 +8,7 @@ import (
 
 	"github.com/statik/site-reliability-clanker/internal/audit"
 	"github.com/statik/site-reliability-clanker/internal/monitor"
+	"github.com/statik/site-reliability-clanker/internal/pack/packtest"
 	"github.com/statik/site-reliability-clanker/internal/store"
 	"github.com/statik/site-reliability-clanker/internal/store/storetest"
 )
@@ -135,7 +136,7 @@ func newStorageFixture(t *testing.T, samples []monitor.VolumeSample) storageFixt
 	clock := fixedClock{store.ParseTime(samples[len(samples)-1].TS)}
 	fixture := storageFixture{raised: make(chan Finding, 4)}
 	fixture.detector = &Detector{DB: db, Audit: audit.New(db, clock),
-		Monitor: monitor.New(db, clock), Clock: clock,
+		Monitor: monitor.New(db, clock), Clock: clock, App: packtest.Example(t),
 		OnFinding: func(_ context.Context, f Finding) { fixture.raised <- f }}
 	fixture.record(t, samples)
 	return fixture

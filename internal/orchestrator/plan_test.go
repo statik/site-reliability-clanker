@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/pack"
+	"github.com/statik/site-reliability-clanker/internal/pack/packtest"
 )
 
 func TestLayersForPaths(t *testing.T) {
@@ -29,7 +31,7 @@ func TestLayersForPaths(t *testing.T) {
 		{"no paths", "local", nil, []string{}},
 	}
 	for _, tc := range cases {
-		got := orchestrator.LayersForPaths(tc.cloud, tc.paths)
+		got := orchestrator.LayersForPaths(tc.cloud, packtest.Example(t), tc.paths)
 		if !slices.Equal(got, tc.want) {
 			t.Errorf("%s: want %q, got %q", tc.name, tc.want, got)
 		}
@@ -47,5 +49,27 @@ func TestTemplateExplanationUsesOnlyPlanFacts(t *testing.T) {
 	want := "Upgrade: 0 resources to add, 1 to change, 0 to destroy or replace in 50-app."
 	if explanation.Sentence != want {
 		t.Errorf("want %q, got %q", want, explanation.Sentence)
+	}
+}
+
+func TestAChartOfAnotherPackTouchesItsLayer(t *testing.T) {
+	second := packtest.Second(t)
+	got := orchestrator.LayersForPaths("local", second, []string{"apps/harbor/chart/values.yaml"})
+	if len(got) != 1 || got[0] != second.Layer {
+		t.Errorf("layers = %v, want the layer of the pack", got)
+	}
+	example := packtest.Example(t)
+	other := orchestrator.LayersForPaths("local", second,
+		[]string{example.ChartMount() + "/values.yaml"})
+	if len(other) != 0 {
+		t.Errorf("the chart of another application touched %v", other)
+	}
+}
+
+func TestAPackCannotPublishIntoARepositoryOfTheCore(t *testing.T) {
+	for _, repo := range []string{orchestrator.PlatformRepo, orchestrator.RunbooksRepo} {
+		if !pack.ReservedRepository(repo) {
+			t.Errorf("a pack can name the repository %s of the core", repo)
+		}
 	}
 }

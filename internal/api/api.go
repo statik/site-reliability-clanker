@@ -21,11 +21,14 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/monitor"
 	"github.com/statik/site-reliability-clanker/internal/notify"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/sim"
 )
 
 // Server holds the components that the handlers call.
 type Server struct {
+	// App is the application pack of the environments.
+	App      pack.Pack
 	Orch     *orchestrator.Orchestrator
 	Audit    *audit.Log
 	Forge    *forge.Forge

@@ -17,11 +17,9 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/monitor"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
-
-// PaperboatRepo is the forge repository with the application releases.
-const PaperboatRepo = "paperboat"
 
 // AdvisoriesKey is the kv key of the advisory feed.
 const AdvisoriesKey = "feed.advisories"
@@ -64,6 +62,8 @@ type Detector struct {
 	Forge   *forge.Forge
 	Monitor *monitor.Monitor
 	Clock   Clock
+	// App is the application pack of the environments.
+	App pack.Pack
 	// OnFinding receives each new finding. The agent takes it from there.
 	OnFinding func(ctx context.Context, f Finding)
 }
@@ -155,20 +155,21 @@ func (d *Detector) runningVersion(env, layer, output string) string {
 	return v
 }
 
-// CheckReleases opens a finding when the paperboat repository has a release newer than the
-// one that runs.
+// CheckReleases opens a finding when the releases repository of the application has a
+// release newer than the one that runs.
 func (d *Detector) CheckReleases(ctx context.Context, env string) error {
-	running := d.runningVersion(env, "50-app", "paperboat_version")
-	if running == "" || !d.Forge.Exists(PaperboatRepo) {
+	app := d.App
+	running := d.runningVersion(env, app.Layer, app.VersionVariable)
+	if running == "" || !d.Forge.Exists(app.Releases.Repository) {
 		return nil
 	}
-	entries, err := d.Forge.Tree(PaperboatRepo, "main", "releases")
+	entries, err := d.Forge.Tree(app.Releases.Repository, "main", app.Releases.Directory)
 	if err != nil {
 		return err
 	}
 	versions := []string{}
 	for _, e := range entries {
-		v := strings.TrimSuffix(e.Name, ".md")
+		v := app.ReleaseOf(e.Name)
 		if Newer(v, running) {
 			versions = append(versions, v)
 		}
@@ -178,16 +179,16 @@ func (d *Detector) CheckReleases(ctx context.Context, env string) error {
 	}
 	sort.Slice(versions, func(i, j int) bool { return Newer(versions[j], versions[i]) })
 	target := versions[len(versions)-1]
-	covered, err := d.hasFindingFor(env, "paperboat_version", target)
+	covered, err := d.hasFindingFor(env, app.VersionVariable, target)
 	if err != nil || covered {
 		return err
 	}
 	return d.open(ctx, Finding{Detector: "release", Env: env,
 		Key:   fmt.Sprintf("release:%s:%s", env, target),
-		Title: fmt.Sprintf("Paperboat %s is published; %s runs %s", target, env, running),
-		Detail: map[string]any{"kind": "app-upgrade", "layer": "50-app",
-			"variable": "paperboat_version", "value": target, "running": running,
-			"release_note": "releases/" + target + ".md"}})
+		Title: fmt.Sprintf("%s %s is published; %s runs %s", app.Title, target, env, running),
+		Detail: map[string]any{"kind": "app-upgrade", "layer": app.Layer,
+			"variable": app.VersionVariable, "value": target, "running": running,
+			"release_note": app.ReleaseNote(target)}})
 }
 
 // hasFindingFor reports whether a finding of env already asks for this variable and value.
@@ -326,8 +327,8 @@ func (d *Detector) CheckHealth(ctx context.Context, env string) error {
 		// One incident for each environment and hour, so an incident that waits for a human
 		// does not open again on every check.
 		Key: fmt.Sprintf("incident:%s:%s", env, last.TS[:13]),
-		Title: fmt.Sprintf("Paperboat in %s fails %d of %d inventory requests", env,
-			last.Total-last.OK, last.Total),
+		Title: fmt.Sprintf("%s in %s fails %d of %d %s requests", d.App.Title, env,
+			last.Total-last.OK, last.Total, d.App.Health.ProbeName),
 		Detail: map[string]any{"kind": "incident", "ok": last.OK, "total": last.Total,
 			"p95_ms": last.P95MS, "version": last.Version}})
 }

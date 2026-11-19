@@ -9,6 +9,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/detect"
 	"github.com/statik/site-reliability-clanker/internal/monitor"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/pack/packtest"
 	"github.com/statik/site-reliability-clanker/internal/store"
 	"github.com/statik/site-reliability-clanker/internal/store/storetest"
 )
@@ -22,8 +23,11 @@ func TestStorageForecastIsOnTheFutureList(t *testing.T) {
 	now := time.Date(2026, 11, 8, 0, 0, 0, 0, time.UTC)
 	clock := fixedClock{now}
 	m := monitor.New(db, clock)
-	detector := &detect.Detector{DB: db, Audit: audit.New(db, clock), Monitor: m, Clock: clock}
-	server := &Server{Detector: detector, Orch: &orchestrator.Orchestrator{DB: db,
+	app := packtest.Example(t)
+	m.App = app
+	detector := &detect.Detector{App: app, DB: db, Audit: audit.New(db, clock), Monitor: m,
+		Clock: clock}
+	server := &Server{App: app, Detector: detector, Orch: &orchestrator.Orchestrator{DB: db,
 		Envs: map[string]orchestrator.EnvConfig{"local": {Cloud: "local"}}}}
 
 	entries, err := server.storageForecasts(store.FormatTime(now))

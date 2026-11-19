@@ -15,15 +15,18 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/broker"
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/jobspec"
+	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/planfacts"
 	"github.com/statik/site-reliability-clanker/internal/policy"
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
 
 // LayersForPaths returns the layers of cloud that the changed paths touch, in apply order.
-// A change to a shared module or to the chart touches the layer that uses it.
-func LayersForPaths(cloud string, paths []string) []string {
+// A change to a shared module or to the chart of the application pack touches the layer
+// that uses it.
+func LayersForPaths(cloud string, app pack.Pack, paths []string) []string {
 	touched := map[string]bool{}
+	chart, appLayer := app.ChartMount(), app.Layer
 	stackPrefix := "platform/stacks/" + cloud + "/"
 	for _, path := range paths {
 		switch {
@@ -33,8 +36,8 @@ func LayersForPaths(cloud string, paths []string) []string {
 		case strings.HasPrefix(path, "platform/modules/shared/platform/"):
 			touched["40-platform"] = true
 		case strings.HasPrefix(path, "platform/modules/shared/app/"),
-			strings.HasPrefix(path, "apps/paperboat/chart/"):
-			touched["50-app"] = true
+			strings.HasPrefix(path, chart+"/"):
+			touched[appLayer] = true
 		}
 	}
 	layers := []string{}
@@ -60,7 +63,7 @@ func (o *Orchestrator) AttachPull(id string, prID int64, actor string) (WorkItem
 	if err != nil {
 		return WorkItem{}, err
 	}
-	wi.Layers = LayersForPaths(o.Envs[wi.Env].Cloud, paths)
+	wi.Layers = LayersForPaths(o.Envs[wi.Env].Cloud, o.App, paths)
 	if len(wi.Layers) == 0 {
 		return WorkItem{}, fmt.Errorf("attach pull request %d to %s: the diff touches no layer "+
 			"of environment %s", prID, id, wi.Env)

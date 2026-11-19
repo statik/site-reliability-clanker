@@ -10,14 +10,17 @@ import (
 	"unicode/utf8"
 )
 
-var localCreates = []Change{
-	{"Add", "PostgreSQL for the control plane, in Docker", "container"},
-	{"Add", "A Kubernetes cluster in Docker", "kind"},
-	{"Add", "An image registry in Docker", "registry"},
-	{"Add", "PostgreSQL in the cluster", "CloudNativePG"},
-	{"Add", "A shared file system in the cluster", "NFS provisioner"},
-	{"Add", "A gateway on localhost:8088", "Envoy Gateway"},
-	{"Add", "The Paperboat example application", "Helm release"},
+// localCreates lists what the local target adds to this machine.
+func (s *Server) localCreates() []Change {
+	return []Change{
+		{"Add", "PostgreSQL for the control plane, in Docker", "container"},
+		{"Add", "A Kubernetes cluster in Docker", "kind"},
+		{"Add", "An image registry in Docker", "registry"},
+		{"Add", "PostgreSQL in the cluster", "CloudNativePG"},
+		{"Add", "A shared file system in the cluster", "NFS provisioner"},
+		{"Add", "A gateway on localhost:8088", "Envoy Gateway"},
+		{"Add", "The " + s.cfg.Application + " example application", "Helm release"},
+	}
 }
 
 func (s *Server) getState(r *http.Request) (any, error) {
@@ -194,7 +197,7 @@ func (s *Server) postReview(r *http.Request) (any, error) {
 	defer s.mu.Unlock()
 	switch s.state.Target {
 	case TargetLocal:
-		s.review = localCreates
+		s.review = s.localCreates()
 	case TargetAWS:
 		if s.state.Account == "" {
 			return nil, invalid("sign in to AWS before the review")

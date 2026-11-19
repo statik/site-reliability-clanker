@@ -31,7 +31,7 @@ func (a *Agent) diagnose(ctx context.Context, wi orchestrator.WorkItem, f detect
 	resp, err := a.complete(ctx, RoleInvestigator, wi.ID, Request{
 		ReplayKey: "investigate_incident",
 		Messages: []ChatMessage{
-			{Role: "system", Content: investigatorSystem},
+			{Role: "system", Content: a.App.Render(investigatorSystem)},
 			{Role: "user", Content: frame(map[string]any{"alert": f,
 				"change_history": strings.Split(history, "\n"),
 				"debug_session":  truncate(transcript, 14000)})},
@@ -39,7 +39,7 @@ func (a *Agent) diagnose(ctx context.Context, wi orchestrator.WorkItem, f detect
 	if errors.Is(err, ErrNoRecording) {
 		return diagnosis{Diagnosis: "No model diagnosis is available in replay mode.",
 			Evidence: "See the recorded debug session.", ProposedRunbook: "restart-deployment",
-			Deployment: "paperboat-api"}, "template", nil
+			Deployment: a.App.IncidentDeployment}, "template", nil
 	}
 	if err != nil {
 		return diagnosis{}, "", err
@@ -109,8 +109,8 @@ func (a *Agent) recovered(ctx context.Context, env string) (bool, string) {
 			if recErr := a.Monitor.Record(sample); recErr != nil {
 				return false, recErr.Error()
 			}
-			return true, fmt.Sprintf("%d of %d inventory requests succeed", sample.OK,
-				sample.Total)
+			return true, fmt.Sprintf("%d of %d %s requests succeed", sample.OK,
+				sample.Total, a.App.Health.ProbeName)
 		}
 		if time.Now().After(deadline) {
 			return false, "the error rate did not return to zero in 90 s"
@@ -206,11 +206,13 @@ func (a *Agent) resolve(ctx context.Context, wi orchestrator.WorkItem, f detect.
 	}
 	minutes := int(a.Clock.Now().Sub(end.opened).Minutes()) + 1
 	explanation := orchestrator.Explanation{
-		Sentence:     end.diagnosis.Diagnosis,
-		Why:          end.diagnosis.WriteUp,
-		Downtime:     fmt.Sprintf("About %d minutes of failed inventory requests", minutes),
-		UserEffect:   f.Title,
-		PreChecks:    []string{"Debug session recorded: read-only, namespace paperboat"},
+		Sentence: end.diagnosis.Diagnosis,
+		Why:      end.diagnosis.WriteUp,
+		Downtime: fmt.Sprintf("About %d minutes of failed %s requests", minutes,
+			a.App.Health.ProbeName),
+		UserEffect: f.Title,
+		PreChecks: []string{"Debug session recorded: read-only, namespace " +
+			a.App.Namespace},
 		Rollback:     "The restart is reversible; no configuration changed",
 		Verification: check,
 		Backup:       "Not needed; no data changed",

@@ -12,11 +12,13 @@ from typing import Any
 from inspect_ai.tool import ToolInfo, ToolParam, ToolParams
 
 from clanker_evals.gotext import scrub, truncate
-from clanker_evals.repo import PAPERBOAT_REPO, PLATFORM_REPO, RUNBOOKS_REPO, Repos
+from clanker_evals.repo import PLATFORM_REPO, RELEASES_REPO, RUNBOOKS_REPO, Repos
 
 # Mirrors of constants in the Go code. tests/test_mirrors.py compares them with the source.
 LAYERS = ["00-bootstrap", "10-network", "20-cluster", "30-data", "40-platform", "50-app"]
-READABLE_REPOS = [PLATFORM_REPO, PAPERBOAT_REPO, RUNBOOKS_REPO]
+READABLE_REPOS = [PLATFORM_REPO, RELEASES_REPO, RUNBOOKS_REPO]
+# The description of the repositories that the Author can read. Go has the same format.
+READABLE_REPOS_FORMAT = "%s, %s or %s"
 TFVAR_NAME = r"^[a-z][a-z0-9_]{1,60}$"
 TFVAR_VALUE = r"^[A-Za-z0-9._-]{1,60}$"
 SLUG_CHARS = r"[^a-z0-9]+"
@@ -45,7 +47,10 @@ def author_tools() -> list[ToolInfo]:
         _tool(
             "read_file",
             "Read a file from a repository on the main branch.",
-            {"repo": "platform-live, paperboat or runbooks", "path": "path inside the repository"},
+            {
+                "repo": READABLE_REPOS_FORMAT % tuple(READABLE_REPOS),
+                "path": "path inside the repository",
+            },
         ),
         _tool(
             "set_tfvar",
