@@ -11,6 +11,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/monitor"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/pack/packtest"
 	"github.com/statik/site-reliability-clanker/internal/store"
 	"github.com/statik/site-reliability-clanker/internal/store/storetest"
 )
@@ -33,10 +34,12 @@ func simulatorWithDataLayer(t *testing.T, raised chan detect.Finding) *Simulator
 	}
 	log := audit.New(db, clock)
 	m := monitor.New(db, clock)
-	return &Simulator{DB: db, Clock: clock, Audit: log, Forge: f, Monitor: m, Env: "local",
-		Orch: &orchestrator.Orchestrator{DB: db, Forge: f,
+	app := packtest.Example(t)
+	m.App = app
+	return &Simulator{App: app, DB: db, Clock: clock, Audit: log, Forge: f, Monitor: m, Env: "local",
+		Orch: &orchestrator.Orchestrator{DB: db, Forge: f, App: app,
 			Envs: map[string]orchestrator.EnvConfig{"local": {Cloud: "local"}}},
-		Detector: &detect.Detector{DB: db, Audit: log, Forge: f, Monitor: m, Clock: clock,
+		Detector: &detect.Detector{App: app, DB: db, Audit: log, Forge: f, Monitor: m, Clock: clock,
 			OnFinding: func(_ context.Context, f detect.Finding) { raised <- f }}}
 }
 

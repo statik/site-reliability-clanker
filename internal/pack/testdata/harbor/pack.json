@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "name": "harbor",
+  "title": "Harbor",
+  "version": "0.1.0",
+  "description": "A second application, for the tests: a small web application with an API, a worker, a database and shared files.",
+  "layer": "50-app",
+  "version_variable": "harbor_release",
+  "url_output": "harbor_url",
+  "releases": {
+    "repository": "harbor",
+    "directory": "notes",
+    "first": "3.4.0"
+  },
+  "chart": "chart",
+  "mount": "apps/harbor",
+  "build": "build.sh",
+  "namespace": "harbor",
+  "data_namespace": "harbor-store",
+  "deployments": ["harbor-gateway", "harbor-ui", "harbor-jobs"],
+  "incident_deployment": "harbor-gateway",
+  "debug_commands": [
+    ["get", "pods", "-o", "wide"],
+    ["get", "deployments"],
+    ["logs", "deployment/harbor-gateway", "--tail=30"],
+    ["get", "events", "--sort-by=.lastTimestamp"]
+  ],
+  "health": {
+    "ready_path": "/api/healthz",
+    "version_path": "/api/version",
+    "probe_path": "/v2/berths",
+    "probe_name": "berth"
+  },
+  "topology": {
+    "services": ["web", "api", "worker", "loadgen"],
+    "edges": [
+      ["lb", "web"], ["web", "api"], ["loadgen", "web"],
+      ["api", "postgres"], ["worker", "postgres"],
+      ["api", "sharedfs"], ["worker", "sharedfs"],
+      ["api", "secrets"], ["worker", "secrets"]
+    ]
+  }
+}

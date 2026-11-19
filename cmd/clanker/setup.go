@@ -26,11 +26,12 @@ func runSetup(ctx context.Context, o options) error {
 		return fmt.Errorf("--setup-addr must be a loopback address such as 127.0.0.1:7069: "+
 			"the wizard acts with your cloud sign-in, so it does not listen on %s", host)
 	}
-	if o.app {
+	if o.inApp {
 		ctx = stopWithParent(ctx)
 	}
 	wizard, err := setup.New(ctx, setup.Config{
-		DataDir: o.dataDir, Version: version, DashboardURL: "http://" + o.addr, InApp: o.app,
+		DataDir: o.dataDir, Version: version, DashboardURL: "http://" + o.addr,
+		InApp: o.inApp, Application: o.app.Title,
 		StartLocal: func(ctx context.Context, env, operator string) error {
 			local := o
 			local.env, local.cloud, local.demo = env, "local", true
@@ -58,7 +59,7 @@ func runSetup(ctx context.Context, o options) error {
 	address := fmt.Sprintf("http://%s/?token=%s", o.setupAddr, wizard.Token())
 	fmt.Printf("The setup wizard runs. Open this address in your browser:\n\n  %s\n\n"+
 		"Press Ctrl+C to stop.\n", address)
-	if !o.noBrowser && !o.app {
+	if !o.noBrowser && !o.inApp {
 		openBrowser(address)
 	}
 	server := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}

@@ -1,14 +1,14 @@
 # Namespace-scoped rights. The broker applies this file when the application namespace exists.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
-metadata: {name: clanker-applier-50-app, namespace: paperboat}
+metadata: {name: clanker-applier-50-app, namespace: {{namespace}}}
 roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: admin}
 subjects:
   - {kind: ServiceAccount, name: clanker-applier-50-app, namespace: clanker-system}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
-metadata: {name: clanker-runbook, namespace: paperboat}
+metadata: {name: clanker-runbook, namespace: {{namespace}}}
 rules:
   - apiGroups: ["apps"]
     resources: ["deployments"]
@@ -19,14 +19,14 @@ rules:
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
-metadata: {name: clanker-runbook, namespace: paperboat}
+metadata: {name: clanker-runbook, namespace: {{namespace}}}
 roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: clanker-runbook}
 subjects:
   - {kind: ServiceAccount, name: clanker-runbook, namespace: clanker-system}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
-metadata: {name: clanker-runbook, namespace: paperboat-data}
+metadata: {name: clanker-runbook, namespace: {{data_namespace}}}
 rules:
   - apiGroups: [""]
     resources: ["pods", "configmaps"]
@@ -37,14 +37,14 @@ rules:
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
-metadata: {name: clanker-runbook, namespace: paperboat-data}
+metadata: {name: clanker-runbook, namespace: {{data_namespace}}}
 roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: clanker-runbook}
 subjects:
   - {kind: ServiceAccount, name: clanker-runbook, namespace: clanker-system}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
-metadata: {name: clanker-debugger, namespace: paperboat}
+metadata: {name: clanker-debugger, namespace: {{namespace}}}
 roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: view}
 subjects:
   - {kind: ServiceAccount, name: clanker-debugger, namespace: clanker-system}

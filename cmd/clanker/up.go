@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
 	// MapFS is a complete file system in memory. The standard library has no other one.
 	"testing/fstest"
 	"time"
@@ -29,6 +30,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/monitor"
 	"github.com/statik/site-reliability-clanker/internal/notify"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/policy"
 	"github.com/statik/site-reliability-clanker/internal/runbook"
 	"github.com/statik/site-reliability-clanker/internal/runner"
@@ -168,31 +170,33 @@ func subtrees(source fs.FS, paths ...string) ([]fs.FS, error) {
 }
 
 // seedForge makes the three repositories of the forge from the source files, when they do
-// not exist yet.
-func seedForge(f *forge.Forge, source fs.FS) error {
-	trees, err := subtrees(source, "platform", "apps/paperboat/chart", "runbooks")
+// not exist yet. The chart of the application pack goes into the platform repository at
+// the path that the stacks read it from.
+func seedForge(f *forge.Forge, source fs.FS, app pack.Pack) error {
+	trees, err := subtrees(source, "platform", app.SourcePath(app.Chart), "runbooks")
 	if err != nil {
 		return err
 	}
 	platform, chart, runbooks := trees[0], trees[1], trees[2]
 	if err := f.Seed(orchestrator.PlatformRepo, map[string]fs.FS{
-		"platform": platform, "apps/paperboat/chart": chart,
-	}, "Seed platform code and the Paperboat chart"); err != nil {
+		"platform": platform, app.ChartMount(): chart,
+	}, "Seed platform code and the "+app.Title+" chart"); err != nil {
 		return err
 	}
 	if err := f.Seed(orchestrator.RunbooksRepo, map[string]fs.FS{".": runbooks},
 		"Seed runbooks, policies and notification routes"); err != nil {
 		return err
 	}
-	note, err := fs.ReadFile(source, "apps/paperboat/releases/1.0.0.md")
+	first := app.Releases.First
+	note, err := fs.ReadFile(source, app.SourcePath(app.ReleaseNote(first)))
 	if err != nil {
-		return fmt.Errorf("read the 1.0.0 release note: %w", err)
+		return fmt.Errorf("read the %s release note: %w", first, err)
 	}
 	// The repository of the application starts with the first release only. The simulator
 	// publishes the later ones.
-	firstRelease := fstest.MapFS{"1.0.0.md": {Data: note, Mode: 0o644}}
-	return f.Seed(detect.PaperboatRepo, map[string]fs.FS{"releases": firstRelease,
-		"chart": chart}, "Release 1.0.0")
+	firstRelease := fstest.MapFS{first + ".md": {Data: note, Mode: 0o644}}
+	return f.Seed(app.Releases.Repository, map[string]fs.FS{
+		app.Releases.Directory: firstRelease, app.Chart: chart}, "Release "+first)
 }
 
 // adapters returns the channels of the notifier. It also builds the chat apps, which are
@@ -287,8 +291,9 @@ func localTarget(c *components, o options) (target, error) {
 		}
 		return path, nil
 	}
-	return target{issuer: localtarget.Credentials{AdminKubeconfig: adminKubeconfig},
-		manualChange: localtarget.ManualChange(adminKubeconfig)}, nil
+	return target{issuer: localtarget.Credentials{AdminKubeconfig: adminKubeconfig,
+		App: o.app},
+		manualChange: localtarget.ManualChange(adminKubeconfig, o.app.DataNamespace)}, nil
 }
 
 func build(ctx context.Context, o options) (*components, error) {
@@ -337,19 +342,21 @@ func build(ctx context.Context, o options) (*components, error) {
 	}
 	c.orch = &orchestrator.Orchestrator{DB: c.db, Audit: c.log, Forge: c.forge,
 		Runners: c.dispatcher, Broker: c.broker, Clock: c.clock, DataDir: o.dataDir,
-		Envs: map[string]orchestrator.EnvConfig{o.env: {Name: o.env, Cloud: o.cloud}}}
+		Envs: map[string]orchestrator.EnvConfig{o.env: {Name: o.env, Cloud: o.cloud}},
+		App:  o.app}
 	if o.demo {
 		c.orch.JobVariables = map[string]string{"TF_VAR_admin_token": demoAdminToken}
 		scrub.Add(demoAdminToken)
 	}
 	c.monitor = monitor.New(c.db, c.clock)
+	c.monitor.App = o.app
 	// The demo users have no way to sign in. They exist only for the user switcher.
 	if o.demo {
 		if err := seedUsers(c.db, localUsers(o.operator)); err != nil {
 			return nil, err
 		}
 	}
-	if err := seedForge(c.forge, o.source); err != nil {
+	if err := seedForge(c.forge, o.source, o.app); err != nil {
 		return nil, err
 	}
 	channelAdapters, err := adapters(c, o)
@@ -371,13 +378,13 @@ func build(ctx context.Context, o options) (*components, error) {
 	}
 	c.agent = &agent.Agent{DB: c.db, Audit: c.log, Orch: c.orch, Forge: c.forge,
 		Monitor: c.monitor, Clock: c.clock, LLM: llm, Models: models,
-		DailyBudgetUSD: 5, DailyBudgetTokens: agent.DefaultDailyTokens}
+		DailyBudgetUSD: 5, DailyBudgetTokens: agent.DefaultDailyTokens, App: o.app}
 	c.detector = &detect.Detector{DB: c.db, Audit: c.log, Orch: c.orch, Forge: c.forge,
-		Monitor: c.monitor, Clock: c.clock, OnFinding: c.agent.HandleFinding}
+		Monitor: c.monitor, Clock: c.clock, OnFinding: c.agent.HandleFinding, App: o.app}
 	c.sim = &sim.Simulator{DB: c.db, Clock: c.clock, Audit: c.log, Forge: c.forge,
 		Detector: c.detector, Orch: c.orch, Monitor: c.monitor, Notifier: c.notifier,
 		Source: o.source, AdminToken: demoAdminToken, ManualChange: on.manualChange,
-		Env: o.env}
+		Env: o.env, App: o.app}
 	c.orch.Hooks = orchestrator.Hooks{Explain: c.agent.Explain, Review: c.agent.Review,
 		Verify: c.monitor.Verify,
 		LayerApplied: func(ctx context.Context, wi orchestrator.WorkItem, layer string) error {
@@ -394,7 +401,8 @@ func build(ctx context.Context, o options) (*components, error) {
 	return c, nil
 }
 
-// publishImages builds the Paperboat releases and pushes them to the registry of the local
+// publishImages builds the releases of the application and pushes them to the registry of
+// the local
 // target. It stands in for the release pipeline of the application, which the prototype
 // does not have. It runs when the registry exists, before the application layer needs it.
 func publishImages(ctx context.Context, c *components, o options) error {
@@ -415,16 +423,17 @@ func publishImages(ctx context.Context, c *components, o options) error {
 		return fmt.Errorf("create image build log: %w", err)
 	}
 	defer logFile.Close()
-	cmd := exec.CommandContext(ctx, filepath.Join(o.sourceDir, "apps", "paperboat", "build.sh"),
-		registry)
+	build := filepath.Join(o.sourceDir, filepath.FromSlash(o.app.SourcePath(o.app.Build)))
+	cmd := exec.CommandContext(ctx, build, registry)
 	cmd.Stdout, cmd.Stderr = logFile, logFile
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("build and push the Paperboat images to %s: %w; see %s", registry,
-			err, logPath)
+		return fmt.Errorf("build and push the %s images to %s: %w; see %s", o.app.Title,
+			registry, err, logPath)
 	}
 	_, err = c.log.Append(audit.Event{Type: "sim.images_published", Actor: "simulator",
-		Env: o.env, Summary: "Paperboat images for all releases are in the registry " + registry,
-		Data: map[string]any{"registry": registry}})
+		Env:     o.env,
+		Summary: o.app.Title + " images for all releases are in the registry " + registry,
+		Data:    map[string]any{"registry": registry}})
 	return err
 }
 
@@ -543,7 +552,8 @@ func up(ctx context.Context, o options) error {
 	if err := reconcile(ctx, c); err != nil {
 		return err
 	}
-	server := &api.Server{Orch: c.orch, Audit: c.log, Forge: c.forge, Broker: c.broker,
+	server := &api.Server{App: o.app, Orch: c.orch, Audit: c.log, Forge: c.forge,
+		Broker:  c.broker,
 		Monitor: c.monitor, Notifier: c.notifier, Agent: c.agent, Detector: c.detector,
 		Sim: c.sim, Clock: c.clock, Runners: c.dispatcher.Handler()}
 	if o.demo && o.operator != "" {

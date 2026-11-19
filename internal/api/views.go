@@ -12,6 +12,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/detect"
 	"github.com/statik/site-reliability-clanker/internal/monitor"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
 
@@ -29,13 +30,14 @@ func (s *Server) envNames() []string {
 	return names
 }
 
-// versions reads the running versions of an environment from a snapshot.
-func versions(snap monitor.Snapshot) map[string]string {
+// versions reads the running versions of an environment from a snapshot. The key of the
+// application is the name of its pack.
+func versions(snap monitor.Snapshot, app pack.Pack) map[string]string {
 	return map[string]string{
 		"kubernetes": str(snap.Layers["20-cluster"], "kubernetes_version"),
 		"node_image": str(snap.Layers["20-cluster"], "node_image_version"),
 		"postgres":   str(snap.Layers["30-data"], "postgres_version"),
-		"paperboat":  str(snap.Layers["50-app"], "paperboat_version"),
+		app.Name:     str(snap.Layers[app.Layer], app.VersionVariable),
 	}
 }
 
@@ -149,9 +151,9 @@ func (s *Server) getOverview(r *http.Request) (any, error) {
 			}
 		}
 		environments = append(environments, map[string]any{"name": name,
-			"cloud": s.Orch.Envs[name].Cloud, "layers": layers, "versions": versions(snap),
-			"health": snap.Health, "app_url": str(snap.Layers["50-app"], "app_url"),
-			"open_work_items": open, "deployed": layers["50-app"], "snapshot_ts": snap.TS})
+			"cloud": s.Orch.Envs[name].Cloud, "layers": layers, "versions": versions(snap, s.App),
+			"health": snap.Health, "app_url": str(snap.Layers[s.App.Layer], s.App.URLOutput),
+			"open_work_items": open, "deployed": layers[s.App.Layer], "snapshot_ts": snap.TS})
 	}
 	stateCounts := map[string]int{}
 	waiting := []orchestrator.WorkItem{}
@@ -334,7 +336,7 @@ type topoNode struct {
 	Badges  []string `json:"badges"`
 }
 
-func topologyNodes(snap monitor.Snapshot) []topoNode {
+func topologyNodes(snap monitor.Snapshot, app pack.Pack) []topoNode {
 	nodes := []topoNode{}
 	add := func(layer, id, kind, label, detail, version string) {
 		if _, ok := snap.Layers[layer]; !ok {
@@ -360,16 +362,15 @@ func topologyNodes(snap monitor.Snapshot) []topoNode {
 		str(l["40-platform"], "public_address"), "")
 	add("40-platform", "secrets", "secret", "Application secret",
 		str(l["40-platform"], "app_secret_name"), "")
-	app := str(l["50-app"], "paperboat_version")
-	for _, svc := range []string{"web", "api", "worker", "loadgen"} {
-		add("50-app", svc, "service", svc, "Paperboat "+svc, app)
+	running := str(l[app.Layer], app.VersionVariable)
+	for _, svc := range app.Topology.Services {
+		add(app.Layer, svc, "service", svc, app.Title+" "+svc, running)
 	}
 	return nodes
 }
 
-var topologyEdges = [][2]string{{"lb", "web"}, {"web", "api"}, {"loadgen", "web"},
-	{"api", "postgres"}, {"worker", "postgres"}, {"api", "sharedfs"}, {"worker", "sharedfs"},
-	{"api", "secrets"}, {"worker", "secrets"}, {"postgres", "backups"}, {"cluster", "network"},
+// platformEdges join the nodes of the platform. The pack has the edges of the application.
+var platformEdges = [][2]string{{"postgres", "backups"}, {"cluster", "network"},
 	{"nodes", "cluster"}, {"nodes", "registry"}}
 
 func (s *Server) getTopology(r *http.Request) (any, error) {
@@ -382,7 +383,7 @@ func (s *Server) getTopology(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	nodes := topologyNodes(snap)
+	nodes := topologyNodes(snap, s.App)
 	items, err := s.itemsAsOf(asOf)
 	if err != nil {
 		return nil, err
@@ -420,7 +421,7 @@ func (s *Server) getTopology(r *http.Request) (any, error) {
 		}
 	}
 	edges := []map[string]string{}
-	for _, e := range topologyEdges {
+	for _, e := range slices.Concat(s.App.Topology.Edges, platformEdges) {
 		if present[e[0]] && present[e[1]] {
 			edges = append(edges, map[string]string{"from": e[0], "to": e[1]})
 		}
@@ -447,8 +448,9 @@ func minorsBehind(current, latest string) int {
 }
 
 func (s *Server) latestVersions() (map[string]string, error) {
+	app := s.App
 	latest := map[string]string{"kubernetes": "1.37", "node_image": "", "postgres": "",
-		"paperboat": ""}
+		app.Name: ""}
 	advisories, err := s.Detector.Advisories()
 	if err != nil {
 		return nil, err
@@ -458,8 +460,8 @@ func (s *Server) latestVersions() (map[string]string, error) {
 			latest["postgres"] = adv.Value
 		}
 	}
-	if s.Forge.Exists(detect.PaperboatRepo) {
-		entries, err := s.Forge.Tree(detect.PaperboatRepo, "main", "releases")
+	if s.Forge.Exists(app.Releases.Repository) {
+		entries, err := s.Forge.Tree(app.Releases.Repository, "main", app.Releases.Directory)
 		if err != nil {
 			return nil, err
 		}
@@ -468,12 +470,12 @@ func (s *Server) latestVersions() (map[string]string, error) {
 			return nil, err
 		}
 		for _, e := range entries {
-			v := strings.TrimSuffix(e.Name, ".md")
+			v := app.ReleaseOf(e.Name)
 			if withdrawn[v] {
 				continue
 			}
-			if latest["paperboat"] == "" || detect.Newer(v, latest["paperboat"]) {
-				latest["paperboat"] = v
+			if latest[app.Name] == "" || detect.Newer(v, latest[app.Name]) {
+				latest[app.Name] = v
 			}
 		}
 	}
@@ -490,7 +492,7 @@ func (s *Server) rolledBackVersions() (map[string]bool, error) {
 	withdrawn := map[string]bool{}
 	for _, f := range findings {
 		version, _ := f.Detail["value"].(string)
-		if f.State == "rolled back" && f.Detail["variable"] == "paperboat_version" {
+		if f.State == "rolled back" && f.Detail["variable"] == s.App.VersionVariable {
 			withdrawn[version] = true
 		}
 	}
@@ -503,14 +505,14 @@ func (s *Server) getPosture(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	components := []string{"kubernetes", "node_image", "postgres", "paperboat"}
+	components := []string{"kubernetes", "node_image", "postgres", s.App.Name}
 	rows := []map[string]any{}
 	for _, env := range s.envNames() {
 		snap, err := s.snapshotFor(env, asOf)
 		if err != nil {
 			return nil, err
 		}
-		current := versions(snap)
+		current := versions(snap, s.App)
 		cells := map[string]any{}
 		for _, c := range components {
 			newest := latest[c]

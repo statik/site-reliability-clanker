@@ -49,6 +49,22 @@ video and the local demo. No pull request is open.
   provider, the database, the approver, the runner and the environment. The page has no
   text about parts of a drawing any more. `node check.mjs` passes; seen in a browser at
   1440 and 390 pixels. On a phone the names in the drawing are too small to read.
+- The core names no application. It reads the names of the application from an application
+  pack: a directory with the manifest `pack.json` (`internal/pack`; the fields are in
+  `apps/paperboat/PACK.md`). Paperboat is the example pack. `clanker` reads the one pack in
+  `apps`, or the one that `--pack` names. A pack is not trusted: the loader refuses an
+  unknown field and checks each value, and a debug command of a pack can only read. The
+  prompts of the Author and the Investigator have placeholders for the names; with the
+  Paperboat pack they are byte for byte the text that the evals measured.
+  - Ran on 2026-11-19: `go test ./...`, the tests and the mock run of the evals, and a start
+    of `clanker up` on other ports with recorded answers, on `main` and on this change. The
+    first work item waited for approval in both, and the three repositories of the forge
+    had the same files. No approval was given.
+  - Not run: a deployment with this change. The scripted month did not run.
+  - Not done: the stacks (`platform/stacks/*/50-app`, `platform/modules/shared/app`), the
+    runbooks, the scenes of the simulator and the recorded answers still belong to
+    Paperboat. No command validates, imports or evaluates a pack. A pack cannot change
+    after the first start, because the forge is seeded one time.
 - #87, #89 and #92: the site has a cost table (Amazon Bedrock against a GPU instance), a
   table that compares four model sets in the evals, the approval in Slack and Teams, and
   tables that fit a phone.
