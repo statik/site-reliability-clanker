@@ -134,6 +134,12 @@ UEFI firmware, the address and the first line of the probe, with no error line. 
 instance, the image, the snapshot and the security group are removed. The real core did not
 run there, and no database was part of the test.
 
+The release `v0.2.1` (2026-11-19, tag on #110) has the same files, built and signed in the
+same way. It adds #106 to #110. Checked: the image from the release page validates with
+`stapler`, and the program inside the app, on other ports, refuses a target with no name
+and the choice of recorded answers. Not run: the app itself, and a first deployment from
+it.
+
 The release `v0.2.0` has a macOS app in a disk image (`SRC.dmg`, #103) and the `clanker`
 binary for four platforms. The front page of the site gives the image as the download
 (#104). `docs/MACOS-RELEASE.md` has the build: `make dmg` signs through the cloud-managed
