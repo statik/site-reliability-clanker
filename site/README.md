@@ -47,6 +47,12 @@ demo uses them.
 
 - On the walkthrough, the right arrow or Space goes to the next step and the left arrow
   goes back. Home and End go to the first and the last step.
+- On every page, P turns the presentation mode on and off, and Escape turns it off. In
+  this mode each section is one slide. The right arrow, the down arrow, Page Down, Space or
+  N shows the next slide. The left arrow, the up arrow, Page Up or Shift+Space shows the
+  previous one. A section that is taller than the window scrolls in parts first. After the
+  last section the next page opens, so the four pages work as one deck. `?presentation` in
+  the address starts a page in this mode.
 - The text is in the HTML, so the pages work without JavaScript.
 - With "reduce motion" set in the system, nothing moves by itself.
 - The pages make no request to another host. The IBM Plex fonts are in `fonts/`.

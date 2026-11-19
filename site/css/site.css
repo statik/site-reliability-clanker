@@ -735,6 +735,8 @@ html:not(.js) .chip { border: 0; background: none; padding: 0; cursor: default; 
   font-family: var(--font-mono); font-size: 1rem; }
 .command-wide { max-width: 56rem; }
 .command code { padding: 0; background: none; }
+.download-other { margin-top: var(--s-8); color: var(--text-secondary); }
+.download-other + .command { margin-top: var(--s-4); }
 section [id] { scroll-margin-top: calc(var(--shell-height) + var(--s-6)); }
 
 /* ------------------------------------------------------------------ notice */
@@ -778,3 +780,20 @@ section [id] { scroll-margin-top: calc(var(--shell-height) + var(--s-6)); }
 .machine .m-barrier .iso-edge { stroke: var(--live); transition: stroke 300ms var(--ease); }
 .machine[data-open] .m-barrier .iso-edge { stroke: var(--sage); }
 .flow-part { color: var(--text-helper); font-weight: 400; }
+
+/* ------------------------------------------------------------------ presentation mode */
+
+/* js/present.js sets the class `present` on the root element. The space after the footer
+   lets the last short section reach the top of the window. */
+.present-hint { color: var(--text-helper); }
+@media (hover: none) { .present-hint { display: none; } }
+html.present body::after { content: ""; display: block; height: 100vh; }
+@media (min-width: 66rem) { html.present { font-size: 112.5%; } }
+html.present-idle, html.present-idle * { cursor: none !important; }
+.present-mark {
+  position: fixed; right: var(--s-5); bottom: var(--s-5); z-index: 60; margin: 0;
+  padding: var(--s-2) var(--s-4); background: var(--layer-02); color: var(--text-secondary);
+  border: 1px solid var(--border-subtle); font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+@media print { .present-mark, .present-hint { display: none; } }
