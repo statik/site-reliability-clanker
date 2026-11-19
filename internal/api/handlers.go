@@ -635,7 +635,7 @@ func (s *Server) startEnvironmentWork(r *http.Request, kind, title, trigger stri
 }
 
 func (s *Server) postBlankSlate(r *http.Request) (any, error) {
-	return s.startEnvironmentWork(r, "blank-slate",
+	return s.startEnvironmentWork(r, orchestrator.KindBlankSlate,
 		"Blank-slate deployment of "+r.PathValue("env"), "First run: no layer exists")
 }
 

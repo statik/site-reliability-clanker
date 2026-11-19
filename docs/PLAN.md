@@ -443,8 +443,9 @@ of the `runbooks` repository. Each window is weekly: days, a start time, a lengt
 minutes and an IANA time zone. A repository without the file has no windows, and an
 approved tier T3 change applies at once. With windows, an approved tier T3 change waits in
 the state `Scheduled` for the start of the next window. It applies at once when the last
-approval comes inside a window with 30 minutes or more left. The grant is issued when the
-apply starts. `runbooks/README.md` has the format and the rules.
+approval comes inside a window with 30 minutes or more left. The first deployment of
+an environment (the kind `blank-slate`) does not wait for a window. The grant is issued
+when the apply starts. `runbooks/README.md` has the format and the rules.
 
 ### 6.4 Bootstrap
 

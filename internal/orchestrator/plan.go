@@ -166,10 +166,12 @@ func MaintenanceWindows(f *forge.Forge) (policy.Windows, error) {
 	return policy.ParseWindows([]byte(source))
 }
 
-// windowsFor returns the maintenance windows that a change of the tier must wait for
-// now. Only tier T3 waits for a window. It reads the windows file at each call.
-func (o *Orchestrator) windowsFor(tier string) (policy.Windows, error) {
-	if tier != "T3" {
+// windowsFor returns the maintenance windows that the work item must wait for now.
+// Only tier T3 waits for a window. The first deployment of an environment does not
+// wait: nothing runs there yet, so no user can see an interruption. It reads the
+// windows file at each call.
+func (o *Orchestrator) windowsFor(wi WorkItem) (policy.Windows, error) {
+	if wi.Tier != "T3" || wi.Kind == KindBlankSlate {
 		return policy.Windows{}, nil
 	}
 	return MaintenanceWindows(o.Forge)

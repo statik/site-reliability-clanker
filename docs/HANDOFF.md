@@ -57,9 +57,8 @@ video and the local demo. No pull request is open.
 **Limits of the work above:**
 
 - The maintenance window ran in unit tests only. The file can be set only before the first
-  start, because the runbooks repository cannot change after it is seeded. With a window
-  set, the first deployment (tier T3) waits too. The owner must decide if the first
-  deployment is exempt.
+  start, because the runbooks repository cannot change after it is seeded. The first
+  deployment does not wait for a window (decided by the owner on 2026-11-18).
 - The local target has no live probe for the size of the volume. The scene writes the
   samples.
 - A secret with no known value and no shape (a bare value in a table, a sentence with no

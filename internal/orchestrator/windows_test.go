@@ -274,6 +274,23 @@ func TestTheShortestWindowIsUsedWhenTheSchedulerComesLate(t *testing.T) {
 	}
 }
 
+func TestTheFirstDeploymentDoesNotWaitForAWindow(t *testing.T) {
+	h := windowOrchestrator(t, saturdayWindow)
+	h.changingItem(t, "WI-0001", "T3")
+	if _, err := h.DB.Exec(`UPDATE work_items SET kind=$1 WHERE id='WI-0001'`,
+		KindBlankSlate); err != nil {
+		t.Fatal(err)
+	}
+	wi := h.approveBoth(t, "WI-0001")
+	if wi.State == StateScheduled || wi.MaintenanceWindow != "" || wi.ScheduledFor != "" {
+		t.Fatalf("want no wait for the first deployment, got %s, window %q, time %q",
+			wi.State, wi.MaintenanceWindow, wi.ScheduledFor)
+	}
+	if waits := h.events(t, "WI-0001", "apply.waits_for_window"); len(waits) != 0 {
+		t.Errorf("want no wait event, got %d", len(waits))
+	}
+}
+
 func TestTierT2DoesNotWaitForAWindow(t *testing.T) {
 	for name, windows := range map[string]string{"a window": saturdayWindow,
 		"a file that is not valid": `{"windows": "always"}`} {

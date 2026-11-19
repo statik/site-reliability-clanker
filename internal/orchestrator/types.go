@@ -21,6 +21,10 @@ import (
 )
 
 // Work item states, from section 5.1 of the plan.
+// KindBlankSlate is the kind of the work item that deploys an environment for the
+// first time.
+const KindBlankSlate = "blank-slate"
+
 const (
 	StateDetected         = "Detected"
 	StateDrafting         = "Drafting"
