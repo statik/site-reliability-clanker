@@ -6,10 +6,12 @@
 # Input:  dist/clanker-darwin-arm64 and dist/clanker-darwin-amd64
 # Output: dist/SRC.dmg, with "Site Reliability Clanker.app" for both processor types.
 #
-# With CODESIGN_IDENTITY and NOTARY_PROFILE in the environment, the script signs the app
-# and the image with that Developer ID identity, sends both to the Apple notary service
-# with that keychain profile, staples the tickets and asks Gatekeeper to accept them.
-# With neither, it signs ad hoc: the image is for a test on this machine only.
+# With SIGNING_TEAM (a team ID) and NOTARY_PROFILE (a keychain profile of notarytool) in
+# the environment, Xcode signs the app with the Developer ID certificate that Apple keeps
+# for the team, and the script sends the app and the image to the Apple notary service,
+# staples the tickets and asks Gatekeeper to accept the app.
+# With SIGNING_TEAM only, the app is signed and nothing is notarized: a test of the signing.
+# With neither, the signature is ad hoc: the image is for a test on this machine only.
 # docs/MACOS-RELEASE.md has the one-time setup.
 set -euo pipefail
 
@@ -35,7 +37,7 @@ fi
 work="build/macos"
 app="$work/$APP_NAME.app"
 dmg="dist/SRC.dmg"
-identity="${CODESIGN_IDENTITY:-}"
+team="${SIGNING_TEAM:-}"
 profile="${NOTARY_PROFILE:-}"
 
 fail() {
@@ -58,16 +60,14 @@ check_inputs() {
   for name in uv trash xcrun lipo iconutil codesign; do
     command -v "$name" >/dev/null || fail "the program '$name' is not installed."
   done
-  if [ -n "$identity" ] && [ -z "$profile" ]; then
-    fail "CODESIGN_IDENTITY is set and NOTARY_PROFILE is not. Set both, or neither."
+  if [ -z "$team" ] && [ -n "$profile" ]; then
+    fail "NOTARY_PROFILE is set and SIGNING_TEAM is not. The notary service accepts only" \
+      "an app with a Developer ID signature. Set SIGNING_TEAM too."
   fi
-  if [ -z "$identity" ] && [ -n "$profile" ]; then
-    fail "NOTARY_PROFILE is set and CODESIGN_IDENTITY is not. Set both, or neither."
+  if [ -n "$team" ] && [ ! -d "$xcode" ]; then
+    fail "Xcode is not at /Applications/Xcode.app. Xcode does the Developer ID signature."
   fi
-  if [ -n "$identity" ]; then
-    security find-identity -v -p codesigning | grep -F -q "$identity" ||
-      fail "the identity of CODESIGN_IDENTITY is not in the keychain. See" \
-        "docs/MACOS-RELEASE.md."
+  if [ -n "$profile" ]; then
     xcrun notarytool history --keychain-profile "$profile" >/dev/null 2>&1 ||
       fail "notarytool cannot use the profile of NOTARY_PROFILE. See docs/MACOS-RELEASE.md."
   fi
@@ -102,23 +102,78 @@ build_app() {
   iconutil -c icns "$work/AppIcon.iconset" -o "$app/Contents/Resources/AppIcon.icns"
 }
 
-# Signs the program inside the app first, then the app. The hardened runtime is on, as
-# the notary service requires. No entitlement is necessary.
-sign_app() {
-  local sign=(codesign --force --options runtime)
-  if [ -n "$identity" ]; then
-    sign+=(--timestamp --sign "$identity")
-  else
-    sign+=(--timestamp=none --sign -)
-  fi
+# Signs the program inside the app first, then the app, ad hoc and with the hardened
+# runtime. For a release, Xcode replaces these signatures and keeps the runtime setting.
+sign_ad_hoc() {
+  local sign=(codesign --force --options runtime --timestamp=none --sign -)
   "${sign[@]}" --identifier io.github.statik.clanker.cli "$app/Contents/MacOS/clanker"
   "${sign[@]}" "$app"
   codesign --verify --strict --verbose=2 "$app"
-  if [ -n "$identity" ]; then
-    codesign --display --verbose=2 "$app" 2>&1 | grep -q "Authority=Developer ID Application" ||
-      fail "the app is not signed with a 'Developer ID Application' certificate. The" \
-        "notary service accepts no other type. See docs/MACOS-RELEASE.md."
+}
+
+# Puts the app into an Xcode archive and lets Xcode export it with the Developer ID
+# method. Xcode asks Apple to sign with the certificate that Apple keeps for the team, so
+# no private key is on this machine. The account in Xcode must have that right.
+sign_with_xcode() {
+  local archive="$work/SRC.xcarchive" options="$work/ExportOptions.plist"
+  local export_dir="$work/export" short
+  short="$(short_version)"
+  discard "$archive"
+  discard "$export_dir"
+  mkdir -p "$archive/Products/Applications"
+  ditto "$app" "$archive/Products/Applications/$APP_NAME.app"
+  cat >"$archive/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+  <key>ApplicationProperties</key>
+  <dict>
+    <key>ApplicationPath</key><string>Applications/$APP_NAME.app</string>
+    <key>CFBundleIdentifier</key><string>io.github.statik.clanker</string>
+    <key>CFBundleShortVersionString</key><string>$short</string>
+    <key>CFBundleVersion</key><string>$short</string>
+    <key>SigningIdentity</key><string>-</string>
+    <key>Team</key><string>$team</string>
+  </dict>
+  <key>ArchiveVersion</key><integer>2</integer>
+  <key>CreationDate</key><date>$(date -u +%Y-%m-%dT%H:%M:%SZ)</date>
+  <key>Name</key><string>SRC</string>
+  <key>SchemeName</key><string>SRC</string>
+</dict>
+</plist>
+PLIST
+  cat >"$options" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+  <key>method</key><string>developer-id</string>
+  <key>signingStyle</key><string>automatic</string>
+  <key>teamID</key><string>$team</string>
+</dict>
+</plist>
+PLIST
+  if ! xcodebuild -exportArchive -archivePath "$archive" -exportPath "$export_dir" \
+    -exportOptionsPlist "$options" -allowProvisioningUpdates >"$work/export.log" 2>&1; then
+    tail -20 "$work/export.log" >&2
+    fail "Xcode did not sign the app. Sign in to Xcode with an account that can use the" \
+      "Developer ID certificate of the team. See docs/MACOS-RELEASE.md and $work/export.log."
   fi
+  discard "$app"
+  ditto "$export_dir/$APP_NAME.app" "$app"
+  check_signature "$app"
+  check_signature "$app/Contents/MacOS/clanker"
+  codesign --verify --deep --strict "$app"
+}
+
+# Fails when a signed file is not what the notary service accepts.
+check_signature() {
+  local facts want
+  facts="$(codesign --display --verbose=4 "$1" 2>&1)"
+  for want in "Authority=Developer ID Application" "TeamIdentifier=$team" "Timestamp=" \
+    "(runtime)"; do
+    grep -F -q "$want" <<<"$facts" ||
+      fail "the signature of $1 does not have '$want'."
+  done
 }
 
 # Sends a file to the notary service and waits. Prints the log of the service on a refusal.
@@ -165,28 +220,40 @@ build_dmg() {
     -D volume_icon="$app/Contents/Resources/AppIcon.icns" "$VOLUME_NAME" "$dmg"
 }
 
-# Asks Gatekeeper what a person who downloads the image gets.
+# Checks the tickets, and asks Gatekeeper about the app as a person gets it from the image.
+# The image has no signature of its own: the key of the certificate is not on this
+# machine. The ticket of the notary service is what Gatekeeper reads for the image.
 verify_release() {
+  local mount="$work/mount" copy="$work/from-image"
   xcrun stapler validate "$app"
   xcrun stapler validate "$dmg"
-  spctl --assess --type execute --verbose=2 "$app"
-  spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg"
+  discard "$copy"
+  mkdir -p "$mount" "$copy"
+  hdiutil attach -quiet -nobrowse -readonly -mountpoint "$mount" "$dmg"
+  ditto "$mount/$APP_NAME.app" "$copy/$APP_NAME.app"
+  hdiutil detach -quiet "$mount"
+  spctl --assess --type execute --verbose=2 "$copy/$APP_NAME.app"
 }
 
 check_inputs
 mkdir -p "$work"
 build_app
-sign_app
-if [ -n "$identity" ]; then
+sign_ad_hoc
+if [ -n "$team" ]; then
+  sign_with_xcode
+fi
+if [ -n "$profile" ]; then
   notarize_app
 fi
 build_dmg
-if [ -n "$identity" ]; then
-  codesign --force --timestamp --sign "$identity" "$dmg"
+if [ -n "$profile" ]; then
   notarize "$dmg"
   xcrun stapler staple "$dmg" || fail "could not staple the ticket to $dmg. Run the script again."
   verify_release
   echo "package: wrote $dmg, signed and notarized."
+elif [ -n "$team" ]; then
+  echo "package: wrote $dmg. The app has a Developer ID signature and no notarization."
+  echo "package: this image is NOT for distribution. Set NOTARY_PROFILE for a release."
 else
   echo "package: wrote $dmg with an ad hoc signature and no notarization."
   echo "package: this image is NOT for distribution. Gatekeeper refuses it on other Macs."

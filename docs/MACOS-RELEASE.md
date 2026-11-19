@@ -39,23 +39,17 @@ publish it.
 
 ### One-time setup
 
-You need a membership in the Apple Developer Program.
+You need a membership in the Apple Developer Program, and Xcode in `/Applications`.
 
-1. Create a certificate of the type **Developer ID Application**. Only the Account Holder
-   of the team can create one. In Xcode: Settings, Accounts, select the team, Manage
-   Certificates, the plus button, Developer ID Application. The certificate and its
-   private key are then in the login keychain.
-2. Find the name of the identity:
+No certificate and no private key are on the build machine. Xcode asks Apple to sign with
+the Developer ID certificate that Apple keeps for the team (a cloud-managed certificate).
 
-   ```sh
-   security find-identity -v -p codesigning
-   ```
-
-   The line starts with `Developer ID Application:` and ends with the team ID in
-   parentheses.
-3. Create an app-specific password for your Apple Account at
+1. Sign in to Xcode: Settings, Accounts, the plus button. The account must have the right
+   to use cloud-managed Developer ID certificates in the team. The Account Holder has it
+   and can give it to other members.
+2. Create an app-specific password for your Apple Account at
    <https://account.apple.com>, in Sign-In and Security.
-4. Store the sign-in for the notary service in the keychain. The command asks for the
+3. Store the sign-in for the notary service in the keychain. The command asks for the
    Apple Account, the team ID and the app-specific password. The name of the profile is
    your choice:
 
@@ -63,26 +57,34 @@ You need a membership in the Apple Developer Program.
    xcrun notarytool store-credentials src-notary
    ```
 
-The certificate and the notary sign-in must be of the same team. Do not put the identity,
-the team ID or the Apple Account in this repository.
+The team of Xcode and the team of the notary sign-in must be the same. Do not put the team
+ID or the Apple Account in this repository.
 
 ### Each release
 
 ```sh
-export CODESIGN_IDENTITY="Developer ID Application: <name> (<team ID>)"
+export SIGNING_TEAM="<team ID>"
 export NOTARY_PROFILE="src-notary"
 make dmg VERSION=v0.2.0
 ```
 
 The script `scripts/macos/package.sh` then does these steps:
 
-1. It signs `clanker` inside the app, then the app, with the hardened runtime and a
-   secure timestamp.
-2. It sends the app to the notary service, waits, and staples the ticket to the app.
-3. It builds the image with `dmgbuild` (the version and the hashes are in
+1. It builds the app and signs it ad hoc with the hardened runtime.
+2. It puts the app into an Xcode archive and lets `xcodebuild -exportArchive` sign it with
+   the Developer ID method. It checks that the app and `clanker` inside it have the
+   Developer ID authority, the team, the hardened runtime and a secure timestamp.
+3. It sends the app to the notary service, waits, and staples the ticket to the app.
+4. It builds the image with `dmgbuild` (the version and the hashes are in
    `scripts/macos/dmg/requirements.txt`).
-4. It signs the image, sends it to the notary service, and staples the ticket.
-5. It asks Gatekeeper to accept the app and the image (`spctl`, `stapler validate`).
+5. It sends the image to the notary service and staples the ticket. The image has no
+   signature of its own, because no private key is on the machine. The ticket is enough
+   for Gatekeeper.
+6. It validates the two tickets, copies the app out of the image, and asks Gatekeeper to
+   accept the copy (`spctl`).
+
+With `SIGNING_TEAM` only, the script signs and does not notarize. Use this to test the
+sign-in of Xcode. Do not publish that image.
 
 The first notarization of a team can take much longer than the later ones.
 
@@ -100,7 +102,6 @@ https://github.com/statik/site-reliability-clanker/releases/latest/download/SRC.
 Download the image with a browser, so that it has the quarantine mark. Then:
 
 ```sh
-spctl --assess --type open --context context:primary-signature --verbose=2 SRC.dmg
 xcrun stapler validate SRC.dmg
 ```
 
