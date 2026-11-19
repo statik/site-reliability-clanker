@@ -6,8 +6,8 @@
 // For every page, at a desktop and a phone width, it
 // fails on: a request to any host that is not this machine, a console error, a broken
 // image, or a page that scrolls sideways. It then checks that the text is there without
-// JavaScript, that the keys move through the walkthrough, and that reduced motion stops
-// the autoplay.
+// JavaScript, that the keys move through the walkthrough, that the presentation mode goes
+// through every section and from page to page, and that reduced motion stops the autoplay.
 
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -123,6 +123,96 @@ async function keyboard(browser, base) {
   await context.close();
 }
 
+// The state of the presentation mode: the page, the mark, and the sections whose top is
+// at the top of the window, below the bars that stay there.
+function presentState(page) {
+  return page.evaluate(() => {
+    let bars = 0;
+    for (const bar of document.querySelectorAll(".shell, .rail")) {
+      if (getComputedStyle(bar).position === "sticky") bars += bar.getBoundingClientRect().height;
+    }
+    const sections = Array.from(document.querySelectorAll("main section"))
+      .filter((section) => section.parentElement.closest("section") === null);
+    return {
+      page: window.location.pathname.split("/").pop(),
+      search: window.location.search,
+      on: document.documentElement.classList.contains("present"),
+      mark: document.querySelector(".present-mark")?.textContent ?? "",
+      top: window.scrollY,
+      sections: sections.length,
+      aligned: sections.findIndex((section) =>
+        Math.abs(section.getBoundingClientRect().top - bars) <= 3),
+    };
+  });
+}
+
+// Press the key until another page opens. Return the sections that were at the top.
+async function pressThroughPage(page, key, label) {
+  const start = await presentState(page);
+  const seen = new Set(start.aligned >= 0 ? [start.aligned] : []);
+  let before = start;
+  for (let presses = 0; presses < 150; presses += 1) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(60);
+    // The state cannot be read while another page loads.
+    const now = await presentState(page).catch(() => null);
+    if (now === null || now.page !== start.page) {
+      await page.waitForURL((url) => !url.pathname.endsWith(start.page), { waitUntil: "load" });
+      return { seen, sections: start.sections, last: before };
+    }
+    if (now.top === before.top) problems.push(`${label}: ${key} did not move at ${now.mark}`);
+    if (now.aligned >= 0) seen.add(now.aligned);
+    before = now;
+  }
+  problems.push(`${label}: ${key} did not reach another page`);
+  return { seen, sections: start.sections, last: before };
+}
+
+async function presentation(browser, base) {
+  const context = await browser.newContext({ viewport: VIEWPORTS.desktop, reducedMotion: "reduce" });
+  const page = await context.newPage();
+  watch(page, "presentation");
+  const expect = (ok, text) => { if (!ok) problems.push(`presentation: ${text}`); };
+  await page.goto(`${base}/index.html`);
+  await page.keyboard.press("ArrowRight");
+  expect((await presentState(page)).top === 0, "a key moved the page with the mode off");
+  await page.keyboard.press("p");
+  let state = await presentState(page);
+  expect(state.on && state.search === "?presentation", "P did not turn the mode on");
+  expect(state.mark.startsWith("1 / "), `the mark is "${state.mark}" at the top`);
+
+  const order = ["index.html", "walkthrough.html", "architecture.html", "screens.html"];
+  for (const name of order.slice(0, -1)) {
+    const result = await pressThroughPage(page, "ArrowRight", name);
+    expect(result.seen.size === result.sections,
+      `${name}: ${result.seen.size} of ${result.sections} sections came to the top`);
+    state = await presentState(page);
+    expect(state.page === order[order.indexOf(name) + 1], `${name}: the next page is ${state.page}`);
+    expect(state.on && state.top === 0, `${state.page} did not open at its top with the mode on`);
+  }
+
+  // Back from the top of a page: the page before it opens at its last slide.
+  await page.keyboard.press("ArrowLeft");
+  await page.waitForURL(/architecture\.html/, { waitUntil: "load" });
+  state = await presentState(page);
+  const [at, of] = state.mark.split(" / ");
+  expect(state.page === "architecture.html" && at === of && state.on,
+    `back from the last page gave ${state.page} at "${state.mark}"`);
+
+  // On the walkthrough one key press is one step: its own keys do not also move the page.
+  await page.goto(`${base}/walkthrough.html?presentation`);
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(200);
+  const step = await page.evaluate(() => document.querySelector(".step.is-active")?.dataset.step);
+  expect(step === "0", `the first key on the walkthrough gave step ${step}`);
+  await page.screenshot({ path: join(OUT, "presentation-desktop.png") });
+
+  await page.keyboard.press("Escape");
+  state = await presentState(page);
+  expect(!state.on && state.search === "" && state.mark === "", "Escape did not turn the mode off");
+  await context.close();
+}
+
 async function reducedMotion(browser, base) {
   const context = await browser.newContext({ viewport: VIEWPORTS.desktop, reducedMotion: "reduce" });
   const page = await context.newPage();
@@ -151,6 +241,7 @@ async function main() {
     await screenshots(browser, server.url);
     await withoutJavaScript(browser, server.url);
     await keyboard(browser, server.url);
+    await presentation(browser, server.url);
     await reducedMotion(browser, server.url);
   } finally {
     await browser.close();
