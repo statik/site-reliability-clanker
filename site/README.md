@@ -215,12 +215,14 @@ of the video is one of them or a mix of two. The site has one theme, a warm dark
 
 ## The figure of the system
 
-Figure 1 of the architecture page shows S.R.C. as a bench with real parts. The video does
-not show it. `lib/machine.mjs` draws it with the Anatomy kit, an isometric SVG
+Figure 1 of the architecture page shows the parts of S.R.C.: the core of the control plane
+with one module for each component, and outside it the model provider, the database, the
+approver, the runner and the environment. A work item moves through them. The video does
+not show it. `lib/system.mjs` draws it with the Anatomy kit, an isometric SVG
 kit under the MIT licence. Its core file is in `lib/anatomy/` with the licence, and its
 styles are `css/anatomy.css`; the site has no other copy and installs nothing for it.
-`lib/machine.mjs` also works out where each moving part is at each of the ten stops of a
-change, and `js/machine.js` eases between those places.
+`lib/system.mjs` also works out where each part is, and which parts act, at each of the ten
+stops of a change, and `js/machine.js` eases between those states.
 
 `img/icon.svg` is the icon: an aircraft marshaller with two wands. The video shows it
 beside the name.

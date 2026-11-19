@@ -44,6 +44,11 @@ video and the local demo. No pull request is open.
   that names a user who does not exist acts as that person. `clanker up` with no wizard
   seeds the four demo users as before. Ran on 2026-11-19: the wizard through its API on
   other ports, then the dashboard in a browser. Not run: the macOS app with this change.
+- Figure 1 of the architecture page of the site is a new drawing (`site/lib/system.mjs`): the
+  core of the control plane with one module for each component, and outside it the model
+  provider, the database, the approver, the runner and the environment. The page has no
+  text about parts of a drawing any more. `node check.mjs` passes; seen in a browser at
+  1440 and 390 pixels. On a phone the names in the drawing are too small to read.
 - #87, #89 and #92: the site has a cost table (Amazon Bedrock against a GPU instance), a
   table that compares four model sets in the evals, the approval in Slack and Teams, and
   tables that fit a phone.
