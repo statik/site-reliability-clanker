@@ -381,6 +381,51 @@ the platform repository, so the main branch of the `runbooks` repository does no
 after it is seeded. That needs a decision of the owner on how such a change is tiered and
 approved, and a standing approval must then name the commit of the runbook that it covers.
 
+### 5.7 Application packs
+
+**Decided 2026-11-19 by the owner:** S.R.C. is separate from the application that it looks
+after. Paperboat is an example application. Everything that the control plane knows about
+an application comes from an application pack. A pack is a directory in a git repository, a
+version of a pack is a tag and a hash of its content, and one environment has one pack.
+
+A pack holds these parts:
+
+| Part | Content | Used by |
+|---|---|---|
+| Manifest (`pack.json`) | Name, title, version of the pack, the layer and the variable that sets the version of the application, the namespaces, the deployments, the topology | Every component |
+| Release source | The forge repository and the directory with one release note for each release | Detector, Author, Explainer |
+| Deployment code | The chart, and where the platform repository expects it | Runner |
+| Checks | The paths for ready, version and the probe that the monitor samples | Monitor, verification, canary |
+| Runbooks | Typed job definitions and scripts, as in section 5.6 | Orchestrator |
+| Debug commands | Read-only `kubectl` argument lists for the debug session | Investigator |
+| Eval cases | Samples for the tasks of the eval suite | `evals/` |
+
+Rules:
+
+1. **The core does not name an application.** A test fails when a Go file of the core names
+   Paperboat. `apps/paperboat/` is the example pack, and its manifest is the reference.
+2. **A pack is untrusted input.** The loader refuses a field that it does not know and checks
+   each value. Text from a pack reaches a prompt only as a short, checked field. The core
+   fixes the verbs of a debug command (`get`, `logs`, `describe`, `top`) and adds the
+   namespace itself. A pack cannot give a model a tool, bring policy rules, lower a tier or
+   skip an approval.
+3. **An import is recorded.** `clanker pack import` clones one tag, validates the pack and
+   writes a lock file with the source, the tag, the commit and the hash. The control plane
+   writes these values to the audit log when it starts with the pack. The first deployment
+   of an environment, a tier T3 change, is the approval of its pack.
+4. **A pack is measured before it is trusted.** A pack brings eval cases, and the eval suite
+   runs them with the same checks as its own cases.
+
+Not built:
+
+- The application layer of the stacks (`platform/stacks/*/50-app` and
+  `platform/modules/shared/app`) still names Paperboat, so a pack for a second application
+  cannot deploy. The pack must bring its application layer for each target.
+- A new version of a pack cannot replace the pack of an environment that runs. This has the
+  same cause as the note at the end of section 5.6: only the platform repository takes pull
+  requests.
+- Several packs in one environment.
+
 ## 6. Permissions and just-in-time access
 
 ### 6.1 Identities
