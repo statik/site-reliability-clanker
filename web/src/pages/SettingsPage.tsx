@@ -36,9 +36,9 @@ export function localControl(user: User | null, local: LocalInference):
   if (!local.available) {
     return { allowed: false, reason: local.reason ?? "This control plane cannot control it." };
   }
-  if (user?.role !== "admin") {
+  if (user?.role !== "admin" && user?.role !== "approver") {
     return { allowed: false,
-      reason: `Only an admin starts or stops the local inference. You are ` +
+      reason: `Only an admin or an approver starts or stops the local inference. You are ` +
         `${user?.display ?? "a user"} (${user?.role ?? "unknown role"}).` };
   }
   return { allowed: true, reason: "" };

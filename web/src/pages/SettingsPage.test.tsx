@@ -127,14 +127,13 @@ describe("the buttons Start and Stop", () => {
     expect(button("Stop").disabled).toBe(false);
   });
 
-  it("are disabled for a viewer and for an approver, with the reason", () => {
-    for (const role of ["viewer", "approver"] as const) {
-      show(settings(), role);
-      expect(button("Start").disabled).toBe(true);
-      expect(button("Stop").disabled).toBe(true);
-      expect(host.textContent).toContain(
-        `Only an admin starts or stops the local inference. You are The ${role} (${role}).`);
-    }
+  it("are disabled for a viewer, with the reason", () => {
+    show(settings(), "viewer");
+    expect(button("Start").disabled).toBe(true);
+    expect(button("Stop").disabled).toBe(true);
+    expect(host.textContent).toContain(
+      "Only an admin or an approver starts or stops the local inference. " +
+        "You are The viewer (viewer).");
   });
 
   it("are disabled for an admin when this target has no local control", () => {
@@ -150,7 +149,7 @@ describe("the buttons Start and Stop", () => {
   it("follow the same rule as the server", () => {
     const off: LocalInference = { ...RUNNING, available: false };
     expect(localControl(person("admin"), RUNNING).allowed).toBe(true);
-    expect(localControl(person("approver"), RUNNING).allowed).toBe(false);
+    expect(localControl(person("approver"), RUNNING).allowed).toBe(true);
     expect(localControl(person("viewer"), RUNNING).allowed).toBe(false);
     expect(localControl(null, RUNNING).allowed).toBe(false);
     expect(localControl(person("admin"), off).allowed).toBe(false);

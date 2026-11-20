@@ -71,10 +71,11 @@ func (s *Server) getModelSettings(r *http.Request) (any, error) {
 	return s.modelSettings(r.Context())
 }
 
-// changeLocalModel starts or stops the local inference for an admin, and records it.
+// changeLocalModel starts or stops the local inference for an admin or an approver, and
+// records it.
 func (s *Server) changeLocalModel(r *http.Request, event, verb string,
 	act func(context.Context) (string, error)) (any, error) {
-	user, err := s.requireRole(r, "admin")
+	user, err := s.requireRole(r, "admin", "approver")
 	if err != nil {
 		return nil, err
 	}

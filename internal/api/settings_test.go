@@ -183,15 +183,14 @@ func TestStopLeavesAServerThatTheControlPlaneDidNotStart(t *testing.T) {
 	}
 }
 
-func TestOnlyAnAdminStartsOrStopsTheLocalInference(t *testing.T) {
+func TestAViewerDoesNotStartOrStopTheLocalInference(t *testing.T) {
 	server := withSettings(t, agent.Replay{}, theModel)
 	server.fake.SetLoaded(ollama.Variant + ":latest")
-	for _, user := range []string{"dave", "alice"} {
-		for _, path := range []string{"/local/start", "/local/stop"} {
-			code, got, _ := server.call(t, "POST", path, user)
-			if code != http.StatusForbidden || !strings.Contains(got.Error, "needs one of: admin") {
-				t.Errorf("POST %s as %s: %d %q, want 403", path, user, code, got.Error)
-			}
+	for _, path := range []string{"/local/start", "/local/stop"} {
+		code, got, _ := server.call(t, "POST", path, "dave")
+		if code != http.StatusForbidden ||
+			!strings.Contains(got.Error, "needs one of: admin, approver") {
+			t.Errorf("POST %s as dave: %d %q, want 403", path, code, got.Error)
 		}
 	}
 	if len(server.fake.Changes()) != 0 || server.program.Starts+server.program.Stops != 0 {
@@ -199,6 +198,10 @@ func TestOnlyAnAdminStartsOrStopsTheLocalInference(t *testing.T) {
 	}
 	if events := server.modelEvents(t); len(events) != 0 {
 		t.Errorf("a refused request wrote audit events: %+v", events)
+	}
+	// The person of the wizard is an approver, and must be able to use the buttons.
+	if code, _, body := server.call(t, "POST", "/local/stop", "alice"); code != http.StatusOK {
+		t.Errorf("POST /local/stop as an approver: %d %s", code, body)
 	}
 }
 
