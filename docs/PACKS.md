@@ -846,6 +846,8 @@ Each step is one pull request or a few, and each leaves Paperboat working.
 2. **The collector on Kubernetes.** The build of the collector. The endpoint of the core
    and the observation. The generator of the configuration. State, versions and volumes
    of Paperboat. The health history by name. The storage detector reads real samples.
+   Built so far: the record and the state rules for Kubernetes in `internal/observation`;
+   nothing sends data to it yet.
 3. **The rules of B.8**, the `tcp` check, the `image` version, the state `unknown`.
 4. **The site runner.** Enrolment and the jobs of a site.
 5. **Access to a host.** The certificate in the broker, the host kit with the collector

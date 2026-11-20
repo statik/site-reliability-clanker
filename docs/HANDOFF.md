@@ -129,6 +129,10 @@ video and the local demo. No pull request is open.
     is unhealthy or has an open incident. Before, only a node with the ID `api` changed.
   - Fixed: the check after an apply fails when the layer of the application has outputs
     and no output with the address. Before, it passed with no check of the application.
+||||||| parent of 187014a (Add the observation record and the state rules for Kubernetes)
+  - `internal/observation` has the record of `docs/PACKS.md` section B.6, the state rules
+    for Kubernetes and the check of a record against a pack. Its unit tests pass. Not
+    run: nothing uses the package yet.
   - The job of a debug session carries reads and a namespace, not `kubectl` argument
     lists (`internal/jobspec/read.go`). One function makes the command of a read. The
     runner starts the command with it, and the core writes the command line of the
