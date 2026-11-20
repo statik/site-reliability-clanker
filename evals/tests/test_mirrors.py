@@ -5,7 +5,7 @@ import re
 
 import pytest
 
-from clanker_evals import author_tools, checks, gotext, inputs, solvers
+from clanker_evals import author_tools, checks, gotext, inputs, repo, solvers
 from clanker_evals.repo import (
     PACK,
     PACK_DIR,
@@ -14,12 +14,15 @@ from clanker_evals.repo import (
     RELEASES_REPO,
     ROOT,
     RUNBOOKS_REPO,
+    component_names,
+    components_with_workloads,
+    mitigation_names,
+    mitigation_runbooks,
     one_of,
     prompt,
     render,
-    workloads,
 )
-from clanker_evals.tasks import reviewer
+from clanker_evals.tasks import investigator, reviewer
 
 
 def go_source(path: str) -> str:
@@ -113,12 +116,24 @@ def test_mitigations_match_the_runbook_definitions() -> None:
         for path in sorted((PACK_DIR / PACK["runbooks"]).glob("*.json"))
     }
     mitigations = [name for name, d in definitions.items() if d.get("incident_mitigation")]
-    assert mitigations == checks.RUNBOOKS
+    assert mitigations, "the pack has no mitigation; the investigator tasks need one"
+    assert mitigations == mitigation_runbooks()
     for name in mitigations:
-        assert definitions[name]["inputs"]["deployment"]["values"] == checks.ALLOWED_MITIGATIONS
+        assert checks.is_mitigation(name)
+        # internal/runbook refuses a mitigation with another input, and internal/pack refuses
+        # a value that is not the name of a component.
+        assert list(definitions[name]["inputs"]) == ["component"]
+        for value in definitions[name]["inputs"]["component"]["values"]:
+            assert checks.is_component(value)
+    assert not any(checks.is_mitigation(name) for name in set(definitions) - set(mitigations))
+    assert [c["name"] for c in PACK["components"]] == component_names()
+    assert not any(checks.is_component(c["workload"]) for c in PACK["components"])
     source = go_source("internal/agent/incident.go")
     assert "if !definition.IncidentMitigation {" in source
-    assert 'return map[string]string{"deployment": d.Deployment}' in source
+    assert "return map[string]string{runbook.MitigationInput: d.Component}" in source
+    assert 'const MitigationInput = "component"' in go_source("internal/runbook/runbook.go")
+    assert json_fields("internal/agent/incident.go", "diagnosis") == investigator.FIELDS
+    assert checks.mitigation({"proposed_runbook": " X ", "component": " Api "}) == ("x", "api")
 
 
 def test_input_frames_match_go() -> None:
@@ -179,15 +194,32 @@ def test_the_placeholders_of_a_prompt_match_go() -> None:
     for placeholder, field in {
         "{{releases_repository}}": "p.Releases.Repository",
         "{{releases_directory}}": "p.Releases.Directory",
-        "{{deployments}}": "oneOf(p.Workloads())",
+        "{{components}}": "oneOf(p.componentsWithWorkloads())",
+        "{{mitigations}}": "p.mitigationNames()",
     }.items():
         assert f'"{placeholder}", {field},' in source
+    assert source.count('"{{') == 4, "prompt.go has a placeholder that render() does not have"
     assert 'strings.Join(names[:last], ", ") + " or " + names[last]' in source
+    assert 'component.Name+" (the deployment "+component.Workload+")"' in source
+    assert 'return "none"' in source
+    assert 'return strings.Join(p.mitigations, ", ")' in source
+    assert "mitigations = sortedKeys(found.mitigations)" in go_source("internal/pack/parts.go")
     assert one_of(["a"]) == "a"
     assert one_of(["a", "b", "c"]) == "a, b or c"
-    assert render("{{releases_repository}} {{releases_directory}} {{deployments}}") == (
-        f"{RELEASES_REPO} {PACK['releases']['directory']} {one_of(workloads())}"
+    first = PACK["components"][0]
+    assert components_with_workloads()[0] == f"{first['name']} (the deployment {first['workload']})"
+    assert mitigation_names() == ", ".join(sorted(mitigation_runbooks()))
+    text = "{{releases_repository}} {{releases_directory}} {{components}} {{mitigations}}"
+    assert render(text) == (
+        f"{RELEASES_REPO} {PACK['releases']['directory']} "
+        f"{one_of(components_with_workloads())} {mitigation_names()}"
     )
+
+
+def test_a_pack_with_no_mitigation_renders_the_word_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(repo, "mitigation_runbooks", list)
+    assert repo.mitigation_names() == "none"
+    assert repo.render("Runbooks: {{mitigations}}.") == "Runbooks: none."
 
 
 def json_fields(path: str, struct: str) -> list[str]:

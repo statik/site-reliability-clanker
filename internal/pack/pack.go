@@ -70,6 +70,9 @@ type Pack struct {
 	// files are the files of that directory.
 	dir   string
 	files fs.FS
+	// mitigations are the names of the runbooks of the pack that are mitigations for an
+	// incident, in the order of the names. Load fills it when it checks the runbooks.
+	mitigations []string
 }
 
 // Releases says where the releases of the application are published.
@@ -214,11 +217,13 @@ func Load(fsys fs.FS, dir string) (Pack, error) {
 			return Pack{}, fmt.Errorf("%s names %s, which the pack does not have", file, name)
 		}
 	}
-	for _, part := range p.CheckParts() {
+	parts, mitigations := p.checkParts()
+	for _, part := range parts {
 		if part.Problem != "" {
 			return Pack{}, fmt.Errorf("%s: %s: %s", file, part.Name, part.Problem)
 		}
 	}
+	p.mitigations = mitigations
 	return p, nil
 }
 
@@ -260,15 +265,6 @@ func (p Pack) ReleaseNote(version string) string {
 
 // ReleaseOf returns the version of a file in the directory of the release notes.
 func (p Pack) ReleaseOf(file string) string { return strings.TrimSuffix(file, ".md") }
-
-// Workloads returns the deployments of the components, in the order of the manifest.
-func (p Pack) Workloads() []string {
-	names := make([]string, 0, len(p.Components))
-	for _, component := range p.Components {
-		names = append(names, component.Workload)
-	}
-	return names
-}
 
 // Component returns the component with the name.
 func (p Pack) Component(name string) (Component, bool) {

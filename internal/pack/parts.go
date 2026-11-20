@@ -25,7 +25,7 @@ const (
 )
 
 // EvalSchema is the version of the format of an eval case file that this code reads.
-const EvalSchema = 1
+const EvalSchema = 2
 
 var (
 	evalTaskPattern   = regexp.MustCompile(`^[a-z][a-z0-9_]{0,40}$`)
@@ -62,20 +62,44 @@ func (p Pack) RunbookFiles() (fs.FS, error) {
 // CheckParts checks the optional parts of the pack, which are files: the runbooks and the
 // eval cases. It returns one result for each part that the manifest names.
 func (p Pack) CheckParts() []Check {
-	checks := []Check{}
+	checks, _ := p.checkParts()
+	return checks
+}
+
+// checkParts returns the results of CheckParts and the names of the runbooks that are
+// mitigations for an incident, in the order of the names.
+func (p Pack) checkParts() ([]Check, []string) {
+	checks, mitigations := []Check{}, []string{}
 	if p.Runbooks == "" && p.Incident != nil {
 		checks = append(checks, Check{Name: "runbooks", Problem: "the pack has an incident " +
 			"runbook and no directory of runbooks"})
 	}
 	if p.Runbooks != "" {
-		names, err := p.checkRunbooks()
-		checks = append(checks, result("runbooks", strings.Join(names, ", "), err))
+		found, err := p.checkRunbooks()
+		checks = append(checks, result("runbooks", strings.Join(found.names, ", "), err))
+		mitigations = sortedKeys(found.mitigations)
 	}
 	if p.Evals != "" {
 		tasks, err := p.checkEvals()
 		checks = append(checks, result("eval cases", strings.Join(tasks, ", "), err))
 	}
-	return checks
+	return checks, mitigations
+}
+
+// runbooks are the runbooks of a pack that passed the checks.
+type runbooks struct {
+	names []string
+	// mitigations are the definitions that are mitigations for an incident, by name.
+	mitigations map[string]runbook.Definition
+}
+
+func sortedKeys(definitions map[string]runbook.Definition) []string {
+	names := make([]string, 0, len(definitions))
+	for name := range definitions {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func result(name, detail string, err error) Check {
@@ -113,61 +137,76 @@ func (p Pack) partFiles(dir string) ([]string, error) {
 }
 
 // checkRunbooks reads each definition with the code that reads it at run time, and
-// returns the names of the runbooks.
-func (p Pack) checkRunbooks() ([]string, error) {
+// returns the runbooks.
+func (p Pack) checkRunbooks() (runbooks, error) {
 	files, err := p.partFiles(p.Runbooks)
 	if err != nil {
-		return nil, err
+		return runbooks{}, err
 	}
-	names, mitigations := []string{}, map[string]runbook.Definition{}
+	found := runbooks{names: []string{}, mitigations: map[string]runbook.Definition{}}
 	for _, file := range files {
-		name, isDefinition := strings.CutSuffix(file, ".json")
-		script, isScript := strings.CutSuffix(file, ".sh")
-		switch {
-		case isScript && slices.Contains(files, script+".json"):
-			continue
-		case !isDefinition:
-			return nil, fmt.Errorf("%s/%s is not a definition (.json) and not the script (.sh) "+
-				"of one", p.Runbooks, file)
-		case !slices.Contains(files, name+".sh"):
-			return nil, fmt.Errorf("runbook %s has a definition and no script %s.sh", name, name)
+		if err := p.addRunbook(&found, files, file); err != nil {
+			return runbooks{}, err
 		}
-		raw, err := fs.ReadFile(p.files, path.Join(p.Runbooks, file))
-		if err != nil {
-			return nil, err
-		}
-		definition, err := runbook.Parse(name, raw)
-		if err != nil {
-			return nil, err
-		}
-		if err := p.checkMitigation(definition); err != nil {
-			return nil, err
-		}
-		if definition.IncidentMitigation {
-			mitigations[name] = definition
-		}
-		names = append(names, name)
 	}
-	if err := p.checkIncidentRunbook(mitigations); err != nil {
-		return nil, err
+	if err := p.checkIncidentRunbook(found.mitigations); err != nil {
+		return runbooks{}, err
 	}
-	if len(names) == 0 || len(names) > maxRunbooks {
-		return nil, fmt.Errorf("%s has %d runbooks; a pack can have 1 to %d", p.Runbooks,
-			len(names), maxRunbooks)
+	if len(found.names) == 0 || len(found.names) > maxRunbooks {
+		return runbooks{}, fmt.Errorf("%s has %d runbooks; a pack can have 1 to %d", p.Runbooks,
+			len(found.names), maxRunbooks)
 	}
-	return names, nil
+	return found, nil
+}
+
+// addRunbook checks one file of the directory of the runbooks. A definition adds its
+// runbook to found. The script of a definition adds nothing.
+func (p Pack) addRunbook(found *runbooks, files []string, file string) error {
+	name, isDefinition := strings.CutSuffix(file, ".json")
+	script, isScript := strings.CutSuffix(file, ".sh")
+	switch {
+	case isScript && slices.Contains(files, script+".json"):
+		return nil
+	case !isDefinition:
+		return fmt.Errorf("%s/%s is not a definition (.json) and not the script (.sh) of one",
+			p.Runbooks, file)
+	case !slices.Contains(files, name+".sh"):
+		return fmt.Errorf("runbook %s has a definition and no script %s.sh", name, name)
+	}
+	definition, err := p.readRunbook(name)
+	if err != nil {
+		return err
+	}
+	if definition.IncidentMitigation {
+		found.mitigations[name] = definition
+	}
+	found.names = append(found.names, name)
+	return nil
+}
+
+// readRunbook reads and checks the definition of one runbook of the pack.
+func (p Pack) readRunbook(name string) (runbook.Definition, error) {
+	raw, err := fs.ReadFile(p.files, path.Join(p.Runbooks, name+".json"))
+	if err != nil {
+		return runbook.Definition{}, err
+	}
+	definition, err := runbook.Parse(name, raw)
+	if err != nil {
+		return runbook.Definition{}, err
+	}
+	return definition, p.checkMitigation(definition)
 }
 
 // checkMitigation checks a runbook that the Investigator can propose: it can name only
-// deployments of the pack.
+// components of the pack.
 func (p Pack) checkMitigation(definition runbook.Definition) error {
 	if !definition.IncidentMitigation {
 		return nil
 	}
-	for _, value := range definition.Inputs["deployment"].Values {
-		if !slices.Contains(p.Workloads(), value) {
-			return fmt.Errorf("runbook %s can restart %q, which is not a deployment of the pack",
-				definition.Name, value)
+	for _, value := range definition.Inputs[runbook.MitigationInput].Values {
+		if _, ok := p.Component(value); !ok {
+			return fmt.Errorf("runbook %s permits the component %q, which is not a component "+
+				"of the pack", definition.Name, value)
 		}
 	}
 	return nil
@@ -186,10 +225,10 @@ func (p Pack) checkIncidentRunbook(mitigations map[string]runbook.Definition) er
 		return fmt.Errorf("incident.runbook %q is not a runbook of the pack that is a "+
 			"mitigation for an incident", p.Incident.Runbook)
 	}
-	component, _ := p.Component(p.Incident.Component)
-	if !slices.Contains(definition.Inputs["deployment"].Values, component.Workload) {
-		return fmt.Errorf("incident.runbook %s does not permit %q, the deployment of "+
-			"incident.component %s", definition.Name, component.Workload, component.Name)
+	permitted := definition.Inputs[runbook.MitigationInput].Values
+	if !slices.Contains(permitted, p.Incident.Component) {
+		return fmt.Errorf("incident.runbook %s does not permit incident.component %q",
+			definition.Name, p.Incident.Component)
 	}
 	return nil
 }

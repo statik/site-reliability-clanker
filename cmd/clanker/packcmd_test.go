@@ -56,7 +56,7 @@ func TestPackValidateFailsForAPackThatIsNotCorrect(t *testing.T) {
 	if err := os.CopyFS(dir, os.DirFS(filepath.Join(packtest.SecondSource(t), "harbor"))); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Remove(filepath.Join(dir, "jobs", "restart-deployment.sh")); err != nil {
+	if err := os.Remove(filepath.Join(dir, "jobs", "restart-component.sh")); err != nil {
 		t.Fatal(err)
 	}
 	out, err := packCommand(t, "validate", dir)
@@ -125,7 +125,7 @@ func TestAnImportedPackStartsTheControlPlane(t *testing.T) {
 	}
 	for repository, path := range map[string]string{
 		orchestrator.PlatformRepo: "apps/harbor/chart/Chart.yaml",
-		orchestrator.RunbooksRepo: "jobs/restart-deployment.sh",
+		orchestrator.RunbooksRepo: "jobs/restart-component.sh",
 		"harbor":                  "notes/3.4.0.md",
 	} {
 		if _, err := f.ReadFile(repository, "main", path); err != nil {

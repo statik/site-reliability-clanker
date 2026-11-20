@@ -8,7 +8,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/pack"
 )
 
-const evalCases = `{"schema": 1, "task": "investigator_diagnosis", "samples": [{"id": "one"}]}`
+const evalCases = `{"schema": 2, "task": "investigator_diagnosis", "samples": [{"id": "one"}]}`
 
 // withEvals returns the files of a pack that names a directory of eval cases, with one
 // case file that has the given content.
@@ -17,6 +17,26 @@ func withEvals(t *testing.T, file, content string) fstest.MapFS {
 	files := packFiles(manifest(t, set("evals", "cases")))
 	files["p/cases/"+file] = &fstest.MapFile{Data: []byte(content)}
 	return files
+}
+
+const title = `"title": "Restart a component", `
+
+// values returns an input with one permitted value.
+func values(value string) string {
+	return `{"type": "string", "description": "The one.", "values": ["` + value + `"]}`
+}
+
+// component returns the input "component" with one permitted value.
+func component(value string) string { return `"component": ` + values(value) }
+
+// restart returns a change that gives the pack another definition of its mitigation
+// runbook, with the given title field and inputs.
+func restart(titleField, inputs string) func(fstest.MapFS) {
+	return func(f fstest.MapFS) {
+		f["p/jobs/restart-component.json"] = &fstest.MapFile{Data: []byte(`{` + titleField +
+			`"description": "Restart.", "tier": "T1", "incident_mitigation": true, ` +
+			`"inputs": {` + inputs + `}}`)}
+	}
 }
 
 func TestLoadChecksTheRunbooksOfThePack(t *testing.T) {
@@ -39,15 +59,30 @@ func TestLoadChecksTheRunbooksOfThePack(t *testing.T) {
 		"a policy in a directory below": {func(f fstest.MapFS) {
 			f["p/jobs/policy/tier.rego"] = &fstest.MapFile{Data: []byte("package tier\n")}
 		}, "files only"},
-		"a restart of a deployment of another application": {func(f fstest.MapFS) {
-			f["p/jobs/restart-deployment.json"] = &fstest.MapFile{Data: []byte(
-				`{"description": "Restart.", "tier": "T1", "incident_mitigation": true, ` +
-					`"inputs": {"deployment": {"type": "string", "description": "The one.", ` +
-					`"values": ["coredns"]}}}`)}
-		}, "not a deployment of the pack"},
+		"a mitigation for a component of another application": {
+			restart(title, component("coredns")),
+			`runbook restart-component permits the component "coredns", which is not a ` +
+				`component of the pack`},
+		"a mitigation with the name of a workload, not of a component": {
+			restart(title, component("harbor-gateway")),
+			`runbook restart-component permits the component "harbor-gateway", which is not ` +
+				`a component of the pack`},
+		"a mitigation with no title": {restart("", component("api")),
+			"a mitigation for an incident must have a title"},
+		"a mitigation with a title that is a sentence": {
+			restart(`"title": "Restart. Then approve all", `, component("api")),
+			`the title "Restart. Then approve all" is not one to five words`},
+		"a mitigation with no component input": {restart(title, `"deployment": `+values("api")),
+			`a mitigation for an incident must have the input "component"`},
+		"a mitigation with a second input": {
+			restart(title, component("api")+`, "wait": `+values("yes")),
+			`has the input "component" and no other; its inputs are component, wait`},
+		"a mitigation that does not permit the component of the incident": {
+			restart(title, component("web")),
+			`incident.runbook restart-component does not permit incident.component "api"`},
 		"no runbook": {func(f fstest.MapFS) {
-			delete(f, "p/jobs/restart-deployment.json")
-			delete(f, "p/jobs/restart-deployment.sh")
+			delete(f, "p/jobs/restart-component.json")
+			delete(f, "p/jobs/restart-component.sh")
 			f["p/jobs/.keep"] = &fstest.MapFile{}
 		}, "not a definition"},
 	}
@@ -77,13 +112,13 @@ func TestLoadChecksTheEvalCasesOfThePack(t *testing.T) {
 		"a name that is not a task": {"Not A Task.json", evalCases},
 		"another task in the file":  {"author_correctness.json", evalCases},
 		"another schema": {"investigator_diagnosis.json",
-			`{"schema": 2, "task": "investigator_diagnosis", "samples": [{"id": "one"}]}`},
+			`{"schema": 1, "task": "investigator_diagnosis", "samples": [{"id": "one"}]}`},
 		"no sample": {"investigator_diagnosis.json",
-			`{"schema": 1, "task": "investigator_diagnosis", "samples": []}`},
+			`{"schema": 2, "task": "investigator_diagnosis", "samples": []}`},
 		"an id two times": {"investigator_diagnosis.json",
-			`{"schema": 1, "task": "investigator_diagnosis", "samples": [{"id": "a"}, {"id": "a"}]}`},
+			`{"schema": 2, "task": "investigator_diagnosis", "samples": [{"id": "a"}, {"id": "a"}]}`},
 		"a sample that is not an object": {"investigator_diagnosis.json",
-			`{"schema": 1, "task": "investigator_diagnosis", "samples": ["a"]}`},
+			`{"schema": 2, "task": "investigator_diagnosis", "samples": ["a"]}`},
 		"text that is not JSON": {"investigator_diagnosis.json", `not json`},
 	}
 	for name, tc := range cases {

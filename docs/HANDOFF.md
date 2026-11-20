@@ -89,6 +89,38 @@ video and the local demo. No pull request is open.
     such a run.
   - Not run: the evals with live models (no prompt changed). The other scenes of the
     scripted month. The dashboard was not viewed. A pack with no `incident` or no build program in a real run.
+  - The runbooks, the Investigator and the eval cases name components, not deployments
+    (the last part of step 1). The runbook `restart-deployment` is now `restart-component`.
+    Its input is `component` with the names `api`, `web` and `worker`, and its script makes
+    the name of the deployment. A runbook definition has the optional field `title`. A
+    mitigation for an incident must have a `title` and exactly the input `component`, and
+    each value must be the name of a component of the pack. The answer of the Investigator
+    has the field `component`. The prompt of the Investigator has the placeholders
+    `{{components}}` and `{{mitigations}}`; `{{deployments}}` is gone. The title of the work
+    item of a mitigation comes from the definition: "Restart a component (api) to mitigate
+    WI-0007". The core has no name of a runbook and no word "Restart" in its code. The eval
+    case file has `schema` 2, and `expect` is `<runbook>:<component>`. The score key
+    `deployment_allowed` of `investigator_diagnosis` is now `component_allowed`. The
+    dashboard reads the field `component` of a diagnosis.
+    - Ran on 2026-11-20: `go test ./...`, `go vet`, `scripts/lint-core.sh`, `shellcheck` and
+      `shfmt` on the two scripts, the lint, the type check and the tests of the eval suite,
+      `./run.sh pack ../apps/paperboat` with the mock model, `clanker pack validate` on
+      both packs, and the lint, the type check and the tests of the dashboard.
+    - Ran on 2026-11-20 with the live models, for the Investigator only, because its
+      prompt changed: `investigator_diagnosis` 1.00 on 12 runs with a grader accuracy of
+      1.00; `prompt_injection` 1.00 on 15 runs with an attack success of 0.00;
+      `secret_leakage` 1.00 on 18 runs with a leak rate of 0.00. These are the scores of
+      before. The logs are in `evals/logs/components-live/` on the machine of the run.
+      `evals/RESULTS.md` is not written again: it still has the old name of one check.
+    - Ran on 2026-11-20: a run on a new data directory with recorded answers, with the
+      first deployment and the scene `incident`. The mitigation was the work item "Restart
+      a component (api) to mitigate WI-0002", and the three work items ended in `Done`.
+    - An environment that runs has the runbook `restart-deployment` in its forge, because
+      the forge is seeded one time. This change is for new environments.
+    - The injected text of two samples of `prompt_injection` names the field `component`
+      now. The sample `event-redirects-restart` fails an answer with the component `web`.
+    - The approval page has no own display of the targets (`docs/PACKS.md` section B.14
+      says why). With this, step 1 of the build order is complete.
   - Found: `clanker destroy` runs OpenTofu in the stack directories of its source. With a
     second data directory it fails with "Backend configuration changed", because those
     directories keep the backend of the first one. The run above was destroyed from a

@@ -64,15 +64,17 @@ func TestTheRunbookListHasTheDefinitions(t *testing.T) {
 		t.Errorf("first row = %#v\nwant %#v", rows[0], backup)
 	}
 	restart := rows[2]
-	got := []any{restart["name"], restart["standing_approver"], restart["incident_mitigation"]}
-	if want := []any{"restart-deployment", "", true}; !reflect.DeepEqual(got, want) {
+	got := []any{restart["name"], restart["title"], restart["standing_approver"],
+		restart["incident_mitigation"]}
+	want := []any{"restart-component", "Restart a component", "", true}
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("third row has %#v, want %#v", got, want)
 	}
 	inputs, _ := restart["inputs"].(map[string]any)
-	deployment, _ := inputs["deployment"].(map[string]any)
-	want := []any{"paperboat-api", "paperboat-web", "paperboat-worker"}
-	if !reflect.DeepEqual(deployment["values"], want) {
-		t.Errorf("values of deployment = %#v, want %#v", deployment["values"], want)
+	component, _ := inputs["component"].(map[string]any)
+	values := []any{"api", "web", "worker"}
+	if !reflect.DeepEqual(component["values"], values) {
+		t.Errorf("values of component = %#v, want %#v", component["values"], values)
 	}
 }
 
@@ -81,10 +83,10 @@ func TestARunbookRequestThatDoesNotFitTheDefinitionGetsTheReason(t *testing.T) {
 	cases := map[string]struct{ path, body, want string }{
 		"an unknown runbook": {"/api/v1/runbooks/delete-namespace", `{"env":"local"}`,
 			"has no definition"},
-		"a missing input": {"/api/v1/runbooks/restart-deployment", `{"env":"local"}`,
+		"a missing input": {"/api/v1/runbooks/restart-component", `{"env":"local"}`,
 			"needs the input"},
-		"a value outside the set": {"/api/v1/runbooks/restart-deployment",
-			`{"env":"local","params":{"deployment":"postgres"}}`, "is not one of"},
+		"a value outside the set": {"/api/v1/runbooks/restart-component",
+			`{"env":"local","params":{"component":"postgres"}}`, "is not one of"},
 		"an input that is not declared": {"/api/v1/runbooks/db-backup",
 			`{"env":"local","params":{"file":"/etc/passwd"}}`, "has no input"},
 	}

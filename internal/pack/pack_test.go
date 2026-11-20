@@ -29,11 +29,59 @@ func TestTheExamplePackAndTheSecondPackLoad(t *testing.T) {
 }
 
 func TestRenderPutsTheNamesOfThePackIntoAPrompt(t *testing.T) {
-	text := "Read {{releases_repository}} at {{releases_directory}}/x.md. One of {{deployments}}."
+	text := "Read {{releases_repository}} at {{releases_directory}}/x.md. One of " +
+		"{{components}}. Runbooks: {{mitigations}}."
 	got := packtest.Second(t).Render(text)
-	want := "Read harbor at notes/x.md. One of harbor-gateway, harbor-ui or harbor-jobs."
+	want := "Read harbor at notes/x.md. One of api (the deployment harbor-gateway), web (the " +
+		"deployment harbor-ui) or worker (the deployment harbor-jobs). Runbooks: " +
+		"restart-component."
 	if got != want {
 		t.Errorf("Render = %q, want %q", got, want)
+	}
+}
+
+func TestRenderNamesTheMitigationsInTheOrderOfTheirNames(t *testing.T) {
+	files := packFiles(manifest(t, func(map[string]any) {}))
+	files["p/jobs/drain-component.json"] = &fstest.MapFile{Data: []byte(
+		`{"title": "Drain a component", "description": "Drain.", "tier": "T1", ` +
+			`"incident_mitigation": true, "inputs": {"component": {"type": "string", ` +
+			`"description": "The one.", "values": ["worker"]}}}`)}
+	files["p/jobs/drain-component.sh"] = &fstest.MapFile{Data: []byte("#!/bin/sh\n")}
+	files["p/jobs/prune.json"] = &fstest.MapFile{Data: []byte(
+		`{"description": "A job.", "tier": "T1"}`)}
+	files["p/jobs/prune.sh"] = &fstest.MapFile{Data: []byte("#!/bin/sh\n")}
+	app, err := pack.Load(files, "p")
+	if err != nil {
+		t.Fatalf("the pack does not load: %v", err)
+	}
+	if got := app.Render("{{mitigations}}"); got != "drain-component, restart-component" {
+		t.Errorf("Render = %q", got)
+	}
+}
+
+func TestRenderSaysNoneForAPackWithNoMitigation(t *testing.T) {
+	noRunbooks := packFiles(manifest(t, func(m map[string]any) {
+		delete(m, "incident")
+		delete(m, "runbooks")
+	}))
+	noMitigation := packFiles(manifest(t, func(m map[string]any) { delete(m, "incident") }))
+	delete(noMitigation, "p/jobs/restart-component.json")
+	delete(noMitigation, "p/jobs/restart-component.sh")
+	noMitigation["p/jobs/prune.json"] = &fstest.MapFile{Data: []byte(
+		`{"description": "A job.", "tier": "T1"}`)}
+	noMitigation["p/jobs/prune.sh"] = &fstest.MapFile{Data: []byte("#!/bin/sh\n")}
+	for name, files := range map[string]fstest.MapFS{"no runbooks": noRunbooks,
+		"runbooks that are not mitigations": noMitigation} {
+		app, err := pack.Load(files, "p")
+		if err != nil {
+			t.Fatalf("%s: the pack does not load: %v", name, err)
+		}
+		got := app.Render("Runbooks: {{mitigations}}. One of {{components}}.")
+		want := "Runbooks: none. One of api (the deployment harbor-gateway), web (the " +
+			"deployment harbor-ui) or worker (the deployment harbor-jobs)."
+		if got != want {
+			t.Errorf("%s: Render = %q, want %q", name, got, want)
+		}
 	}
 }
 
@@ -64,11 +112,11 @@ func packFiles(raw []byte) fstest.MapFS {
 		"p/chart/Chart.yaml": {Data: []byte("name: x\n")},
 		"p/build.sh":         {Data: []byte("#!/bin/sh\n")},
 		"p/notes/3.4.0.md":   {Data: []byte("# 3.4.0\n")},
-		"p/jobs/restart-deployment.json": {Data: []byte(`{"description": "Restart one ` +
-			`deployment.", "tier": "T1", "incident_mitigation": true, "inputs": {"deployment": ` +
-			`{"type": "string", "description": "The deployment.", "values": ["harbor-gateway", ` +
-			`"harbor-ui"]}}}`)},
-		"p/jobs/restart-deployment.sh": {Data: []byte("#!/bin/sh\n"), Mode: 0o755},
+		"p/jobs/restart-component.json": {Data: []byte(`{"title": "Restart a component", ` +
+			`"description": "Restart one component.", "tier": "T1", "incident_mitigation": ` +
+			`true, "inputs": {"component": {"type": "string", "description": "The ` +
+			`component.", "values": ["api", "web"]}}}`)},
+		"p/jobs/restart-component.sh": {Data: []byte("#!/bin/sh\n"), Mode: 0o755},
 	}
 }
 
@@ -136,7 +184,8 @@ func TestLoadRefusesAManifestThatIsNotSafe(t *testing.T) {
 		"an incident with a runbook that is not a name": {
 			in("incident", "runbook", "x; id"), `incident.runbook "x; id" must match`},
 		"an incident for a component that its runbook does not permit": {
-			in("incident", "component", "worker"), `does not permit "harbor-jobs"`},
+			in("incident", "component", "worker"),
+			`incident.runbook restart-component does not permit incident.component "worker"`},
 		"no read":             {set("diagnostics", []any{}), "diagnostics must have"},
 		"a read that changes": {read(map[string]any{"read": "delete"}), "is not logs"},
 		"a read with a command": {read(map[string]any{"read": "logs", "component": "api",
