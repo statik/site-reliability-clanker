@@ -20,7 +20,7 @@
     {"name": "web", "runtime": "kubernetes", "workload": "paperboat-web", "required": true},
     {"name": "worker", "runtime": "kubernetes", "workload": "paperboat-worker", "required": true}
   ],
-  "incident": {"runbook": "restart-deployment", "component": "api"},
+  "incident": {"runbook": "restart-component", "component": "api"},
   "diagnostics": [
     {"read": "logs", "component": "api", "lines": 30},
     {"read": "events"}

@@ -105,7 +105,7 @@ func TestRunbooksListsTheDefinitionsOfTheRepository(t *testing.T) {
 	for _, d := range definitions {
 		names = append(names, d.Name)
 	}
-	want := "db-backup db-maintenance restart-deployment restore-drill"
+	want := "db-backup db-maintenance restart-component restore-drill"
 	if got := strings.Join(names, " "); got != want {
 		t.Errorf("runbooks = %s, want %s", got, want)
 	}
@@ -124,7 +124,7 @@ func TestRunbooksFailsOnADefinitionThatIsNotValid(t *testing.T) {
 
 func TestARequestIsRefusedBeforeAWorkItemOrAGrantExists(t *testing.T) {
 	o, runners := runbookOrchestrator(t, extraRunbooks)
-	sign(t, o, "restart-deployment", "db-backup")
+	sign(t, o, "restart-component", "db-backup")
 	cases := map[string]struct {
 		name   string
 		params map[string]string
@@ -133,11 +133,11 @@ func TestARequestIsRefusedBeforeAWorkItemOrAGrantExists(t *testing.T) {
 		"a runbook that does not exist": {"delete-namespace", nil, "has no definition"},
 		"a name that is not valid":      {"../policy/tier", nil, "is not valid"},
 		"a script name":                 {"db-backup.sh", nil, "is not valid"},
-		"a missing input":               {"restart-deployment", nil, `needs the input "deployment"`},
-		"a value outside the set": {"restart-deployment",
-			map[string]string{"deployment": "postgres"}, "is not one of"},
-		"an input that is not declared": {"restart-deployment",
-			map[string]string{"deployment": "paperboat-web", "namespace": "kube-system"},
+		"a missing input":               {"restart-component", nil, `needs the input "component"`},
+		"a value outside the set": {"restart-component",
+			map[string]string{"component": "postgres"}, "is not one of"},
+		"an input that is not declared": {"restart-component",
+			map[string]string{"component": "web", "namespace": "kube-system"},
 			`has no input "namespace"`},
 		"a parameter for a runbook without inputs": {"db-backup",
 			map[string]string{"file": "/etc/passwd"}, `has no input "file"`},
@@ -161,8 +161,8 @@ func TestARequestIsRefusedBeforeAWorkItemOrAGrantExists(t *testing.T) {
 // known.
 func TestARunStopsBeforeAWorkItemForOtherFaults(t *testing.T) {
 	o, runners := runbookOrchestrator(t, extraRunbooks)
-	sign(t, o, "restart-deployment", "no-script")
-	web := map[string]string{"deployment": "paperboat-web"}
+	sign(t, o, "restart-component", "no-script")
+	web := map[string]string{"component": "web"}
 	cases := map[string]struct {
 		request RunbookRequest
 		want    string
@@ -173,7 +173,7 @@ func TestARunStopsBeforeAWorkItemForOtherFaults(t *testing.T) {
 			"has no standing approval"},
 		"a definition without a script": {RunbookRequest{Env: "local", Name: "no-script"},
 			"no script"},
-		"an unknown environment": {RunbookRequest{Env: "moon", Name: "restart-deployment",
+		"an unknown environment": {RunbookRequest{Env: "moon", Name: "restart-component",
 			Params: web}, "is not configured"},
 	}
 	for label, tc := range cases {
@@ -283,19 +283,19 @@ func TestARunRecordsItsTypedOutputs(t *testing.T) {
 
 func TestARunRecordsTheInputsThatItGot(t *testing.T) {
 	o, runners := runbookOrchestrator(t, nil)
-	if err := o.SignStandingApproval("restart-deployment", "carol"); err != nil {
+	if err := o.SignStandingApproval("restart-component", "carol"); err != nil {
 		t.Fatal(err)
 	}
-	params := map[string]string{"deployment": "paperboat-worker"}
+	params := map[string]string{"component": "worker"}
 	if _, err := o.RunRunbook(context.Background(), RunbookRequest{Env: "local",
-		Name: "restart-deployment", Params: params, Actor: "investigator"}); err != nil {
+		Name: "restart-component", Params: params, Actor: "investigator"}); err != nil {
 		t.Fatal(err)
 	}
-	if got := runners.jobs[0].Params["deployment"]; got != "paperboat-worker" {
-		t.Errorf("the runner got deployment %q", got)
+	if got := runners.jobs[0].Params["component"]; got != "worker" {
+		t.Errorf("the runner got component %q", got)
 	}
 	recorded, _ := eventData(t, o, "runbook.succeeded")["params"].(map[string]any)
-	if recorded["deployment"] != "paperboat-worker" {
+	if recorded["component"] != "worker" {
 		t.Errorf("recorded params = %#v", recorded)
 	}
 }

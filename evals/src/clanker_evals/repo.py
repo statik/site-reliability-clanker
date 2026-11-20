@@ -70,9 +70,38 @@ def one_of(names: list[str]) -> str:
     return ", ".join(first) + " or " + last
 
 
-def workloads() -> list[str]:
-    """Return the deployments of the components. Mirrors Pack.Workloads in internal/pack."""
-    return [component["workload"] for component in PACK["components"]]
+def component_names() -> list[str]:
+    """Return the names of the components of the pack, in the order of the manifest."""
+    return [component["name"] for component in PACK["components"]]
+
+
+def components_with_workloads() -> list[str]:
+    """Return each component with its deployment. Mirrors componentsWithWorkloads in Go."""
+    return [
+        component["name"] + " (the deployment " + component["workload"] + ")"
+        for component in PACK["components"]
+    ]
+
+
+@cache
+def mitigation_runbooks() -> list[str]:
+    """Return the names of the runbooks of the pack that are mitigations for an incident.
+
+    The names are in their order, as Pack.Load keeps them in Go. A pack with no directory of
+    runbooks has none.
+    """
+    if "runbooks" not in PACK:
+        return []
+    names = []
+    for path in (PACK_DIR / PACK["runbooks"]).glob("*.json"):
+        if json.loads(path.read_text(encoding="utf-8")).get("incident_mitigation") is True:
+            names.append(path.stem)
+    return sorted(names)
+
+
+def mitigation_names() -> str:
+    """Write the mitigation runbooks as "a, b", or "none". Mirrors mitigationNames in Go."""
+    return ", ".join(mitigation_runbooks()) or "none"
 
 
 def primary_check() -> str:
@@ -85,7 +114,8 @@ def render(text: str) -> str:
     values = {
         "{{releases_repository}}": RELEASES_REPO,
         "{{releases_directory}}": PACK["releases"]["directory"],
-        "{{deployments}}": one_of(workloads()),
+        "{{components}}": one_of(components_with_workloads()),
+        "{{mitigations}}": mitigation_names(),
     }
     for placeholder, value in values.items():
         text = text.replace(placeholder, value)

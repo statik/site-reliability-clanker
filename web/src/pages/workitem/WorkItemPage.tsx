@@ -170,7 +170,7 @@ function Diagnosis({ events }: { events: AuditEvent[] }) {
       {field("proposed_runbook") !== "" && (
         <p className="app-label">
           Proposed mitigation: runbook {field("proposed_runbook")} on{" "}
-          {field("deployment") || "no deployment"}
+          {field("component") || "no component"}
         </p>
       )}
     </Tile>

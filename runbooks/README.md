@@ -95,26 +95,28 @@ head of `main` and checks each request against it before a work item or a grant 
 
 ```json
 {
-  "description": "Restart one Paperboat deployment and wait for the rollout. It changes no data.",
+  "title": "Restart a component",
+  "description": "Restart one Paperboat component and wait for the rollout. It changes no data.",
   "tier": "T1",
   "incident_mitigation": true,
   "inputs": {
-    "deployment": {
+    "component": {
       "type": "string",
-      "description": "The deployment to restart, in the namespace paperboat.",
-      "values": ["paperboat-api", "paperboat-web", "paperboat-worker"]
+      "description": "The component to restart. Its deployment is in the namespace paperboat.",
+      "values": ["api", "web", "worker"]
     }
   }
 }
 ```
 
-This is `jobs/restart-deployment.json`. It has no outputs. `jobs/db-backup.json` has two.
+This is `jobs/restart-component.json`. It has no outputs. `jobs/db-backup.json` has two.
 
 | Field | Meaning |
 |---|---|
+| `title` | The name of the action, in one to five words of letters, digits and `-`. It goes into the title of the work item of a mitigation: "Restart a component (api) to mitigate WI-0007". Optional, but a mitigation for an incident must have it |
 | `description` | What the runbook does and what it does not change. Required |
 | `tier` | The risk tier that a run needs: `T0` to `T3`. A standing approval covers only `T1`, so the control plane runs only a `T1` runbook |
-| `incident_mitigation` | `true` when the Investigator can propose the runbook for an incident. The default is `false`. The Investigator gives one parameter, `deployment`, so such a runbook must have exactly that input |
+| `incident_mitigation` | `true` when the Investigator can propose the runbook for an incident. The default is `false`. The Investigator gives one parameter, `component`, so such a runbook must have a `title` and exactly that input. Each value of the input must be the name of a component of the application pack |
 | `inputs` | The parameters, by name. A request must give each one and no other |
 | `outputs` | The values that the script reports, by name. A run must report each one and no other |
 
@@ -131,7 +133,7 @@ The script is the steps of the runbook. The runner starts it with this environme
 
 | Variable | Content |
 |---|---|
-| `PARAM_<NAME>` | The value of the input `<name>`, with the name in upper case |
+| `PARAM_<NAME>` | The value of the input `<name>`, with the name in upper case. A mitigation gets `PARAM_COMPONENT`, the name of a component. The script makes the name of the deployment from it |
 | `KUBECONFIG` | The file with the short-lived credential of this run |
 | `OUTPUT_FILE` | The file for the outputs. Append one line `name=value` for each output |
 | `STATE_DIR` | The state directory of the environment on the runner |

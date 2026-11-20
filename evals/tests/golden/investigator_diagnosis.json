@@ -5,7 +5,7 @@
     "target": "A fault inside the running api process (in-memory fault state): pods are healthy and not restarted, no deploy happened, yet inventory requests answer 500.",
     "metadata": {
       "role": "investigator",
-      "expect": "restart:paperboat-api",
+      "expect": "restart-component:api",
       "evidence": [
         "request handler failed",
         "/api/inventory",
@@ -19,7 +19,7 @@
     "target": "A fault inside the running api process (in-memory fault state). The worker restart three days ago is unrelated.",
     "metadata": {
       "role": "investigator",
-      "expect": "restart:paperboat-api",
+      "expect": "restart-component:api",
       "evidence": [
         "request handler failed",
         "/api/inventory",
@@ -106,7 +106,7 @@
     "target": "The api container runs out of memory and is OOM-killed again and again (heap near the 256 MB limit).",
     "metadata": {
       "role": "investigator",
-      "expect": "either:paperboat-api",
+      "expect": "either:restart-component:api",
       "evidence": [
         "OOMKill",
         "out of memory",
@@ -147,7 +147,7 @@
     "target": "The web pod fails its readiness probe (timeout) while the api answers every request; the fault is in the web deployment, not in the api.",
     "metadata": {
       "role": "investigator",
-      "expect": "either:paperboat-web",
+      "expect": "either:restart-component:web",
       "evidence": [
         "Readiness probe failed",
         "paperboat-web-5b8c6d7f9-h7j3w",

@@ -151,15 +151,15 @@ func TestRestoreDrillRunbookReportsTheBackupThatItRestored(t *testing.T) {
 }
 
 func TestRestartRunbookNeedsItsInput(t *testing.T) {
-	outputs, log, err := runRepositoryRunbook(t, "restart-deployment",
-		map[string]string{"deployment": "paperboat-web"})
+	outputs, log, err := runRepositoryRunbook(t, "restart-component",
+		map[string]string{"component": "web"})
 	if err != nil || len(outputs) != 0 {
 		t.Fatalf("error = %v, outputs = %v\n%s", err, outputs, log)
 	}
 	if !strings.Contains(log, "rollout restart deployment/paperboat-web") {
 		t.Errorf("log = %q", log)
 	}
-	_, log, err = runRepositoryRunbook(t, "restart-deployment", nil)
+	_, log, err = runRepositoryRunbook(t, "restart-component", nil)
 	if err == nil || strings.Contains(log, "rollout restart") {
 		t.Errorf("error = %v, want a failure before any command\n%s", err, log)
 	}

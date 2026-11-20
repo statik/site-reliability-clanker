@@ -95,19 +95,28 @@ A pack comes from outside the core. `pack.Load` refuses a manifest when:
 - the directory of the runbooks or of the eval cases has a directory in it, a file of
   more than 256 KiB, a script with no definition, a definition with no script or a
   definition that `internal/runbook` refuses;
-- a runbook that the Investigator can propose names a deployment that is not the workload
-  of a component;
-- an eval case file does not have `schema` 1, the task of its name, and 1 to 200 samples
+- a runbook that the Investigator can propose has no `title`, has a `title` that is not
+  one to five words, does not have the input `component`, has a second input, or permits
+  a value that is not the name of a component. The name of a workload is not the name of
+  a component;
+- an eval case file does not have `schema` 2, the task of its name, and 1 to 200 samples
   that each have their own `id`.
 
-Only names that passed these checks go into the prompt of a model, through three
-placeholders: `{{releases_repository}}`, `{{releases_directory}}` and `{{deployments}}`
-(the workloads of the components).
+Only names that passed these checks go into the prompt of a model, through four
+placeholders:
+
+| Placeholder | Text |
+|---|---|
+| `{{releases_repository}}` | The repository with the release notes: `paperboat` |
+| `{{releases_directory}}` | The directory of the notes in that repository: `releases` |
+| `{{components}}` | The components, each with its deployment: `api (the deployment paperboat-api), web (the deployment paperboat-web) or worker (the deployment paperboat-worker)` |
+| `{{mitigations}}` | The runbooks that are mitigations for an incident, in the order of their names: `restart-component`. The word `none` when the pack has none |
 
 ## Runbooks
 
-The runbooks of an application are in the pack, because they name its deployments and its
-database. At the first start, the control plane puts them in the directory `jobs/` of the
+The runbooks of an application are in the pack, because they name its components and its
+database. A runbook that is a mitigation for an incident gets the name of a component, and
+its script makes the name of the deployment. At the first start, the control plane puts them in the directory `jobs/` of the
 runbooks repository, beside the policies and the notification routes of the core. A pack
 can put files only there: it cannot bring a policy, change a risk tier or add a route.
 `runbooks/README.md` has the format of a definition.
@@ -116,7 +125,9 @@ can put files only there: it cannot bring a policy, change a risk tier or add a 
 
 `evals/investigator_diagnosis.json` has the incidents that the eval suite gives to the
 Investigator role: for each one the transcript of the debug session, the true cause, the
-mitigation that is acceptable, and the evidence that the answer must cite. The suite
+mitigation that is acceptable, and the evidence that the answer must cite. The field
+`expect` of a case is `none`, `<runbook>:<component>`, or `either:<runbook>:<component>`
+when that mitigation and no mitigation are both acceptable. The suite
 (`evals/`) has the checks, which are the same for every pack. Only this task reads its
 samples from the pack; the other tasks have their samples in the code of the suite.
 
@@ -143,8 +154,8 @@ ok    components: api (paperboat-api), web (paperboat-web), worker (paperboat-wo
 ok    diagnostics: 2 reads, and the state of the pods and the deployments
 ok    checks: ready /api/healthz 200, inventory /api/inventory 200 (primary)
 ok    version: http-json /api/version
-ok    incident: restart-deployment on api without a diagnosis of a model
-ok    runbooks: db-backup, db-maintenance, restart-deployment, restore-drill
+ok    incident: restart-component on api without a diagnosis of a model
+ok    runbooks: db-backup, db-maintenance, restart-component, restore-drill
 ok    eval cases: investigator_diagnosis
 ok    hash: sha256 <64 hexadecimal characters>
 ```
@@ -200,7 +211,5 @@ The core on a cloud has no disk. It reads only the pack that it carries.
 - The recorded model answers in `internal/agent/replay` are answers about Paperboat.
 - The eval tasks other than `investigator_diagnosis` have their samples in the code of the
   suite, and those samples are about Paperboat.
-- The runbooks, the prompt of the Investigator and the eval cases still name deployments,
-  not components. `docs/PACKS.md` section B.14 has the order of the work.
 - The scripts of the runbooks of Paperboat have the namespaces `paperboat` and
   `paperboat-data` in their text. They do not read the targets.

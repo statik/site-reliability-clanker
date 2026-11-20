@@ -807,6 +807,7 @@ Open:
 | Schema change | Schema 2 replaces schema 1, for new environments (B.10) | A migration of an environment that runs |
 | Hardware of a server (disks, the RAID, power, the management controller) | Not in this design. No detector uses it, and it belongs to the platform | Receivers of the collector for it, as a part of the target for hosts that exist |
 | Data from a monitoring system that the application has already | Not in this design | The collector reads it: it has receivers for the common formats |
+| Where the text is that says when a mitigation fits | In the prompt of the core, in general words, while a pack has one kind of mitigation | A checked field of the runbook definition |
 | Names of the fields of the observation | The names of this document. No public convention has this record: OpenTelemetry has names for the identity of a service, a host and a pod, and no values for health. The health check format of the IETF is a draft that expired in 2022 | The OpenTelemetry names for the identity fields, when the record goes to another system |
 
 ### B.14 Build order
@@ -831,8 +832,17 @@ Each step is one pull request or a few, and each leaves Paperboat working.
    and the debug session and the rights of the identities read it. On Kubernetes the
    output is a map with the key `application` for the namespace of the components and
    the key `data` for the namespace of the data services; a list for each component
-   comes with a runtime on hosts. The approval page does not show the targets yet. The
-   runbooks and the prompt of the Investigator still name deployments.
+   comes with a runtime on hosts. The runbooks, the prompt of the Investigator and the
+   eval cases name components now. A mitigation runbook has a `title` and the one input
+   `component`, and the prompt gets the components and the mitigation runbooks of the
+   pack through placeholders. The evals of the Investigator ran with the live models
+   after the change of the prompt, with the same scores as before.
+
+   The approval page has no own display of the targets. On Kubernetes the targets come
+   from the variable `app_namespace` of the layer `40-platform` and from the code of the
+   layer `30-data`, and a change of either is a change of the platform repository, which
+   the approval page shows as a diff and a plan. An own display comes with the runtime
+   on hosts, where the targets are a list of addresses. With this, step 1 is complete.
 2. **The collector on Kubernetes.** The build of the collector. The endpoint of the core
    and the observation. The generator of the configuration. State, versions and volumes
    of Paperboat. The health history by name. The storage detector reads real samples.

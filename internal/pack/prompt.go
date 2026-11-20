@@ -8,13 +8,33 @@ import "strings"
 //
 //	{{releases_repository}}  the repository with the release notes
 //	{{releases_directory}}   the directory of the notes in that repository
-//	{{deployments}}          the deployments of the components, as "a, b or c"
+//	{{components}}           the components, each with its deployment, as "a, b or c"
+//	{{mitigations}}          the runbooks that are mitigations for an incident, or "none"
 func (p Pack) Render(prompt string) string {
 	return strings.NewReplacer(
 		"{{releases_repository}}", p.Releases.Repository,
 		"{{releases_directory}}", p.Releases.Directory,
-		"{{deployments}}", oneOf(p.Workloads()),
+		"{{components}}", oneOf(p.componentsWithWorkloads()),
+		"{{mitigations}}", p.mitigationNames(),
 	).Replace(prompt)
+}
+
+// componentsWithWorkloads returns each component as "api (the deployment shop-api)".
+func (p Pack) componentsWithWorkloads() []string {
+	names := make([]string, 0, len(p.Components))
+	for _, component := range p.Components {
+		names = append(names, component.Name+" (the deployment "+component.Workload+")")
+	}
+	return names
+}
+
+// mitigationNames returns the names of the mitigation runbooks as "a, b", or the word
+// "none" when the pack has none.
+func (p Pack) mitigationNames() string {
+	if len(p.mitigations) == 0 {
+		return "none"
+	}
+	return strings.Join(p.mitigations, ", ")
 }
 
 // oneOf writes a list as "a, b or c".

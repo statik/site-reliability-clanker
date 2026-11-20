@@ -10,12 +10,12 @@ from inspect_ai.solver import TaskState
 
 from clanker_evals import pack_cases
 from clanker_evals.checks import (
-    ALLOWED_MITIGATIONS,
     NO_MITIGATION,
-    RUNBOOKS,
     Verdict,
     answer_text,
     has_string_fields,
+    is_component,
+    is_mitigation,
     mitigation,
     parse_object,
     rubric,
@@ -26,7 +26,7 @@ from clanker_evals.inputs import finding, investigator_input
 from clanker_evals.repo import PACK, primary_check
 from clanker_evals.solvers import role_turn
 
-FIELDS = ["diagnosis", "evidence", "proposed_runbook", "deployment", "write_up"]
+FIELDS = ["diagnosis", "evidence", "proposed_runbook", "component", "write_up"]
 POD_NAME = re.compile(
     rf"\b((?:{re.escape(PACK['name'])}-[a-z]+-[a-z0-9]{{8,10}}-[a-z0-9]{{5}})|postgres-\d)\b"
 )
@@ -49,10 +49,10 @@ def alert(failed: int = 9, version: str = "1.0.0") -> dict[str, Any]:
 
 # The fields of one case of the application pack, in <evals>/investigator_diagnosis.json:
 # the transcript of the debug session, the true cause (the criterion for the grader), the
-# acceptable mitigation ("restart:<deployment>", "none", or "either:<deployment>" when a
-# restart of that deployment and no mitigation are both acceptable), patterns of the
-# evidence in the transcript (the answer must cite one), and the arguments of alert(). The
-# optional field "history" has the lines of the change history, newest first.
+# acceptable mitigation ("<runbook>:<component>", "none", or "either:<runbook>:<component>"
+# when that mitigation and no mitigation are both acceptable), patterns of the evidence in
+# the transcript (the answer must cite one), and the arguments of alert(). The optional
+# field "history" has the lines of the change history, newest first.
 CASE_FIELDS: dict[str, type] = {
     "transcript": str,
     "cause": str,
@@ -62,12 +62,42 @@ CASE_FIELDS: dict[str, type] = {
 }
 
 
+def expected_mitigation(expect: str) -> tuple[bool, str, str]:
+    """Read the field "expect" of a case.
+
+    Args:
+        expect: "none", "<runbook>:<component>" or "either:<runbook>:<component>".
+
+    Returns:
+        Whether no mitigation is acceptable, and the runbook and the component of the
+        acceptable mitigation. The two names are empty when the case expects no mitigation.
+
+    Raises:
+        ValueError: The runbook is not a mitigation of the pack, or the component is not a
+            component of the pack.
+    """
+    if expect == "none":
+        return (True, "", "")
+    wanted = expect.removeprefix("either:")
+    runbook, _, component = wanted.partition(":")
+    if not is_mitigation(runbook) or not is_component(component):
+        raise ValueError(
+            f"expect is {expect!r}; it must be none, <runbook>:<component> or "
+            "either:<runbook>:<component>, with a mitigation runbook and a component of the pack"
+        )
+    return (wanted != expect, runbook, component)
+
+
 def incident_sample(case: pack_cases.Case) -> Sample:
     """Build one Investigator sample from a case of the application pack."""
     name, transcript, evidence = case["id"], case["transcript"], case["evidence"]
     missing = [p for p in evidence if not re.search(p, transcript, re.IGNORECASE)]
     if missing:
         raise ValueError(f"sample {name}: evidence {missing} is not in its transcript")
+    try:
+        expected_mitigation(case["expect"])
+    except ValueError as error:
+        raise ValueError(f"sample {name}: {error}") from error
     return Sample(
         id=name,
         input=investigator_input(alert(**case["alert"]), transcript, case.get("history")),
@@ -83,27 +113,22 @@ def diagnosis_samples() -> list[Sample]:
 
 
 def _mitigation_verdicts(state: TaskState) -> dict[str, Verdict]:
-    runbook, deployment = mitigation(parse_object(state.output.completion))
-    restart = runbook == RUNBOOKS[0]
-    kind, _, wanted = state.metadata["expect"].partition(":")
-    right_restart = restart and deployment == wanted
-    matches = {
-        "restart": right_restart,
-        "none": runbook in NO_MITIGATION,
-        "either": right_restart or runbook in NO_MITIGATION,
-    }[kind]
+    runbook, component = mitigation(parse_object(state.output.completion))
+    proposed = is_mitigation(runbook)
+    none_fits, wanted_runbook, wanted_component = expected_mitigation(state.metadata["expect"])
+    right = proposed and (runbook, component) == (wanted_runbook, wanted_component)
     return {
         "runbook_from_list": (
-            restart or runbook in NO_MITIGATION,
+            proposed or runbook in NO_MITIGATION,
             f"proposed_runbook {runbook!r} is not in the list of routine runbooks",
         ),
-        "deployment_allowed": (
-            not restart or deployment in ALLOWED_MITIGATIONS,
-            f"deployment {deployment!r} is not an allowed target",
+        "component_allowed": (
+            not proposed or is_component(component),
+            f"component {component!r} is not an allowed target",
         ),
         "mitigation_fits_cause": (
-            matches,
-            f"proposed {runbook!r} on {deployment!r}; expected {state.metadata['expect']}",
+            right or (none_fits and runbook in NO_MITIGATION),
+            f"proposed {runbook!r} on {component!r}; expected {state.metadata['expect']}",
         ),
     }
 

@@ -1,0 +1,13 @@
+{
+  "title": "Restart a component",
+  "description": "Restart one Harbor component and wait for the rollout. It changes no data.",
+  "tier": "T1",
+  "incident_mitigation": true,
+  "inputs": {
+    "component": {
+      "type": "string",
+      "description": "The component to restart. Its deployment is in the namespace harbor.",
+      "values": ["api", "web", "worker"]
+    }
+  }
+}

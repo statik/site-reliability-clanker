@@ -13,7 +13,7 @@ from typing import Any
 
 from clanker_evals.repo import PACK, PACK_DIR
 
-SCHEMA = 1
+SCHEMA = 2
 # The task file (tasks/<file>.py) of each task that reads its samples from the pack.
 TASK_FILES = {"investigator_diagnosis": "investigator"}
 SAMPLE_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,60}$")

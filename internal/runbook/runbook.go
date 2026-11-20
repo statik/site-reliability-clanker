@@ -34,8 +34,15 @@ const maxOutputLength = 500
 var (
 	name      = regexp.MustCompile(`^[a-z][a-z0-9-]{1,40}$`)
 	fieldName = regexp.MustCompile(`^[a-z][a-z0-9_]{0,30}$`)
-	tiers     = []string{"T0", "T1", "T2", "T3"}
+	// A title is one to five words, with no punctuation that can make a sentence.
+	title = regexp.MustCompile(
+		`^[A-Za-z][A-Za-z0-9-]{0,19}( [A-Za-z0-9][A-Za-z0-9-]{0,19}){0,4}$`)
+	tiers = []string{"T0", "T1", "T2", "T3"}
 )
+
+// MitigationInput is the one input of a runbook that is a mitigation for an incident: the
+// name of a component of the application.
+const MitigationInput = "component"
 
 // ValidName reports whether text can be the name of a runbook.
 func ValidName(text string) bool { return name.MatchString(text) }
@@ -52,13 +59,16 @@ type Field struct {
 // Definition describes one runbook. Its steps are the script with the same name.
 type Definition struct {
 	// Name comes from the name of the file, not from its content.
-	Name        string `json:"name"`
+	Name string `json:"name"`
+	// Title names the action in the title of a work item, in one to five words. A mitigation
+	// for an incident must have one.
+	Title       string `json:"title,omitempty"`
 	Description string `json:"description"`
 	// Tier is the risk tier that a run needs.
 	Tier string `json:"tier"`
 	// IncidentMitigation means that the Investigator can propose the runbook for an incident.
-	// The Investigator gives one parameter, "deployment", so such a runbook must have
-	// exactly that input.
+	// The Investigator gives one parameter, the name of a component, so such a runbook must
+	// have a title and exactly the input MitigationInput.
 	IncidentMitigation bool `json:"incident_mitigation,omitempty"`
 	// Inputs are the parameters. A request must give each one, and no other.
 	Inputs map[string]Field `json:"inputs,omitempty"`
@@ -92,11 +102,8 @@ func Parse(runbookName string, raw []byte) (Definition, error) {
 }
 
 func (d Definition) check() error {
-	if strings.TrimSpace(d.Description) == "" {
-		return errors.New("it has no description")
-	}
-	if !slices.Contains(tiers, d.Tier) {
-		return fmt.Errorf("the tier %q is not one of %s", d.Tier, strings.Join(tiers, ", "))
+	if err := d.checkText(); err != nil {
+		return err
 	}
 	for _, field := range sortedNames(d.Inputs) {
 		if err := checkInput(d.Inputs[field]); err != nil {
@@ -108,7 +115,45 @@ func (d Definition) check() error {
 			return fmt.Errorf("output %q: %w", field, err)
 		}
 	}
-	return checkNames(d.Inputs, d.Outputs)
+	if err := checkNames(d.Inputs, d.Outputs); err != nil {
+		return err
+	}
+	return d.checkMitigation()
+}
+
+func (d Definition) checkText() error {
+	if strings.TrimSpace(d.Description) == "" {
+		return errors.New("it has no description")
+	}
+	if !slices.Contains(tiers, d.Tier) {
+		return fmt.Errorf("the tier %q is not one of %s", d.Tier, strings.Join(tiers, ", "))
+	}
+	if d.Title != "" && !title.MatchString(d.Title) {
+		return fmt.Errorf("the title %q is not one to five words: it must match %s", d.Title,
+			title)
+	}
+	return nil
+}
+
+// checkMitigation checks a runbook that the Investigator can propose. The Investigator
+// gives the name of a component and nothing else, and the title of the runbook goes into
+// the title of the work item.
+func (d Definition) checkMitigation() error {
+	if !d.IncidentMitigation {
+		return nil
+	}
+	if d.Title == "" {
+		return errors.New("a mitigation for an incident must have a title")
+	}
+	if _, declared := d.Inputs[MitigationInput]; !declared {
+		return fmt.Errorf("a mitigation for an incident must have the input %q",
+			MitigationInput)
+	}
+	if len(d.Inputs) != 1 {
+		return fmt.Errorf("a mitigation for an incident has the input %q and no other; its "+
+			"inputs are %s", MitigationInput, list(sortedNames(d.Inputs)))
+	}
+	return nil
 }
 
 func checkNames(groups ...map[string]Field) error {

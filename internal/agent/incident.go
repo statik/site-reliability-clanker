@@ -11,6 +11,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/audit"
 	"github.com/statik/site-reliability-clanker/internal/detect"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
+	"github.com/statik/site-reliability-clanker/internal/runbook"
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
 
@@ -18,7 +19,7 @@ type diagnosis struct {
 	Diagnosis       string `json:"diagnosis"`
 	Evidence        string `json:"evidence"`
 	ProposedRunbook string `json:"proposed_runbook"`
-	Deployment      string `json:"deployment"`
+	Component       string `json:"component"`
 	WriteUp         string `json:"write_up"`
 }
 
@@ -61,8 +62,7 @@ func (a *Agent) templateDiagnosis() diagnosis {
 	d := diagnosis{Diagnosis: "No model diagnosis is available in replay mode.",
 		Evidence: "See the recorded debug session.", ProposedRunbook: "none"}
 	if incident := a.App.Incident; incident != nil {
-		component, _ := a.App.Component(incident.Component)
-		d.ProposedRunbook, d.Deployment = incident.Runbook, component.Workload
+		d.ProposedRunbook, d.Component = incident.Runbook, incident.Component
 	}
 	return d
 }
@@ -93,23 +93,29 @@ func (a *Agent) recentChanges(env string) (string, error) {
 
 // mitigationParams are the parameters of the runbook that the Investigator proposes.
 func mitigationParams(d diagnosis) map[string]string {
-	return map[string]string{"deployment": d.Deployment}
+	return map[string]string{runbook.MitigationInput: d.Component}
 }
 
 // checkMitigation checks the proposal of the Investigator against the definition of the
 // runbook in the runbooks repository. The model proposes; the definition decides: the
 // runbook must exist, it must be marked as a mitigation for an incident, and the
-// deployment must be one of the values of its input.
-func (a *Agent) checkMitigation(d diagnosis) error {
+// component must be one of the values of its input. It returns the definition.
+func (a *Agent) checkMitigation(d diagnosis) (runbook.Definition, error) {
 	definition, err := a.Orch.CheckRunbook(d.ProposedRunbook, mitigationParams(d))
 	if err != nil {
-		return err
+		return runbook.Definition{}, err
 	}
 	if !definition.IncidentMitigation {
-		return fmt.Errorf("%w: runbook %s is not a mitigation for an incident",
-			orchestrator.ErrInvalid, definition.Name)
+		return runbook.Definition{}, fmt.Errorf("%w: runbook %s is not a mitigation for an "+
+			"incident", orchestrator.ErrInvalid, definition.Name)
 	}
-	return nil
+	return definition, nil
+}
+
+// mitigationTitle is the title of the work item of a mitigation: what the runbook does, on
+// which component, and for which incident.
+func mitigationTitle(definition runbook.Definition, d diagnosis, incident string) string {
+	return fmt.Sprintf("%s (%s) to mitigate %s", definition.Title, d.Component, incident)
 }
 
 func (a *Agent) recovered(ctx context.Context, env string) (bool, string) {
@@ -160,7 +166,7 @@ func (a *Agent) escalate(wi orchestrator.WorkItem, f detect.Finding, d diagnosis
 		return err
 	}
 	return a.failIncident(wi, fmt.Errorf("the proposed mitigation %q on %q is not a "+
-		"routine runbook; a human must decide", d.ProposedRunbook, d.Deployment))
+		"routine runbook; a human must decide", d.ProposedRunbook, d.Component))
 }
 
 // HandleIncident runs use case 17: alert, diagnosis under a debug grant, mitigation with a
@@ -182,8 +188,9 @@ func (a *Agent) HandleIncident(ctx context.Context, f detect.Finding) error {
 	a.emit(audit.Event{Type: "incident.diagnosed", Actor: RoleInvestigator, Env: f.Env,
 		WorkItem: wi.ID, Summary: "Diagnosis: " + d.Diagnosis,
 		Data: map[string]any{"evidence": d.Evidence, "proposed_runbook": d.ProposedRunbook,
-			"deployment": d.Deployment, "model": model}})
-	if err := a.checkMitigation(d); errors.Is(err, orchestrator.ErrInvalid) {
+			"component": d.Component, "model": model}})
+	definition, err := a.checkMitigation(d)
+	if errors.Is(err, orchestrator.ErrInvalid) {
 		return a.escalate(wi, f, d, model)
 	} else if err != nil {
 		return a.failIncident(wi, err)
@@ -191,18 +198,20 @@ func (a *Agent) HandleIncident(ctx context.Context, f detect.Finding) error {
 	mitigation, err := a.Orch.RunRunbook(ctx, orchestrator.RunbookRequest{Env: f.Env,
 		Name: d.ProposedRunbook, Params: mitigationParams(d),
 		Actor: RoleInvestigator, Trigger: "Mitigation for " + wi.ID,
-		Title: fmt.Sprintf("Restart %s to mitigate %s", d.Deployment, wi.ID)})
+		Title: mitigationTitle(definition, d, wi.ID)})
 	if err != nil {
 		return a.failIncident(wi, err)
 	}
 	return a.resolve(ctx, wi, f, incidentEnd{diagnosis: d, model: model,
-		mitigation: mitigation.ID, opened: opened})
+		runbook: definition.Name, mitigation: mitigation.ID, opened: opened})
 }
 
 // incidentEnd is what the write-up of a mitigated incident needs.
 type incidentEnd struct {
-	diagnosis  diagnosis
-	model      string
+	diagnosis diagnosis
+	model     string
+	// runbook is the name of the runbook that ran, and mitigation is its work item.
+	runbook    string
 	mitigation string
 	opened     time.Time
 }
@@ -229,7 +238,8 @@ func (a *Agent) resolve(ctx context.Context, wi orchestrator.WorkItem, f detect.
 		UserEffect: f.Title,
 		PreChecks: []string{"Debug session recorded: read-only, namespace " +
 			targets.Namespace},
-		Rollback:     "The restart is reversible; no configuration changed",
+		Rollback: "The mitigation is the routine runbook " + end.runbook +
+			"; no configuration changed",
 		Verification: check,
 		Backup:       "Not needed; no data changed",
 		Duration:     fmt.Sprintf("%d minutes from alert to recovery", minutes),

@@ -14,11 +14,9 @@ from inspect_ai.scorer import Score, Scorer, model_graded_qa
 from inspect_ai.solver import TaskState
 
 from clanker_evals.inputs import TIERS
+from clanker_evals.repo import component_names, mitigation_runbooks
 
 Verdict = tuple[bool, str]
-
-ALLOWED_MITIGATIONS = ["paperboat-api", "paperboat-web", "paperboat-worker"]
-RUNBOOKS = ["restart-deployment"]
 
 VERSION = re.compile(r"(?<![\w.])v?(\d+\.\d+(?:\.\d+)?(?:-[a-z][a-z0-9]*)?)(?![\w]|\.\d)")
 # An OpenTofu address: a resource type with an underscore, a dot and a resource name.
@@ -321,12 +319,26 @@ def has_string_fields(parsed: dict[str, Any] | None, fields: list[str], exact: b
 
 
 def mitigation(parsed: dict[str, Any] | None) -> tuple[str, str]:
-    """Return the proposed runbook and deployment of a diagnosis, trimmed and lower-case."""
+    """Return the proposed runbook and component of a diagnosis, trimmed and lower-case."""
     if parsed is None:
         return ("", "")
     runbook = str(parsed.get("proposed_runbook") or "").strip().lower()
-    deployment = str(parsed.get("deployment") or "").strip().lower()
-    return (runbook, deployment)
+    component = str(parsed.get("component") or "").strip().lower()
+    return (runbook, component)
+
+
+def is_mitigation(runbook: str) -> bool:
+    """Report whether the runbook is a mitigation for an incident in the pack.
+
+    The names come from the runbook definitions of the pack: the definitions with
+    incident_mitigation true.
+    """
+    return runbook in mitigation_runbooks()
+
+
+def is_component(name: str) -> bool:
+    """Report whether the name is the name of a component in the manifest of the pack."""
+    return name in component_names()
 
 
 def to_score(
