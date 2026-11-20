@@ -86,15 +86,16 @@ func (m *Monitor) Probe(ctx context.Context, env string, count int) (Sample, err
 	var version struct {
 		Version string `json:"version"`
 	}
-	if _, err := m.getJSON(ctx, base+m.App.Health.VersionPath, &version); err == nil {
+	if _, err := m.getJSON(ctx, base+m.App.AppVersion.Path, &version); err == nil {
 		sample.Version = version.Version
 	}
 	durations := []float64{}
+	primary := m.App.PrimaryCheck()
 	for range count {
 		start := time.Now()
-		status, err := m.getJSON(ctx, base+m.App.Health.ProbePath, nil)
+		status, err := m.getJSON(ctx, base+primary.Path, nil)
 		durations = append(durations, float64(time.Since(start).Microseconds())/1000)
-		if err == nil && status == http.StatusOK {
+		if err == nil && status == primary.PassStatus() {
 			sample.OK++
 		}
 	}
@@ -177,19 +178,20 @@ func (m *Monitor) Verify(ctx context.Context, wi orchestrator.WorkItem) (orchest
 	result := orchestrator.VerifyResult{}
 	deadline := time.Now().Add(90 * time.Second)
 	for {
-		status, err := m.getJSON(ctx, base+m.App.Health.ReadyPath, nil)
+		failed := m.failedCheck(ctx, base)
 		var version struct {
 			Version string `json:"version"`
 		}
-		_, versionErr := m.getJSON(ctx, base+m.App.Health.VersionPath, &version)
-		if err == nil && status == http.StatusOK && versionErr == nil && version.Version == want {
-			result.Checks = append(result.Checks, "health check answers 200",
-				"running version is "+want)
+		_, versionErr := m.getJSON(ctx, base+m.App.AppVersion.Path, &version)
+		if failed == "" && versionErr == nil && version.Version == want {
+			result.Checks = append(result.Checks, m.passedChecks()...)
+			result.Checks = append(result.Checks, "running version is "+want)
 			break
 		}
 		if time.Now().After(deadline) {
 			result.Reason = fmt.Sprintf("after 90 s the application does not report healthy "+
-				"version %s (health status %d, version %q)", want, status, version.Version)
+				"version %s (%s, version %q)", want, orText(failed, "each check passes"),
+				version.Version)
 			return result, nil
 		}
 		time.Sleep(3 * time.Second)
@@ -203,7 +205,7 @@ func (m *Monitor) Verify(ctx context.Context, wi orchestrator.WorkItem) (orchest
 	}
 	errorRate := 100 * float64(sample.Total-sample.OK) / float64(sample.Total)
 	check := fmt.Sprintf("canary: %d of %d %s requests succeeded (error rate %.0f%%)",
-		sample.OK, sample.Total, m.App.Health.ProbeName, errorRate)
+		sample.OK, sample.Total, m.App.PrimaryCheck().Name, errorRate)
 	result.Checks = append(result.Checks, check)
 	if errorRate >= 10 {
 		result.Reason = fmt.Sprintf("canary failed: error rate %.0f%% is over the 10%% limit "+
@@ -212,6 +214,44 @@ func (m *Monitor) Verify(ctx context.Context, wi orchestrator.WorkItem) (orchest
 	}
 	result.OK = true
 	return result, nil
+}
+
+// failedCheck sends one request for each check that is not the primary check. It returns
+// "" when each one passes, or the text of the first one that fails. The canary measures
+// the primary check after these pass.
+func (m *Monitor) failedCheck(ctx context.Context, base string) string {
+	for _, check := range m.App.Checks {
+		if check.Primary {
+			continue
+		}
+		status, err := m.getJSON(ctx, base+check.Path, nil)
+		if err != nil {
+			return fmt.Sprintf("check %s got no answer", check.Name)
+		}
+		if status != check.PassStatus() {
+			return fmt.Sprintf("check %s answers %d", check.Name, status)
+		}
+	}
+	return ""
+}
+
+// passedChecks returns one line for each check that is not the primary check.
+func (m *Monitor) passedChecks() []string {
+	lines := []string{}
+	for _, check := range m.App.Checks {
+		if !check.Primary {
+			lines = append(lines, fmt.Sprintf("check %s answers %d", check.Name,
+				check.PassStatus()))
+		}
+	}
+	return lines
+}
+
+func orText(text, empty string) string {
+	if text == "" {
+		return empty
+	}
+	return text
 }
 
 // Snapshot is the state of one environment at one time.

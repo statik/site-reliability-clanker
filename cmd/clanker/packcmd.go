@@ -71,14 +71,16 @@ func packFacts(app pack.Pack) []string {
 	lines := []string{
 		fmt.Sprintf("manifest: %s %s (%s), schema %d", app.Name, app.Version, app.Title, app.Schema),
 		fmt.Sprintf("deployment: layer %s, variable %s, chart %s", app.Layer, app.VersionVariable,
-			app.Chart),
+			app.Deploy.Chart),
 		fmt.Sprintf("releases: repository %s, first release %s", app.Releases.Repository,
 			app.Releases.First),
-		fmt.Sprintf("services: %s in the namespace %s", strings.Join(app.Deployments, ", "),
+		fmt.Sprintf("components: %s in the namespace %s", strings.Join(componentFacts(app), ", "),
 			app.Namespace),
-		fmt.Sprintf("debug commands: %d, each one a read", len(app.DebugCommands)),
-		fmt.Sprintf("checks: %s, %s, %s", app.Health.ReadyPath, app.Health.VersionPath,
-			app.Health.ProbePath),
+		fmt.Sprintf("diagnostics: %d reads, and the state of the pods and the deployments",
+			len(app.Diagnostics)),
+		fmt.Sprintf("checks: %s", strings.Join(checkFacts(app), ", ")),
+		fmt.Sprintf("version: %s %s", app.AppVersion.Source, app.AppVersion.Path),
+		"incident: " + incidentFact(app),
 	}
 	for _, part := range app.CheckParts() {
 		lines = append(lines, part.Name+": "+part.Detail)
@@ -89,6 +91,37 @@ func packFacts(app pack.Pack) []string {
 		}
 	}
 	return lines
+}
+
+// componentFacts returns each component with its deployment: "api (shop-api)".
+func componentFacts(app pack.Pack) []string {
+	facts := []string{}
+	for _, component := range app.Components {
+		facts = append(facts, fmt.Sprintf("%s (%s)", component.Name, component.Workload))
+	}
+	return facts
+}
+
+// checkFacts returns each check with what passes it. A pack sets the path and the status,
+// so a person must see them.
+func checkFacts(app pack.Pack) []string {
+	facts := []string{}
+	for _, check := range app.Checks {
+		fact := fmt.Sprintf("%s %s %d", check.Name, check.Path, check.PassStatus())
+		if check.Primary {
+			fact += " (primary)"
+		}
+		facts = append(facts, fact)
+	}
+	return facts
+}
+
+func incidentFact(app pack.Pack) string {
+	if app.Incident == nil {
+		return "no mitigation without a diagnosis of a model"
+	}
+	return fmt.Sprintf("%s on %s without a diagnosis of a model", app.Incident.Runbook,
+		app.Incident.Component)
 }
 
 func packImport(ctx context.Context, args []string, out io.Writer) error {

@@ -17,6 +17,7 @@ from clanker_evals.repo import (
     one_of,
     prompt,
     render,
+    workloads,
 )
 from clanker_evals.tasks import reviewer
 
@@ -178,14 +179,14 @@ def test_the_placeholders_of_a_prompt_match_go() -> None:
     for placeholder, field in {
         "{{releases_repository}}": "p.Releases.Repository",
         "{{releases_directory}}": "p.Releases.Directory",
-        "{{deployments}}": "oneOf(p.Deployments)",
+        "{{deployments}}": "oneOf(p.Workloads())",
     }.items():
         assert f'"{placeholder}", {field},' in source
     assert 'strings.Join(names[:last], ", ") + " or " + names[last]' in source
     assert one_of(["a"]) == "a"
     assert one_of(["a", "b", "c"]) == "a, b or c"
     assert render("{{releases_repository}} {{releases_directory}} {{deployments}}") == (
-        f"{RELEASES_REPO} {PACK['releases']['directory']} {one_of(PACK['deployments'])}"
+        f"{RELEASES_REPO} {PACK['releases']['directory']} {one_of(workloads())}"
     )
 
 

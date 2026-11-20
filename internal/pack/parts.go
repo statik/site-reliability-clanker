@@ -48,7 +48,7 @@ func (p Pack) ReadReleaseNote(version string) ([]byte, error) {
 }
 
 // ChartFiles returns the files of the deployment chart.
-func (p Pack) ChartFiles() (fs.FS, error) { return fs.Sub(p.files, p.Chart) }
+func (p Pack) ChartFiles() (fs.FS, error) { return fs.Sub(p.files, p.Deploy.Chart) }
 
 // RunbookFiles returns the runbooks of the pack: one definition `<name>.json` and one
 // script `<name>.sh` for each. It returns nil when the pack has no runbooks.
@@ -63,6 +63,10 @@ func (p Pack) RunbookFiles() (fs.FS, error) {
 // eval cases. It returns one result for each part that the manifest names.
 func (p Pack) CheckParts() []Check {
 	checks := []Check{}
+	if p.Runbooks == "" && p.Incident != nil {
+		checks = append(checks, Check{Name: "runbooks", Problem: "the pack has an incident " +
+			"runbook and no directory of runbooks"})
+	}
 	if p.Runbooks != "" {
 		names, err := p.checkRunbooks()
 		checks = append(checks, result("runbooks", strings.Join(names, ", "), err))
@@ -115,7 +119,7 @@ func (p Pack) checkRunbooks() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	names := []string{}
+	names, mitigations := []string{}, map[string]runbook.Definition{}
 	for _, file := range files {
 		name, isDefinition := strings.CutSuffix(file, ".json")
 		script, isScript := strings.CutSuffix(file, ".sh")
@@ -139,7 +143,13 @@ func (p Pack) checkRunbooks() ([]string, error) {
 		if err := p.checkMitigation(definition); err != nil {
 			return nil, err
 		}
+		if definition.IncidentMitigation {
+			mitigations[name] = definition
+		}
 		names = append(names, name)
+	}
+	if err := p.checkIncidentRunbook(mitigations); err != nil {
+		return nil, err
 	}
 	if len(names) == 0 || len(names) > maxRunbooks {
 		return nil, fmt.Errorf("%s has %d runbooks; a pack can have 1 to %d", p.Runbooks,
@@ -155,10 +165,31 @@ func (p Pack) checkMitigation(definition runbook.Definition) error {
 		return nil
 	}
 	for _, value := range definition.Inputs["deployment"].Values {
-		if !slices.Contains(p.Deployments, value) {
+		if !slices.Contains(p.Workloads(), value) {
 			return fmt.Errorf("runbook %s can restart %q, which is not a deployment of the pack",
 				definition.Name, value)
 		}
+	}
+	return nil
+}
+
+// checkIncidentRunbook checks the mitigation that the pack names for an incident with no
+// diagnosis of a model: it must be a mitigation of the pack, and it must permit the
+// component of the incident. A pack that fails this check would send each such incident
+// to a person with no word about the cause.
+func (p Pack) checkIncidentRunbook(mitigations map[string]runbook.Definition) error {
+	if p.Incident == nil {
+		return nil
+	}
+	definition, ok := mitigations[p.Incident.Runbook]
+	if !ok {
+		return fmt.Errorf("incident.runbook %q is not a runbook of the pack that is a "+
+			"mitigation for an incident", p.Incident.Runbook)
+	}
+	component, _ := p.Component(p.Incident.Component)
+	if !slices.Contains(definition.Inputs["deployment"].Values, component.Workload) {
+		return fmt.Errorf("incident.runbook %s does not permit %q, the deployment of "+
+			"incident.component %s", definition.Name, component.Workload, component.Name)
 	}
 	return nil
 }

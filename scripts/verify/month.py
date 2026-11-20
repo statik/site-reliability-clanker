@@ -1,10 +1,12 @@
 """Drive the scripted month through the HTTP API: run a scene, approve what waits, wait for the end."""
 import json
+import os
 import sys
 import time
 import urllib.request
 
-BASE = "http://127.0.0.1:7070/api/v1"
+# CLANKER_URL names a control plane on another address, for a run beside the demo.
+BASE = os.environ.get("CLANKER_URL", "http://127.0.0.1:7070") + "/api/v1"
 TERMINAL = {"Done", "Failed", "RolledBack", "Rejected"}
 
 def call(method, path, body=None, user="carol"):

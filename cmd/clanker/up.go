@@ -209,7 +209,7 @@ func seedForge(f *forge.Forge, source fs.FS, app pack.Pack) error {
 	// publishes the later ones.
 	firstRelease := fstest.MapFS{first + ".md": {Data: note, Mode: 0o644}}
 	return f.Seed(app.Releases.Repository, map[string]fs.FS{
-		app.Releases.Directory: firstRelease, app.Chart: chart}, "Release "+first)
+		app.Releases.Directory: firstRelease, app.Deploy.Chart: chart}, "Release "+first)
 }
 
 // adapters returns the channels of the notifier. It also builds the chat apps, which are
@@ -419,6 +419,10 @@ func build(ctx context.Context, o options) (*components, error) {
 // target. It stands in for the release pipeline of the application, which the prototype
 // does not have. It runs when the registry exists, before the application layer needs it.
 func publishImages(ctx context.Context, c *components, o options) error {
+	// A pack with no build program has its images in a registry already.
+	if o.app.Deploy.Build == "" {
+		return nil
+	}
 	outputs, err := c.runner.Outputs(o.env, "10-network")
 	if err != nil {
 		return err
@@ -436,7 +440,7 @@ func publishImages(ctx context.Context, c *components, o options) error {
 		return fmt.Errorf("create image build log: %w", err)
 	}
 	defer logFile.Close()
-	build := filepath.Join(o.packDisk, filepath.FromSlash(o.app.Build))
+	build := filepath.Join(o.packDisk, filepath.FromSlash(o.app.Deploy.Build))
 	cmd := exec.CommandContext(ctx, build, registry)
 	cmd.Stdout, cmd.Stderr = logFile, logFile
 	if err := cmd.Run(); err != nil {

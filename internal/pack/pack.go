@@ -22,7 +22,7 @@ import (
 const ManifestName = "pack.json"
 
 // Schema is the version of the manifest format that this code reads.
-const Schema = 1
+const Schema = 2
 
 // Pack is the manifest of one application pack.
 type Pack struct {
@@ -43,27 +43,25 @@ type Pack struct {
 	// URLOutput is the output of the layer with the address of the application.
 	URLOutput string   `json:"url_output"`
 	Releases  Releases `json:"releases"`
-	// Chart is the directory of the deployment chart, inside the pack.
-	Chart string `json:"chart"`
-	// Mount is the path of the pack in the platform repository. The stacks of the
-	// platform read the chart from there.
-	Mount string `json:"mount"`
-	// Build is the program of the pack that builds the images of every release and
-	// pushes them to a registry. The local target runs it with the registry as argument.
-	Build string `json:"build"`
+	// Deploy says how the layer deploys the application.
+	Deploy Deploy `json:"deploy"`
 	// Namespace is the Kubernetes namespace of the application. A debug session reads
 	// only there. DataNamespace is the namespace of its data services.
 	Namespace     string `json:"namespace"`
 	DataNamespace string `json:"data_namespace"`
-	// Deployments are the deployments that a runbook can name. IncidentDeployment is the
-	// one that an incident names when no model gives a diagnosis.
-	Deployments        []string `json:"deployments"`
-	IncidentDeployment string   `json:"incident_deployment"`
-	// DebugCommands are the kubectl commands of a debug session, with no namespace. The
-	// core adds the namespace. Each one must be a read.
-	DebugCommands [][]string `json:"debug_commands"`
-	Health        Health     `json:"health"`
-	Topology      Topology   `json:"topology"`
+	// Components are the parts of the application that run. A runbook, a diagnostic read
+	// and the Investigator can name only these.
+	Components []Component `json:"components"`
+	// Incident is the mitigation that an incident proposes when no model gives a
+	// diagnosis. A pack can have none: the incident then goes to a person.
+	Incident *Incident `json:"incident,omitempty"`
+	// Diagnostics are the reads of a debug session. The core makes the commands.
+	Diagnostics []Read `json:"diagnostics"`
+	// Checks are the tests of the application over HTTP. Exactly one is the primary check.
+	Checks []HealthCheck `json:"checks"`
+	// AppVersion says where the monitor reads the version of the application that runs.
+	AppVersion AppVersion `json:"app_version"`
+	Topology   Topology   `json:"topology"`
 	// Runbooks is the directory of the runbooks of the application, inside the pack: one
 	// definition and one script for each. The core puts them in the directory of the jobs
 	// of the runbooks repository. A pack can have none.
@@ -89,23 +87,91 @@ type Releases struct {
 	First string `json:"first"`
 }
 
-// Health says how the monitor checks the application over HTTP.
-type Health struct {
-	// ReadyPath answers 200 when the application is ready.
-	ReadyPath string `json:"ready_path"`
-	// VersionPath answers with a JSON object that has the field `version`.
-	VersionPath string `json:"version_path"`
-	// ProbePath is the request that the monitor repeats to measure the error rate.
-	ProbePath string `json:"probe_path"`
-	// ProbeName names that request in a finding: "fails 9 of 20 <name> requests".
-	ProbeName string `json:"probe_name"`
+// Deploy kinds.
+const DeployHelm = "helm"
+
+// Deploy says how the layer of the application deploys it.
+type Deploy struct {
+	// Kind is DeployHelm: the layer installs a chart of the pack.
+	Kind string `json:"kind"`
+	// Chart is the directory of the deployment chart, inside the pack.
+	Chart string `json:"chart"`
+	// Mount is the path of the pack in the platform repository. The stacks of the
+	// platform read the chart from there.
+	Mount string `json:"mount"`
+	// Build is the program of the pack that builds the images of every release and
+	// pushes them to a registry. The local target runs it with the registry as argument.
+	// A pack whose images are in a registry already has none.
+	Build string `json:"build,omitempty"`
 }
 
-// Topology is the part of the topology view that belongs to the application.
+// Runtimes of a component.
+const RuntimeKubernetes = "kubernetes"
+
+// Component is one part of the application that runs.
+type Component struct {
+	// Name is the name in findings, in the topology view and in a diagnostic read.
+	Name string `json:"name"`
+	// Runtime is RuntimeKubernetes.
+	Runtime string `json:"runtime"`
+	// Workload is the name of the deployment of the component.
+	Workload string `json:"workload"`
+	// Required means that the application does not work without the component. No code
+	// reads it yet: the health rules that do come with the state of the components.
+	Required bool `json:"required"`
+}
+
+// Incident is the mitigation that an incident proposes when no model gives a diagnosis.
+type Incident struct {
+	// Runbook is a runbook of the pack that is a mitigation for an incident.
+	Runbook string `json:"runbook"`
+	// Component is the component that the runbook gets.
+	Component string `json:"component"`
+}
+
+// Check kinds.
+const CheckHTTP = "http"
+
+// HealthCheck is one test of the application.
+type HealthCheck struct {
+	// Name names the check in a finding: "fails 9 of 20 <name> requests".
+	Name string `json:"name"`
+	// Kind is CheckHTTP: a GET request on the address of the application.
+	Kind string `json:"kind"`
+	Path string `json:"path"`
+	// Status is the status that passes. The default is 200.
+	Status int `json:"status,omitempty"`
+	// Primary marks the check that the canary, the incident rule and the recovery rule
+	// read. The monitor repeats it to measure the error rate.
+	Primary bool `json:"primary,omitempty"`
+}
+
+// PassStatus returns the HTTP status that passes the check.
+func (c HealthCheck) PassStatus() int {
+	if c.Status == 0 {
+		return 200
+	}
+	return c.Status
+}
+
+// Version sources.
+const VersionHTTPJSON = "http-json"
+
+// AppVersion says where the monitor reads the version of the application that runs.
+type AppVersion struct {
+	// Source is VersionHTTPJSON: Path answers with a JSON object that has the field
+	// `version`.
+	Source string `json:"source"`
+	Path   string `json:"path"`
+}
+
+// Topology is the part of the topology view that belongs to the application. Each
+// component is a node.
 type Topology struct {
-	// Services are the nodes of the application.
-	Services []string `json:"services"`
-	// Edges join two services, or a service and a node of the platform.
+	// Extra are nodes of the application that are not components, for example a load
+	// generator.
+	Extra []string `json:"extra,omitempty"`
+	// Edges join two nodes of the application, or one of them and a node of the platform.
 	Edges [][2]string `json:"edges"`
 }
 
@@ -143,7 +209,11 @@ func Load(fsys fs.FS, dir string) (Pack, error) {
 	if p.files, err = fs.Sub(fsys, dir); err != nil {
 		return Pack{}, fmt.Errorf("open the application pack in %s: %w", dir, err)
 	}
-	for _, name := range []string{p.Chart, p.Build, p.ReleaseNote(p.Releases.First)} {
+	needed := []string{p.Deploy.Chart, p.ReleaseNote(p.Releases.First)}
+	if p.Deploy.Build != "" {
+		needed = append(needed, p.Deploy.Build)
+	}
+	for _, name := range needed {
 		if _, err := fs.Stat(p.files, name); err != nil {
 			return Pack{}, fmt.Errorf("%s names %s, which the pack does not have", file, name)
 		}
@@ -184,7 +254,7 @@ func Discover(fsys fs.FS, root string) (string, error) {
 func (p Pack) Dir() string { return p.dir }
 
 // ChartMount returns the path of the chart in the platform repository.
-func (p Pack) ChartMount() string { return path.Join(p.Mount, p.Chart) }
+func (p Pack) ChartMount() string { return path.Join(p.Deploy.Mount, p.Deploy.Chart) }
 
 // ReleaseNote returns the path of the note of a release, in the pack and in the releases
 // repository.
@@ -195,15 +265,44 @@ func (p Pack) ReleaseNote(version string) string {
 // ReleaseOf returns the version of a file in the directory of the release notes.
 func (p Pack) ReleaseOf(file string) string { return strings.TrimSuffix(file, ".md") }
 
-// DebugArgs returns the arguments of each kubectl command of a debug session: the verb,
-// the namespace of the application, then the rest of the command of the pack.
-func (p Pack) DebugArgs() [][]string {
-	commands := make([][]string, 0, len(p.DebugCommands))
-	for _, command := range p.DebugCommands {
-		args := append([]string{command[0], "-n", p.Namespace}, command[1:]...)
-		commands = append(commands, args)
+// Workloads returns the deployments of the components, in the order of the manifest.
+func (p Pack) Workloads() []string {
+	names := make([]string, 0, len(p.Components))
+	for _, component := range p.Components {
+		names = append(names, component.Workload)
 	}
-	return commands
+	return names
+}
+
+// Component returns the component with the name.
+func (p Pack) Component(name string) (Component, bool) {
+	for _, component := range p.Components {
+		if component.Name == name {
+			return component, true
+		}
+	}
+	return Component{}, false
+}
+
+// PrimaryCheck returns the check that the canary, the incident rule and the recovery rule
+// read. Validate makes sure that there is exactly one.
+func (p Pack) PrimaryCheck() HealthCheck {
+	for _, check := range p.Checks {
+		if check.Primary {
+			return check
+		}
+	}
+	return HealthCheck{}
+}
+
+// TopologyNodes returns the nodes of the application in the topology view: the
+// components, then the extra nodes.
+func (p Pack) TopologyNodes() []string {
+	names := make([]string, 0, len(p.Components)+len(p.Topology.Extra))
+	for _, component := range p.Components {
+		names = append(names, component.Name)
+	}
+	return append(names, p.Topology.Extra...)
 }
 
 var (
@@ -216,7 +315,6 @@ var (
 	variablePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
 	pathPattern     = regexp.MustCompile(`^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$`)
 	urlPathPattern  = regexp.MustCompile(`^(/[A-Za-z0-9._-]+)+$`)
-	probePattern    = regexp.MustCompile(`^[a-z][a-z0-9-]{0,20}( [a-z0-9][a-z0-9-]{0,20})?$`)
 )
 
 type check struct {
@@ -235,8 +333,8 @@ func (p Pack) Validate() error {
 	if ReservedRepository(p.Releases.Repository) {
 		return fmt.Errorf("releases.repository %q is a repository of the core", p.Releases.Repository)
 	}
-	for _, validate := range []func() error{p.checkValues, p.checkPaths, p.checkDeployments,
-		p.checkDebugCommands, p.checkTopology} {
+	for _, validate := range []func() error{p.checkValues, p.checkPaths, p.checkComponents,
+		p.checkIncident, p.checkDiagnostics, p.checkChecks, p.checkTopology} {
 		if err := validate(); err != nil {
 			return err
 		}
@@ -254,10 +352,14 @@ func (p Pack) checkValues() error {
 		{"releases.first", p.Releases.First, versionPattern},
 		{"namespace", p.Namespace, namePattern},
 		{"data_namespace", p.DataNamespace, namePattern},
-		{"health.ready_path", p.Health.ReadyPath, urlPathPattern},
-		{"health.version_path", p.Health.VersionPath, urlPathPattern},
-		{"health.probe_path", p.Health.ProbePath, urlPathPattern},
-		{"health.probe_name", p.Health.ProbeName, probePattern},
+		{"app_version.path", p.AppVersion.Path, urlPathPattern},
+	}
+	if p.Deploy.Kind != DeployHelm {
+		return fmt.Errorf("deploy.kind is %q; this version reads %q", p.Deploy.Kind, DeployHelm)
+	}
+	if p.AppVersion.Source != VersionHTTPJSON {
+		return fmt.Errorf("app_version.source is %q; this version reads %q",
+			p.AppVersion.Source, VersionHTTPJSON)
 	}
 	for _, c := range checks {
 		if !c.pattern.MatchString(c.value) {
@@ -269,9 +371,12 @@ func (p Pack) checkValues() error {
 
 // checkPaths refuses a path that can leave the pack.
 func (p Pack) checkPaths() error {
-	paths := map[string]string{"releases.directory": p.Releases.Directory, "chart": p.Chart,
-		"mount": p.Mount, "build": p.Build}
-	fields := []string{"build", "chart", "mount", "releases.directory"}
+	paths := map[string]string{"releases.directory": p.Releases.Directory,
+		"deploy.chart": p.Deploy.Chart, "deploy.mount": p.Deploy.Mount}
+	fields := []string{"deploy.chart", "deploy.mount", "releases.directory"}
+	if p.Deploy.Build != "" {
+		paths["deploy.build"], fields = p.Deploy.Build, append(fields, "deploy.build")
+	}
 	if p.Runbooks != "" {
 		paths["runbooks"], fields = p.Runbooks, append(fields, "runbooks")
 	}
@@ -289,51 +394,134 @@ func (p Pack) checkPaths() error {
 	return nil
 }
 
-func (p Pack) checkDeployments() error {
-	if len(p.Deployments) == 0 || len(p.Deployments) > 20 {
-		return fmt.Errorf("deployments must have 1 to 20 names")
+func (p Pack) checkComponents() error {
+	if len(p.Components) == 0 || len(p.Components) > 20 {
+		return fmt.Errorf("components must have 1 to 20 entries")
 	}
-	for _, name := range p.Deployments {
-		if !namePattern.MatchString(name) {
-			return fmt.Errorf("deployment %q must match %s", name, namePattern)
+	names, workloads := []string{}, []string{}
+	for _, component := range p.Components {
+		if err := checkComponent(component, names, workloads); err != nil {
+			return err
 		}
+		names, workloads = append(names, component.Name), append(workloads, component.Workload)
 	}
-	if !slices.Contains(p.Deployments, p.IncidentDeployment) {
-		return fmt.Errorf("incident_deployment %q is not one of the deployments",
-			p.IncidentDeployment)
+	return nil
+}
+
+// checkComponent checks one component against the names and the workloads before it.
+func checkComponent(component Component, names, workloads []string) error {
+	if !namePattern.MatchString(component.Name) {
+		return fmt.Errorf("component %q must match %s", component.Name, namePattern)
+	}
+	if slices.Contains(names, component.Name) {
+		return fmt.Errorf("component %q is in the list two times", component.Name)
+	}
+	if slices.Contains(PlatformNodes, component.Name) {
+		return fmt.Errorf("component %q has the name of a node of the platform", component.Name)
+	}
+	if component.Runtime != RuntimeKubernetes {
+		return fmt.Errorf("component %s has the runtime %q; this version reads %q",
+			component.Name, component.Runtime, RuntimeKubernetes)
+	}
+	if !namePattern.MatchString(component.Workload) {
+		return fmt.Errorf("the workload %q of component %s must match %s", component.Workload,
+			component.Name, namePattern)
+	}
+	if slices.Contains(workloads, component.Workload) {
+		return fmt.Errorf("the workload %q is in the list two times", component.Workload)
+	}
+	return nil
+}
+
+func (p Pack) checkIncident() error {
+	if p.Incident == nil {
+		return nil
+	}
+	if !namePattern.MatchString(p.Incident.Runbook) {
+		return fmt.Errorf("incident.runbook %q must match %s", p.Incident.Runbook, namePattern)
+	}
+	if _, ok := p.Component(p.Incident.Component); !ok {
+		return fmt.Errorf("incident.component %q is not one of the components",
+			p.Incident.Component)
+	}
+	return nil
+}
+
+func (p Pack) checkChecks() error {
+	if len(p.Checks) == 0 || len(p.Checks) > 8 {
+		return fmt.Errorf("checks must have 1 to 8 entries")
+	}
+	names, primary := []string{}, 0
+	for _, check := range p.Checks {
+		if slices.Contains(names, check.Name) {
+			return fmt.Errorf("check %q is in the list two times", check.Name)
+		}
+		if err := checkHealthCheck(check); err != nil {
+			return err
+		}
+		if check.Primary {
+			primary++
+		}
+		names = append(names, check.Name)
+	}
+	if primary != 1 {
+		return fmt.Errorf("checks must have exactly one primary check, and have %d", primary)
+	}
+	return nil
+}
+
+// checkHealthCheck checks the values of one check.
+func checkHealthCheck(check HealthCheck) error {
+	if !namePattern.MatchString(check.Name) {
+		return fmt.Errorf("check %q must match %s", check.Name, namePattern)
+	}
+	if check.Kind != CheckHTTP {
+		return fmt.Errorf("check %s has the kind %q; this version reads %q", check.Name,
+			check.Kind, CheckHTTP)
+	}
+	if !urlPathPattern.MatchString(check.Path) {
+		return fmt.Errorf("the path %q of check %s must match %s", check.Path, check.Name,
+			urlPathPattern)
+	}
+	// The monitor follows a redirect, so a status from 300 to 399 never reaches it.
+	if check.Status != 0 && (check.Status < 200 || check.Status > 299) {
+		return fmt.Errorf("the status %d of check %s must be from 200 to 299", check.Status,
+			check.Name)
 	}
 	return nil
 }
 
 func (p Pack) checkTopology() error {
-	services := p.Topology.Services
-	if len(services) == 0 || len(services) > 20 {
-		return fmt.Errorf("topology.services must have 1 to 20 names")
+	nodes := p.TopologyNodes()
+	if len(nodes) > 20 {
+		return fmt.Errorf("the topology must have 20 nodes or fewer")
 	}
-	for index, name := range services {
+	for index, name := range p.Topology.Extra {
+		at := len(p.Components) + index
 		if !namePattern.MatchString(name) || slices.Contains(PlatformNodes, name) ||
-			slices.Contains(services[:index], name) {
-			return fmt.Errorf("topology service %q must match %s, be in the list one time, "+
-				"and not have the name of a node of the platform", name, namePattern)
+			slices.Contains(nodes[:at], name) {
+			return fmt.Errorf("topology node %q must match %s, be in the list one time, not "+
+				"be a component, and not have the name of a node of the platform", name,
+				namePattern)
 		}
 	}
 	for _, edge := range p.Topology.Edges {
 		if !p.joins(edge) {
 			return fmt.Errorf("topology edge %s to %s must join two nodes that exist, and one "+
-				"of them must be a service of the pack", edge[0], edge[1])
+				"of them must be a node of the pack", edge[0], edge[1])
 		}
 	}
 	return nil
 }
 
-// joins reports whether an edge joins two nodes that exist, with a service of the pack at
+// joins reports whether an edge joins two nodes that exist, with a node of the pack at
 // one end or at both.
 func (p Pack) joins(edge [2]string) bool {
-	services := p.Topology.Services
+	nodes := p.TopologyNodes()
 	owned := 0
 	for _, name := range edge {
 		switch {
-		case slices.Contains(services, name):
+		case slices.Contains(nodes, name):
 			owned++
 		case !slices.Contains(PlatformNodes, name):
 			return false

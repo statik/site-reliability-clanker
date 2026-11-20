@@ -64,6 +64,24 @@ func TestTheDefinitionDecidesWhichMitigationRuns(t *testing.T) {
 
 // TestTheInvestigatorPromptOffersOnlyMitigationsThatExist compares the fixed text of the
 // prompt with the definitions of the example pack of this repository.
+// With no answer of a model, the incident proposes the mitigation that the pack names. A
+// pack with none proposes nothing, so the incident goes to a person.
+func TestWithNoModelThePackDecidesTheMitigation(t *testing.T) {
+	a := agentWithRunbooks(t)
+	d := a.templateDiagnosis()
+	if d.ProposedRunbook != "restart-deployment" || d.Deployment != "paperboat-api" {
+		t.Errorf("the diagnosis proposes %q on %q", d.ProposedRunbook, d.Deployment)
+	}
+	if err := a.checkMitigation(d); err != nil {
+		t.Errorf("the mitigation of the pack is refused: %v", err)
+	}
+	a.App.Incident = nil
+	d = a.templateDiagnosis()
+	if err := a.checkMitigation(d); !errors.Is(err, orchestrator.ErrInvalid) {
+		t.Errorf("a pack with no incident mitigation proposes %q: %v", d.ProposedRunbook, err)
+	}
+}
+
 func TestTheInvestigatorPromptOffersOnlyMitigationsThatExist(t *testing.T) {
 	a := agentWithRunbooks(t)
 	definitions, err := a.Orch.Runbooks()

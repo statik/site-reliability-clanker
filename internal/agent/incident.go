@@ -37,9 +37,7 @@ func (a *Agent) diagnose(ctx context.Context, wi orchestrator.WorkItem, f detect
 				"debug_session":  truncate(transcript, 14000)})},
 		}})
 	if errors.Is(err, ErrNoRecording) {
-		return diagnosis{Diagnosis: "No model diagnosis is available in replay mode.",
-			Evidence: "See the recorded debug session.", ProposedRunbook: "restart-deployment",
-			Deployment: a.App.IncidentDeployment}, "template", nil
+		return a.templateDiagnosis(), "template", nil
 	}
 	if err != nil {
 		return diagnosis{}, "", err
@@ -54,6 +52,19 @@ func (a *Agent) diagnose(ctx context.Context, wi orchestrator.WorkItem, f detect
 			err)
 	}
 	return d, resp.Model, nil
+}
+
+// templateDiagnosis is the diagnosis when no model gives one. It proposes the mitigation
+// that the pack names for that case. A pack with none proposes nothing, and the incident
+// goes to a person.
+func (a *Agent) templateDiagnosis() diagnosis {
+	d := diagnosis{Diagnosis: "No model diagnosis is available in replay mode.",
+		Evidence: "See the recorded debug session.", ProposedRunbook: "none"}
+	if incident := a.App.Incident; incident != nil {
+		component, _ := a.App.Component(incident.Component)
+		d.ProposedRunbook, d.Deployment = incident.Runbook, component.Workload
+	}
+	return d
 }
 
 // recentChanges lists the last finished changes of an environment with their age, so the
@@ -110,7 +121,7 @@ func (a *Agent) recovered(ctx context.Context, env string) (bool, string) {
 				return false, recErr.Error()
 			}
 			return true, fmt.Sprintf("%d of %d %s requests succeed", sample.OK,
-				sample.Total, a.App.Health.ProbeName)
+				sample.Total, a.App.PrimaryCheck().Name)
 		}
 		if time.Now().After(deadline) {
 			return false, "the error rate did not return to zero in 90 s"
@@ -209,7 +220,7 @@ func (a *Agent) resolve(ctx context.Context, wi orchestrator.WorkItem, f detect.
 		Sentence: end.diagnosis.Diagnosis,
 		Why:      end.diagnosis.WriteUp,
 		Downtime: fmt.Sprintf("About %d minutes of failed %s requests", minutes,
-			a.App.Health.ProbeName),
+			a.App.PrimaryCheck().Name),
 		UserEffect: f.Title,
 		PreChecks: []string{"Debug session recorded: read-only, namespace " +
 			a.App.Namespace},

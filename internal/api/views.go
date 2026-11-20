@@ -363,7 +363,7 @@ func topologyNodes(snap monitor.Snapshot, app pack.Pack) []topoNode {
 	add("40-platform", "secrets", "secret", "Application secret",
 		str(l["40-platform"], "app_secret_name"), "")
 	running := str(l[app.Layer], app.VersionVariable)
-	for _, svc := range app.Topology.Services {
+	for _, svc := range app.TopologyNodes() {
 		add(app.Layer, svc, "service", svc, app.Title+" "+svc, running)
 	}
 	return nodes

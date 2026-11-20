@@ -23,7 +23,7 @@ from clanker_evals.checks import (
     to_score,
 )
 from clanker_evals.inputs import finding, investigator_input
-from clanker_evals.repo import PACK
+from clanker_evals.repo import PACK, primary_check
 from clanker_evals.solvers import role_turn
 
 FIELDS = ["diagnosis", "evidence", "proposed_runbook", "deployment", "write_up"]
@@ -42,7 +42,7 @@ def alert(failed: int = 9, version: str = "1.0.0") -> dict[str, Any]:
     return finding(
         "health",
         "incident:local:2026-03-02T08:57:00Z",
-        f"{PACK['title']} in local fails {failed} of 20 {PACK['health']['probe_name']} requests",
+        f"{PACK['title']} in local fails {failed} of 20 {primary_check()} requests",
         {"kind": "incident", "ok": 20 - failed, "total": 20, "p95_ms": 41, "version": version},
     )
 

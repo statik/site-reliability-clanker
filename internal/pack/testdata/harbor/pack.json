@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "name": "harbor",
   "title": "Harbor",
   "version": "0.1.0",
@@ -12,28 +12,27 @@
     "directory": "notes",
     "first": "3.4.0"
   },
-  "chart": "chart",
-  "mount": "apps/harbor",
-  "build": "build.sh",
+  "deploy": {"kind": "helm", "chart": "chart", "mount": "apps/harbor", "build": "build.sh"},
   "runbooks": "jobs",
   "namespace": "harbor",
   "data_namespace": "harbor-store",
-  "deployments": ["harbor-gateway", "harbor-ui", "harbor-jobs"],
-  "incident_deployment": "harbor-gateway",
-  "debug_commands": [
-    ["get", "pods", "-o", "wide"],
-    ["get", "deployments"],
-    ["logs", "deployment/harbor-gateway", "--tail=30"],
-    ["get", "events", "--sort-by=.lastTimestamp"]
+  "components": [
+    {"name": "api", "runtime": "kubernetes", "workload": "harbor-gateway", "required": true},
+    {"name": "web", "runtime": "kubernetes", "workload": "harbor-ui", "required": true},
+    {"name": "worker", "runtime": "kubernetes", "workload": "harbor-jobs", "required": true}
   ],
-  "health": {
-    "ready_path": "/api/healthz",
-    "version_path": "/api/version",
-    "probe_path": "/v2/berths",
-    "probe_name": "berth"
-  },
+  "incident": {"runbook": "restart-deployment", "component": "api"},
+  "diagnostics": [
+    {"read": "logs", "component": "api", "lines": 30},
+    {"read": "events"}
+  ],
+  "checks": [
+    {"name": "ready", "kind": "http", "path": "/api/healthz"},
+    {"name": "berth", "kind": "http", "path": "/v2/berths", "primary": true}
+  ],
+  "app_version": {"source": "http-json", "path": "/api/version"},
   "topology": {
-    "services": ["web", "api", "worker", "loadgen"],
+    "extra": ["loadgen"],
     "edges": [
       ["lb", "web"], ["web", "api"], ["loadgen", "web"],
       ["api", "postgres"], ["worker", "postgres"],

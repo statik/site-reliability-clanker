@@ -9,7 +9,11 @@ has what is decided and what is open.
 `docs/PLAN.md` section 5.7 has the rules of a pack. `apps/paperboat/PACK.md` has the fields
 of the manifest and the commands.
 
-## Part A — How a pack works today
+## Part A — How a pack works before schema 2
+
+Part A describes the code at the commit `d182274`, before the first step of section B.14.
+The places in the code are those of that commit. `apps/paperboat/PACK.md` has the manifest
+of today.
 
 ### A.1 The path of a pack
 
@@ -374,7 +378,8 @@ does today. They do not change the rules of section B.8, which the core fixes.
 - The count of the collector grows without end. The core takes the difference between
   two observations.
 
-**The version that runs** comes from `version`, with one of these sources.
+**The version that runs** comes from `app_version`, with one of these sources. The field
+`version` of the manifest is the version of the pack.
 
 | Source | Fields | The version is |
 |---|---|---|
@@ -660,9 +665,9 @@ Schema 2 replaces schema 1. The loader reads one schema.
 | `data_namespace` | An entry of `targets`. It is a fact of the target, not of the application: only a target with its data services in the cluster has one |
 | `incident_deployment` | `incident`, optional |
 | `debug_commands` | `diagnostics` |
-| `health.*` | `checks`, `version` |
+| `health.*` | `checks`, `app_version` |
 | — | `volumes` |
-| `chart`, `build` (required) | `deploy: {"kind": "helm", "chart": …}` or `deploy: {"kind": "layer"}`, where the layer of the pack does all of the deployment. `build` is optional with both |
+| `chart`, `mount`, `build` (required) | `deploy: {"kind": "helm", "chart": …, "mount": …}` or `deploy: {"kind": "layer"}`, where the layer of the pack does all of the deployment. `build` is optional with both |
 | `topology.services` | `components`, plus `topology.extra` for nodes that are not components (the load generator, a load balancer) |
 
 The part that changes, for the two applications of section B.11:
@@ -677,7 +682,7 @@ The part that changes, for the two applications of section B.11:
   {"name": "ready", "kind": "http", "path": "/api/healthz"},
   {"name": "inventory", "kind": "http", "path": "/api/inventory", "primary": true}
 ],
-"version": {"source": "http-json", "path": "/api/version"},
+"app_version": {"source": "http-json", "path": "/api/version"},
 "diagnostics": [
   {"read": "logs", "component": "api", "lines": 30},
   {"read": "events"}
@@ -699,7 +704,7 @@ The part that changes, for the two applications of section B.11:
    "pattern": "ERROR|OutOfMemoryError", "limit": 5},
   {"name": "export-ran", "kind": "job", "component": "export", "max_age_hours": 26}
 ],
-"version": {"source": "file", "component": "app", "path": "ledger/VERSION"},
+"app_version": {"source": "file", "component": "app", "path": "ledger/VERSION"},
 "volumes": [{"name": "app-data", "component": "app", "path": "ledger/data"}],
 "diagnostics": [
   {"read": "logs", "component": "app", "lines": 60},
@@ -814,6 +819,15 @@ Each step is one pull request or a few, and each leaves Paperboat working.
    identities from it. The job type carries reads. The Investigator, the eval cases, the
    checks of the eval suite and the recorded answer of the Investigator change to
    components. The evals run again.
+
+   In this step the core puts two reads of its own before the reads of the pack in a
+   debug session on Kubernetes: the state of the pods and of the deployments. The
+   observation of step 2 takes their place.
+
+   Built so far: the manifest of schema 2 with `components`, `incident`, `diagnostics`,
+   `checks`, `app_version` and `deploy`, and the code of the core that reads it. The
+   namespaces are still in the manifest, the runbooks and the prompt of the Investigator
+   still name deployments, and the job type still carries commands.
 2. **The collector on Kubernetes.** The build of the collector. The endpoint of the core
    and the observation. The generator of the configuration. State, versions and volumes
    of Paperboat. The health history by name. The storage detector reads real samples.

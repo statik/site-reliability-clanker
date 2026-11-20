@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "name": "paperboat",
   "title": "Paperboat",
   "version": "0.1.0",
@@ -12,29 +12,28 @@
     "directory": "releases",
     "first": "1.0.0"
   },
-  "chart": "chart",
-  "mount": "apps/paperboat",
-  "build": "build.sh",
+  "deploy": {"kind": "helm", "chart": "chart", "mount": "apps/paperboat", "build": "build.sh"},
   "runbooks": "runbooks",
   "evals": "evals",
   "namespace": "paperboat",
   "data_namespace": "paperboat-data",
-  "deployments": ["paperboat-api", "paperboat-web", "paperboat-worker"],
-  "incident_deployment": "paperboat-api",
-  "debug_commands": [
-    ["get", "pods", "-o", "wide"],
-    ["get", "deployments"],
-    ["logs", "deployment/paperboat-api", "--tail=30"],
-    ["get", "events", "--sort-by=.lastTimestamp"]
+  "components": [
+    {"name": "api", "runtime": "kubernetes", "workload": "paperboat-api", "required": true},
+    {"name": "web", "runtime": "kubernetes", "workload": "paperboat-web", "required": true},
+    {"name": "worker", "runtime": "kubernetes", "workload": "paperboat-worker", "required": true}
   ],
-  "health": {
-    "ready_path": "/api/healthz",
-    "version_path": "/api/version",
-    "probe_path": "/api/inventory",
-    "probe_name": "inventory"
-  },
+  "incident": {"runbook": "restart-deployment", "component": "api"},
+  "diagnostics": [
+    {"read": "logs", "component": "api", "lines": 30},
+    {"read": "events"}
+  ],
+  "checks": [
+    {"name": "ready", "kind": "http", "path": "/api/healthz"},
+    {"name": "inventory", "kind": "http", "path": "/api/inventory", "primary": true}
+  ],
+  "app_version": {"source": "http-json", "path": "/api/version"},
   "topology": {
-    "services": ["web", "api", "worker", "loadgen"],
+    "extra": ["loadgen"],
     "edges": [
       ["lb", "web"], ["web", "api"], ["loadgen", "web"],
       ["api", "postgres"], ["worker", "postgres"],

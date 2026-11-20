@@ -53,7 +53,7 @@ video and the local demo. No pull request is open.
   pack: a directory with the manifest `pack.json` (`internal/pack`; the fields are in
   `apps/paperboat/PACK.md`). Paperboat is the example pack. `clanker` reads the one pack in
   `apps`, or the one that `--pack` names. A pack is not trusted: the loader refuses an
-  unknown field and checks each value, and a debug command of a pack can only read. The
+  unknown field and checks each value, and a debug session of a pack can only read. The
   prompts of the Author and the Investigator have placeholders for the names; with the
   Paperboat pack they are byte for byte the text that the evals measured.
   - Ran on 2026-11-19: `go test ./...`, the tests and the mock run of the evals, and a start
@@ -64,6 +64,37 @@ video and the local demo. No pull request is open.
   - Not done: the stacks (`platform/stacks/*/50-app`, `platform/modules/shared/app`), the
     scenes of the simulator and the recorded answers still belong to Paperboat. A pack
     cannot change after the first start, because the forge is seeded one time.
+- The manifest of a pack has the format of schema 2 (`docs/PACKS.md` section B.14, the
+  first part of step 1). `components` take the place of the deployments, `checks` and
+  `app_version` of the three health paths, `diagnostics` of the debug commands, `incident`
+  of the incident deployment, and `deploy` of the chart, the mount and the build program.
+  A pack gives no command for a debug session: the core makes the commands from the reads.
+  The loader reads only schema 2.
+  - With the Paperboat pack the commands of a debug session and the prompts are the same
+    text as before, so the results of the evals stay valid.
+  - New in behaviour: a check can pass with another status from 200 to 299; after an
+    apply each check that is not primary must pass; a pack with no `incident` sends an
+    incident with no diagnosis of a model to a person; a pack with no build program
+    builds no image.
+  - Changed text: a verification has the line "check ready answers 200" in the place of
+    "health check answers 200". The topology view gets the nodes of the application in
+    the order api, web, worker, loadgen; before it was web, api, worker, loadgen.
+  - `required` of a component is in the manifest and no code reads it yet.
+  - Ran on 2026-11-20: `go test ./...`, `go vet`, `make lint-core`, the tests of the eval
+    suite, `./run.sh pack ../apps/paperboat` with the mock model, `clanker pack validate`
+    on both packs, and a run on a new data directory and other ports with recorded
+    answers: the first deployment, the scenes `feature-release` and `incident`. The four
+    work items ended in `Done`, the audit chain verified with 122 events, and the log had
+    no error line. `scripts/verify/month.py` reads the address from `CLANKER_URL` for
+    such a run.
+  - Not run: the evals with live models (no prompt changed). The other scenes of the
+    scripted month. The dashboard was not viewed. A pack with no `incident` or no build program in a real run.
+  - Found: `clanker destroy` runs OpenTofu in the stack directories of its source. With a
+    second data directory it fails with "Backend configuration changed", because those
+    directories keep the backend of the first one. The run above was destroyed from a
+    copy of the sources.
+  - Not done in step 1 yet: the namespaces are in the manifest, the runbooks and the
+    prompt of the Investigator name deployments, and the job type carries commands.
 - A pack has two more parts, and there are commands for a pack (`apps/paperboat/PACK.md`):
   - The runbooks of the application are in the pack (`apps/paperboat/runbooks/`, before
     `runbooks/jobs/`). The control plane seeds them into `jobs/` of the runbooks

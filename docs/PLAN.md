@@ -392,12 +392,12 @@ A pack holds these parts:
 
 | Part | Content | Used by |
 |---|---|---|
-| Manifest (`pack.json`) | Name, title, version of the pack, the layer and the variable that sets the version of the application, the namespaces, the deployments, the topology | Every component |
+| Manifest (`pack.json`) | Name, title, version of the pack, the layer and the variable that sets the version of the application, the namespaces, the components, the topology | Every component |
 | Release source | The forge repository and the directory with one release note for each release | Detector, Author, Explainer |
 | Deployment code | The chart, and where the platform repository expects it | Runner |
-| Checks | The paths for ready, version and the probe that the monitor samples | Monitor, verification, canary |
+| Checks | The HTTP checks, one of them the primary check that the monitor samples, and the path for the version | Monitor, verification, canary |
 | Runbooks | Typed job definitions and scripts, as in section 5.6 | Orchestrator |
-| Debug commands | Read-only `kubectl` argument lists for the debug session | Investigator |
+| Diagnostics | The reads of the debug session: the logs of a component, the events. The core makes the commands | Investigator |
 | Eval cases | Samples for the tasks of the eval suite | `evals/` |
 
 Rules:
@@ -405,9 +405,9 @@ Rules:
 1. **The core does not name an application.** A test fails when a Go file of the core names
    Paperboat. `apps/paperboat/` is the example pack, and its manifest is the reference.
 2. **A pack is untrusted input.** The loader refuses a field that it does not know and checks
-   each value. Text from a pack reaches a prompt only as a short, checked field. The core
-   fixes the verbs of a debug command (`get`, `logs`, `describe`, `top`) and adds the
-   namespace itself. A pack cannot give a model a tool, bring policy rules, lower a tier or
+   each value. Text from a pack reaches a prompt only as a short, checked field. A pack
+   gives no command for a debug session: it names a read and a component, and the core
+   makes the command and adds the namespace itself. A pack cannot give a model a tool, bring policy rules, lower a tier or
    skip an approval.
 3. **An import is recorded.** `clanker pack import` clones one tag, validates the pack and
    writes a lock file with the source, the tag, the commit and the hash. The control plane
@@ -426,7 +426,8 @@ Not built:
   requests.
 - Several packs in one environment.
 - A pack for an application that does not run on Kubernetes. The components, the health
-  checks, the debug commands and the credentials of a pack are those of Kubernetes.
+  checks, the reads of a debug session and the credentials of a pack are those of
+  Kubernetes.
   `docs/PACKS.md` has the interface of today in detail and a proposal for a standard way to
   gather health and observability data on every runtime, also on servers in a data
   centre. **Chosen 2026-11-20 by the owner:** the OpenTelemetry Collector gathers that
