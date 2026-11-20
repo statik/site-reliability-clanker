@@ -3,9 +3,8 @@
 This document has two parts. Part A says how an application pack works today and what the
 core requires from it. Part B is a proposal: a standard way to gather health and
 observability data, so that a pack can describe a legacy application that does not run on
-Kubernetes, also on servers in a data centre. Nothing in part B is built. One thing is
-decided: the OpenTelemetry Collector gathers the data. Section B.13 has that decision and
-the decisions that are open.
+Kubernetes, also on servers in a data centre. Nothing in part B is built. Section B.13
+has what is decided and what is open.
 
 `docs/PLAN.md` section 5.7 has the rules of a pack. `apps/paperboat/PACK.md` has the fields
 of the manifest and the commands.
@@ -160,7 +159,7 @@ says. A pack that does not meet them loads, but it does not work.
    install the guard that limits it.
 
 Not a goal: a general monitoring system. The core keeps only what its detectors and the
-Investigator use.
+Investigator use, and a fixed list of series for the charts of section B.16.
 
 ### B.2 Terms
 
@@ -440,8 +439,8 @@ the standard that the detectors, the Investigator and the eval cases read.
 - An entry for memory has the form of a volume entry, in its own list. `total` is absent
   when the component has no limit.
 
-The core keeps the record and nothing else. It is not a store for metrics: what a
-collector sends and the record does not use is dropped.
+The core keeps the record and the series of section B.16, and nothing else. It is not a
+general store for metrics: what a collector sends and neither of them uses is dropped.
 
 Who reads it:
 
@@ -782,6 +781,9 @@ Decided:
 | Decision | Choice |
 |---|---|
 | What gathers the standing data | **Chosen 2026-11-20 by the owner:** the OpenTelemetry Collector, with a configuration that the core writes (B.3) |
+| Charts of runtime health | **Chosen 2026-11-20 by the owner:** charts of load, CPU, memory, disk space, network and disk operations for each host and node (B.16) |
+| Where the series of the charts are | **Chosen 2026-11-20 by the owner:** a bounded table in the database of the control plane. This document recommends no extension of PostgreSQL for it (B.16) |
+| Detectors on those series | **Chosen 2026-11-20 by the owner:** not now. The first version has charts only |
 
 Open:
 
@@ -825,6 +827,10 @@ Each step is one pull request or a few, and each leaves Paperboat working.
 7. **The `docker` runtime**, with the receiver of the collector for containers, which is
    alpha.
 
+The charts of section B.16 come in two parts. The table, the read of the API and the
+panel for the nodes of Kubernetes come after step 2. The charts for hosts come with
+step 6.
+
 ### B.15 Not in this design
 
 - Several packs in one environment, also two packs on one host, and a new version of a
@@ -841,3 +847,84 @@ Each step is one pull request or a few, and each leaves Paperboat working.
   a certificate.
 - Windows hosts.
 - The nodes of the platform in the topology view for a target with no cluster.
+
+### B.16 Runtime health in the dashboard
+
+**Decided 2026-11-20 by the owner:** the dashboard shows the runtime health of each host
+and each node as charts. The data is in a bounded table of the database of the control
+plane. The first version has charts only: no detector reads this data.
+
+This changes one statement of the first version of this design, that the core is no
+store for metrics. The core now keeps one more thing than the observation: a fixed list
+of series for each host and node. It is still not a general store: a pack adds no series,
+and the core drops each metric that is not in the list.
+
+**The series.** They are for a host or a node, not for a component.
+
+| Series | On a host | On a node of Kubernetes |
+|---|---|---|
+| Load: the average of 1 minute, and the number of CPUs | Receiver `hostmetrics`, scraper `load` | The same scraper, in the collector of the node |
+| CPU: the part that is in use | Scraper `cpu` | Receiver `kubeletstats`, or the scraper `cpu` |
+| Memory: used and total | Scraper `memory` | Receiver `kubeletstats`, or the scraper `memory` |
+| Disk space: used and total, for each file system | Scraper `filesystem` | Receiver `kubeletstats` for the file system of the node |
+| Network: bytes in and out for each second, and errors | Scraper `network` | Receiver `kubeletstats`, or the scraper `network` |
+| Disk operations: reads and writes for each second | Scraper `disk` | Scraper `disk`. The receiver `kubeletstats` has no such metric |
+
+- The receiver `hostmetrics` is beta. In a container it reads the host through a mount of
+  the file system of the host, so the collector of a node needs that mount, read-only.
+- The collector sends the network bytes, the disk operations and the CPU time as counts
+  that grow. The core stores the rate between two reports.
+- The network is the sum of the interfaces without the loopback interface. The disk
+  operations are the sum of the devices. Disk space is for each local file system, 16 for
+  each host at most.
+- These are settings of the configuration that the core writes already. No value of a
+  pack is in them.
+
+**The table.** One row is a time, an environment, an instance, a series and a value.
+
+| Level | One point for each | Kept for |
+|---|---|---|
+| Raw | Minute | 48 hours |
+| Rollup: the average and the maximum | 5 minutes | 30 days |
+
+- With 20 instances and 15 series, the raw level has under 1 million rows and the rollup
+  under 3 million. The core makes the rollup and removes old data.
+- The limits are in the core: the list of series, the number of instances of an
+  environment (those of the approved targets), and the two periods.
+
+**PostgreSQL needs no extension for this.**
+
+- The table is partitioned by day with the partitions that PostgreSQL has itself. The
+  core makes the partition of a day before it writes the first row of that day, and drops
+  the partition that is too old. The clock of the core can jump in a demonstration, so
+  the core does not make partitions on a schedule. To drop a partition costs almost
+  nothing; to delete rows leaves work for the database.
+- The time column is a timestamp, not text as in the tables of today, so that the
+  partitions work.
+- An extension for time series (TimescaleDB) can do the partitions, the rollup and
+  compression itself. The design does not use it: a managed database of a cloud does not
+  always offer it, and the control plane must run on each target with the same database.
+  Not checked: which managed services offer it today.
+- An extension that makes partitions on a schedule (`pg_partman`) is not needed, because
+  the core does that work.
+
+**The dashboard.** The API gets one read: the series of an environment between two times,
+at the level that fits the range. The dashboard has a chart library already
+(`@carbon/charts-react`) and a health chart on the overview page
+(`web/src/pages/overview/HealthChart.tsx`).
+
+- A panel "Runtime" for each environment, with one row of small charts for each host or
+  node: load, CPU, memory, disk space, network, disk operations.
+- The charts show the marks of the work items of the timeline, so that a person sees a
+  change of memory or of load beside the deployment that came before it.
+- A host or a node with no data in time shows a gap and the state `unknown`, not a zero.
+
+**The Investigator.** The observation of a debug session gets the last hour of the series
+of the hosts or nodes of the application. They are numbers, so they need no scrub.
+
+**Later, not in this version.**
+
+- Detectors on these series, for example for memory that grows.
+- Series for each component: the CPU and the network of one unit or one pod need more
+  receivers, and the disk operations of one pod have no source in `kubeletstats`.
+- A copy of the data to a monitoring system that the site has already.
