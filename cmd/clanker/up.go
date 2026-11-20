@@ -378,6 +378,9 @@ func build(ctx context.Context, o options) (*components, error) {
 		c.orch.JobVariables = map[string]string{"TF_VAR_admin_token": demoAdminToken}
 		scrub.Add(demoAdminToken)
 	}
+	if err := addCollectorVariables(c.orch, o.cloud, o.addr, o.env); err != nil {
+		return nil, err
+	}
 	c.monitor = monitor.New(c.db, c.clock)
 	c.monitor.App = o.app
 	// The demo users have no way to sign in. They exist only for the user switcher.

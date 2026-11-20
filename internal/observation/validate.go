@@ -47,14 +47,27 @@ func (o Observation) validateComponents(app pack.Pack) error {
 		if !known[component.Name] {
 			return fmt.Errorf("the pack %q has no component %q", app.Name, component.Name)
 		}
-		where := fmt.Sprintf("component %q", component.Name)
-		if err := validState(where, component.State); err != nil {
+		if err := validateComponent(component); err != nil {
 			return err
 		}
-		for _, instance := range component.Instances {
-			if err := validateInstance(where, instance); err != nil {
-				return err
-			}
+	}
+	return nil
+}
+
+func validateComponent(component Component) error {
+	where := fmt.Sprintf("component %q", component.Name)
+	if err := validState(where, component.State); err != nil {
+		return err
+	}
+	if err := notNegative(where, "wanted", int64(component.Wanted)); err != nil {
+		return err
+	}
+	if err := notNegative(where, "ready", int64(component.Ready)); err != nil {
+		return err
+	}
+	for _, instance := range component.Instances {
+		if err := validateInstance(where, instance); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -133,8 +146,12 @@ func validState(where string, state State) error {
 	return fmt.Errorf("%s: the state %q is not ok, degraded, down or unknown", where, state)
 }
 
+// IsVersion reports whether text has the form of a version, as Validate asks of each
+// version in a record.
+func IsVersion(text string) bool { return versionPattern.MatchString(text) }
+
 func validVersion(where, version string) error {
-	if version == "" || versionPattern.MatchString(version) {
+	if version == "" || IsVersion(version) {
 		return nil
 	}
 	return fmt.Errorf("%s: %q is not a version", where, version)

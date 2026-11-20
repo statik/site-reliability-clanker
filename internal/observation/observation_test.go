@@ -175,6 +175,12 @@ func TestValidateRefuses(t *testing.T) {
 		{"a negative restart count",
 			func(o *observation.Observation) { o.Components[0].Instances[1].Restarts = -1 },
 			`component "api", instance "pod-2": restarts is -1, a negative count`},
+		{"a negative count of wanted instances",
+			func(o *observation.Observation) { o.Components[0].Wanted = -1 },
+			`component "api": wanted is -1, a negative count`},
+		{"a negative count of ready instances",
+			func(o *observation.Observation) { o.Components[0].Ready = -2 },
+			`component "api": ready is -2, a negative count`},
 		{"negative passes",
 			func(o *observation.Observation) { o.Checks[1].OK = -1 },
 			`check "ready": ok is -1, a negative count`},
@@ -224,7 +230,7 @@ const documented = `{
   "application": "ledger",
   "version": {"wanted": "4.2.1", "source": "file"},
   "components": [
-    {"name": "app", "runtime": "systemd", "state": "ok",
+    {"name": "app", "runtime": "systemd", "state": "ok", "wanted": 2, "ready": 2,
      "instances": [
        {"id": "host-1", "state": "ok", "version": "4.2.1", "restarts": 0,
         "started": "2026-11-11T02:10:00Z"},
@@ -280,9 +286,9 @@ func TestJSONOmitsWhatTheRecordDoesNotHave(t *testing.T) {
 	want := []string{
 		"application", "at", "checks", "components", "components.instances",
 		"components.instances.id", "components.instances.restarts",
-		"components.instances.state", "components.name", "components.runtime",
-		"components.state", "env", "schema", "version", "version.source", "version.wanted",
-		"volumes",
+		"components.instances.state", "components.name", "components.ready",
+		"components.runtime", "components.state", "components.wanted", "env", "schema",
+		"version", "version.source", "version.wanted", "volumes",
 	}
 	if names := fieldNames("", got); !slices.Equal(names, want) {
 		t.Errorf("field names:\n got %v\nwant %v", names, want)

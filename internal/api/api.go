@@ -186,6 +186,8 @@ func (s *Server) Handler() (http.Handler, error) {
 		"GET /api/v1/topology":                        s.getTopology,
 		"GET /api/v1/posture":                         s.getPosture,
 		"GET /api/v1/health":                          s.getHealth,
+		"GET /api/v1/observation":                     s.getObservation,
+		"POST " + CollectorPath:                       s.postMetrics,
 		"GET /api/v1/access":                          s.getAccess,
 		"GET /api/v1/findings":                        s.getFindings,
 		"GET /api/v1/notifications":                   s.getNotifications,
@@ -258,12 +260,13 @@ func (s *Server) getAuth(*http.Request) (any, error) {
 }
 
 // open reports whether a path needs no signed-in user: the health path, the sign-in, the
-// runner path, where each request carries the token of one job, and the two endpoints of
-// the chat platforms, where each request carries the signature of the platform.
+// runner path, where each request carries the token of one job, the two endpoints of the
+// chat platforms, where each request carries the signature of the platform, and the path
+// of the collectors, where each request carries the token of one environment.
 func open(path string) bool {
 	return path == "/healthz" || strings.HasPrefix(path, "/auth/") ||
 		strings.HasPrefix(path, "/runner/v1/") || path == chatops.SlackPath ||
-		path == chatops.TeamsPath
+		path == chatops.TeamsPath || path == CollectorPath
 }
 
 // gitPush reports whether a request is a part of a push with the git client: the list of

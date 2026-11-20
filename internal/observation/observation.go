@@ -49,9 +49,13 @@ type Version struct {
 
 // Component is the state of one component of the pack.
 type Component struct {
-	Name      string     `json:"name"`
-	Runtime   string     `json:"runtime"`
-	State     State      `json:"state"`
+	Name    string `json:"name"`
+	Runtime string `json:"runtime"`
+	State   State  `json:"state"`
+	// Wanted is the number of instances that the specification asks for, and Ready is
+	// the number of instances that are ready.
+	Wanted    int        `json:"wanted"`
+	Ready     int        `json:"ready"`
 	Instances []Instance `json:"instances"`
 }
 

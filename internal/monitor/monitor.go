@@ -25,7 +25,9 @@ type Monitor struct {
 	DB    *sql.DB
 	Clock Clock
 	// App is the application pack. It names the layer, the outputs and the checks.
-	App    pack.Pack
+	App pack.Pack
+	// Wall gives the wall-clock time for the age of an observation. Nil is time.Now.
+	Wall   func() time.Time
 	client *http.Client
 }
 

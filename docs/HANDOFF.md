@@ -44,41 +44,24 @@ video and the local demo. No pull request is open.
     node (`kubeletstats`). A change of the token alone does not start the pod again.
   - The tier policy has no rule for these resource types: a plan with them is T2
     (`normal-change`). The rule `identity-change` does not match `kubernetes_role_binding_v1`.
-||||||| parent of 7c0a636 (Add model settings and start and stop of the local inference)
-- Written on 2026-11-20, on the branch `model-settings` (one commit, not pushed, no pull
-  request): settings of the language model, and Start and Stop for the local inference.
-  - `GET /api/v1/settings/model` gives the mode, the provider, the model of each role,
-    whether a key is set (never the key) and the state of the local inference.
-    `POST /api/v1/settings/model/local/start` and `.../stop` are for an admin and write the
-    events `model.local_started` and `model.local_stopped` (`internal/api/settings.go`,
-    `docs/API.md`).
-  - Start starts `ollama serve` when Ollama does not answer, and loads the model with
-    `keep_alive: -1`. Stop unloads the model with `keep_alive: 0`, and stops the server only
-    when this control plane started it. A start that cannot load the model stops the
-    server that it started. The output of the server is in `logs/ollama.log` of the data
-    directory.
-  - `clanker up` stops the server that it started when it stops. Under `clanker setup`,
-    which the macOS app runs, the process can end before that stop. An interrupt of the
-    process group (Ctrl+C, or Quit in the app) reaches `ollama serve` too. After a forced
-    quit of the app, or a signal to `clanker` alone, `ollama serve` can stay with the
-    model in memory; the next control plane then treats it as a server that it did not
-    start.
-  - The Ollama client is the package `internal/ollama`, which the wizard uses too. It is in
-    `CORE_PACKAGES`. The part that starts the program is `cmd/clanker/model.go`, for the
-    local target only. On a cloud, and for a model endpoint on another machine, the local
-    inference is not available and the two routes answer 409.
-  - `clanker model status|start|stop [--addr URL] [--user NAME] [--json]` calls the routes.
-    The dashboard has the page Settings (`/settings`). The macOS app has the menu item
-    Settings… (Command-comma), which shows that page.
-  - In the demo the person of the wizard is an approver, so that person sees Start and Stop
-    disabled, and the CLI needs `--user carol`.
-  - Ran: the unit tests with a stand-in for Ollama and a stand-in for the `ollama` program,
-    29 changes of the code that each made a test fail, the web tests, and a compile of
-    `macos/App` with `swiftc` for both processor types.
-  - Not run: the macOS app was not started, and the menu item was not clicked. Ollama was
-    not started or stopped, and no model was loaded or unloaded: no request went to a real
-    Ollama. `clanker model` did not run against a control plane. The page Settings was not
-    opened in a browser.
+- The core receives the metrics of a collector on Kubernetes and keeps the live state of
+  each component (`docs/PACKS.md` section B.14, step 2; built on 2026-11-20, not merged at
+  the time of writing). `POST /otlp/v1/metrics` takes OTLP in JSON with the bearer token of
+  the collector of one environment (`internal/api/observe.go`). `internal/otlp` reads the
+  points, `observation.FromKubernetes` reduces them to the record with the pack and the
+  targets, and `internal/monitor/observe.go` keeps the newest record of each environment in
+  the table `observations`. `GET /api/v1/observation?env=` returns it with `age_seconds`
+  and `stale`. After 60 seconds with no data each state is `unknown`. The topology view
+  takes the status of a component and the text "1 of 1 ready" from a record that is not
+  stale. On the local target the jobs get `TF_VAR_collector_endpoint` and
+  `TF_VAR_collector_token`.
+  - Ran on 2026-11-20: the unit tests, with a request body that a real collector sent to
+    a capture program.
+  - Not run: a real collector against this code.
+  - Not done: the rate limit of an environment, the checks and the volumes in the record,
+    the health history by name. One request must hold all the metrics of the cluster:
+    the core does not join two requests. No layer reads the two variables yet.
+
 - #86: the Explainer, the Investigator and the Reviewer read the first JSON object in the
   answer of a model (`firstObject` in `internal/agent/answer.go`). An object after the last
   mark `</think>` wins over a draft before it.
@@ -187,7 +170,6 @@ video and the local demo. No pull request is open.
     is unhealthy or has an open incident. Before, only a node with the ID `api` changed.
   - Fixed: the check after an apply fails when the layer of the application has outputs
     and no output with the address. Before, it passed with no check of the application.
-||||||| parent of 187014a (Add the observation record and the state rules for Kubernetes)
   - `internal/observation` has the record of `docs/PACKS.md` section B.6, the state rules
     for Kubernetes and the check of a record against a pack. Its unit tests pass. Not
     run: nothing uses the package yet.
