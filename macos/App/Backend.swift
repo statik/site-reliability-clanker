@@ -15,6 +15,10 @@ final class Backend {
     /// Called on the main queue.
     var onEvent: ((Event) -> Void)?
 
+    /// Where the control plane serves the dashboard. The app starts the program with no
+    /// address, so this is the default of the program.
+    static let dashboardURL = URL(string: "http://127.0.0.1:7070")!
+
     private let lock = NSLock()
     private var pid: pid_t = 0
     private var running = false

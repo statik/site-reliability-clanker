@@ -222,6 +222,32 @@ export interface Overview {
   planned_clouds: string[];
 }
 
+/** The local inference: the model server on the machine of the control plane. */
+export interface LocalInference {
+  /** False when this control plane cannot start or stop a model server. */
+  available: boolean;
+  reason?: string;
+  url?: string;
+  running: boolean;
+  version?: string;
+  model?: string;
+  model_present: boolean;
+  model_loaded: boolean;
+  started_by_src: boolean;
+}
+
+/** The language model of the control plane. The API never sends a key. */
+export interface ModelSettings {
+  mode: string;
+  provider: string;
+  models: Record<string, string> | null;
+  base_url?: string;
+  key_set: boolean;
+  local: LocalInference;
+  /** What a start or a stop did. */
+  done?: string;
+}
+
 export interface TimelineMarker {
   seq: number;
   ts: string;
@@ -272,6 +298,41 @@ export interface Timeline {
   health: Record<string, HealthBucket[]>;
 }
 
+/** The live state of a component, of an instance or of a node of the topology. */
+export type ComponentState = "ok" | "degraded" | "down" | "unknown";
+
+export interface ObservedInstance {
+  id: string;
+  state: ComponentState;
+  version?: string;
+  restarts: number;
+}
+
+export interface ObservedComponent {
+  name: string;
+  runtime: string;
+  state: ComponentState;
+  wanted: number;
+  ready: number;
+  instances: ObservedInstance[];
+}
+
+/** The last report of the observer of one environment. */
+export interface Observation {
+  schema: number;
+  env: string;
+  at: string;
+  application: string;
+  version: { wanted: string; source: string };
+  components: ObservedComponent[];
+  checks: unknown[];
+  volumes: unknown[];
+  /** The age of the report, or -1 when no report arrived yet. */
+  age_seconds: number;
+  /** True when no report arrived for 60 seconds. Every state is then `unknown`. */
+  stale: boolean;
+}
+
 export interface TopologyNode {
   id: string;
   layer: string;
@@ -279,7 +340,7 @@ export interface TopologyNode {
   label: string;
   detail: string;
   version: string;
-  status: string;
+  status: ComponentState;
   badges: string[];
 }
 

@@ -95,6 +95,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return true
     }
 
+    /// The menu item Settings. It shows the page Settings of the dashboard in the window
+    /// that shows the dashboard, or in a new window when no window shows it.
+    @objc func showSettings(_: Any?) {
+        let port = Backend.dashboardURL.port
+        let window = windows.first { $0.webView.url?.port == port }
+            ?? open(configuration: WKWebViewConfiguration())
+        window.show()
+        window.load(Backend.dashboardURL.appendingPathComponent("settings"))
+    }
+
     /// The menu item Reset Demo Environment. After a confirmation it stops the program,
     /// removes the local environment with its history and its saved setup, and starts
     /// the program again, which then shows the wizard from its first step.
@@ -147,7 +157,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        item.action != #selector(resetDemoEnvironment(_:)) || !resetting
+        // During a reset no control plane runs, so there is no page Settings to show.
+        let needsBackend = [#selector(resetDemoEnvironment(_:)), #selector(showSettings(_:))]
+        guard let action = item.action, resetting else { return true }
+        return !needsBackend.contains(action)
     }
 
     func applicationShouldTerminate(_: NSApplication) -> NSApplication.TerminateReply {

@@ -16,6 +16,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/statik/site-reliability-clanker/internal/ollama"
 )
 
 //go:embed ui
@@ -91,7 +93,7 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 		cfg.CLI = realCLI
 	}
 	if cfg.OllamaURL == "" {
-		cfg.OllamaURL = defaultOllamaURL
+		cfg.OllamaURL = ollama.DefaultURL
 	}
 	raw := make([]byte, 16)
 	if _, err := rand.Read(raw); err != nil {

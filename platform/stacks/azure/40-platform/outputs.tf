@@ -30,3 +30,8 @@ output "targets" {
   }
   description = "Where the application runs: the namespace of its components. The data services are not in the cluster."
 }
+
+output "collector_namespace" {
+  value       = module.platform.collector_namespace
+  description = "Namespace of the collector. Empty when there is no collector."
+}

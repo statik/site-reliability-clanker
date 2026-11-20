@@ -414,8 +414,8 @@ func (s *Server) getTopology(r *http.Request) (any, error) {
 			nodes[i].Badges = append(nodes[i].Badges, badge)
 		}
 	}
-	if unhealthy || incident {
-		markComponents(nodes, s.App, incident)
+	if err := s.markHealth(nodes, env, asOf, unhealthy, incident); err != nil {
+		return nil, err
 	}
 	edges := []map[string]string{}
 	for _, e := range slices.Concat(s.App.Topology.Edges, platformEdges) {

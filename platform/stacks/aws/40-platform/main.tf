@@ -100,6 +100,9 @@ module "platform" {
   gateway_class  = "envoy"
   public_address = ""
 
+  collector_endpoint = var.collector_endpoint
+  collector_token    = var.collector_token
+
   # Without the first annotation the cloud controller in EKS makes a Classic Load Balancer.
   # The load balancer is internet-facing by default and goes into the public subnets.
   service_annotations = {

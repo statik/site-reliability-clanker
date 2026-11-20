@@ -25,3 +25,16 @@ variable "shared_fs_claim_gb" {
   description = "Size of the shared volume claim in GiB."
   default     = 1
 }
+
+variable "collector_endpoint" {
+  type        = string
+  description = "Address of the control plane for the data of the collector, for example http://host:7070/otlp. Empty: no collector."
+  default     = ""
+}
+
+variable "collector_token" {
+  type        = string
+  sensitive   = true
+  description = "Token that the collector sends to the control plane."
+  default     = ""
+}

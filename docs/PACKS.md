@@ -407,7 +407,7 @@ the standard that the detectors, the Investigator and the eval cases read.
   "application": "ledger",
   "version": {"wanted": "4.2.1", "source": "file"},
   "components": [
-    {"name": "app", "runtime": "systemd", "state": "ok",
+    {"name": "app", "runtime": "systemd", "state": "ok", "wanted": 2, "ready": 2,
      "instances": [
        {"id": "host-1", "state": "ok", "version": "4.2.1", "restarts": 0,
         "started": "2026-11-11T02:10:00Z"},
@@ -429,6 +429,8 @@ the standard that the detectors, the Investigator and the eval cases read.
 
 - `state` is one of `ok`, `degraded`, `down` and `unknown`, for a component, an instance
   and a check.
+- `wanted` is the number of instances that the specification of a component asks for, and
+  `ready` is the number that are ready.
 - `ran_from` is `core`, `site` or `host`.
 - With the version source `http-json`, `version` also has the field `running`, and the
   instances have no version.
@@ -846,8 +848,13 @@ Each step is one pull request or a few, and each leaves Paperboat working.
 2. **The collector on Kubernetes.** The build of the collector. The endpoint of the core
    and the observation. The generator of the configuration. State, versions and volumes
    of Paperboat. The health history by name. The storage detector reads real samples.
-   Built so far: the record and the state rules for Kubernetes in `internal/observation`;
-   nothing sends data to it yet.
+   Built so far: the record and the state rules for Kubernetes in `internal/observation`.
+   The core has the endpoint `POST /otlp/v1/metrics` for OTLP in JSON with one token for
+   each environment, reduces the state metrics of the deployments, the pods and the
+   containers to the record, keeps the newest record of each environment and shows the
+   state of each component in the topology view. A record with no new data for 60 seconds
+   has each state `unknown`. The record has no checks and no volumes yet, and the version
+   of an instance is the tag of its image. No collector ran against this endpoint yet.
 3. **The rules of B.8**, the `tcp` check, the `image` version, the state `unknown`.
 4. **The site runner.** Enrolment and the jobs of a site.
 5. **Access to a host.** The certificate in the broker, the host kit with the collector

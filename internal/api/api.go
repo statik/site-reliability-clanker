@@ -20,6 +20,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/monitor"
 	"github.com/statik/site-reliability-clanker/internal/notify"
+	"github.com/statik/site-reliability-clanker/internal/ollama"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
 	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/sim"
@@ -60,6 +61,10 @@ type Server struct {
 	// signed. Nil leaves the endpoint out.
 	Slack http.Handler
 	Teams http.Handler
+	// LocalModel starts and stops the model server on the machine of the control plane.
+	// Nil on a target that cannot start a program: the settings then say that the local
+	// inference is not available.
+	LocalModel *ollama.Control
 }
 
 // ErrNotSignedIn means that a request carries no valid sign-in.
@@ -181,6 +186,8 @@ func (s *Server) Handler() (http.Handler, error) {
 		"GET /api/v1/topology":                        s.getTopology,
 		"GET /api/v1/posture":                         s.getPosture,
 		"GET /api/v1/health":                          s.getHealth,
+		"GET /api/v1/observation":                     s.getObservation,
+		"POST " + CollectorPath:                       s.postMetrics,
 		"GET /api/v1/access":                          s.getAccess,
 		"GET /api/v1/findings":                        s.getFindings,
 		"GET /api/v1/notifications":                   s.getNotifications,
@@ -203,6 +210,9 @@ func (s *Server) Handler() (http.Handler, error) {
 		"POST /api/v1/notifications/digest":           s.postDigest,
 		"POST /api/v1/environments/{env}/blank-slate": s.postBlankSlate,
 		"POST /api/v1/environments/{env}/teardown":    s.postTeardown,
+		"GET /api/v1/settings/model":                  s.getModelSettings,
+		"POST /api/v1/settings/model/local/start":     s.postLocalModelStart,
+		"POST /api/v1/settings/model/local/stop":      s.postLocalModelStop,
 	}
 	for pattern, h := range routes {
 		mux.HandleFunc(pattern, wrap(h))
@@ -250,12 +260,13 @@ func (s *Server) getAuth(*http.Request) (any, error) {
 }
 
 // open reports whether a path needs no signed-in user: the health path, the sign-in, the
-// runner path, where each request carries the token of one job, and the two endpoints of
-// the chat platforms, where each request carries the signature of the platform.
+// runner path, where each request carries the token of one job, the two endpoints of the
+// chat platforms, where each request carries the signature of the platform, and the path
+// of the collectors, where each request carries the token of one environment.
 func open(path string) bool {
 	return path == "/healthz" || strings.HasPrefix(path, "/auth/") ||
 		strings.HasPrefix(path, "/runner/v1/") || path == chatops.SlackPath ||
-		path == chatops.TeamsPath
+		path == chatops.TeamsPath || path == CollectorPath
 }
 
 // gitPush reports whether a request is a part of a push with the git client: the list of

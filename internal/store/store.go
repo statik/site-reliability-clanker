@@ -85,6 +85,9 @@ CREATE TABLE IF NOT EXISTS volume_samples (
   total_bytes BIGINT NOT NULL);
 CREATE INDEX IF NOT EXISTS volume_samples_ts ON volume_samples(env, volume, ts);
 
+CREATE TABLE IF NOT EXISTS observations (
+  env TEXT PRIMARY KEY, at TEXT NOT NULL, data TEXT NOT NULL);
+
 CREATE TABLE IF NOT EXISTS deliveries (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, event_seq BIGINT NOT NULL, channel TEXT NOT NULL,
   target TEXT NOT NULL, status TEXT NOT NULL, attempts BIGINT NOT NULL DEFAULT 0,

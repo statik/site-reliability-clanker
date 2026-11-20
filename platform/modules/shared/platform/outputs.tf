@@ -22,3 +22,8 @@ output "shared_volume_claim" {
   value       = kubernetes_persistent_volume_claim_v1.shared.metadata[0].name
   description = "ReadWriteMany claim for api and worker."
 }
+
+output "collector_namespace" {
+  value       = try(kubernetes_namespace_v1.observe[0].metadata[0].name, "")
+  description = "Namespace of the collector. Empty when there is no collector."
+}

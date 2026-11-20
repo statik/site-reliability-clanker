@@ -21,6 +21,47 @@ video and the local demo. No pull request is open.
 
 **Merged on 2026-11-18:**
 
+- Not merged, on the branch `observe-platform` (2026-11-20): the layer `40-platform` can
+  install an OpenTelemetry Collector in the cluster (`platform/modules/shared/platform`,
+  `docs/PACKS.md` section B.7). The inputs `collector_endpoint` and
+  `collector_token` are new in the four stacks, and the output `collector_namespace`
+  (`platform/CONTRACT.md`). With an empty `collector_endpoint` the module makes no collector.
+  With a value it makes the namespace `clanker-observe`, a service account, a `RoleBinding`
+  in the namespace of the application to the `ClusterRole` `view`, a secret with the token,
+  a config map and a deployment with one replica of `otel/opentelemetry-collector-k8s`
+  0.165.0, pinned by digest. The receiver `k8s_cluster` reads only the namespace of the
+  application, and the exporter `otlp_http` sends JSON to the endpoint. The token arrives
+  in the pod as the variable `COLLECTOR_TOKEN` from the secret; it is not in the config map.
+  - Ran on 2026-11-20: `tofu fmt -check -recursive platform`, `tofu init -backend=false`
+    and `tofu validate` in the four `40-platform` stacks, `opa check` and `opa test` of
+    `runbooks/policy`. The brief of this task says that the same configuration of the
+    collector ran by hand in a local cluster and reached the control plane; this session
+    did not run it.
+  - Not run: an apply. No plan ran against a cluster. The security settings of the
+    container (`run_as_non_root`, read-only root file system, no capabilities) did not run.
+  - Not in this change: the code of the control plane that sets
+    `TF_VAR_collector_endpoint` and `TF_VAR_collector_token`, and the collector on each
+    node (`kubeletstats`). A change of the token alone does not start the pod again.
+  - The tier policy has no rule for these resource types: a plan with them is T2
+    (`normal-change`). The rule `identity-change` does not match `kubernetes_role_binding_v1`.
+- The core receives the metrics of a collector on Kubernetes and keeps the live state of
+  each component (`docs/PACKS.md` section B.14, step 2; built on 2026-11-20, not merged at
+  the time of writing). `POST /otlp/v1/metrics` takes OTLP in JSON with the bearer token of
+  the collector of one environment (`internal/api/observe.go`). `internal/otlp` reads the
+  points, `observation.FromKubernetes` reduces them to the record with the pack and the
+  targets, and `internal/monitor/observe.go` keeps the newest record of each environment in
+  the table `observations`. `GET /api/v1/observation?env=` returns it with `age_seconds`
+  and `stale`. After 60 seconds with no data each state is `unknown`. The topology view
+  takes the status of a component and the text "1 of 1 ready" from a record that is not
+  stale. On the local target the jobs get `TF_VAR_collector_endpoint` and
+  `TF_VAR_collector_token`.
+  - Ran on 2026-11-20: the unit tests, with a request body that a real collector sent to
+    a capture program.
+  - Not run: a real collector against this code.
+  - Not done: the rate limit of an environment, the checks and the volumes in the record,
+    the health history by name. One request must hold all the metrics of the cluster:
+    the core does not join two requests. No layer reads the two variables yet.
+
 - #86: the Explainer, the Investigator and the Reviewer read the first JSON object in the
   answer of a model (`firstObject` in `internal/agent/answer.go`). An object after the last
   mark `</think>` wins over a draft before it.
@@ -129,7 +170,6 @@ video and the local demo. No pull request is open.
     is unhealthy or has an open incident. Before, only a node with the ID `api` changed.
   - Fixed: the check after an apply fails when the layer of the application has outputs
     and no output with the address. Before, it passed with no check of the application.
-||||||| parent of 187014a (Add the observation record and the state rules for Kubernetes)
   - `internal/observation` has the record of `docs/PACKS.md` section B.6, the state rules
     for Kubernetes and the check of a record against a pack. Its unit tests pass. Not
     run: nothing uses the package yet.

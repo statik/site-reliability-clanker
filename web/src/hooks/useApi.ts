@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiGet, errorMessage } from "@/api/client";
+import { ApiError, apiGet, errorMessage } from "@/api/client";
 import type { AuditEvent } from "@/api/types";
 import { useLive } from "@/state/live";
 import { useSession } from "@/state/session";
@@ -9,6 +9,8 @@ const DEBOUNCE_MS = 500;
 export interface ApiState<T> {
   data: T | null;
   error: string | null;
+  /** The HTTP status of the error, or null when there is no error or no response. */
+  status: number | null;
   loading: boolean;
   reload: () => void;
 }
@@ -28,6 +30,7 @@ interface Settled<T> {
   version: number;
   data: T | null;
   error: string | null;
+  status: number | null;
 }
 
 export const anyEvent = () => true;
@@ -43,7 +46,7 @@ export function useApi<T>(path: string | null, options: Options = {}): ApiState<
   const { subscribe } = useLive();
   const key = `${path ?? ""}|${userName}|${asOf?.getTime() ?? "live"}`;
   const [settled, setSettled] = useState<Settled<T>>({ key: "", version: -1, data: null,
-    error: null });
+    error: null, status: null });
   const [version, setVersion] = useState(0);
   const reload = useCallback(() => setVersion((current) => current + 1), []);
   const liveTest = useRef(options.live);
@@ -59,13 +62,14 @@ export function useApi<T>(path: string | null, options: Options = {}): ApiState<
     apiGet<T>(path, asOf).then(
       (data) => {
         if (!cancelled) {
-          setSettled({ key, version, data, error: null });
+          setSettled({ key, version, data, error: null, status: null });
         }
       },
       (failure: unknown) => {
         if (!cancelled) {
           setSettled((last) => ({ key, version, data: last.key === key ? last.data : null,
-            error: errorMessage(failure) }));
+            error: errorMessage(failure),
+            status: failure instanceof ApiError ? failure.status : null }));
         }
       },
     );
@@ -107,6 +111,7 @@ export function useApi<T>(path: string | null, options: Options = {}): ApiState<
   return {
     data: current ? settled.data : null,
     error: current ? settled.error : null,
+    status: current ? settled.status : null,
     loading: path !== null && (settled.key !== key || settled.version !== version),
     reload,
   };

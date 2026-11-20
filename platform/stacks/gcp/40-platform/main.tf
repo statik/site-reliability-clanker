@@ -69,4 +69,7 @@ module "platform" {
 
   gateway_class  = "envoy"
   public_address = data.terraform_remote_state.network.outputs.public_address
+
+  collector_endpoint = var.collector_endpoint
+  collector_token    = var.collector_token
 }
