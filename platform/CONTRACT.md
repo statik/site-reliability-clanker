@@ -132,6 +132,7 @@ Types use OpenTofu syntax. "Local" shows how the local target satisfies the row.
 | `postgres_version` | `string` | Version that runs now | Image tag |
 | `rwx_storage_class` | `string` | Name of a `StorageClass` that supports `ReadWriteMany` | Static volume class |
 | `backup_bucket` | `string` | Bucket or path for database backups | Directory on the node |
+| `data_namespace` | `string` | Local target only: the namespace of the data services in the cluster | `paperboat-data` |
 
 ### 40-platform
 
@@ -147,6 +148,7 @@ Types use OpenTofu syntax. "Local" shows how the local target satisfies the row.
 | `public_address` | `string` | Host name or IP address that serves the application | `localhost:8088` |
 | `app_secret_name` | `string` | Kubernetes secret in `app_namespace` with keys `DATABASE_URL` | Same |
 | `shared_volume_claim` | `string` | `PersistentVolumeClaim` in `app_namespace`, `ReadWriteMany` | Same |
+| `targets` | `map(string)` | Where the application runs. The key `application` has the namespace of its components. The key `data` has the namespace of its data services, or it is empty when they are not in the cluster. The control plane reads the namespaces of a debug session and of the rights of its identities from this output, not from the application pack | `data` is the output `data_namespace` of `30-data` |
 
 ### 50-app
 

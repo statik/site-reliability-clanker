@@ -326,6 +326,20 @@ func lastPart(text string) string {
 	return "(earlier output left out)\n" + cut
 }
 
+// Targets returns where the components of the application run on an environment: the
+// output of the layer of the platform, as the last apply of that layer wrote it.
+func (o *Orchestrator) Targets(env string) (pack.Targets, error) {
+	outputs, err := store.LayerOutputs(o.DB, env, pack.TargetsLayer)
+	if err != nil {
+		return pack.Targets{}, err
+	}
+	targets, err := pack.ParseTargets(outputs)
+	if err != nil {
+		return pack.Targets{}, fmt.Errorf("environment %s: %w", env, err)
+	}
+	return targets, nil
+}
+
 // debugReads returns the reads of a debug session. The first two read the state of the
 // pods and of the deployments; the core always asks for them. Then comes one read for
 // each read of the pack.
@@ -375,6 +389,10 @@ func writeTranscript(out io.Writer, namespace string, reads []jobspec.Read,
 // scrubbed transcript.
 func (o *Orchestrator) DebugSession(ctx context.Context, wi WorkItem, actor, reason string) (
 	string, error) {
+	targets, err := o.Targets(wi.Env)
+	if err != nil {
+		return "", err
+	}
 	grant, err := o.Broker.Issue(broker.Request{WorkItem: wi.ID, Env: wi.Env, Layer: "debug",
 		Kind: broker.KindDebug, Tier: "T1", Approvers: []string{actor},
 		Duration: 15 * time.Minute})
@@ -384,7 +402,7 @@ func (o *Orchestrator) DebugSession(ctx context.Context, wi WorkItem, actor, rea
 	o.emit(audit.Event{Type: "grant.debug_issued", Actor: "broker", Env: wi.Env,
 		WorkItem: wi.ID,
 		Summary: fmt.Sprintf("Debug grant %s for %s: read-only, namespace %s, until %s",
-			grant.ID, actor, o.App.Namespace, grant.Expires),
+			grant.ID, actor, targets.Namespace, grant.Expires),
 		Data: map[string]any{"grant": grant.ID, "identity": grant.Identity, "kind": grant.Kind,
 			"reason": reason, "expires": grant.Expires, "not_before": grant.NotBefore,
 			"tier": "T1", "approvers": grant.Approvers}})
@@ -400,11 +418,11 @@ func (o *Orchestrator) DebugSession(ctx context.Context, wi WorkItem, actor, rea
 			return fmt.Errorf("the broker refused the debug grant: %w", err)
 		}
 		result, err := o.run(ctx, &job, jobspec.Job{Spec: jobspec.Spec{Kind: jobspec.KindDiagnose,
-			Env: wi.Env, KubeConfig: cred.KubeConfig, Namespace: o.App.Namespace, Reads: reads}})
+			Env: wi.Env, KubeConfig: cred.KubeConfig, Namespace: targets.Namespace, Reads: reads}})
 		if err != nil {
 			return err
 		}
-		return writeTranscript(io.MultiWriter(logFile, &transcript), o.App.Namespace, reads,
+		return writeTranscript(io.MultiWriter(logFile, &transcript), targets.Namespace, reads,
 			result.Commands)
 	}()
 	o.endJob(job, logFile, runErr)

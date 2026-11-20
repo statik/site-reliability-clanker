@@ -15,8 +15,6 @@
   "deploy": {"kind": "helm", "chart": "chart", "mount": "apps/paperboat", "build": "build.sh"},
   "runbooks": "runbooks",
   "evals": "evals",
-  "namespace": "paperboat",
-  "data_namespace": "paperboat-data",
   "components": [
     {"name": "api", "runtime": "kubernetes", "workload": "paperboat-api", "required": true},
     {"name": "web", "runtime": "kubernetes", "workload": "paperboat-web", "required": true},

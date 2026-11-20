@@ -283,8 +283,7 @@ func (s *Simulator) drift(ctx context.Context) error {
 		return fmt.Errorf("simulate a manual change: %w", err)
 	}
 	s.emit("sim.manual_change", "Someone set the backup retention to 1 day with kubectl",
-		map[string]any{"resource": "configmap/backup-policy",
-			"namespace": s.App.DataNamespace})
+		map[string]any{"resource": "configmap/backup-policy"})
 	_, err := s.Detector.CheckDrift(ctx, s.Env)
 	return err
 }

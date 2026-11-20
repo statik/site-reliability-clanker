@@ -32,3 +32,8 @@ output "backup_bucket" {
   value       = local.backup_path
   description = "Directory on the node for database backups."
 }
+
+output "data_namespace" {
+  value       = local.namespace
+  description = "Namespace of the data services in the cluster."
+}

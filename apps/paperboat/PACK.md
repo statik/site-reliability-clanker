@@ -41,8 +41,6 @@ built.
 | `deploy.chart` | The directory of the chart, inside the pack |
 | `deploy.mount` | The path of the pack in the platform repository, where the stacks read the chart |
 | `deploy.build` | Optional. The build program, inside the pack. A pack with none has its images in a registry already |
-| `namespace` | The Kubernetes namespace of the application. A debug session reads only there |
-| `data_namespace` | The namespace of the data services of the application |
 | `components` | The parts of the application that run. Each has a `name`, the `runtime` `kubernetes`, the `workload` (the name of its deployment) and `required`. No code reads `required` yet |
 | `incident` | Optional. The `runbook` and the `component` that an incident proposes when no model gives a diagnosis. Without it, such an incident goes to a person |
 | `diagnostics` | The reads of a debug session, 1 to 8. A read is `{"read": "logs", "component": …, "lines": …}` with 1 to 200 lines, or `{"read": "events"}` |
@@ -65,6 +63,13 @@ command for each read: `kubectl logs deployment/<workload> --tail=<lines>` and
 that goes to the runner has the reads and the namespace, not the commands
 (`internal/jobspec/read.go`). The runner makes each command, and it starts no program for
 a read that it does not know.
+
+**Where the application runs.** The manifest has no namespace. The layer `40-platform`
+has the output `targets` with the namespace of the components and the namespace of the
+data services (`platform/CONTRACT.md`). The control plane reads the namespace of a debug
+session and of the rights of its identities from that output. It refuses a namespace of
+the cluster or of the control plane.
+
 
 ## A pack is not trusted
 
@@ -134,7 +139,7 @@ $ clanker pack validate apps/paperboat
 ok    manifest: paperboat 0.1.0 (Paperboat), schema 2
 ok    deployment: layer 50-app, variable paperboat_version, chart chart
 ok    releases: repository paperboat, first release 1.0.0
-ok    components: api (paperboat-api), web (paperboat-web), worker (paperboat-worker) in the namespace paperboat
+ok    components: api (paperboat-api), web (paperboat-web), worker (paperboat-worker)
 ok    diagnostics: 2 reads, and the state of the pods and the deployments
 ok    checks: ready /api/healthz 200, inventory /api/inventory 200 (primary)
 ok    version: http-json /api/version
@@ -196,5 +201,6 @@ The core on a cloud has no disk. It reads only the pack that it carries.
 - The eval tasks other than `investigator_diagnosis` have their samples in the code of the
   suite, and those samples are about Paperboat.
 - The runbooks, the prompt of the Investigator and the eval cases still name deployments,
-  not components. The namespaces are still in the manifest. `docs/PACKS.md` section B.14
-  has the order of the work.
+  not components. `docs/PACKS.md` section B.14 has the order of the work.
+- The scripts of the runbooks of Paperboat have the namespaces `paperboat` and
+  `paperboat-data` in their text. They do not read the targets.

@@ -216,6 +216,11 @@ func (a *Agent) resolve(ctx context.Context, wi orchestrator.WorkItem, f detect.
 			check))
 	}
 	minutes := int(a.Clock.Now().Sub(end.opened).Minutes()) + 1
+	// The debug session of this incident read the targets a moment ago.
+	targets, err := a.Orch.Targets(f.Env)
+	if err != nil {
+		return a.failIncident(wi, err)
+	}
 	explanation := orchestrator.Explanation{
 		Sentence: end.diagnosis.Diagnosis,
 		Why:      end.diagnosis.WriteUp,
@@ -223,7 +228,7 @@ func (a *Agent) resolve(ctx context.Context, wi orchestrator.WorkItem, f detect.
 			a.App.PrimaryCheck().Name),
 		UserEffect: f.Title,
 		PreChecks: []string{"Debug session recorded: read-only, namespace " +
-			a.App.Namespace},
+			targets.Namespace},
 		Rollback:     "The restart is reversible; no configuration changed",
 		Verification: check,
 		Backup:       "Not needed; no data changed",
@@ -238,7 +243,7 @@ func (a *Agent) resolve(ctx context.Context, wi orchestrator.WorkItem, f detect.
 	a.emit(audit.Event{Type: "incident.resolved", Actor: RoleInvestigator, Env: f.Env,
 		WorkItem: wi.ID, Summary: "Incident resolved: " + check,
 		Data: map[string]any{"mitigation": end.mitigation, "minutes": minutes}})
-	_, err := a.Orch.Transition(wi.ID, orchestrator.StateDone, RoleInvestigator,
+	_, err = a.Orch.Transition(wi.ID, orchestrator.StateDone, RoleInvestigator,
 		"mitigated and verified")
 	return err
 }

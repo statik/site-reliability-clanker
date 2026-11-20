@@ -22,3 +22,11 @@ output "shared_volume_claim" {
   description = "ReadWriteMany PersistentVolumeClaim in app_namespace."
   value       = module.platform.shared_volume_claim
 }
+
+output "targets" {
+  value = {
+    application = module.platform.app_namespace
+    data        = ""
+  }
+  description = "Where the application runs: the namespace of its components. The data services are not in the cluster."
+}

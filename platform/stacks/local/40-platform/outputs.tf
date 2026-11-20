@@ -22,3 +22,11 @@ output "shared_volume_claim" {
   value       = module.platform.shared_volume_claim
   description = "ReadWriteMany claim for api and worker."
 }
+
+output "targets" {
+  value = {
+    application = module.platform.app_namespace
+    data        = local.data_outputs.data_namespace
+  }
+  description = "Where the application runs: the namespace of its components and the namespace of its data services."
+}

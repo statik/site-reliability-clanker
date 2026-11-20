@@ -103,8 +103,25 @@ video and the local demo. No pull request is open.
     answers, with the first deployment and the scene `incident`. The record of the debug
     session had the four commands of before and no failed read, and the incident ended
     in `Done`.
-  - Not done in step 1 yet: the namespaces are in the manifest, and the runbooks and the
-    prompt of the Investigator name deployments.
+  - The manifest has no namespace. Each stack of the layer `40-platform` has the output
+    `targets` (`platform/CONTRACT.md`): the namespace of the components, and the namespace
+    of the data services, which is empty on a cloud. `pack.ParseTargets` checks it and
+    refuses a namespace of the cluster or of the control plane. The debug session, the
+    write-up of an incident, the bindings of the identities on the local target and the
+    manual change of the simulator read it from the stored outputs of the layer. The
+    bindings of the data namespace are in their own file,
+    `internal/localtarget/identities-data.yaml`.
+    An environment from before this change must start again. Its platform repository
+    was seeded one time and has no output `targets`, so a debug session there fails and
+    the identities get no bindings in the namespaces.
+    Ran on 2026-11-20: the Go tests, `tofu fmt`, and a run on a new data directory with
+    recorded answers: the first deployment and the scenes `database-upkeep`, `drift` and
+    `incident`. They use the rights of the runbook identity in the data namespace, the
+    manual change in the data namespace and the debug session. Five work items ended in
+    `Done`, the audit chain verified with 129 events, and the log had no error line.
+    Not run: the stacks of AWS, Google Cloud and Azure, which only CI validates.
+  - Not done in step 1 yet: the runbooks and the prompt of the Investigator name
+    deployments. The approval page does not show the targets.
 - A pack has two more parts, and there are commands for a pack (`apps/paperboat/PACK.md`):
   - The runbooks of the application are in the pack (`apps/paperboat/runbooks/`, before
     `runbooks/jobs/`). The control plane seeds them into `jobs/` of the runbooks
