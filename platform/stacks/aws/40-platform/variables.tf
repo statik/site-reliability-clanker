@@ -24,3 +24,16 @@ variable "public_port" {
   type        = number
   default     = 80
 }
+
+variable "collector_endpoint" {
+  description = "Address of the control plane for the data of the collector, for example http://host:7070/otlp. Empty: no collector."
+  type        = string
+  default     = ""
+}
+
+variable "collector_token" {
+  description = "Token that the collector sends to the control plane."
+  type        = string
+  sensitive   = true
+  default     = ""
+}

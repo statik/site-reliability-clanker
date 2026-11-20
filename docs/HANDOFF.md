@@ -21,6 +21,29 @@ video and the local demo. No pull request is open.
 
 **Merged on 2026-11-18:**
 
+- Not merged, on the branch `observe-platform` (2026-11-20): the layer `40-platform` can
+  install an OpenTelemetry Collector in the cluster (`platform/modules/shared/platform`,
+  `docs/PACKS.md` section B.7). The inputs `collector_endpoint` and
+  `collector_token` are new in the four stacks, and the output `collector_namespace`
+  (`platform/CONTRACT.md`). With an empty `collector_endpoint` the module makes no collector.
+  With a value it makes the namespace `clanker-observe`, a service account, a `RoleBinding`
+  in the namespace of the application to the `ClusterRole` `view`, a secret with the token,
+  a config map and a deployment with one replica of `otel/opentelemetry-collector-k8s`
+  0.165.0, pinned by digest. The receiver `k8s_cluster` reads only the namespace of the
+  application, and the exporter `otlp_http` sends JSON to the endpoint. The token arrives
+  in the pod as the variable `COLLECTOR_TOKEN` from the secret; it is not in the config map.
+  - Ran on 2026-11-20: `tofu fmt -check -recursive platform`, `tofu init -backend=false`
+    and `tofu validate` in the four `40-platform` stacks, `opa check` and `opa test` of
+    `runbooks/policy`. The brief of this task says that the same configuration of the
+    collector ran by hand in a local cluster and reached the control plane; this session
+    did not run it.
+  - Not run: an apply. No plan ran against a cluster. The security settings of the
+    container (`run_as_non_root`, read-only root file system, no capabilities) did not run.
+  - Not in this change: the code of the control plane that sets
+    `TF_VAR_collector_endpoint` and `TF_VAR_collector_token`, and the collector on each
+    node (`kubeletstats`). A change of the token alone does not start the pod again.
+  - The tier policy has no rule for these resource types: a plan with them is T2
+    (`normal-change`). The rule `identity-change` does not match `kubernetes_role_binding_v1`.
 - #86: the Explainer, the Investigator and the Reviewer read the first JSON object in the
   answer of a model (`firstObject` in `internal/agent/answer.go`). An object after the last
   mark `</think>` wins over a draft before it.
