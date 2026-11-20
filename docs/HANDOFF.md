@@ -125,6 +125,10 @@ video and the local demo. No pull request is open.
     second data directory it fails with "Backend configuration changed", because those
     directories keep the backend of the first one. The run above was destroyed from a
     copy of the sources.
+  - Fixed: the topology shows each component of the pack as degraded when the application
+    is unhealthy or has an open incident. Before, only a node with the ID `api` changed.
+  - Fixed: the check after an apply fails when the layer of the application has outputs
+    and no output with the address. Before, it passed with no check of the application.
   - The job of a debug session carries reads and a namespace, not `kubectl` argument
     lists (`internal/jobspec/read.go`). One function makes the command of a read. The
     runner starts the command with it, and the core writes the command line of the
