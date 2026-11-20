@@ -3,8 +3,9 @@
 This document has two parts. Part A says how an application pack works today and what the
 core requires from it. Part B is a proposal: a standard way to gather health and
 observability data, so that a pack can describe a legacy application that does not run on
-Kubernetes, also on servers in a data centre. Nothing in part B is built, and nothing in
-part B is decided. Section B.13 has the decisions for the owner.
+Kubernetes, also on servers in a data centre. Nothing in part B is built. One thing is
+decided: the OpenTelemetry Collector gathers the data. Section B.13 has that decision and
+the decisions that are open.
 
 `docs/PLAN.md` section 5.7 has the rules of a pack. `apps/paperboat/PACK.md` has the fields
 of the manifest and the commands.
@@ -158,7 +159,7 @@ says. A pack that does not meet them loads, but it does not work.
    cannot give a model a tool, and no text of a pack becomes a command. A pack does not
    install the guard that limits it.
 
-Not a goal: a general monitoring system. The core gathers only what its detectors and the
+Not a goal: a general monitoring system. The core keeps only what its detectors and the
 Investigator use.
 
 ### B.2 Terms
@@ -168,31 +169,64 @@ Investigator use.
 | Component | One part of the application that runs: a deployment, a service of the operating system. It replaces "deployment" in the manifest, the runbooks, the prompts and the eval cases |
 | Instance | One copy of a component: a pod, or the unit on one host |
 | Runtime | The kind of system that runs a component. The core has a closed list of runtimes |
-| Collector | The code of the core that reads one runtime. Each runtime has one |
+| Collector | The OpenTelemetry Collector: a program that stays on a host, in a cluster or in a site, gathers data and sends it to the core |
 | Check | A test of the application: a request, a connection, the result of a job |
-| Observation | The record that the collectors and the checks produce. It has one format for every runtime |
+| Observation | The record that the core makes from the data of the collectors and of the checks. It has one format for every runtime |
 | Site | A network that the core cannot reach from outside: a data centre, a private network |
 | Site runner | A runner that stays inside a site and gets its jobs from the core |
 
-### B.3 The pack declares, the core collects
+### B.3 The pack declares, the collector collects
 
-A pack can bring data for collection in two ways.
+**Decided 2026-11-20 by the owner:** the OpenTelemetry Collector gathers the standing
+health and observability data. The project does not write its own collectors for that
+data. The read of logs in a debug session stays apart, under a grant (section B.7); that
+part is the recommendation of this document, and section B.13 has it as an open row.
 
-| | A. Declared (recommended) | B. Scripts |
+A pack does not bring a configuration of the collector, and it does not bring a program.
+
+| | A. Declared (this design) | B. Scripts or configuration in the pack |
 |---|---|---|
-| The pack brings | Names and numbers: the components, their runtime, the checks | Programs that read the application and print the observation |
-| The core runs | Its own collector for the runtime, with commands that are in its code | The program of the pack, with a read-only credential |
+| The pack brings | Names and numbers: the components, their runtime, the checks | Programs that read the application, or a configuration of the collector |
+| What runs | The collector of the project, with a configuration that the core writes | The code or the configuration of the pack |
 | A new kind of application needs | A new runtime in the core, when no runtime fits | Only a new pack |
-| What a pack can make the runner do | Nothing outside the fixed reads | Any read that the credential permits, and any use of the network |
-| Output that a model reads | Produced by the core | Produced by the code of the pack |
+| What a pack can make a host do | Nothing outside the fixed reads | Any read that the collector can do, and any use of the network |
 
-Way A keeps the rule that the core fixes the verbs. It is the same step that the debug
-commands took, one level higher: today the pack gives the words after a fixed verb, and
-with way A the pack gives only the name of a component and a number of lines. Way B is
-more flexible, and it makes each pack a program that needs a review before each import.
+The core writes the whole configuration of a collector from a template. A value of a pack
+fills only a place for one checked value: a unit name, a port, a path below a permitted
+directory, a pattern. Section B.7 has the rules.
 
-When no runtime fits an application, the answer is a new runtime in the core, with its
-tests. It is not a script in a pack.
+**What the collector gives, and what the project still writes.** The versions are those of
+2026-11-20: the collector core 0.165.0 and the contrib components 0.165.1. The stability
+is what each component states.
+
+| Data | Component of the collector | Stability |
+|---|---|---|
+| State and instances on Kubernetes | Receiver `k8s_cluster` | Beta |
+| Volume fill and pod memory on Kubernetes | Receiver `kubeletstats` | Beta |
+| Image tag, start time of a pod | Receiver `k8s_cluster`, processor `k8sattributes` | Beta, stable |
+| Active state and restarts of a unit | Receiver `systemd` | Alpha |
+| Fill of a file system, memory | Receiver `hostmetrics` | Beta |
+| HTTP and TCP checks | Receivers `httpcheck`, `tcpcheck` | Alpha |
+| Lines of a log file, lines of the journal | Receivers `filelog`, `journald` | Beta, alpha |
+| A count of log lines that match a pattern | Connector `count` | Alpha |
+| Sending to the core, with a queue on the disk | Exporter `otlphttp`, extension `file_storage` | Stable, beta |
+
+The project writes:
+
+1. **The generator of the configuration**, from the manifest and the approved targets.
+2. **The endpoint of the core** that receives the data and reduces it to the observation
+   (section B.6).
+3. **One receiver of its own**, built into the collector, for what no component gives on a
+   host: the sub state and the result of a unit, the start time of its main process, the
+   last run of a timer and its result, and the first line of a version file. The rule for
+   a service that fails in a loop and the check kind `job` need it.
+4. **The reads of a debug session**, on a host and on Kubernetes (section B.7).
+5. **A build of the collector** with only these components, made with the builder of the
+   collector project, at a pinned version. The full contrib archive has 115 MB; the
+   smallest official build has 13 MB. The size of this build was not measured.
+
+Five of the components are alpha. Their names of metrics and their settings can change
+between versions, so the version is pinned and a new version is a reviewed change.
 
 ### B.4 Components and runtimes
 
@@ -229,66 +263,67 @@ host addresses for `systemd`.
 - On a host, the units and the log files of the manifest are a part of the scope, and
   the pack writes them. Section B.7 says who approves them.
 
-**The reads.** A collector has five reads.
+**What is gathered.**
 
-| Read | `kubernetes` | `systemd` |
+| Data | `kubernetes` | `systemd` |
 |---|---|---|
-| `state` | The workload and its pods: ready and wanted instances, restarts, the time of the last start. With no component: each pod of the namespace, so that a pod of a data service is in the record | Named properties of the unit on each host: the active state, the result, the restart count, the time of the last start. For a timer: the last run and the result of the service that it starts |
-| `logs` | The last lines of the pods of the workload | The last lines of the journal of the unit, or of `log_path` |
-| `events` | The events of the namespace that name the workload or one of its pods | The journal lines of the unit with the priority warning or higher, and the lines of systemd about a start or a stop of the unit |
-| `saturation` | Memory of the pods; the fill level of the volumes of the pack | Memory of the unit; the fill level of the volumes of the pack |
-| `version` | Not used | The first line of the version file (section B.5) |
+| State | Wanted and ready instances of the workload, the phase of each pod | The active state of the unit on each host; the sub state and the result from the receiver of the project |
+| Restarts | The restart count of each container | The count of automatic restarts of the unit |
+| Start time | The start time of the pod | The start time of the main process, from the receiver of the project |
+| Version | The image tag of each instance | The first line of the version file, from the receiver of the project |
+| Volumes | Capacity and free space of each volume claim | The use of the file system of each path |
+| Memory | The memory of each pod | The memory of the unit |
+| Logs and events | Not gathered by the collector | Not gathered by the collector |
 
-- The `systemd` collector asks for named properties only: the load state, the active
-  state, the sub state, the result, the restart count and the start time of the main
-  process. The full properties of a unit can hold its environment variables, and those
-  can hold a secret.
+- The collector sends no log line and no event to the core. Section B.7 says why and how
+  the Investigator reads them.
+- The receiver of the project reads named properties of a unit only. The full properties
+  of a unit can hold its environment variables, and those can hold a secret.
 - The active state alone is not enough. A service that fails and starts again in a loop
-  reports "activating", so the collector reads the sub state too.
-- On Kubernetes, the memory of a pod and the fill level of a volume are not in the core
-  interface of the cluster. They come from the metrics service and from the statistics of
-  a node. A role in one namespace probably does not give the statistics of a node; this
-  was not checked. If it does not, the identity `observer` needs a read right outside
-  the namespace, and a debug session has no `saturation` read on Kubernetes.
-- The exact commands are fixed in the implementation, in the collector, with a test for
-  each.
+  reports "activating", so the sub state is needed.
+- On Kubernetes, the fill of a volume comes from the statistics of a node. No role in a
+  namespace can read them: the collector needs the right `get` on `nodes/stats` for the
+  cluster. This collector therefore belongs to the layer of the platform, not to a pack.
+  The path through the proxy of the API server needs the right `nodes/proxy`, which
+  Kubernetes documents as more than a read. The design does not use it.
 
-**The states.** Each collector maps the states of its runtime to four.
+**The states.** The core maps what the collector sends to four states.
 
 | State | `kubernetes` | `systemd` service | `systemd` timer |
 |---|---|---|---|
 | `ok` | Each wanted instance is ready and has the new specification | Active and running on each host, with no new restart | The timer is active: it waits for its next run |
 | `degraded` | One instance or more is ready, but not all; or a container started again since the last observation | Active on some hosts; or it starts, stops or reloads; or it started again since the last observation | Active on some hosts |
 | `down` | Instances are wanted and none is ready | Failed, inactive, or in a loop of restarts, on each host | The timer is not active |
-| `unknown` | The collector got no answer, or the cluster did not yet read the last change | The collector got no answer from a host, or the unit is not there | The collector got no answer |
+| `unknown` | No data arrived in time, or the cluster did not yet read the last change | No data arrived in time from a host, or the unit is not there | No data arrived in time |
 
 - `unknown` is a real value. The detectors do not read `unknown` as `ok`.
 - The four states are those of a long convention of monitoring programs: OK, warning,
   critical, unknown.
-- A timer and the service that it starts are two units. The collector reads both. The
-  state of a timer says only that it will run. The result of its last run is the check
-  of the kind `job` (section B.5), so a timer that had no run since an apply is `ok`.
+- A timer and the service that it starts are two units, and both are read. The state of
+  a timer says only that it will run. The result of its last run is the check of the kind
+  `job` (section B.5), so a timer that had no run since an apply is `ok`.
 - A service that runs one time and ends is healthy when it is inactive and its result is
-  a success. The collector must know this type of unit from its properties.
+  a success.
 
 **Volumes.** The manifest gets a list `volumes`: a `name`, a `component`, and `claim` (the
 volume claim, for `kubernetes`) or `path` (a file system path, for `systemd`). An optional
-`size_variable` names the variable of the layer that sets the size.
+`size_variable` names the variable of the layer that sets the size. On a host, the
+collector reports a file system by the point where it is mounted, so the host kit
+(section B.7) finds that point for each path when it writes the configuration.
 
 **Diagnostics.** The debug session of a pack becomes a list of reads. It replaces
 `debug_commands`:
 
 ```json
 "diagnostics": [
-  {"read": "state"},
   {"read": "logs", "component": "api", "lines": 30},
   {"read": "events"}
 ]
 ```
 
-A read has the name of one of the reads `state`, `logs`, `events` and `saturation`,
-optionally one component of the pack, and `lines` from 1 to 200. There is nothing else to
-check: no flag, no word, no format.
+A read is `logs` or `events`, optionally with one component of the pack, and `lines` from
+1 to 200. There is nothing else to check: no flag, no word, no format. The state, the
+volumes and the checks are not reads: the Investigator gets the newest observation.
 
 ### B.5 Checks
 
@@ -299,18 +334,20 @@ name, a `kind`, and the fields of its kind.
 |---|---|---|
 | `http` | `path`, optional `status` (default 200), optional `from`; with `from` `host` also `component` and `port` | The answer has the status |
 | `tcp` | `address_output`; or, with `from` `host`, `component` and `port` | The connection opens |
-| `log-match` | `component`, `pattern`, `limit` (0 to 100) | The log lines of the component since the last observation have `limit` lines or fewer that match the pattern |
+| `log-match` | `component`, `pattern`, `limit` (0 to 100) | The log lines of the component in the last 5 minutes have `limit` lines or fewer that match the pattern |
 | `job` | `component` (a timer), `max_age_hours` (1 to 168) | The last run passed and is not older than the limit |
 
 **Where a check runs.** `from` has two values.
 
 | `from` | The check runs | Against |
 |---|---|---|
-| `outside` (default) | In the core. For an environment in a site, in the site runner | The URL of `url_output`, or each address of `address_output`: an output of the layer with a list of `host:port` values, under the address rules of section B.4 |
-| `host` | In the `observe` job, on each instance of `component` | `localhost` and `port`. For a database that listens only on its host, or a port behind a load balancer |
+| `outside` (default) | In the core, with the code of today, when the core has a network path. For an environment in a site: in the collector of the site, which runs beside the site runner | The URL of `url_output`, or each address of `address_output`: an output of the layer with a list of `host:port` values, under the address rules of section B.4 |
+| `host` | In the collector on each host of `component` | `localhost` and `port`. For a database that listens only on its host, or a port behind a load balancer |
 
-A check that could not run has the state `unknown`. It is not a failed check. Today a
-request with no network path counts as an error (`internal/monitor/monitor.go:93`).
+- The check of the core sends many requests in one sample, as today. A check of the
+  collector gives one result for each interval. Section B.8 has the rules for both.
+- A check with no result in time has the state `unknown`. It is not a failed check. Today
+  a request with no network path counts as an error (`internal/monitor/monitor.go:93`).
 
 **The primary check.** One check has `"primary": true`. The incident rule and the recovery
 rule read it. It is of the kind `http`, `tcp` or `job`. An application with no listener,
@@ -326,21 +363,24 @@ does today. They do not change the rules of section B.8, which the core fixes.
 
 **`log-match`.**
 
-- The `observe` job reads the lines of the component after the position of the last
-  observation, 2000 lines for each instance at most. The position is a cursor of the
-  journal, or an offset in a log file. The core keeps it for each instance and gives it
-  to the job.
-- The core applies the pattern to the lines and keeps only the count. The pattern goes to
-  no program.
+- The pattern goes into the configuration of the collector on the host. The collector
+  counts the lines that match and sends only the count. No log line leaves the host for
+  this check.
+- The pattern is a value in a configuration file. It is never a part of a command line.
 - The pattern is a regular expression of the Go syntax, 200 characters at most. The Go
   package guarantees a run time that is linear in the size of the input.
+- The collector reads `${…}` in a value as a reference to a file or to a variable of the
+  environment. The generator writes each `$` of a pattern in the escaped form, and the
+  build of the collector has no source of configuration over the network.
+- The count of the collector grows without end. The core takes the difference between
+  two observations.
 
 **The version that runs** comes from `version`, with one of these sources.
 
 | Source | Fields | The version is |
 |---|---|---|
-| `http-json` | `path` | The field `version` of the JSON answer. This is the source of today. It gives one value for the application, in the field `version.running` of the observation, not one for each instance |
-| `file` | `component`, `path` | The first line of a file on each host of the component. The path is relative to a directory that the host permits (section B.7). The helper refuses a symbolic link that leaves that directory |
+| `http-json` | `path` | The field `version` of the JSON answer. This is the source of today. It gives one value for the application, in the field `version.running` of the observation. Only the core can read it, so it is not for an environment in a site |
+| `file` | `component`, `path` | The first line of a file on each host of the component. The path is relative to a directory that the host permits (section B.7). A symbolic link that leaves that directory is refused |
 | `image` | `component` | The tag of the image of each instance. For `kubernetes`, and for `docker` |
 | `layer` | none | The output of the layer. The control plane then knows only what it deployed, not what runs |
 
@@ -352,7 +392,8 @@ does today. They do not change the rules of section B.8, which the core fixes.
 
 ### B.6 The observation
 
-Every collector and every check writes into one record. This is the standard.
+The core reduces the data of the collector and of its own checks to one record. This is
+the standard that the detectors, the Investigator and the eval cases read.
 
 ```json
 {
@@ -360,7 +401,8 @@ Every collector and every check writes into one record. This is the standard.
   "env": "prod",
   "at": "2026-11-20T10:15:00Z",
   "application": "ledger",
-  "version": {"wanted": "4.2.1", "source": "file"},  "components": [
+  "version": {"wanted": "4.2.1", "source": "file"},
+  "components": [
     {"name": "app", "runtime": "systemd", "state": "ok",
      "instances": [
        {"id": "host-1", "state": "ok", "version": "4.2.1", "restarts": 0,
@@ -386,16 +428,20 @@ Every collector and every check writes into one record. This is the standard.
 - `ran_from` is `core`, `site` or `host`.
 - With the version source `http-json`, `version` also has the field `running`, and the
   instances have no version.
-- `logs.text` and `events.text` hold text of the application. The core scrubs them and
-  frames them as untrusted data, as it does with the transcript today.
-- No other field holds free text. A version must match the pattern of a version. An
-  instance has no field for a message of the runtime: such a message goes into `events`.
-- `restarts` is the number of restarts since the last observation. The runtimes count
-  restarts in different ways, and a count can go back to zero.
+- `logs` and `events` are only in the observation of a debug session. Their `text` holds
+  text of the application. The core scrubs it and frames it as untrusted data, as it
+  does with the transcript today.
+- No other field holds free text. A version must match the pattern of a version.
+- `restarts` is the number of restarts since the last observation. The collector sends a
+  count that grows and that can go back to zero; the core takes the difference.
 - `started` is the time at which the main process of the instance started last.
-- A part that was not gathered is absent. A monitor sample has no `logs`.
+- `ok`, `total` and `p95_ms` of a check of the collector come from its results in one
+  sample period (section B.8).
 - An entry for memory has the form of a volume entry, in its own list. `total` is absent
-  when the component has no limit. CPU is not in the record: no detector uses it.
+  when the component has no limit.
+
+The core keeps the record and nothing else. It is not a store for metrics: what a
+collector sends and the record does not use is dropped.
 
 Who reads it:
 
@@ -404,7 +450,7 @@ Who reads it:
 | Health history | `ok`, `total`, `p95_ms`, `version` of one probe | One row for each check and each component state, by name |
 | Incident detector | Error rate of the probe | Section B.8 |
 | Storage detector | Samples that only the simulator writes | `volumes`. It proposes a larger size only for a volume with a `size_variable`. For a disk of a server it opens the finding for a person and proposes no change |
-| Investigator | The text of `kubectl` commands | The observation of the debug session: the state as the core printed it, the logs and the events as scrubbed text |
+| Investigator | The text of `kubectl` commands | The newest observation, and the logs and the events of the debug session as scrubbed text |
 | Topology view | A health value on the node `api` | The state of each component |
 | Eval cases | `kubectl` transcripts | Observations. `expect` becomes `<runbook>:<component>`. The format of an eval case file gets the version 2, and the checks of the suite name no runbook |
 
@@ -415,28 +461,70 @@ that changes run again before the change merges.
 
 ### B.7 Where collection runs, and with which identity
 
-The core starts no program (`docs/PLAN.md` section 12, "Core and runners"). So:
-
-| Data | Runs in | Identity |
+| Data | Gathered by | Identity |
 |---|---|---|
-| Checks `from` `outside`, the `http-json` version | The core. For a site: the site runner | None: a network request |
-| `state`, `saturation`, the `file` and `image` versions, checks `from` `host`, the lines for `log-match`, the `job` check | A runner, as a new job kind `observe` | `observer`: standing, read-only (`docs/PLAN.md` section 6.1) |
-| The reads of `diagnostics` for the Investigator | A runner, as the job kind `diagnose` | `debugger`: no standing access, a grant of 15 minutes, the session recorded |
+| Checks `from` `outside` and the `http-json` version, when the core has a path | The core, as today | None: a network request |
+| State, restarts, versions, volumes, memory, the other checks, the count of `log-match`, the `job` check | A collector that stays: one on each host, one in each cluster, one in each site for the checks from outside | A local user on a host, or a service account in a cluster, with read rights only. This is the identity `observer` of `docs/PLAN.md` section 6.1: standing and read-only |
+| Logs and events for the Investigator | A runner, as the job kind `diagnose` | `debugger`: no standing access, a grant of 15 minutes, the session recorded |
 
-**When `observe` runs.**
+**Why logs do not go through the collector.** A collector sends all the time. It has no
+read on request, and nothing to bind a grant to. To send the logs through it, the core
+must become a store for the logs of the application, and the rule "the debugger has no
+standing access" of `docs/PLAN.md` section 6.1 must end. This design keeps the rule: the
+collector sends numbers and states, and a log line leaves a host only in a recorded debug
+session. Section B.13 has the alternative.
 
-- On a slow schedule, for example each 5 minutes.
-- At each monitor interval while the primary check fails or a required component is not
-  `ok`. The "3 samples" of section B.8 are then 3 monitor intervals.
-- In the check after an apply, and in the check for recovery. Both rules need the state
-  of the components and the version of each instance at that moment.
+**From the collector to the core.**
 
-The job type changes with this: `Commands` (kubectl argument lists) becomes a list of
-reads, and `KubeConfig` becomes a credential with a kind.
+- A collector sends over HTTPS, outbound only, in the OTLP format. This fits a site.
+- In a site, a collector on a host sends to the collector of the site, and that one
+  sends to the core. A host then needs no path out of the site. The receiver of the
+  collector for this format is stable.
+- The core receives the data in its own process, with the data library of the collector
+  project. It starts no program.
+- Each environment has its own token: one for a site, one for a cluster, one for the
+  hosts of an environment outside a site. The token is a standing secret that the kit or
+  the layer of the platform installs. It is not a credential of the broker, and it gives
+  only the right to send.
+- The core accepts only data for the hosts, the units, the namespaces and the workloads
+  of the approved targets and manifest of that environment, and drops the rest. A
+  request has a size limit and an environment has a rate limit.
+- The core stamps an observation with its own clock, which the simulator can move. It
+  uses the time in the data only to find the age of the data. A collector keeps a queue
+  on its disk while the core is not reachable and sends it later. Data that is older
+  than a few intervals goes to the history and opens no incident.
+- Silence is a state. When no data arrives from a collector for 3 intervals, its
+  components and checks are `unknown`.
 
-**The site runner.** A runner inside a site needs a network path to the hosts and outbound
-HTTPS to the core. The direction of the protocol fits already: each call goes from the
-runner to the core with a token (`internal/runner/client.go:35`). What is missing:
+**The configuration of a collector.**
+
+- The core writes it from a template, the manifest and the approved targets. One value
+  comes from the host: the point where the file system of a volume path is mounted. The
+  kit finds it and the core checks it against the permitted directory.
+- A value of a pack fills only one checked place. No pack value reaches these settings:
+  the files or the units that a receiver reads other than those of the manifest, the
+  address or the headers of a check, the address that the collector sends to, the
+  program of the journal receiver.
+- The statements of the transform language of the collector are fixed in the template.
+  The pattern of a `log-match` check fills one string in one fixed statement, escaped for
+  that string and for `$` (section B.5). The statement reads the message of a log line,
+  not the full entry of the journal, which also has the command line of the process.
+- The journal receiver starts the program `journalctl` with the unit names as arguments.
+  The pattern of a unit name permits no `-` at its start.
+- The configuration is a file. It goes to the host or to the cluster with the first
+  deployment, a tier T3 change, so a person approves what the collector reads. The remote
+  management protocol of the collector project (OpAMP) is not used: its parts for the
+  collector are alpha.
+
+**On Kubernetes.** The layer of the platform installs the collectors: one for the cluster,
+which reads the state with a role in the namespace of the application, and one on each
+node, which reads the statistics of that node. The receiver for those statistics reads
+one node only. Its right is for the cluster (section B.4).
+
+**The site runner.** A site still needs a runner for jobs: a plan, an apply, a runbook, a
+debug session. It needs a network path to the hosts and outbound HTTPS to the core. The
+direction of the protocol fits already: each call goes from the runner to the core with a
+token (`internal/runner/client.go:35`). What is missing:
 
 - A runner that stays. Today the core starts a runner for each job, and only as a process
   on its own machine (`internal/launch/local.go:31`). A site runner is enrolled one time,
@@ -444,47 +532,48 @@ runner to the core with a token (`internal/runner/client.go:35`). What is missin
   changes the choice "Core and runners" of `docs/PLAN.md` section 12, which says that a
   runner is short-lived and that the core starts it.
 - A time limit for a job that no runner takes.
-- The checks `from` `outside` of an environment in a site run in this runner.
 
 A site with no outbound path to the core needs the core inside the site, as the local
 target has it.
 
-**Access to a host.** On Kubernetes three things make the debug session safe. Each needs an
-equal on a host:
+**The debug session and the runbooks on a host.** On Kubernetes three things make the
+debug session safe. Each needs an equal on a host:
 
 | Guard | Kubernetes | Host |
 |---|---|---|
-| The verbs are fixed | The core permits four `kubectl` verbs | The collector has the commands in its code. A helper on the host accepts only the reads, and it treats what the runner sends as untrusted input |
-| The scope is added by the core | `-n <namespace>` | The hosts come from the approved `targets`. The helper has a list of the units, the log files and the directories that it can read |
+| The verbs are fixed | The core permits four `kubectl` verbs | The runner has the reads in its code. A helper on the host accepts only the reads `logs` and `events`, and it treats what the runner sends as untrusted input |
+| The scope is added by the core | `-n <namespace>` | The hosts come from the approved `targets`. The helper has a list of the units and the log files that it can read |
 | The credential is limited and short-lived | A token for a role in one namespace | See the options |
 
 | Option | How | For | Against |
 |---|---|---|---|
 | 1. SSH certificate (recommended) | The broker signs a user certificate that is valid for minutes, with one principal for the environment and no permission but a forced command. The host trusts the key of the broker, lists the principal, and has a rule for the user that forces the helper and switches off each kind of forwarding | The same on every cloud and in a data centre. It fits the grant model and the `Issuer` interface of the broker. The rule is on the host, so a faulty runner or a wrong certificate cannot pass it | A certificate cannot be withdrawn; it expires, unless each host keeps a revocation list. The host and the broker need the same clock. The broker holds a signing key. To read the journal, the user is in a group that reads the logs of every unit, so the helper must filter by unit |
-| 2. The command service of a cloud | AWS Systems Manager Run Command with a document whose parameters have a list of permitted values, and a role that is limited to that document | No inbound port. The audit trail of the cloud records each command. It needs no change of the broker | AWS only. Azure Run Command runs any script as an elevated user, and no equal was found on Google Cloud. None in a data centre. The service cuts long output |
-| 3. A reporter on the host | A small read-only service on the host. The core reads it over HTTPS | The simplest network model on a cloud | A process that always runs on a legacy host. The debug session has no grant and no credential of its own. The core must reach the host, so it does not work for a site |
+| 2. The command service of a cloud | AWS Systems Manager Run Command with a document whose parameters have a list of permitted values, and a role that is limited to that document. On Azure, an Automation runbook on a Hybrid Runbook Worker: the script is fixed in the account, and the caller sends parameters and the name of a group of workers | No inbound port. On AWS the audit trail records each command; on Azure the record of the job has the caller and the parameters. It needs no change of the broker. Azure Arc brings the Azure service to a server in a data centre | A full equal on AWS only. On Azure the service does not check the parameters, the caller selects the group of workers, and a worker asks for jobs each 30 seconds. Azure Run Command runs any script that the caller sends, as root. Google Cloud has no command on request: OS policies and patch jobs are not for reads, and OS Login and IAP give a login. The service cuts long output |
+| 3. A reporter on the host | A small read-only service on the host. The core reads it over HTTPS | The simplest network model on a cloud | The debug session has no grant and no credential of its own. The core must reach the host, so it does not work for a site |
 
-Only option 1 works for a server in a data centre. The sources for this table are at the
-end of the section.
+Only option 1 works for a server in a data centre with no agent of a cloud. The SSH
+certificate services of Azure and of Google Cloud cannot take the place of the key of the
+broker: their documents show no forced command and no principal that the caller sets.
 
-**Who installs the guard.** The helper, the users, the trust in the key of the broker and
-the lists of the helper are the "host kit". The core owns it, as it owns the roles of the
+**The host kit.** A host of an application gets two things: the collector, and the helper
+for the debug session. With the users, the trust in the key of the broker and the lists of
+the helper, they are the "host kit". The core owns it, as it owns the roles of the
 identities on Kubernetes. A pack does not write it.
 
 - On hosts that a layer creates, the layer of the platform installs the kit.
 - On hosts that exist, an administrator installs it one time with their own credential,
   at `clanker setup`. `docs/PLAN.md` section 6.4 has the same step for a cloud account.
-- The kit comes first, with empty lists: the helper then reads nothing.
-- The lists of the helper (the units, the log files, the directories) come from the
-  manifest. They are a part of the first deployment, a tier T3 change, so a person
-  approves them on the approval page before the helper gets them.
+- The kit comes first, with a configuration that reads nothing and empty lists.
+- The configuration of the collector and the lists of the helper come from the manifest.
+  They are a part of the first deployment, a tier T3 change, so a person approves them on
+  the approval page before a host gets them.
 
 **The identities on a host.**
 
 | Identity | On a host |
 |---|---|
-| `observer` | A user that can run the reads `state`, `saturation` and `version`, the checks `from` `host`, and the log read for `log-match`. Its certificate is signed for each `observe` job, with no grant, because the access is standing by design |
-| `debugger` | A user that can run each read. Its certificate needs the debug grant |
+| `observer` | The user that the collector runs as. It can read the state of the units, the file systems, the permitted version files and the logs that a `log-match` check counts. It has no certificate: nothing connects to the host for it |
+| `debugger` | A user that can run the reads of the helper. Its certificate needs the debug grant |
 | `runbook` | A user that can run the commands that the kit permits for the units of the pack that are not shared, for example a restart |
 | `applier` | A user for the layer of the application, with a grant for that layer as today |
 
@@ -492,23 +581,41 @@ identities on Kubernetes. A pack does not write it.
 definition names: `KUBECONFIG` for `kubernetes`, as today, and for `systemd` an SSH
 configuration file in which each instance is a host alias.
 
-Sources for the options: the manual pages `ssh-keygen(1)`, `sshd_config(5)` and `sshd(8)`
-of OpenBSD; the manuals of `journalctl` and of the D-Bus interface of systemd; the AWS
-Systems Manager user guide (document parameters, Run Command set-up); the Azure
-documentation of Run Command; the Google Cloud documentation of OS Login. Not checked:
-that sshd permits no difference of the clocks, and that Azure and Google Cloud have no
-equal service at all.
+Sources: the documents and the metadata of each component in the repositories of the
+collector project at the versions of section B.3, and the specifications of OTLP and
+OpAMP; the manual pages `ssh-keygen(1)`, `sshd_config(5)` and `sshd(8)` of OpenBSD; the
+manuals of `journalctl` and of the D-Bus interface of systemd; the Kubernetes documents on
+the authorization of the kubelet and on good practice for RBAC; the AWS Systems Manager
+user guide; the Azure documents of Run Command, Arc, Automation and the sign-in with
+Entra; the Google Cloud documents of OS Login, IAP, OS Config and patch jobs.
+
+Not checked: the size and the memory use of the build of the collector; the group that
+the journal receiver needs; that the check receivers send one request for each interval;
+that sshd permits no difference of the clocks; that the Azure roles limit a principal to
+one runbook; that a service account can get an OS Login certificate.
 
 ### B.8 The health rules
 
 The rules stay in the core, with the same limits as today. They read the observation.
 
+**Samples.** The rules of today count requests in a sample. A check of the core gives
+that directly. A check of a collector gives one result for each interval, so the core
+makes a sample from the results of one sample period. The core sets the interval of the
+primary check, so that a sample period has 8 results or more, as a sample has today.
+
 | Rule | Today | Proposed |
 |---|---|---|
-| Canary after an apply | The probe has under 10 % errors | Each check passes, the primary check with under 10 % errors. Each required component is `ok`. Each version that the source gives is the wanted version: one for each instance, or one for the application with `http-json` |
-| Incident | Over 20 % errors in 3 samples, when no change applies and no incident is open | The same for the primary check, **or** a required component is `down` or `degraded` in 3 samples. The two conditions of today stay, so a rollout opens no incident |
-| Not reachable | — | A required component is `unknown` in 3 samples: an incident with the title "not reachable". A primary check that is `unknown` opens no incident for errors |
-| Recovery | 20 of 20 requests succeed | The primary check passes, and each required component is `ok` |
+| Canary after an apply | The probe has under 10 % errors of 40 requests | The primary check has under 10 % errors of 40 results. Each other check passes. Each required component is `ok`. Each version that the source gives is the wanted version: one for each instance, or one for the application with `http-json` |
+| Incident | Over 20 % errors in 3 samples, when no change applies and no incident is open | The same for the primary check, **or** a required component is `down` or `degraded` in 3 reports of its collector in a row. The two conditions of today stay, so a rollout opens no incident |
+| Not reachable | — | A required component is `unknown` for 3 intervals of its collector: an incident with the title "not reachable". A primary check that is `unknown` opens no incident for errors |
+| Recovery | 20 of 20 requests succeed | The primary check passes in 20 of 20 results, and each required component is `ok` |
+
+- The canary and the recovery read only data that is newer than the apply or the
+  mitigation. The collector sends at its own interval, so the wait is longer than the 90
+  seconds of today. The core gives the wait a limit from that interval. When the limit
+  ends with too few results, the canary or the recovery fails.
+- An observation is the newest data of each collector at a monitor interval. A rule that
+  counts reports counts each report of a collector one time.
 
 For a primary check of the kind `job`:
 
@@ -573,7 +680,6 @@ The part that changes, for the two applications of section B.11:
 ],
 "version": {"source": "http-json", "path": "/api/version"},
 "diagnostics": [
-  {"read": "state"},
   {"read": "logs", "component": "api", "lines": 30},
   {"read": "events"}
 ],
@@ -597,10 +703,8 @@ The part that changes, for the two applications of section B.11:
 "version": {"source": "file", "component": "app", "path": "ledger/VERSION"},
 "volumes": [{"name": "app-data", "component": "app", "path": "ledger/data"}],
 "diagnostics": [
-  {"read": "state"},
   {"read": "logs", "component": "app", "lines": 60},
-  {"read": "logs", "component": "proxy", "lines": 20},
-  {"read": "saturation"}
+  {"read": "logs", "component": "proxy", "lines": 20}
 ],
 "incident": {"runbook": "restart-component", "component": "app"}
 ```
@@ -617,14 +721,15 @@ into the data centre.
 |---|---|---|
 | Components | Three deployments | Two services, one of them shared, and one timer |
 | Where they run | `targets`: one namespace, from the layer | `targets`: two addresses for each component, as variables of the site layer that a person approved |
-| Runner | Started for each job | The site runner in the data centre |
-| Primary check | `GET /api/inventory`, from the core | `GET /login` through the proxy, from the site runner |
-| Other checks | `GET /api/healthz` | The port of the service on each host; the error lines in its journal; the export of the night |
+| Collector | One in the cluster and one on each node, from the layer of the platform | One on each server, and one in the site for the check from outside |
+| Primary check | `GET /api/inventory`, from the core | `GET /login` through the proxy, from the collector of the site |
+| Other checks | `GET /api/healthz` | The port of the service on each host; the count of error lines in its journal; the export of the night |
 | Running version | `GET /api/version` | The file `VERSION` on both hosts |
 | State | Pods ready of pods wanted | Active on 2 of 2 hosts; the last run of the timer |
-| Logs and events | Pod logs, namespace events | The journal of the service; the log file of the proxy for this site |
 | Volumes | The volume claims | The file system of the data directory |
-| Read credential | A token for `view` in the namespace | An SSH certificate for the helper |
+| Logs and events | Pod logs and namespace events, in a debug session | The journal of the service and the log file of the proxy for this site, in a debug session |
+| Runner | Started for each job | The site runner in the data centre |
+| Credential of the debug session | A token for `view` in the namespace | An SSH certificate for the helper |
 | Who installs the guard | The broker binds the roles | An administrator installs the host kit at setup |
 | Mitigation | `restart-component` with `kubectl rollout restart` | `restart-component` with `systemctl restart` on one host after the other. The proxy is shared, so no runbook can restart it |
 | Deployment code | A chart that the layer installs | The layer of the pack copies a package to the servers |
@@ -653,12 +758,13 @@ no cloud interface.
 | Question | Answer |
 |---|---|
 | Where do the hosts come from? | Variables of the site layer, approved by a person (B.4) |
+| How does the data reach the core? | A collector on each server sends it to the collector of the site, which sends it to the core over outbound HTTPS (B.7) |
+| Where do the checks run? | In the collector of the site and in the collectors on the hosts (B.5) |
 | Where do the jobs run? | In a site runner with outbound HTTPS only (B.7) |
-| Where do the checks run? | In the site runner, and on the hosts (B.5) |
 | What credential does the broker give? | An SSH certificate. No identity service of a cloud is needed (B.7) |
-| Who installs the trust on the hosts? | An administrator, one time, at setup (B.7) |
+| Who installs the collector, the helper and the trust on the hosts? | An administrator, one time, at setup (B.7) |
 | What is the fix for a full disk? | A finding for a person. A disk does not grow from a variable (B.6) |
-| What does the core do when the site is not reachable? | The states are `unknown`. An incident "not reachable" opens, and no incident for errors (B.8) |
+| What does the core do when the site is not reachable? | The states are `unknown`. An incident "not reachable" opens, and no incident for errors. The collectors keep their data and send it later (B.7, B.8) |
 
 Three things must exist before a pack can deploy on such servers, and this design does
 not define them:
@@ -671,43 +777,53 @@ not define them:
 
 ### B.13 Decisions for the owner
 
+Decided:
+
+| Decision | Choice |
+|---|---|
+| What gathers the standing data | **Chosen 2026-11-20 by the owner:** the OpenTelemetry Collector, with a configuration that the core writes (B.3) |
+
+Open:
+
 | Decision | Recommended | Alternative |
 |---|---|---|
-| How a pack brings collection | Declared: a closed list of runtimes and check kinds in the core (B.3, way A) | Read scripts in the pack, with a review at each import |
-| Access to a host | An SSH certificate from the broker and the host kit (B.7, option 1). It is the only option that works in a data centre | AWS Systems Manager for hosts on AWS, with the certificate for the rest |
+| The logs of the application | The collector sends no log line. The Investigator reads logs in a debug session under a grant (B.7) | The collector sends all logs to the core. The core becomes a store for logs, the helper on the host is not needed, and the rule "no standing access for the debugger" ends |
+| The collector on Kubernetes | The same collector there too, in the layer of the platform, so that one path gives the observation | The code of the project reads the cluster, and the collector is for hosts only |
+| Where `log-match` counts | In the collector on the host; the pattern is in its configuration (B.5) | No `log-match` check |
+| The configuration of a collector | A file in the first deployment, approved by a person (B.7) | The remote management protocol of the collector project, when its parts are stable |
+| Access to a host for a debug session and a runbook | An SSH certificate from the broker and the host kit (B.7, option 1) | AWS Systems Manager for hosts on AWS and an Azure Automation runbook for hosts on Azure, with the certificate for the rest |
 | The runner of a site | A runner that stays, is enrolled one time and asks the core for jobs (B.7) | A runner that an administrator starts for each job |
 | Who installs the host kit on hosts that exist | An administrator, at `clanker setup` | The first deployment, with a credential that the administrator gives for that one job |
 | Runtimes after Kubernetes | `systemd` first, then `docker` for containers on a host with no orchestrator | Only `systemd`. Windows services are not in this design |
 | Health limits | Fixed in the core (B.8). A pack sets only what one check is | A pack sets the limits of the rules inside a range that the core gives |
 | The version source `layer` | Permitted, and shown on the approval page and in each canary | Refused: each pack must have a version that the core can read |
-| What the Investigator reads | The observation: state from the core, logs as scrubbed text (B.6) | The output of the commands, as today |
 | Schema change | Schema 2 replaces schema 1, for new environments (B.10) | A migration of an environment that runs |
-| Hardware of a server (disks, the RAID, power, the management controller) | Not in this design. No detector uses it, and it belongs to the platform | A collector for it, as a part of the target for hosts that exist |
-| Data from a monitoring system that the application has already | Not in this design | A collector that reads a metrics service |
-| Names of the fields | The names of this document. No public convention has this record: OpenTelemetry has names for the identity of a service, a host and a pod, and no values for health. The health check format of the IETF is a draft that expired in 2022 | The OpenTelemetry names for the identity fields, when the record goes to another system |
+| Hardware of a server (disks, the RAID, power, the management controller) | Not in this design. No detector uses it, and it belongs to the platform | Receivers of the collector for it, as a part of the target for hosts that exist |
+| Data from a monitoring system that the application has already | Not in this design | The collector reads it: it has receivers for the common formats |
+| Names of the fields of the observation | The names of this document. No public convention has this record: OpenTelemetry has names for the identity of a service, a host and a pod, and no values for health. The health check format of the IETF is a draft that expired in 2022 | The OpenTelemetry names for the identity fields, when the record goes to another system |
 
 ### B.14 Build order
 
 Each step is one pull request or a few, and each leaves Paperboat working.
 
-1. **Components and the observation, on Kubernetes only.** Schema 2 with `components`,
-   `incident`, `diagnostics`, `checks` of the kind `http`, the `http-json` version and
-   `deploy` of the kind `helm`. The output `targets` in the layer `40-platform`, and the
-   rights of the identities from it.
-   The `kubernetes` collector writes the observation in the debug session. The job type
-   carries reads. The Investigator, the eval cases, the checks of the eval suite and the
-   recorded answer of the Investigator change to components. The evals run again.
-2. **The `observe` job, on Kubernetes.** State and volumes with the identity `observer`.
-   The health history by name. The storage detector reads real samples.
-3. **The rules of B.8**, the `tcp` check, the `image` version, the state `unknown` for a
-   check.
-4. **The site runner.** Enrolment, the jobs of a site, checks from the site.
-5. **Access to a host.** The decision of B.13, then the certificate in the broker, the
-   host kit, and a test machine that runs systemd.
-6. **The `systemd` collector**, checks `from` `host`, `log-match`, `job`, the `file`
-   version, and a second example pack on that machine. This step needs the target for
-   hosts that exist and the layer of that pack (section B.12).
-7. **The `docker` runtime.**
+1. **Components, on Kubernetes only.** Schema 2 with `components`, `incident`,
+   `diagnostics`, `checks` of the kind `http`, the `http-json` version and `deploy` of the
+   kind `helm`. The output `targets` in the layer `40-platform`, and the rights of the
+   identities from it. The job type carries reads. The Investigator, the eval cases, the
+   checks of the eval suite and the recorded answer of the Investigator change to
+   components. The evals run again.
+2. **The collector on Kubernetes.** The build of the collector. The endpoint of the core
+   and the observation. The generator of the configuration. State, versions and volumes
+   of Paperboat. The health history by name. The storage detector reads real samples.
+3. **The rules of B.8**, the `tcp` check, the `image` version, the state `unknown`.
+4. **The site runner.** Enrolment and the jobs of a site.
+5. **Access to a host.** The certificate in the broker, the host kit with the collector
+   and the helper, and a test machine that runs systemd.
+6. **Hosts.** The receiver of the project, checks from a site and from a host,
+   `log-match`, `job`, the `file` version, and a second example pack on that machine. This
+   step needs the target for hosts that exist and the layer of that pack (section B.12).
+7. **The `docker` runtime**, with the receiver of the collector for containers, which is
+   alpha.
 
 ### B.15 Not in this design
 
@@ -715,7 +831,8 @@ Each step is one pull request or a few, and each leaves Paperboat working.
   pack for an environment that runs (`docs/PLAN.md` section 5.7, "Not built").
 - The scenes of the simulator, which are about Paperboat.
 - Traces, and metrics of the application other than the checks: the depth of a queue, the
-  heap of a Java process, a pool of connections.
+  heap of a Java process, a pool of connections. The collector can gather them; no
+  detector reads them.
 - The state of a load balancer that is hardware, and of its members.
 - Jobs of plain cron with no unit. A pack needs a timer.
 - An application server that starts its own managed servers, for example with a node

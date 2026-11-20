@@ -428,7 +428,9 @@ Not built:
 - A pack for an application that does not run on Kubernetes. The components, the health
   checks, the debug commands and the credentials of a pack are those of Kubernetes.
   `docs/PACKS.md` has the interface of today in detail and a proposal for a standard way to
-  gather health and observability data on every runtime. The proposal is not decided.
+  gather health and observability data on every runtime, also on servers in a data
+  centre. **Chosen 2026-11-20 by the owner:** the OpenTelemetry Collector gathers that
+  data. The other parts of the proposal are not decided.
 
 ## 6. Permissions and just-in-time access
 
