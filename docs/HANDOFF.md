@@ -122,9 +122,12 @@ video and the local demo. No pull request is open.
     - The approval page has no own display of the targets (`docs/PACKS.md` section B.14
       says why). With this, step 1 of the build order is complete.
   - Found: `clanker destroy` runs OpenTofu in the stack directories of its source. With a
-    second data directory it fails with "Backend configuration changed", because those
+    second data directory it failed with "Backend configuration changed", because those
     directories keep the backend of the first one. The run above was destroyed from a
-    copy of the sources.
+    copy of the sources. Fixed: `Runner.Destroy` sets `TF_DATA_DIR` to
+    `work/destroy/<environment>/<layer>` below the data directory, so a destroy does not
+    read or write the `.terraform` directory of the stack. A test with a fake `tofu`
+    checks the environment. A real destroy with two data directories did not run.
   - The job of a debug session carries reads and a namespace, not `kubectl` argument
     lists (`internal/jobspec/read.go`). One function makes the command of a read. The
     runner starts the command with it, and the core writes the command line of the
