@@ -45,10 +45,6 @@ type Pack struct {
 	Releases  Releases `json:"releases"`
 	// Deploy says how the layer deploys the application.
 	Deploy Deploy `json:"deploy"`
-	// Namespace is the Kubernetes namespace of the application. A debug session reads
-	// only there. DataNamespace is the namespace of its data services.
-	Namespace     string `json:"namespace"`
-	DataNamespace string `json:"data_namespace"`
 	// Components are the parts of the application that run. A runbook, a diagnostic read
 	// and the Investigator can name only these.
 	Components []Component `json:"components"`
@@ -350,8 +346,6 @@ func (p Pack) checkValues() error {
 		{"url_output", p.URLOutput, variablePattern},
 		{"releases.repository", p.Releases.Repository, namePattern},
 		{"releases.first", p.Releases.First, versionPattern},
-		{"namespace", p.Namespace, namePattern},
-		{"data_namespace", p.DataNamespace, namePattern},
 		{"app_version.path", p.AppVersion.Path, urlPathPattern},
 	}
 	if p.Deploy.Kind != DeployHelm {

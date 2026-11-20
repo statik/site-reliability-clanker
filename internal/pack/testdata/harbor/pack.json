@@ -14,8 +14,6 @@
   },
   "deploy": {"kind": "helm", "chart": "chart", "mount": "apps/harbor", "build": "build.sh"},
   "runbooks": "jobs",
-  "namespace": "harbor",
-  "data_namespace": "harbor-store",
   "components": [
     {"name": "api", "runtime": "kubernetes", "workload": "harbor-gateway", "required": true},
     {"name": "web", "runtime": "kubernetes", "workload": "harbor-ui", "required": true},

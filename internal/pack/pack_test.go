@@ -14,8 +14,7 @@ import (
 
 func TestTheExamplePackAndTheSecondPackLoad(t *testing.T) {
 	example, second := packtest.Example(t), packtest.Second(t)
-	if example.Name == second.Name || example.Namespace == second.Namespace ||
-		example.VersionVariable == second.VersionVariable {
+	if example.Name == second.Name || example.VersionVariable == second.VersionVariable {
 		t.Fatalf("the second pack must have other names: %+v", second)
 	}
 	if got := second.ChartMount(); got != "apps/harbor/chart" {
@@ -113,8 +112,9 @@ func TestLoadRefusesAManifestThatIsNotSafe(t *testing.T) {
 		"a deployment that is not a chart": {in("deploy", "kind", "script"), "deploy.kind"},
 		"a field of a deployment that does not exist": {in("deploy", "hook", "x"),
 			"unknown field"},
-		"a namespace with a flag": {set("namespace", "-A"), "namespace"},
-		"no component":            {set("components", []any{}), "components must have"},
+		"a namespace, which is not a fact of a pack": {set("namespace", "kube-system"),
+			"unknown field"},
+		"no component": {set("components", []any{}), "components must have"},
 		"a component with a flag as its deployment": {first("components", "workload",
 			"-A"), `workload "-A"`},
 		"a component with a path as its deployment": {first("components", "workload",

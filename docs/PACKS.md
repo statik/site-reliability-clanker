@@ -827,8 +827,12 @@ Each step is one pull request or a few, and each leaves Paperboat working.
    Built so far: the manifest of schema 2 with `components`, `incident`, `diagnostics`,
    `checks`, `app_version` and `deploy`, and the code of the core that reads it. The
    job of a debug session carries reads, and the runner makes the commands. The
-   namespaces are still in the manifest, and the runbooks and the prompt of the
-   Investigator still name deployments.
+   namespaces are not in the manifest: the layer `40-platform` has the output `targets`,
+   and the debug session and the rights of the identities read it. On Kubernetes the
+   output is a map with the key `application` for the namespace of the components and
+   the key `data` for the namespace of the data services; a list for each component
+   comes with a runtime on hosts. The approval page does not show the targets yet. The
+   runbooks and the prompt of the Investigator still name deployments.
 2. **The collector on Kubernetes.** The build of the collector. The endpoint of the core
    and the observation. The generator of the configuration. State, versions and volumes
    of Paperboat. The health history by name. The storage detector reads real samples.

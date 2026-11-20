@@ -1,0 +1,19 @@
+# The rights of the runbook identity in the namespace of the data services. The broker
+# applies this file when the target has such a namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: clanker-runbook, namespace: {{data_namespace}}}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "configmaps"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create", "get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: clanker-runbook, namespace: {{data_namespace}}}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: clanker-runbook}
+subjects:
+  - {kind: ServiceAccount, name: clanker-runbook, namespace: clanker-system}

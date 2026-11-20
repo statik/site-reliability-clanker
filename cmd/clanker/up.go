@@ -304,9 +304,18 @@ func localTarget(c *components, o options) (target, error) {
 		}
 		return path, nil
 	}
+	// The targets are known after the first apply of the layer of the platform.
+	targets := func(env string) (pack.Targets, bool) {
+		outputs, err := store.LayerOutputs(c.db, env, pack.TargetsLayer)
+		if err != nil {
+			return pack.Targets{}, false
+		}
+		found, err := pack.ParseTargets(outputs)
+		return found, err == nil
+	}
 	return target{issuer: localtarget.Credentials{AdminKubeconfig: adminKubeconfig,
-		App: o.app},
-		manualChange: localtarget.ManualChange(adminKubeconfig, o.app.DataNamespace)}, nil
+		Targets: targets},
+		manualChange: localtarget.ManualChange(adminKubeconfig, targets)}, nil
 }
 
 func build(ctx context.Context, o options) (*components, error) {

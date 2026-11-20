@@ -392,7 +392,7 @@ A pack holds these parts:
 
 | Part | Content | Used by |
 |---|---|---|
-| Manifest (`pack.json`) | Name, title, version of the pack, the layer and the variable that sets the version of the application, the namespaces, the components, the topology | Every component |
+| Manifest (`pack.json`) | Name, title, version of the pack, the layer and the variable that sets the version of the application, the components, the topology. The namespaces are an output of the layer of the platform | Every component |
 | Release source | The forge repository and the directory with one release note for each release | Detector, Author, Explainer |
 | Deployment code | The chart, and where the platform repository expects it | Runner |
 | Checks | The HTTP checks, one of them the primary check that the monitor samples, and the path for the version | Monitor, verification, canary |
