@@ -26,6 +26,11 @@ export function apiUrl(path: string, asOf: Date | null = null): string {
   return `${url}${separator}as_of=${encodeURIComponent(serverTime(asOf))}`;
 }
 
+/** The path of the live state of the components of one environment. */
+export function observationPath(env: string): string {
+  return `/observation${query({ env })}`;
+}
+
 /** Builds a query string from the defined, non-empty parameters. */
 export function query(params: Record<string, string | number | undefined>): string {
   const search = new URLSearchParams();

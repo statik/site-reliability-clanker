@@ -272,6 +272,41 @@ export interface Timeline {
   health: Record<string, HealthBucket[]>;
 }
 
+/** The live state of a component, of an instance or of a node of the topology. */
+export type ComponentState = "ok" | "degraded" | "down" | "unknown";
+
+export interface ObservedInstance {
+  id: string;
+  state: ComponentState;
+  version?: string;
+  restarts: number;
+}
+
+export interface ObservedComponent {
+  name: string;
+  runtime: string;
+  state: ComponentState;
+  wanted: number;
+  ready: number;
+  instances: ObservedInstance[];
+}
+
+/** The last report of the observer of one environment. */
+export interface Observation {
+  schema: number;
+  env: string;
+  at: string;
+  application: string;
+  version: { wanted: string; source: string };
+  components: ObservedComponent[];
+  checks: unknown[];
+  volumes: unknown[];
+  /** The age of the report, or -1 when no report arrived yet. */
+  age_seconds: number;
+  /** True when no report arrived for 60 seconds. Every state is then `unknown`. */
+  stale: boolean;
+}
+
 export interface TopologyNode {
   id: string;
   layer: string;
@@ -279,7 +314,7 @@ export interface TopologyNode {
   label: string;
   detail: string;
   version: string;
-  status: string;
+  status: ComponentState;
   badges: string[];
 }
 

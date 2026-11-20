@@ -19,6 +19,7 @@ import { AiMark, AppLink, Empty, ErrorNote,
 import { IconTag, StatusTag, TierTag } from "@/components/status";
 import { anyEvent, useApi } from "@/hooks/useApi";
 import { formatTime, shortHash } from "@/lib/time";
+import { ComponentsPanel } from "@/pages/overview/ComponentsPanel";
 import { HealthChart } from "@/pages/overview/HealthChart";
 import { useSession } from "@/state/session";
 
@@ -210,6 +211,8 @@ function Body({ overview }: { overview: Overview }) {
   // The catch-up of this visit stays on screen after the visit is recorded.
   const [catchUp] = useState(overview.catch_up);
   const seenError = useMarkSeen();
+  const deployed = useMemo(() => overview.environments.filter((env) => env.deployed)
+    .map((env) => env.name), [overview.environments]);
   return (
     <div className="app-stack">
       <Section title="Catch-up"><CatchUpPanel catchUp={catchUp} /></Section>
@@ -234,6 +237,7 @@ function Body({ overview }: { overview: Overview }) {
           {overview.planned_clouds.map((cloud) => <PlannedCloud key={cloud} cloud={cloud} />)}
         </div>
       </Section>
+      <ComponentsPanel envs={deployed} />
       <Section title="Version posture">
         <Loaded state={posture} what="the version posture">
           {(data) => <PostureMatrix posture={data} />}

@@ -64,6 +64,10 @@ async function send<T>(url: string, init: RequestInit): Promise<T> {
   if (!response.ok) {
     throw await errorOf(response);
   }
+  if ((response.headers.get("Content-Type") ?? "").startsWith("text/html")) {
+    // A control plane that does not have the route answers with the page of the dashboard.
+    throw new ApiError(404, `HTTP 404: the control plane has no route ${url}`);
+  }
   return (await response.json()) as T;
 }
 
