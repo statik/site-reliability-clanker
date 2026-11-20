@@ -38,6 +38,9 @@ log and the snapshots as of that time.
 | `POST /debug-sessions` | Open a recorded, read-only debug session. Approver or admin |
 | `POST /environments/{env}/blank-slate` | Open the blank-slate work item. Admin |
 | `GET /sim`, `POST /sim/advance`, `POST /sim/scenes/{name}` | Simulator: virtual clock and scenes of the scripted month |
+| `GET /settings/model` | The language model of the control plane, for every role of a user. `mode` is `openrouter`, `local` or `replay`. `provider` is the name for a person. `models` is the model of each role (empty in the mode `replay`). `base_url` is the endpoint of the mode `local`, without a user, a password or a query. `key_set` says whether a key is set; the answer never holds a key or a part of one. `local` is the local inference: `available` (with a `reason` when false), `url`, `running`, `version`, `model`, `model_present`, `model_loaded` and `started_by_src` |
+| `POST /settings/model/local/start` | Start the local inference: start the Ollama server when it does not answer, then load the model into memory. No body. The answer is the settings with `done`, a sentence that says what was done. Admin; another role gets 403. A control plane that cannot control a model server (`available` is false), and a server that does not hold the model, answer 409 with the reason |
+| `POST /settings/model/local/stop` | Stop the local inference: unload the model, and stop the Ollama server only when this control plane started it. `done` says which of the two was done. No body. Admin; the same refusals as the start |
 
 Git over HTTP is at `/git/<repository>.git`.
 
@@ -76,4 +79,5 @@ Git over HTTP is at `/git/<repository>.git`.
 | Incidents | `incident.opened`, `incident.diagnosed`, `incident.escalated`, `incident.resolved` |
 | Agent | `agent.drafted`, `agent.explained`, `agent.answered`, `agent.failed`, `agent.budget_reached` |
 | Notifications | `notify.sent`, `notify.failed`, `notify.skipped` |
+| Settings | `model.local_started`, `model.local_stopped` |
 | Simulator | `sim.scene_started`, `sim.clock_advanced`, `sim.release_published`, `sim.advisory_published`, `sim.manual_change`, `sim.fault_injected`, `sim.images_published` |

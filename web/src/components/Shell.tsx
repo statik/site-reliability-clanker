@@ -29,6 +29,7 @@ import {
   Notification,
   PlayOutline,
   Roadmap,
+  Settings,
   TaskApproved,
   UserAvatar,
 } from "@carbon/icons-react";
@@ -61,6 +62,7 @@ const NAV: NavEntry[] = [
   { to: "/notifications", label: "Notifications", icon: Notification },
   { to: "/ask", label: "Ask", icon: Chat },
   { to: "/demo", label: "Demo", icon: PlayOutline },
+  { to: "/settings", label: "Settings", icon: Settings },
 ];
 
 function isActive(pathname: string, to: string): boolean {

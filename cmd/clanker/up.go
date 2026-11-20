@@ -29,6 +29,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/localtarget"
 	"github.com/statik/site-reliability-clanker/internal/monitor"
 	"github.com/statik/site-reliability-clanker/internal/notify"
+	"github.com/statik/site-reliability-clanker/internal/ollama"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
 	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/policy"
@@ -279,14 +280,19 @@ type components struct {
 	sim        *sim.Simulator
 	// chat is the apps for approval in Slack and Teams. Nil when none is configured.
 	chat *chatApps
+	// localModel starts and stops the model server on this machine. Only the local
+	// target has it.
+	localModel *ollama.Control
 }
 
 // target holds the parts that only one kind of target has. On a cloud manualChange is nil:
 // the drift scene reports that it cannot run. On AWS the issuer is nil without the roles
-// of the identities: the broker then exchanges no grant.
+// of the identities: the broker then exchanges no grant. On a cloud localModel is nil: the
+// core starts no program, so it cannot start a model server.
 type target struct {
 	issuer       broker.Issuer
 	manualChange func(context.Context, string) error
+	localModel   *ollama.Control
 }
 
 // localTarget makes the data directory and the parts of the local target, which all use
@@ -315,7 +321,8 @@ func localTarget(c *components, o options) (target, error) {
 	}
 	return target{issuer: localtarget.Credentials{AdminKubeconfig: adminKubeconfig,
 		Targets: targets},
-		manualChange: localtarget.ManualChange(adminKubeconfig, targets)}, nil
+		manualChange: localtarget.ManualChange(adminKubeconfig, targets),
+		localModel:   localModelControl(os.Getenv, o.dataDir)}, nil
 }
 
 func build(ctx context.Context, o options) (*components, error) {
@@ -329,6 +336,7 @@ func build(ctx context.Context, o options) (*components, error) {
 		if on, err = localTarget(c, o); err != nil {
 			return nil, err
 		}
+		c.localModel = on.localModel
 	}
 	secret, err := loadSecrets(o)
 	if err != nil {
@@ -558,6 +566,18 @@ func reconcile(ctx context.Context, c *components) error {
 	return nil
 }
 
+// stopModelServer stops the model server that this control plane started. After a
+// restart the control plane does not know that it started one, so the server must not
+// stay.
+func stopModelServer(control *ollama.Control) {
+	if control == nil || control.Server == nil {
+		return
+	}
+	if err := control.Server.Stop(); err != nil {
+		slog.Error("stop the model server", "error", err)
+	}
+}
+
 func up(ctx context.Context, o options) error {
 	c, err := build(ctx, o)
 	if err != nil {
@@ -584,7 +604,8 @@ func up(ctx context.Context, o options) error {
 	server := &api.Server{App: o.app, Orch: c.orch, Audit: c.log, Forge: c.forge,
 		Broker:  c.broker,
 		Monitor: c.monitor, Notifier: c.notifier, Agent: c.agent, Detector: c.detector,
-		Sim: c.sim, Clock: c.clock, Runners: c.dispatcher.Handler()}
+		Sim: c.sim, Clock: c.clock, Runners: c.dispatcher.Handler(), LocalModel: c.localModel}
+	defer stopModelServer(c.localModel)
 	if o.demo && o.operator != "" {
 		server.DefaultUser = operatorUserName(o.operator)
 	}

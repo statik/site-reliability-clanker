@@ -222,6 +222,32 @@ export interface Overview {
   planned_clouds: string[];
 }
 
+/** The local inference: the model server on the machine of the control plane. */
+export interface LocalInference {
+  /** False when this control plane cannot start or stop a model server. */
+  available: boolean;
+  reason?: string;
+  url?: string;
+  running: boolean;
+  version?: string;
+  model?: string;
+  model_present: boolean;
+  model_loaded: boolean;
+  started_by_src: boolean;
+}
+
+/** The language model of the control plane. The API never sends a key. */
+export interface ModelSettings {
+  mode: string;
+  provider: string;
+  models: Record<string, string> | null;
+  base_url?: string;
+  key_set: boolean;
+  local: LocalInference;
+  /** What a start or a stop did. */
+  done?: string;
+}
+
 export interface TimelineMarker {
   seq: number;
   ts: string;

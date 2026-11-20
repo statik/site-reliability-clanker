@@ -20,6 +20,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/monitor"
 	"github.com/statik/site-reliability-clanker/internal/notify"
+	"github.com/statik/site-reliability-clanker/internal/ollama"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
 	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/sim"
@@ -60,6 +61,10 @@ type Server struct {
 	// signed. Nil leaves the endpoint out.
 	Slack http.Handler
 	Teams http.Handler
+	// LocalModel starts and stops the model server on the machine of the control plane.
+	// Nil on a target that cannot start a program: the settings then say that the local
+	// inference is not available.
+	LocalModel *ollama.Control
 }
 
 // ErrNotSignedIn means that a request carries no valid sign-in.
@@ -203,6 +208,9 @@ func (s *Server) Handler() (http.Handler, error) {
 		"POST /api/v1/notifications/digest":           s.postDigest,
 		"POST /api/v1/environments/{env}/blank-slate": s.postBlankSlate,
 		"POST /api/v1/environments/{env}/teardown":    s.postTeardown,
+		"GET /api/v1/settings/model":                  s.getModelSettings,
+		"POST /api/v1/settings/model/local/start":     s.postLocalModelStart,
+		"POST /api/v1/settings/model/local/stop":      s.postLocalModelStop,
 	}
 	for pattern, h := range routes {
 		mux.HandleFunc(pattern, wrap(h))

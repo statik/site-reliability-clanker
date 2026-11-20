@@ -29,7 +29,7 @@ async function pages(page) {
     approvals: "/approvals", activity: "/activity", code: "/code",
     "code-repo": "/code/runbooks?ref=main&path=notifications/routes.json&file=1",
     access: "/access", audit: "/audit", notifications: "/notifications", ask: "/ask",
-    demo: "/demo",
+    demo: "/demo", settings: "/settings",
   };
   const withPull = items.find((item) => item.pr_id !== 0) ?? items[0];
   if (withPull !== undefined) {
