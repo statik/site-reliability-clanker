@@ -20,7 +20,7 @@ const (
 	KindApply = "apply"
 	// KindRunbook runs one script of the runbooks repository.
 	KindRunbook = "runbook"
-	// KindDiagnose runs read-only kubectl commands and returns what they print.
+	// KindDiagnose runs the reads of a debug session and returns what they print.
 	KindDiagnose = "diagnose"
 )
 
@@ -77,8 +77,10 @@ type Spec struct {
 	// Runbook is the name of the script of a runbook job, and Params are its parameters.
 	Runbook string            `json:"runbook,omitempty"`
 	Params  map[string]string `json:"params,omitempty"`
-	// Commands are the kubectl argument lists of a diagnose job.
-	Commands [][]string `json:"commands,omitempty"`
+	// Namespace and Reads are the reads of a diagnose job: what to read, and where. The
+	// job carries no command.
+	Namespace string `json:"namespace,omitempty"`
+	Reads     []Read `json:"reads,omitempty"`
 	// Variables are added to the environment of OpenTofu, for example TF_VAR_admin_token.
 	Variables map[string]string `json:"variables,omitempty"`
 	// Backend holds the settings of the state backend, as `tofu init -backend-config`
@@ -107,10 +109,10 @@ type Job struct {
 	Log io.Writer
 }
 
-// CommandOutput is the result of one command of a diagnose job.
+// CommandOutput is the result of one read of a diagnose job.
 type CommandOutput struct {
 	Output string `json:"output"`
-	// Failure is empty when the command worked.
+	// Failure is empty when the read worked.
 	Failure string `json:"failure,omitempty"`
 }
 

@@ -826,8 +826,9 @@ Each step is one pull request or a few, and each leaves Paperboat working.
 
    Built so far: the manifest of schema 2 with `components`, `incident`, `diagnostics`,
    `checks`, `app_version` and `deploy`, and the code of the core that reads it. The
-   namespaces are still in the manifest, the runbooks and the prompt of the Investigator
-   still name deployments, and the job type still carries commands.
+   job of a debug session carries reads, and the runner makes the commands. The
+   namespaces are still in the manifest, and the runbooks and the prompt of the
+   Investigator still name deployments.
 2. **The collector on Kubernetes.** The build of the collector. The endpoint of the core
    and the observation. The generator of the configuration. State, versions and volumes
    of Paperboat. The health history by name. The storage detector reads real samples.

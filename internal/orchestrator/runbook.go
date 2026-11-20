@@ -11,6 +11,7 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/audit"
 	"github.com/statik/site-reliability-clanker/internal/broker"
 	"github.com/statik/site-reliability-clanker/internal/jobspec"
+	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/runbook"
 	"github.com/statik/site-reliability-clanker/internal/scrub"
 	"github.com/statik/site-reliability-clanker/internal/store"
@@ -325,6 +326,48 @@ func lastPart(text string) string {
 	return "(earlier output left out)\n" + cut
 }
 
+// debugReads returns the reads of a debug session. The first two read the state of the
+// pods and of the deployments; the core always asks for them. Then comes one read for
+// each read of the pack.
+func debugReads(app pack.Pack) []jobspec.Read {
+	reads := []jobspec.Read{{Read: jobspec.ReadPods}, {Read: jobspec.ReadWorkloads}}
+	for _, read := range app.Diagnostics {
+		switch read.Read {
+		case pack.ReadLogs:
+			component, _ := app.Component(read.Component)
+			reads = append(reads, jobspec.Read{Read: jobspec.ReadLogs,
+				Workload: component.Workload, Lines: read.Lines})
+		case pack.ReadEvents:
+			reads = append(reads, jobspec.Read{Read: jobspec.ReadEvents})
+		}
+	}
+	return reads
+}
+
+// writeTranscript writes the record of a debug session: for each read the command that
+// the runner made from it, and the scrubbed end of what the command printed. The core
+// makes the command line itself, with the code of the runner, so the record does not
+// depend on text from the runner.
+func writeTranscript(out io.Writer, namespace string, reads []jobspec.Read,
+	results []jobspec.CommandOutput) error {
+	if len(results) != len(reads) {
+		return fmt.Errorf("the runner answered %d of %d diagnostic reads", len(results),
+			len(reads))
+	}
+	for i, read := range reads {
+		args, err := read.KubectlArgs(namespace)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "$ kubectl %s\n", strings.Join(args, " "))
+		fmt.Fprintln(out, lastPart(scrub.Text(strings.TrimSpace(results[i].Output))))
+		if failure := results[i].Failure; failure != "" {
+			fmt.Fprintf(out, "(command failed: %s)\n", failure)
+		}
+	}
+	return nil
+}
+
 // DebugSession opens a time-boxed, read-only session with the debugger identity, runs the
 // diagnostic reads of the application pack and records every command and its output. The
 // pack names reads, not commands: the core makes each command and adds the namespace. It
@@ -350,30 +393,19 @@ func (o *Orchestrator) DebugSession(ctx context.Context, wi WorkItem, actor, rea
 		return "", err
 	}
 	var transcript strings.Builder
-	diagnosticCommands := o.App.DebugArgs()
+	reads := debugReads(o.App)
 	runErr := func() error {
 		cred, err := o.Broker.Exchange(ctx, grant, broker.Presentation{})
 		if err != nil {
 			return fmt.Errorf("the broker refused the debug grant: %w", err)
 		}
 		result, err := o.run(ctx, &job, jobspec.Job{Spec: jobspec.Spec{Kind: jobspec.KindDiagnose,
-			Env: wi.Env, KubeConfig: cred.KubeConfig, Commands: diagnosticCommands}})
+			Env: wi.Env, KubeConfig: cred.KubeConfig, Namespace: o.App.Namespace, Reads: reads}})
 		if err != nil {
 			return err
 		}
-		if len(result.Commands) != len(diagnosticCommands) {
-			return fmt.Errorf("the runner answered %d of %d diagnostic commands",
-				len(result.Commands), len(diagnosticCommands))
-		}
-		out := io.MultiWriter(logFile, &transcript)
-		for i, args := range diagnosticCommands {
-			fmt.Fprintf(out, "$ kubectl %s\n", strings.Join(args, " "))
-			fmt.Fprintln(out, lastPart(scrub.Text(strings.TrimSpace(result.Commands[i].Output))))
-			if failure := result.Commands[i].Failure; failure != "" {
-				fmt.Fprintf(out, "(command failed: %s)\n", failure)
-			}
-		}
-		return nil
+		return writeTranscript(io.MultiWriter(logFile, &transcript), o.App.Namespace, reads,
+			result.Commands)
 	}()
 	o.endJob(job, logFile, runErr)
 	if err := o.Broker.Revoke(ctx, grant, "used"); err != nil {

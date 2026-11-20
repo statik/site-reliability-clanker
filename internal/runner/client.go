@@ -198,17 +198,32 @@ func (c *Client) execute(ctx context.Context, spec jobspec.Spec, log io.Writer) 
 			Name: spec.Runbook, Params: spec.Params, KubeConfig: spec.KubeConfig, Log: log})
 		return jobspec.Result{Outputs: outputs}, err
 	case jobspec.KindDiagnose:
-		outputs := make([]jobspec.CommandOutput, 0, len(spec.Commands))
-		for _, args := range spec.Commands {
-			raw, err := c.Runner.Kubectl(ctx, spec.KubeConfig, args...)
-			output := jobspec.CommandOutput{Output: string(raw)}
-			if err != nil {
-				output.Failure = err.Error()
-			}
-			outputs = append(outputs, output)
+		kubectl := func(args ...string) ([]byte, error) {
+			return c.Runner.Kubectl(ctx, spec.KubeConfig, args...)
 		}
-		return jobspec.Result{Commands: outputs}, nil
+		return jobspec.Result{Commands: diagnose(spec, kubectl)}, nil
 	default:
 		return jobspec.Result{}, fmt.Errorf("the job kind %q does not exist", spec.Kind)
 	}
+}
+
+// diagnose runs each read of a diagnose job with kubectl and returns one result for each,
+// in the same order. A read that is not valid starts no program: it is a failure.
+func diagnose(spec jobspec.Spec,
+	kubectl func(args ...string) ([]byte, error)) []jobspec.CommandOutput {
+	outputs := make([]jobspec.CommandOutput, 0, len(spec.Reads))
+	for _, read := range spec.Reads {
+		args, err := read.KubectlArgs(spec.Namespace)
+		if err != nil {
+			outputs = append(outputs, jobspec.CommandOutput{Failure: err.Error()})
+			continue
+		}
+		raw, err := kubectl(args...)
+		output := jobspec.CommandOutput{Output: string(raw)}
+		if err != nil {
+			output.Failure = err.Error()
+		}
+		outputs = append(outputs, output)
+	}
+	return outputs
 }
