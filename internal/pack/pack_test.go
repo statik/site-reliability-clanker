@@ -29,21 +29,6 @@ func TestTheExamplePackAndTheSecondPackLoad(t *testing.T) {
 	}
 }
 
-// The pack gives two reads: the logs of one component and the events. The core puts the
-// state of the pods and of the deployments before them, and makes each command.
-func TestTheCoreMakesTheCommandsOfADebugSession(t *testing.T) {
-	got := packtest.Second(t).DebugArgs()
-	want := [][]string{
-		{"get", "-n", "harbor", "pods", "-o", "wide"},
-		{"get", "-n", "harbor", "deployments"},
-		{"logs", "-n", "harbor", "deployment/harbor-gateway", "--tail=30"},
-		{"get", "-n", "harbor", "events", "--sort-by=.lastTimestamp"},
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("DebugArgs() = %v\nwant %v", got, want)
-	}
-}
-
 func TestRenderPutsTheNamesOfThePackIntoAPrompt(t *testing.T) {
 	text := "Read {{releases_repository}} at {{releases_directory}}/x.md. One of {{deployments}}."
 	got := packtest.Second(t).Render(text)

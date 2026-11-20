@@ -52,26 +52,3 @@ func (p Pack) checkRead(read Read) error {
 	}
 	return nil
 }
-
-// DebugArgs returns the arguments of each kubectl command of a debug session. The first
-// two commands read the state of the pods and of the deployments; the core always runs
-// them. Then comes one command for each read of the pack. Every command has the namespace
-// of the application, and every command reads.
-func (p Pack) DebugArgs() [][]string {
-	commands := [][]string{
-		{"get", "-n", p.Namespace, "pods", "-o", "wide"},
-		{"get", "-n", p.Namespace, "deployments"},
-	}
-	for _, read := range p.Diagnostics {
-		switch read.Read {
-		case ReadLogs:
-			component, _ := p.Component(read.Component)
-			commands = append(commands, []string{"logs", "-n", p.Namespace,
-				"deployment/" + component.Workload, fmt.Sprintf("--tail=%d", read.Lines)})
-		case ReadEvents:
-			commands = append(commands, []string{"get", "-n", p.Namespace, "events",
-				"--sort-by=.lastTimestamp"})
-		}
-	}
-	return commands
-}

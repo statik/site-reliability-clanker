@@ -93,8 +93,18 @@ video and the local demo. No pull request is open.
     second data directory it fails with "Backend configuration changed", because those
     directories keep the backend of the first one. The run above was destroyed from a
     copy of the sources.
-  - Not done in step 1 yet: the namespaces are in the manifest, the runbooks and the
-    prompt of the Investigator name deployments, and the job type carries commands.
+  - The job of a debug session carries reads and a namespace, not `kubectl` argument
+    lists (`internal/jobspec/read.go`). One function makes the command of a read. The
+    runner starts the command with it, and the core writes the command line of the
+    record with it. A read that is not valid starts no program. A runner and a core of
+    different versions do not work together for a debug session: the field of the job
+    changed.
+    Ran on 2026-11-20: the Go tests, and a run on a new data directory with recorded
+    answers, with the first deployment and the scene `incident`. The record of the debug
+    session had the four commands of before and no failed read, and the incident ended
+    in `Done`.
+  - Not done in step 1 yet: the namespaces are in the manifest, and the runbooks and the
+    prompt of the Investigator name deployments.
 - A pack has two more parts, and there are commands for a pack (`apps/paperboat/PACK.md`):
   - The runbooks of the application are in the pack (`apps/paperboat/runbooks/`, before
     `runbooks/jobs/`). The control plane seeds them into `jobs/` of the runbooks

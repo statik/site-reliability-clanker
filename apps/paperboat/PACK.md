@@ -61,7 +61,10 @@ pass before the canary measures the primary check.
 **The debug session.** The pack gives no command. The core starts with two commands of
 its own, `kubectl get pods -o wide` and `kubectl get deployments`, and then makes one
 command for each read: `kubectl logs deployment/<workload> --tail=<lines>` and
-`kubectl get events --sort-by=.lastTimestamp`. It adds the namespace to each.
+`kubectl get events --sort-by=.lastTimestamp`. It adds the namespace to each. The job
+that goes to the runner has the reads and the namespace, not the commands
+(`internal/jobspec/read.go`). The runner makes each command, and it starts no program for
+a read that it does not know.
 
 ## A pack is not trusted
 
