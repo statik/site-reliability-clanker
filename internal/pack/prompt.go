@@ -8,12 +8,12 @@ import "strings"
 //
 //	{{releases_repository}}  the repository with the release notes
 //	{{releases_directory}}   the directory of the notes in that repository
-//	{{deployments}}          the deployments, as "a, b or c"
+//	{{deployments}}          the deployments of the components, as "a, b or c"
 func (p Pack) Render(prompt string) string {
 	return strings.NewReplacer(
 		"{{releases_repository}}", p.Releases.Repository,
 		"{{releases_directory}}", p.Releases.Directory,
-		"{{deployments}}", oneOf(p.Deployments),
+		"{{deployments}}", oneOf(p.Workloads()),
 	).Replace(prompt)
 }
 

@@ -35,8 +35,8 @@ func TestTheTopologyHasThePlatformNodesAndTheServicesOfThePack(t *testing.T) {
 	if !slices.Equal(platform, want) {
 		t.Errorf("platform nodes = %v, the pack package has %v", platform, want)
 	}
-	if !slices.Equal(services, app.Topology.Services) {
-		t.Errorf("services = %v, want %v", services, app.Topology.Services)
+	if !slices.Equal(services, app.TopologyNodes()) {
+		t.Errorf("services = %v, want %v", services, app.TopologyNodes())
 	}
 	for _, edge := range platformEdges {
 		if !slices.Contains(pack.PlatformNodes, edge[0]) ||

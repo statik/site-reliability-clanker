@@ -70,12 +70,22 @@ def one_of(names: list[str]) -> str:
     return ", ".join(first) + " or " + last
 
 
+def workloads() -> list[str]:
+    """Return the deployments of the components. Mirrors Pack.Workloads in internal/pack."""
+    return [component["workload"] for component in PACK["components"]]
+
+
+def primary_check() -> str:
+    """Return the name of the primary check. Mirrors Pack.PrimaryCheck in internal/pack."""
+    return next(check["name"] for check in PACK["checks"] if check.get("primary"))
+
+
 def render(text: str) -> str:
     """Put the names of the pack into a prompt. Mirrors Pack.Render in internal/pack."""
     values = {
         "{{releases_repository}}": RELEASES_REPO,
         "{{releases_directory}}": PACK["releases"]["directory"],
-        "{{deployments}}": one_of(PACK["deployments"]),
+        "{{deployments}}": one_of(workloads()),
     }
     for placeholder, value in values.items():
         text = text.replace(placeholder, value)
@@ -103,8 +113,9 @@ def _read_tree(source: Path, dest: str, into: dict[str, str]) -> None:
 def _seed() -> Repos:
     platform: dict[str, str] = {}
     _read_tree(ROOT / "platform", "platform", platform)
-    chart = PACK_DIR / PACK["chart"]
-    _read_tree(chart, f"{PACK['mount']}/{PACK['chart']}", platform)
+    deploy = PACK["deploy"]
+    chart = PACK_DIR / deploy["chart"]
+    _read_tree(chart, f"{deploy['mount']}/{deploy['chart']}", platform)
     runbooks: dict[str, str] = {}
     _read_tree(ROOT / "runbooks", "", runbooks)
     # The runbooks of the application come from the pack, into the directory of the jobs.
@@ -112,7 +123,7 @@ def _seed() -> Repos:
         _read_tree(PACK_DIR / PACK["runbooks"], "jobs", runbooks)
     releases: dict[str, str] = {}
     _read_tree(RELEASES_DIR, PACK["releases"]["directory"], releases)
-    _read_tree(chart, PACK["chart"], releases)
+    _read_tree(chart, deploy["chart"], releases)
     return {PLATFORM_REPO: platform, RUNBOOKS_REPO: runbooks, RELEASES_REPO: releases}
 
 

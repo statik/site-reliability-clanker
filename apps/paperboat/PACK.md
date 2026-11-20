@@ -21,9 +21,12 @@ to show that the core does not depend on a name of Paperboat.
 
 ## The manifest
 
+The format has the version 2. `docs/PACKS.md` has the design, with the parts that are not
+built.
+
 | Field | Meaning |
 |---|---|
-| `schema` | The version of the manifest format. This version reads `1` |
+| `schema` | The version of the manifest format. This version reads `2` |
 | `name` | The short name. The API uses it as the key of the application in its version lists |
 | `title` | The name that a person reads. One to three words |
 | `version` | The version of the pack, not of the application |
@@ -34,45 +37,64 @@ to show that the core does not depend on a name of Paperboat.
 | `releases.repository` | The repository of the forge with the release notes. Not a repository of the core |
 | `releases.directory` | The directory of the notes, in the pack and in that repository |
 | `releases.first` | The release that a new environment starts with |
-| `chart` | The directory of the chart, inside the pack |
-| `mount` | The path of the pack in the platform repository, where the stacks read the chart |
-| `build` | The build program, inside the pack |
+| `deploy.kind` | How the layer deploys the application. This version reads `helm` |
+| `deploy.chart` | The directory of the chart, inside the pack |
+| `deploy.mount` | The path of the pack in the platform repository, where the stacks read the chart |
+| `deploy.build` | Optional. The build program, inside the pack. A pack with none has its images in a registry already |
 | `namespace` | The Kubernetes namespace of the application. A debug session reads only there |
 | `data_namespace` | The namespace of the data services of the application |
-| `deployments` | The deployments that a runbook and the Investigator can name |
-| `incident_deployment` | The deployment that an incident names when no model gives a diagnosis |
-| `debug_commands` | The kubectl commands of a debug session, with no namespace |
-| `health.ready_path` | Answers 200 when the application is ready |
-| `health.version_path` | Answers with a JSON object that has the field `version` |
-| `health.probe_path` | The request that the monitor repeats to measure the error rate |
-| `health.probe_name` | The name of that request in a finding. One or two words |
-| `topology.services` | The nodes of the application in the topology view |
-| `topology.edges` | Edges between two services, or a service and a node of the platform |
+| `components` | The parts of the application that run. Each has a `name`, the `runtime` `kubernetes`, the `workload` (the name of its deployment) and `required`. No code reads `required` yet |
+| `incident` | Optional. The `runbook` and the `component` that an incident proposes when no model gives a diagnosis. Without it, such an incident goes to a person |
+| `diagnostics` | The reads of a debug session, 1 to 8. A read is `{"read": "logs", "component": …, "lines": …}` with 1 to 200 lines, or `{"read": "events"}` |
+| `checks` | The HTTP checks, 1 to 8. Each has a `name`, the `kind` `http`, a `path` and optionally the `status` that passes (the default is 200; a value from 200 to 299). Exactly one has `"primary": true` |
+| `app_version.source` | Where the monitor reads the version that runs. This version reads `http-json` |
+| `app_version.path` | Answers with a JSON object that has the field `version` |
+| `topology.extra` | Optional. Nodes of the topology view that are not components |
+| `topology.edges` | Edges between two nodes of the application, or one of them and a node of the platform |
 | `runbooks` | Optional. The directory of the runbooks, inside the pack |
 | `evals` | Optional. The directory of the eval cases, inside the pack |
+
+**The checks.** The monitor repeats the primary check to measure the error rate. Its name
+is in a finding: "fails 9 of 20 inventory requests". After an apply, each other check must
+pass before the canary measures the primary check.
+
+**The debug session.** The pack gives no command. The core starts with two commands of
+its own, `kubectl get pods -o wide` and `kubectl get deployments`, and then makes one
+command for each read: `kubectl logs deployment/<workload> --tail=<lines>` and
+`kubectl get events --sort-by=.lastTimestamp`. It adds the namespace to each.
 
 ## A pack is not trusted
 
 A pack comes from outside the core. `pack.Load` refuses a manifest when:
 
-- it has a field that the format does not have;
+- it has a field that the format does not have, also inside `deploy`, a component, a read
+  or a check;
 - a name, a path or a version does not match its fixed pattern;
 - a path can leave the pack;
-- a debug command does not start with `get`, `logs`, `describe` or `top`, has a flag that
-  selects a namespace, a cluster or an identity, prints a full object, or reads a secret;
+- `deploy.kind`, the runtime of a component, the kind of a check or the source of the
+  version is one that this version does not read;
+- a component or its workload comes twice, or a component has the name of a node of the
+  platform;
+- a read is not `logs` or `events`, a read of logs names a component that the pack does
+  not have or asks for more than 200 lines;
+- the path of a check is not a plain path, the status that passes is not from 200 to 299,
+  or the number of primary checks is not one;
+- `incident` names a component that the pack does not have, a runbook that is not a
+  mitigation for an incident in the pack, or a component that this runbook does not
+  permit;
 - an edge of the topology joins nodes that do not exist, or two nodes of the platform;
 - the chart, the build program or the note of the first release is not in the pack;
 - the directory of the runbooks or of the eval cases has a directory in it, a file of
   more than 256 KiB, a script with no definition, a definition with no script or a
   definition that `internal/runbook` refuses;
-- a runbook that the Investigator can propose names a deployment that is not in
-  `deployments`;
+- a runbook that the Investigator can propose names a deployment that is not the workload
+  of a component;
 - an eval case file does not have `schema` 1, the task of its name, and 1 to 200 samples
   that each have their own `id`.
 
-The core adds the namespace to each debug command. Only names that passed these checks go
-into the prompt of a model, through three placeholders: `{{releases_repository}}`,
-`{{releases_directory}}` and `{{deployments}}`.
+Only names that passed these checks go into the prompt of a model, through three
+placeholders: `{{releases_repository}}`, `{{releases_directory}}` and `{{deployments}}`
+(the workloads of the components).
 
 ## Runbooks
 
@@ -106,12 +128,14 @@ fails. It asks no question, so a program can run it.
 
 ```text
 $ clanker pack validate apps/paperboat
-ok    manifest: paperboat 0.1.0 (Paperboat), schema 1
+ok    manifest: paperboat 0.1.0 (Paperboat), schema 2
 ok    deployment: layer 50-app, variable paperboat_version, chart chart
 ok    releases: repository paperboat, first release 1.0.0
-ok    services: paperboat-api, paperboat-web, paperboat-worker in the namespace paperboat
-ok    debug commands: 4, each one a read
-ok    checks: /api/healthz, /api/version, /api/inventory
+ok    components: api (paperboat-api), web (paperboat-web), worker (paperboat-worker) in the namespace paperboat
+ok    diagnostics: 2 reads, and the state of the pods and the deployments
+ok    checks: ready /api/healthz 200, inventory /api/inventory 200 (primary)
+ok    version: http-json /api/version
+ok    incident: restart-deployment on api without a diagnosis of a model
 ok    runbooks: db-backup, db-maintenance, restart-deployment, restore-drill
 ok    eval cases: investigator_diagnosis
 ok    hash: sha256 <64 hexadecimal characters>
@@ -168,3 +192,6 @@ The core on a cloud has no disk. It reads only the pack that it carries.
 - The recorded model answers in `internal/agent/replay` are answers about Paperboat.
 - The eval tasks other than `investigator_diagnosis` have their samples in the code of the
   suite, and those samples are about Paperboat.
+- The runbooks, the prompt of the Investigator and the eval cases still name deployments,
+  not components. The namespaces are still in the manifest. `docs/PACKS.md` section B.14
+  has the order of the work.

@@ -326,8 +326,9 @@ func lastPart(text string) string {
 }
 
 // DebugSession opens a time-boxed, read-only session with the debugger identity, runs the
-// diagnostic commands of the application pack and records every command and its output.
-// The pack can name only commands that read, and the core adds the namespace. It returns the
+// diagnostic reads of the application pack and records every command and its output. The
+// pack names reads, not commands: the core makes each command and adds the namespace. It
+// returns the
 // scrubbed transcript.
 func (o *Orchestrator) DebugSession(ctx context.Context, wi WorkItem, actor, reason string) (
 	string, error) {

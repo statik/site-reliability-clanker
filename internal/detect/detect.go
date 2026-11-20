@@ -328,7 +328,7 @@ func (d *Detector) CheckHealth(ctx context.Context, env string) error {
 		// does not open again on every check.
 		Key: fmt.Sprintf("incident:%s:%s", env, last.TS[:13]),
 		Title: fmt.Sprintf("%s in %s fails %d of %d %s requests", d.App.Title, env,
-			last.Total-last.OK, last.Total, d.App.Health.ProbeName),
+			last.Total-last.OK, last.Total, d.App.PrimaryCheck().Name),
 		Detail: map[string]any{"kind": "incident", "ok": last.OK, "total": last.Total,
 			"p95_ms": last.P95MS, "version": last.Version}})
 }
