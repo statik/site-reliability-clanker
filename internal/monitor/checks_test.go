@@ -114,3 +114,31 @@ func TestACheckPassesWithTheStatusThatThePackGives(t *testing.T) {
 		t.Errorf("the status 200 passed a check that wants 204: %+v", sample)
 	}
 }
+
+func TestVerifyPassesWhenTheApplicationLayerHasNoOutputs(t *testing.T) {
+	m := New(storetest.Open(t), fixedClock{time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC)})
+	m.App = packtest.Second(t)
+	result, err := m.Verify(context.Background(), orchestrator.WorkItem{Env: "local"})
+	if err != nil || !result.OK || len(result.Checks) != 1 {
+		t.Errorf("Verify: %+v, %v", result, err)
+	}
+}
+
+func TestVerifyFailsWhenTheApplicationLayerHasOutputsAndNoAddress(t *testing.T) {
+	app := packtest.Second(t)
+	now := time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC)
+	for _, outputs := range []map[string]any{{app.VersionVariable: "3.4.0"},
+		{app.VersionVariable: "3.4.0", app.URLOutput: ""}} {
+		m := New(storetest.Open(t), fixedClock{now})
+		m.App = app
+		err := store.SetLayerOutputs(m.DB, "local", app.Layer, outputs, store.FormatTime(now))
+		if err != nil {
+			t.Fatal(err)
+		}
+		result, err := m.Verify(context.Background(), orchestrator.WorkItem{Env: "local"})
+		if err != nil || result.OK || !strings.Contains(result.Reason, app.Layer) ||
+			!strings.Contains(result.Reason, "no output "+app.URLOutput) {
+			t.Errorf("Verify with the outputs %v: %+v, %v", outputs, result, err)
+		}
+	}
+}
