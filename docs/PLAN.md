@@ -425,6 +425,10 @@ Not built:
   same cause as the note at the end of section 5.6: only the platform repository takes pull
   requests.
 - Several packs in one environment.
+- A pack for an application that does not run on Kubernetes. The components, the health
+  checks, the debug commands and the credentials of a pack are those of Kubernetes.
+  `docs/PACKS.md` has the interface of today in detail and a proposal for a standard way to
+  gather health and observability data on every runtime. The proposal is not decided.
 
 ## 6. Permissions and just-in-time access
 
