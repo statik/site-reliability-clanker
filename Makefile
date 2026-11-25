@@ -54,16 +54,22 @@ CORE_PACKAGES := agent api audit awsrunner awstarget chatops detect dispatch for
 lint-core:
 	scripts/lint-core.sh $(CORE_PACKAGES)
 
+# The packs in apps/ and packs/, and the runbook scripts of the packs in packs/.
+PACK_DIRS := $(wildcard apps/*/ packs/*/)
+PACK_SCRIPTS := $(wildcard packs/*/runbooks/*.sh)
+
 lint: lint-core
 	test -z "$$(gofmt -l cmd internal scripts apps/paperboat)"
+	for dir in $(PACK_DIRS); do go run ./cmd/clanker pack validate $$dir || exit 1; done
 	go vet ./...
 	cd apps/paperboat && go vet ./...
 	tofu fmt -check -recursive platform internal/setup/stack
 	opa check runbooks/policy
 	shellcheck apps/paperboat/runbooks/*.sh apps/paperboat/build.sh ops/run-local.sh scripts/*.sh \
-		scripts/verify/*.sh scripts/macos/*.sh build/runner/*.sh internal/setup/stack/*/*.sh
+		scripts/verify/*.sh scripts/macos/*.sh build/runner/*.sh internal/setup/stack/*/*.sh \
+		$(PACK_SCRIPTS)
 	shfmt -i 2 -d apps/paperboat/runbooks apps/paperboat/build.sh ops/run-local.sh scripts \
-		build/runner internal/setup/stack
+		build/runner internal/setup/stack $(PACK_SCRIPTS)
 
 destroy: build
 	./bin/clanker destroy --env local
