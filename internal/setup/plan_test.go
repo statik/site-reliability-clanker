@@ -77,7 +77,7 @@ func TestPlanForANetworkWithARouter(t *testing.T) {
 	text := details(plan)
 	for _, want := range []string{"t4g.small", "auto scaling group of one", "db.t4g.micro",
 		"machine image and its snapshot", "Fargate", "/src/prod-1", "admits only the router",
-		"vpc-1", "US West (Oregon)", "2026-11-18"} {
+		"internal load balancer", "Keycloak", "vpc-1", "US West (Oregon)", "2026-11-18"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("the plan lacks %q: %s", want, text)
 		}
@@ -85,8 +85,8 @@ func TestPlanForANetworkWithARouter(t *testing.T) {
 	if plan.TagKey != "clanker_env" || plan.TagValue != "prod-1" {
 		t.Errorf("tag = %s=%s", plan.TagKey, plan.TagValue)
 	}
-	if math.Abs(plan.Weekly-5.51) > 0.005 {
-		t.Errorf("one week = %.4f USD, want about 5.51", plan.Weekly)
+	if math.Abs(plan.Weekly-16.16) > 0.005 {
+		t.Errorf("one week = %.4f USD, want about 16.16", plan.Weekly)
 	}
 	if strings.Contains(text, "NAT gateway") {
 		t.Errorf("the plan for a network that exists names a NAT gateway: %s", text)
