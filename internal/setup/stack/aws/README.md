@@ -49,7 +49,7 @@ starts. The image of the core holds only the path and the region (output `core_i
 | `CLANKER_ADMIN_EMAIL` | `admin@src-<env>-idp.<zone>` |
 | `CLANKER_APPROVER_EMAILS` | `approver@src-<env>-idp.<zone>`: the core makes this user an approver when it starts, so a T3 change has its second approver |
 | `CLANKER_AWS_RUNNER` | Phase 2: cluster, task definition, container, private subnets and the runner security group |
-| `CLANKER_AWS_BOOTSTRAP` | A placeholder for the outputs of `00-bootstrap` (`tofu output -json`). Nothing writes them yet: `clanker bootstrap --cloud aws` refuses today. The writer must overwrite the parameter as a SecureString with `--key-id <parameter_key_arn>`, as the role that applies this stack. The stack ignores later changes of the value. With the placeholder the core does not start |
+| `CLANKER_AWS_BOOTSTRAP` | A placeholder for the outputs of `00-bootstrap` (`tofu output -json`). `clanker bootstrap --cloud aws --parameter-path <parameter_path> --kms-key <parameter_key_arn>` overwrites the parameter as a SecureString with that key, as the person who applies this stack. The stack ignores later changes of the value. With the placeholder the core does not start |
 
 No value holds the address of an instance: people, Keycloak (the redirect URI) and the
 collector (output `collector_endpoint`) reach the core by its name. The runners get the
@@ -107,9 +107,10 @@ The owner gives the values of one account in `terraform.tfvars` (git ignores it;
 2. Push the runner image (`make runner-image`) to `runner_repository_url`, and note its
    digest.
 3. Build the image of the core with `ops`, with `core_image_env` as its `Env`.
-4. Apply `00-bootstrap` with `broker_principal = <core_role_arn>`, and write its outputs to
-   `bootstrap_parameter` (see the table above). `clanker bootstrap` is to do both; it does
-   not do them on AWS yet.
+4. Apply `00-bootstrap` and write its outputs to `bootstrap_parameter` (see the table
+   above): `clanker bootstrap --cloud aws --env <env_name> --profile <profile> --region
+   <region> --broker-principal <core_role_arn> --parameter-path <parameter_path> --kms-key
+   <parameter_key_arn>`.
 5. **Phase 2.** Apply with `runner_image_digest` and `core_image_id`. The apply waits until
    the core answers `/healthz` behind the load balancer (up to 15 minutes).
 
@@ -156,20 +157,22 @@ with no traffic.
 
 ## Teardown
 
-1. Remove the layers above `00-bootstrap` (`clanker destroy`), if they exist.
-2. Stop the runner tasks that still run in the cluster. A cluster with a running task
+1. Stop the runner tasks that still run in the cluster. A cluster with a running task
    cannot be deleted.
-3. Destroy `00-bootstrap`. Its agent roles trust the role of the core, so they go first.
-4. `tofu destroy` here, with the same inputs. It terminates the instance, stops Keycloak,
+2. `clanker destroy --cloud aws --env <env_name> --profile <profile> --region <region>
+   --broker-principal <core_role_arn>` removes the layers above `00-bootstrap` that have
+   resources, then `00-bootstrap`. Its agent roles trust the role of the core, so they go
+   before this stack.
+3. `tofu destroy` here, with the same inputs. It terminates the instance, stops Keycloak,
    deletes the database without a final snapshot and with its automatic backups, deletes the
    repository with its images, the parameters (with `CLANKER_AWS_BOOTSTRAP`), the log groups,
    the certificate, its validation records and the alias records, and schedules the
    deletion of the key (7 days).
-5. Delete what is outside the state: the image of the core and its snapshot (`ops` made
+4. Delete what is outside the state: the image of the core and its snapshot (`ops` made
    them), and the task definitions of the two families. `tofu destroy` only deregisters a
    task definition, which stays `INACTIVE`:
    `aws ecs delete-task-definitions --task-definitions <ARN of each revision>`.
-6. Prove that nothing is left: the tagging API with the tag `clanker_env = <env>`, and lists
+5. Prove that nothing is left: the tagging API with the tag `clanker_env = <env>`, and lists
    of the IAM roles `clanker-<env>-*`, the task definitions `clanker-<env>-*`, the log groups
    `/clanker/<env>/`, the parameters below `/src/<env>`, the alias `alias/clanker-<env>-settings`
    (its key waits for deletion), and the records `src-<env>*` in the zone.

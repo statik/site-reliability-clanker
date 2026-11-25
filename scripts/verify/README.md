@@ -17,6 +17,7 @@ target and Python 3.
 | `nanos-check.sh` | Builds the same binary for `linux/arm64` and boots it as a Nanos unikernel under QEMU (`ops/run-local.sh`), with its own PostgreSQL container. It signs the first admin in through the fake identity provider, checks the dashboard and the seeded forge, pushes a branch with the git client, boots a second unikernel on the same database and looks for the branch. It needs `ops` and QEMU on an Apple Silicon Mac. It does not touch the local demo | About 1 minute |
 | `restart_check.py <new directory>` | Starts a second control plane on the database of the demo, which must wait. Then it opens a pull request and kills the control plane in the middle of the plan: after the start the plan must run again and end in a request for approval. It approves, kills the control plane in the middle of the apply and starts it again. The work item must be `Failed`, its job `lost` and no grant open. It leaves a failed work item and possibly a partly applied change: run `fresh-run.sh` afterward | About 4 minutes |
 | `runner-image-check.sh` | Builds the runner image for `linux/arm64` with `make runner-image` and checks its user, entrypoint, OpenTofu version (the CI pin) and that `tofu init` of each AWS stack needs no network. Then `runnerharness` (a Go program) serves the runner routes of the dispatcher and starts each job in a new container: a plan, an apply with a changed plan file (refused) and the apply of the plan. The state is in an S3 bucket in a MinIO container. The check compares the plan hash, the tool digest and the outputs that the apply job reports, and reads the state and the absence of a lock from the bucket with the AWS CLI of the image. It needs Docker Desktop. It does not touch the local demo | About 2 minutes after the first build |
+| `aws-bootstrap-destroy-check.sh` | Runs `clanker bootstrap --cloud aws` and `clanker destroy --cloud aws` with the fixture stacks in `awsfixture` (only `terraform_data`, an `s3` backend) against a MinIO container with a KMS key. A stub `aws` program answers `sts` and `ssm` and records the parameter; the AWS variables of the shell are removed and every endpoint is MinIO, so nothing reaches AWS. It checks the local apply, the move of the state into the bucket, the encrypted state object, the setting `CLANKER_AWS_BOOTSTRAP` (printed and written, without the sensitive output), a second bootstrap with the state in the bucket, a destroy that fails and destroys nothing when a state cannot be read, a destroy that stops at a missing input, and the destroy that skips the empty layers, moves `00-bootstrap` out of the bucket and destroys it. Then two local bootstraps with two data directories from this checkout (#140) and a local destroy of `00-bootstrap`. It needs Docker, Go, OpenTofu, the AWS CLI v2 and `jq`. It does not touch the local demo | About 1 minute |
 | `fakeidp` | A fake identity provider (a Go program) for the two checks above and for `web/scripts/signin-check.mjs`. It signs in whoever a check names, with no password. Never use it for a real control plane | - |
 
 ## What a good run looks like
@@ -34,6 +35,8 @@ target and Python 3.
   Before it, the harness prints that the apply job reports the outputs `message` and
   `state_location` (the bucket of the backend), which the runner reads with
   `tofu output -json` from the state in the bucket.
+- `aws-bootstrap-destroy-check.sh`: the last line starts with
+  `RESULT: bootstrap moved 00-bootstrap into the bucket and wrote the setting`.
 - `fresh-run.sh`: thirteen work items. Twelve end in `Done`. `WI-0005` (the faulty release)
   ends in `RolledBack`. The last line before the error count is
   `chain: {'ok': True, 'count': 317, ...}`. The error count is 0.
@@ -54,6 +57,10 @@ target and Python 3.
 - `keycloak-signin-check.sh` runs Keycloak in Docker Desktop, which shows Keycloak the address
   of its own gateway and not the address of the browser. The rule "require SSL: external
   requests" is therefore checked only with the second Keycloak and `X-Forwarded-For`.
+- `aws-bootstrap-destroy-check.sh` uses MinIO for S3 and a stub for STS and Parameter Store.
+  It says nothing about IAM, KMS or the real AWS stacks, and the fixture does not own its
+  bucket, so the bucket and the copy of the state of `00-bootstrap` stay in MinIO after the
+  destroy. On AWS the destroy of `00-bootstrap` removes the bucket.
 
 ## The realm file
 

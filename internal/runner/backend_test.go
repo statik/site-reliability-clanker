@@ -103,8 +103,7 @@ func argumentsOf(calls []string) []string {
 }
 
 func s3Backend() map[string]string {
-	return map[string]string{"region": "eu-west-1", "bucket": "state-of-prod",
-		"key": "prod/10-network.tfstate", "use_lockfile": "true"}
+	return S3Backend("state-of-prod", "eu-west-1", "prod", "10-network")
 }
 
 func TestAnApplyWithABucketReportsTheOutputsThatTofuPrints(t *testing.T) {
@@ -142,8 +141,8 @@ func TestAJobWithABucketGivesTheBucketAsTheStateLocationAndNoPath(t *testing.T) 
 		t.Fatal(got.err)
 	}
 	wantInit := "init -no-color -input=false -backend-config=bucket=state-of-prod " +
-		"-backend-config=key=prod/10-network.tfstate -backend-config=region=eu-west-1 " +
-		"-backend-config=use_lockfile=true"
+		"-backend-config=encrypt=true -backend-config=key=prod/10-network.tfstate " +
+		"-backend-config=region=eu-west-1 -backend-config=use_lockfile=true"
 	if arguments := argumentsOf(got.calls); arguments[0] != wantInit {
 		t.Errorf("tofu init was called with %q, want %q", arguments[0], wantInit)
 	}

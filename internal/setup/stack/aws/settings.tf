@@ -219,10 +219,9 @@ resource "aws_ssm_parameter" "core" {
   }
 }
 
-# The slot of the outputs of 00-bootstrap. Nothing writes it yet. Its writer must overwrite
-# it as a SecureString with --key-id <this key>, as the role that applies this stack. Until
-# then the value is a placeholder that stops the start of the core, so apply phase 2 after
-# the outputs are written.
+# The slot of the outputs of 00-bootstrap. `clanker bootstrap --cloud aws --kms-key <this
+# key>` overwrites it as a SecureString. Until then the value is a placeholder that stops the
+# start of the core, so apply phase 2 after the outputs are written.
 resource "aws_ssm_parameter" "bootstrap" {
   name   = "${local.parameter_path}/CLANKER_AWS_BOOTSTRAP"
   type   = "SecureString"
