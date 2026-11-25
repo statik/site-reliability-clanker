@@ -12,6 +12,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/statik/site-reliability-clanker/internal/observation"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
 	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/store"
@@ -89,7 +90,7 @@ func (m *Monitor) Probe(ctx context.Context, env string, count int) (Sample, err
 		Version string `json:"version"`
 	}
 	if _, err := m.getJSON(ctx, base+m.App.AppVersion.Path, &version); err == nil {
-		sample.Version = version.Version
+		sample.Version = observation.NormalizeVersion(version.Version)
 	}
 	durations := []float64{}
 	primary := m.App.PrimaryCheck()
@@ -189,15 +190,16 @@ func (m *Monitor) Verify(ctx context.Context, wi orchestrator.WorkItem) (orchest
 			Version string `json:"version"`
 		}
 		_, versionErr := m.getJSON(ctx, base+m.App.AppVersion.Path, &version)
-		if failed == "" && versionErr == nil && version.Version == want {
+		running := observation.NormalizeVersion(version.Version)
+		if failed == "" && versionErr == nil && running == want {
 			result.Checks = append(result.Checks, m.passedChecks()...)
 			result.Checks = append(result.Checks, "running version is "+want)
 			break
 		}
 		if time.Now().After(deadline) {
 			result.Reason = fmt.Sprintf("after 90 s the application does not report healthy "+
-				"version %s (%s, version %q)", want, orText(failed, "each check passes"),
-				version.Version)
+				"version %s (%s, version %s)", want, orText(failed, "each check passes"),
+				orText(running, "unknown"))
 			return result, nil
 		}
 		time.Sleep(3 * time.Second)

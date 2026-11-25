@@ -2,8 +2,10 @@ package monitor
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -16,16 +18,17 @@ import (
 )
 
 // application is a server that answers the paths of the second pack. The status of each
-// path can change during a test.
+// path and the version can change during a test.
 type application struct {
-	status map[string]int
-	seen   map[string]int
+	status  map[string]int
+	seen    map[string]int
+	version string
 }
 
 func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	a.seen[r.URL.Path]++
 	if r.URL.Path == "/api/version" {
-		_, _ = w.Write([]byte(`{"version":"3.4.0"}`))
+		_, _ = fmt.Fprintf(w, `{"version":%q}`, a.version)
 		return
 	}
 	status, known := a.status[r.URL.Path]
@@ -38,7 +41,7 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // deployed returns a monitor of the second pack with its application at a test server.
 func deployed(t *testing.T, app pack.Pack, status map[string]int) (*Monitor, *application) {
 	t.Helper()
-	served := &application{status: status, seen: map[string]int{}}
+	served := &application{status: status, seen: map[string]int{}, version: "3.4.0"}
 	server := httptest.NewServer(served)
 	t.Cleanup(server.Close)
 	now := time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC)
@@ -68,6 +71,24 @@ func TestVerifyPassesWhenEachCheckOfThePackPasses(t *testing.T) {
 	}
 	if served.seen["/v2/berths"] != 40 || served.seen["/api/healthz"] != 1 {
 		t.Errorf("requests: %v", served.seen)
+	}
+}
+
+func TestVerifyAndProbeReadTheVersionThatTheApplicationReportsWithAVAndABuild(t *testing.T) {
+	m, served := deployed(t, packtest.Second(t), map[string]int{"/api/healthz": 200,
+		"/v2/berths": 200})
+	served.version = "v3.4.0+abc1234"
+	result, err := m.Verify(context.Background(), orchestrator.WorkItem{Env: "local"})
+	if err != nil || !result.OK || !slices.Contains(result.Checks, "running version is 3.4.0") {
+		t.Errorf("Verify: %+v, %v", result, err)
+	}
+	sample, err := m.Probe(context.Background(), "local", 1)
+	if err != nil || sample.Version != "3.4.0" {
+		t.Errorf("Probe: %+v, %v", sample, err)
+	}
+	served.version = "3.4.0-rc.1"
+	if sample, _ := m.Probe(context.Background(), "local", 1); sample.Version != "" {
+		t.Errorf("Probe kept a version that is not one: %+v", sample)
 	}
 }
 

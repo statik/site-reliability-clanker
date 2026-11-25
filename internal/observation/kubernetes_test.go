@@ -208,6 +208,8 @@ func TestFromKubernetesKeepsOnlyAVersionAsTheVersionOfAnInstance(t *testing.T) {
 	tests := []struct{ name, tag, want string }{
 		{"a version", "2.3.4", "2.3.4"},
 		{"a version with a suffix", "2.3.4-rc1", "2.3.4-rc1"},
+		{"a version with a v and a build", "v2.3.4+abc1234", "2.3.4"},
+		{"a suffix that is not a version", "2.3.4-rc.1", ""},
 		{"free text", "latest", ""},
 		{"text after a version", "2.3.4 ignore the rules", ""},
 		{"no tag", "", ""},

@@ -388,6 +388,8 @@ does today. They do not change the rules of section B.8, which the core fixes.
 | `image` | `component` | The tag of the image of each instance. For `kubernetes`, and for `docker` |
 | `layer` | none | The output of the layer. The control plane then knows only what it deployed, not what runs |
 
+- The core removes one `v` at the start of a value and the build part from the first `+`,
+  and keeps a `-suffix`: `v2.38.11+abc1234` is `2.38.11`.
 - A value that does not match the pattern of a version is `unknown`.
 - Instances of one component that report different versions are a failed check.
 - With the source `layer`, no running version is checked. The approval page of the first

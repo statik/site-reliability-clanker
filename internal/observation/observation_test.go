@@ -125,6 +125,40 @@ func valid() observation.Observation {
 	}
 }
 
+func TestNormalizeVersion(t *testing.T) {
+	tests := []struct{ text, want string }{
+		{"v2.38.11+abc1234", "2.38.11"},
+		{"v2.39.5-devel+1d565409e4", "2.39.5-devel"},
+		{"1.2.0-bad", "1.2.0-bad"},
+		{"2.39.0-rc.1", ""},
+		{"1.2.3", "1.2.3"},
+		{"v1.2.3", "1.2.3"},
+		{"1.2.3+", "1.2.3"},
+		{"1.2.3+build+more", "1.2.3"},
+		{"1.2.3-rc1+build", "1.2.3-rc1"},
+		{"", ""},
+		{"v", ""},
+		{"vv1.2.3", ""},
+		{"V1.2.3", ""},
+		{"v.1.2.3", ""},
+		{"+1.2.3", ""},
+		{"1.2", ""},
+		{"1.2.3.4", ""},
+		{"1.2.3-", ""},
+		{"1.2.3-RC1", ""},
+		{" 1.2.3", ""},
+		{"1.2.3 ", ""},
+		{"v 1.2.3", ""},
+		{"latest", ""},
+		{"1.2.3@sha256:0d3b", ""},
+	}
+	for _, test := range tests {
+		if got := observation.NormalizeVersion(test.text); got != test.want {
+			t.Errorf("NormalizeVersion(%q) = %q, want %q", test.text, got, test.want)
+		}
+	}
+}
+
 func TestValidateAccepts(t *testing.T) {
 	app := packtest.Second(t)
 	if err := valid().Validate(app); err != nil {
