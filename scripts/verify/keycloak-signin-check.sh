@@ -2,8 +2,8 @@
 # Sign in to the core through a real Keycloak over plain HTTP, in the shape of a core in a VPC
 # that people reach through Tailscale. Keycloak runs in production mode (kc.sh start) with the
 # realm of scripts/verify/keycloak/realm.json. The core runs as it runs on a cloud, with its
-# own PostgreSQL container. The realm has three people: the first admin, a second approver
-# that the core makes from CLANKER_APPROVER_EMAILS, and a person with no role in the core.
+# own PostgreSQL container. The core makes the second person of the realm an approver from
+# CLANKER_APPROVER_EMAILS. The check adds a third person, who has no role in the core.
 #
 # The core and Keycloak listen on the private address of this machine and not on 127.0.0.1:
 # a browser treats a loopback address as a secure context, and Keycloak asks for HTTPS only
@@ -73,13 +73,14 @@ CLANKER_OIDC_CLIENT_SECRET="$(secret)"
 export CLANKER_OIDC_CLIENT_SECRET
 export CLANKER_ADMIN_EMAIL=admin@example.com
 export REALM_APPROVER_EMAIL=approver@example.com
-export REALM_OUTSIDER_EMAIL=outsider@example.com
 REALM_ADMIN_PASSWORD="$(secret)"
 REALM_APPROVER_PASSWORD="$(secret)"
-REALM_OUTSIDER_PASSWORD="$(secret)"
 KC_BOOTSTRAP_ADMIN_PASSWORD="$(secret)"
-export REALM_ADMIN_PASSWORD REALM_APPROVER_PASSWORD REALM_OUTSIDER_PASSWORD
-export KC_BOOTSTRAP_ADMIN_PASSWORD
+export REALM_ADMIN_PASSWORD REALM_APPROVER_PASSWORD KC_BOOTSTRAP_ADMIN_PASSWORD
+# The third person is not in the realm file. The browser reads the password.
+outsider_email=outsider@example.com
+REALM_OUTSIDER_PASSWORD="$(secret)"
+export REALM_OUTSIDER_PASSWORD
 
 # start_keycloak starts Keycloak in production mode with plain HTTP and imports the realm. $1
 # is the name of the container and $2 its port; the other arguments go to kc.sh start. The
@@ -90,7 +91,6 @@ start_keycloak() {
   docker run -d --name "${name}" -p "${address}:${listen}:8080" \
     -e CLANKER_PUBLIC_URL -e CLANKER_OIDC_CLIENT_SECRET -e CLANKER_ADMIN_EMAIL \
     -e REALM_APPROVER_EMAIL -e REALM_ADMIN_PASSWORD -e REALM_APPROVER_PASSWORD \
-    -e REALM_OUTSIDER_EMAIL -e REALM_OUTSIDER_PASSWORD \
     -e KC_BOOTSTRAP_ADMIN_USERNAME=bootstrap -e KC_BOOTSTRAP_ADMIN_PASSWORD \
     -v "${repo}/scripts/verify/keycloak/realm.json:/opt/keycloak/data/import/realm.json:ro" \
     "${image}" start --http-enabled=true --hostname="http://${address}:${listen}" \
@@ -159,6 +159,18 @@ for from in 10.0.0.5 172.16.0.5 192.168.0.5; do expect_from "${from}" "the login
 for from in 100.64.0.1 203.0.113.7; do expect_from "${from}" "HTTPS required"; done
 docker rm -f "${probe}" >/dev/null
 
+echo "== add a person with no role in the core to the realm"
+KC_CLI_PASSWORD="${KC_BOOTSTRAP_ADMIN_PASSWORD}" docker exec -e KC_CLI_PASSWORD "${keycloak}" \
+  /opt/keycloak/bin/kcadm.sh config credentials --config /tmp/kcadm.config \
+  --server http://localhost:8080 --realm master --user bootstrap >"${work}/kcadm.log" 2>&1
+# The password goes to kcadm on stdin, so that it is not on a command line.
+{
+  printf '{"username": "outsider", "email": "%s", "emailVerified": true, ' "${outsider_email}"
+  printf '"enabled": true, "firstName": "No", "lastName": "Role", "credentials": '
+  printf '[{"type": "password", "value": "%s", "temporary": false}]}' "${REALM_OUTSIDER_PASSWORD}"
+} | docker exec -i "${keycloak}" /opt/keycloak/bin/kcadm.sh create users -r clanker -f - \
+  --config /tmp/kcadm.config >>"${work}/kcadm.log" 2>&1
+
 echo "== start the core with the sign-in of Keycloak and a second approver"
 mkdir "${work}/cwd" "${work}/home" "${work}/client"
 before="$(core_requests "GET /realms/clanker/.well-known/openid-configuration")"
@@ -199,7 +211,7 @@ if [ -z "${page}" ]; then fail "clanker login showed no code; see ${work}/login.
 echo "== in a browser: the admin signs in and approves the code, the approver acts as an"
 echo "   approver, and a person with no role is refused"
 if ! node "${repo}/web/scripts/keycloak-signin-check.mjs" signin "${base}" \
-  "${CLANKER_ADMIN_EMAIL}" "${REALM_APPROVER_EMAIL}" "${REALM_OUTSIDER_EMAIL}" "${page}"; then
+  "${CLANKER_ADMIN_EMAIL}" "${REALM_APPROVER_EMAIL}" "${outsider_email}" "${page}"; then
   fail "the sign-in in the browser"
   # Nobody approved the code, and clanker login would wait ten minutes for it.
   kill "${login}" 2>/dev/null || true
@@ -223,9 +235,6 @@ for request in "GET /realms/clanker/protocol/openid-connect/certs" \
 done
 
 echo "== the core refuses an email address that Keycloak did not confirm"
-KC_CLI_PASSWORD="${KC_BOOTSTRAP_ADMIN_PASSWORD}" docker exec -e KC_CLI_PASSWORD "${keycloak}" \
-  /opt/keycloak/bin/kcadm.sh config credentials --config /tmp/kcadm.config \
-  --server http://localhost:8080 --realm master --user bootstrap >"${work}/kcadm.log" 2>&1
 approver="$(kcadm get users -r clanker -q "email=${REALM_APPROVER_EMAIL}" --fields id --format csv --noquotes)"
 kcadm update "users/${approver}" -r clanker -s emailVerified=false
 if ! node "${repo}/web/scripts/keycloak-signin-check.mjs" unverified "${base}" \

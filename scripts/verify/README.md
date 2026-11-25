@@ -59,11 +59,13 @@ target and Python 3.
 
 `keycloak/realm.json` holds no secret. When Keycloak imports it, it replaces `${NAME}` with
 the environment variable `NAME`: `CLANKER_PUBLIC_URL`, `CLANKER_OIDC_CLIENT_SECRET`,
-`CLANKER_ADMIN_EMAIL`, `REALM_APPROVER_EMAIL`, `REALM_OUTSIDER_EMAIL`,
-`REALM_ADMIN_PASSWORD`, `REALM_APPROVER_PASSWORD` and `REALM_OUTSIDER_PASSWORD`. Set all
-eight: Keycloak keeps a placeholder whose variable is not set as literal text, so a missing
-client secret becomes the known text `${CLANKER_OIDC_CLIENT_SECRET}`. Keycloak imports a
-realm only when it does not exist yet.
+`CLANKER_ADMIN_EMAIL`, `REALM_APPROVER_EMAIL`, `REALM_ADMIN_PASSWORD` and
+`REALM_APPROVER_PASSWORD`. Set all six: Keycloak keeps a placeholder whose variable is not set
+as literal text, so a missing client secret becomes the known text
+`${CLANKER_OIDC_CLIENT_SECRET}`. Keycloak imports a realm only when it does not exist yet.
+The home stack of AWS (`internal/setup/stack/aws`) imports the same realm and refuses a
+placeholder that it gives no value, so `keycloak-signin-check.sh` adds its third person with
+`kcadm` and not in the realm file.
 
 The home stack on AWS (`internal/setup/stack/aws`) imports the same file through its input
 `keycloak_realm`. Its plan fails when the realm reads a variable that the container does not
