@@ -49,6 +49,40 @@ jobs:
           go vet ./...
           go test ./...
 
+  packs:
+    name: Application packs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+      - name: Validate each pack in apps and packs
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          go build -o "${RUNNER_TEMP}/clanker" ./cmd/clanker
+          for dir in apps/*/ packs/*/; do
+            echo "::group::${dir}"
+            "${RUNNER_TEMP}/clanker" pack validate "${dir}"
+            echo "::endgroup::"
+          done
+      - name: Check the runbook scripts of the packs in packs
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          scripts=(packs/*/runbooks/*.sh)
+          if [ "${#scripts[@]}" -eq 0 ]; then
+            echo "packs/ has no runbook scripts"
+            exit 0
+          fi
+          go install mvdan.cc/sh/v3/cmd/shfmt@v3.14.1
+          shellcheck --version
+          shellcheck "${scripts[@]}"
+          "$(go env GOPATH)/bin/shfmt" -i 2 -d "${scripts[@]}"
+
   policy:
     name: Rego policy tests
     runs-on: ubuntu-latest

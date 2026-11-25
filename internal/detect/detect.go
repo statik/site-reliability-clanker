@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -69,6 +68,26 @@ type Detector struct {
 }
 
 func (d *Detector) open(ctx context.Context, f Finding) error {
+	opened, err := d.record(f)
+	if err != nil || !opened {
+		return err
+	}
+	if d.OnFinding != nil {
+		go d.OnFinding(context.WithoutCancel(ctx), f)
+	}
+	return nil
+}
+
+// openForPerson opens a finding that no role of the agent handles. It reaches a person
+// through the notification routes and the dashboard only.
+func (d *Detector) openForPerson(f Finding) error {
+	_, err := d.record(f)
+	return err
+}
+
+// record stores a new finding and writes its audit event. It reports false when a finding
+// with the key exists already.
+func (d *Detector) record(f Finding) (bool, error) {
 	detail, _ := json.Marshal(f.Detail)
 	f.At, f.State = store.FormatTime(d.Clock.Now()), "open"
 	err := d.DB.QueryRow(`INSERT INTO findings (detector, env, key, title, detail, state, at)
@@ -76,19 +95,16 @@ func (d *Detector) open(ctx context.Context, f Finding) error {
 		f.Env, f.Key, f.Title, string(detail), f.State, f.At).Scan(&f.ID)
 	// No row comes back when a finding with this key exists already.
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil
+		return false, nil
 	}
 	if err != nil {
-		return fmt.Errorf("record finding %s: %w", f.Key, err)
+		return false, fmt.Errorf("record finding %s: %w", f.Key, err)
 	}
 	if _, err := d.Audit.Append(audit.Event{Type: "finding.opened", Actor: "detector:" + f.Detector,
 		Env: f.Env, Summary: f.Title, Data: map[string]any{"key": f.Key, "detail": f.Detail}}); err != nil {
-		return err
+		return false, err
 	}
-	if d.OnFinding != nil {
-		go d.OnFinding(context.WithoutCancel(ctx), f)
-	}
-	return nil
+	return true, nil
 }
 
 // SetWorkItem links a finding to the work item that handles it.
@@ -155,40 +171,95 @@ func (d *Detector) runningVersion(env, layer, output string) string {
 	return v
 }
 
+// ReleaseRecordKind is the kind of the finding for a release that has no record in the
+// platform repository. It goes to a person: only a reviewed pull request adds a record.
+const ReleaseRecordKind = "release-record"
+
 // CheckReleases opens a finding when the releases repository of the application has a
-// release newer than the one that runs.
+// release newer than the one that runs. For a pack with release records, a release whose
+// record is not in the platform repository gets a finding for a person instead.
 func (d *Detector) CheckReleases(ctx context.Context, env string) error {
 	app := d.App
 	running := d.runningVersion(env, app.Layer, app.VersionVariable)
 	if running == "" || !d.Forge.Exists(app.Releases.Repository) {
 		return nil
 	}
-	entries, err := d.Forge.Tree(app.Releases.Repository, "main", app.Releases.Directory)
+	target, err := d.newestRelease(running)
+	if err != nil || target == "" {
+		return err
+	}
+	missing, err := d.recordMissing(target)
 	if err != nil {
 		return err
 	}
-	versions := []string{}
-	for _, e := range entries {
-		v := app.ReleaseOf(e.Name)
-		if Newer(v, running) {
-			versions = append(versions, v)
-		}
+	if missing {
+		return d.askForRecord(env, target, running)
 	}
-	if len(versions) == 0 {
-		return nil
-	}
-	sort.Slice(versions, func(i, j int) bool { return Newer(versions[j], versions[i]) })
-	target := versions[len(versions)-1]
-	covered, err := d.hasFindingFor(env, app.VersionVariable, target)
+	return d.openUpgrade(ctx, env, target, running)
+}
+
+// openUpgrade opens the finding for the agent that the release is newer than the one that
+// runs, when no finding asks for that version yet.
+func (d *Detector) openUpgrade(ctx context.Context, env, version, running string) error {
+	app := d.App
+	covered, err := d.hasFindingFor(env, app.VersionVariable, version)
 	if err != nil || covered {
 		return err
 	}
 	return d.open(ctx, Finding{Detector: "release", Env: env,
-		Key:   fmt.Sprintf("release:%s:%s", env, target),
-		Title: fmt.Sprintf("%s %s is published; %s runs %s", app.Title, target, env, running),
+		Key:   fmt.Sprintf("release:%s:%s", env, version),
+		Title: fmt.Sprintf("%s %s is published; %s runs %s", app.Title, version, env, running),
 		Detail: map[string]any{"kind": "app-upgrade", "layer": app.Layer,
-			"variable": app.VersionVariable, "value": target, "running": running,
-			"release_note": app.ReleaseNote(target)}})
+			"variable": app.VersionVariable, "value": version, "running": running,
+			"release_note": app.ReleaseNote(version)}})
+}
+
+// askForRecord opens the finding for a person about a release with no record. It names no
+// variable and no value, so it does not count as a finding for the upgrade: the upgrade
+// opens when the record is on main.
+func (d *Detector) askForRecord(env, version, running string) error {
+	app := d.App
+	return d.openForPerson(Finding{Detector: "release", Env: env,
+		Key: fmt.Sprintf("release-record:%s:%s", env, version),
+		Title: fmt.Sprintf("%s %s is published; add its record %s in a pull request",
+			app.Title, version, app.RecordPath(version)),
+		Detail: map[string]any{"kind": ReleaseRecordKind, "version": version,
+			"running": running, "record": app.RecordPath(version),
+			"release_note": app.ReleaseNote(version)}})
+}
+
+// newestRelease returns the newest release note of the releases repository that is newer
+// than the running version, or "" when there is none. Only a note is a release.
+func (d *Detector) newestRelease(running string) (string, error) {
+	app := d.App
+	entries, err := d.Forge.Tree(app.Releases.Repository, "main", app.Releases.Directory)
+	if err != nil {
+		return "", err
+	}
+	newest := ""
+	for _, e := range entries {
+		if v, ok := app.ReleaseOf(e.Name); ok && Newer(v, running) &&
+			(newest == "" || Newer(v, newest)) {
+			newest = v
+		}
+	}
+	return newest, nil
+}
+
+// recordMissing reports whether the pack has release records and the main branch of the
+// platform repository has no record for the version.
+func (d *Detector) recordMissing(version string) (bool, error) {
+	if !d.App.HasRecords() {
+		return false, nil
+	}
+	_, err := d.Forge.ReadFile(orchestrator.PlatformRepo, "main", d.App.RecordPath(version))
+	if errors.Is(err, forge.ErrFileNotFound) {
+		return true, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("read the record of release %s: %w", version, err)
+	}
+	return false, nil
 }
 
 // hasFindingFor reports whether a finding of env already asks for this variable and value.
