@@ -88,9 +88,9 @@ data "aws_iam_policy_document" "applier_state" {
 
 data "aws_iam_policy_document" "layer_10_network" {
   statement {
-    sid       = "NetworkAndRegistry"
+    sid       = "Network"
     effect    = "Allow"
-    actions   = ["ec2:*", "ecr:*"]
+    actions   = ["ec2:*"]
     resources = ["*"]
   }
 }

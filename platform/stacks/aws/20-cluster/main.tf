@@ -43,6 +43,15 @@ locals {
       namespaces    = []
     }
   }
+
+  # The operator can remove the environment after the sessions of the agent roles end.
+  operator_entry = var.operator_principal_arn == "" ? {} : {
+    operator = {
+      principal_arn = var.operator_principal_arn
+      policy        = local.cluster_admin
+      namespaces    = []
+    }
+  }
 }
 
 data "terraform_remote_state" "bootstrap" {
@@ -85,8 +94,10 @@ module "cluster" {
   node_image_version       = var.node_image_version
   node_count               = var.node_count
   node_size                = var.node_size
+  ami_type                 = var.node_ami_type
+  instance_tags            = var.instance_tags
   subnet_ids               = local.network.private_subnet_ids
   role_path                = local.bootstrap.workload_role_path
   permissions_boundary_arn = local.bootstrap.permission_guard
-  access_entries           = local.access_entries
+  access_entries           = merge(local.access_entries, local.operator_entry)
 }

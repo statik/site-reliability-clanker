@@ -26,6 +26,48 @@ resource "aws_eks_cluster" "this" {
   depends_on = [aws_iam_role_policy_attachment.this]
 }
 
+# Provider default tags do not reach tag_specifications, so the clanker_* tags are read
+# here and win over an extra tag with the same key.
+data "aws_default_tags" "current" {}
+
+locals {
+  # Each value of instance_tags is marked sensitive. The plan then marks it, and the
+  # control plane gives every marked value to its scrubber before a model reads the plan.
+  # The clanker_* values stay readable.
+  launch_tags = merge(
+    { for key, value in var.instance_tags : key => sensitive(value) },
+    data.aws_default_tags.current.tags,
+  )
+}
+
+# A managed node group without a launch template puts no tags on its instances. With this
+# template, each RunInstances call of the node group carries the tags.
+resource "aws_launch_template" "node" {
+  name_prefix            = "${var.name}-node-"
+  update_default_version = true
+
+  # With a launch template, EKS takes the disk size from the template only.
+  block_device_mappings {
+    device_name = "/dev/xvda"
+
+    ebs {
+      volume_size           = 20
+      volume_type           = "gp3"
+      encrypted             = true
+      delete_on_termination = true
+    }
+  }
+
+  dynamic "tag_specifications" {
+    for_each = toset(["instance", "volume"])
+
+    content {
+      resource_type = tag_specifications.value
+      tags          = local.launch_tags
+    }
+  }
+}
+
 resource "aws_eks_node_group" "default" {
   cluster_name    = aws_eks_cluster.this.name
   node_group_name = "default"
@@ -34,10 +76,14 @@ resource "aws_eks_node_group" "default" {
 
   version         = aws_eks_cluster.this.version
   release_version = var.node_image_version == "" ? null : var.node_image_version
-  ami_type        = "AL2023_x86_64_STANDARD"
+  ami_type        = var.ami_type
   capacity_type   = "ON_DEMAND"
   instance_types  = [var.node_size]
-  disk_size       = 20
+
+  launch_template {
+    id      = aws_launch_template.node.id
+    version = aws_launch_template.node.latest_version
+  }
 
   scaling_config {
     desired_size = var.node_count
