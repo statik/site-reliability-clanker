@@ -120,6 +120,13 @@ for attempt in $(seq 1 30); do
   sleep 1
 done
 
+# object prints an object of the bucket. It uses s3api and not `s3 cp -`, whose stream to
+# standard output was cut once with AWS_IO_SOCKET_CLOSED.
+object() {
+  s3 s3api get-object --bucket "${bucket}" --key "$1" "${work}/object" >/dev/null
+  cat "${work}/object"
+}
+
 # resources prints the number of resources in the state of a layer in the bucket, or
 # "none" when the bucket has no state for it.
 resources() {
@@ -128,7 +135,7 @@ resources() {
     echo none
     return
   fi
-  s3 s3 cp "s3://${bucket}/${key}" - | jq '.resources | length'
+  object "${key}" | jq '.resources | length'
 }
 
 echo "== build clanker and copy the fixture"
@@ -161,10 +168,10 @@ expect "the bucket holds the state of 00-bootstrap with resources (${count})" \
 encryption="$(s3 s3api head-object --bucket "${bucket}" \
   --key "${env_name}/00-bootstrap.tfstate" --query ServerSideEncryption --output text)"
 expect "the state object is encrypted (${encryption})" test "${encryption}" = AES256
-path_var="$(s3 s3 cp "s3://${bucket}/${env_name}/00-bootstrap.tfstate" - | jq -r \
+path_var="$(object "${env_name}/00-bootstrap.tfstate" | jq -r \
   '.resources[] | select(.name == "identities") | .instances[0].attributes.input' |
   jq -r '.value.core_parameter_path')"
-expect "-var gave core_parameter_path (${path_var})" test "${path_var}" = /src/check
+expect "core_parameter_path kept its default /src (${path_var})" test "${path_var}" = /src
 expect "no local state file is left" test ! -e "${local_state}"
 keys="$(s3 s3api list-objects-v2 --bucket "${bucket}" --query 'Contents[].Key' --output text)"
 expect "the bucket holds only the state, no lock (${keys})" \
@@ -225,7 +232,8 @@ echo "resources: 10-network $(resources 10-network), 30-data $(resources 30-data
 
 echo "== destroy with a state that cannot be read: it fails and destroys nothing"
 printf 'not a state' >"${work}/unreadable"
-s3 s3 cp "${work}/unreadable" "s3://${bucket}/${env_name}/20-cluster.tfstate" >/dev/null
+s3 s3api put-object --bucket "${bucket}" --key "${env_name}/20-cluster.tfstate" \
+  --body "${work}/unreadable" >/dev/null
 if clanker_aws destroy "${common[@]}" >"${work}/destroy-1.log" 2>&1; then
   fail "the destroy passed with a state that cannot be read"
 fi
@@ -236,7 +244,7 @@ expect "the failed destroy printed no success" not grep -q "is destroyed" "${wor
 expect "nothing was destroyed and 00-bootstrap stayed in the bucket" test \
   "$(resources 10-network) $(resources 30-data) $(resources 00-bootstrap)" = "1 1 ${count}" \
   -a ! -e "${local_state}"
-s3 s3 rm "s3://${bucket}/${env_name}/20-cluster.tfstate" >/dev/null
+s3 s3api delete-object --bucket "${bucket}" --key "${env_name}/20-cluster.tfstate" >/dev/null
 
 echo "== destroy without TF_VAR_image_registry: 30-data goes, 10-network stops it"
 if clanker_aws destroy "${common[@]}" >"${work}/destroy-2.log" 2>&1; then

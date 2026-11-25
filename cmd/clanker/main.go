@@ -73,8 +73,8 @@ Flags of bootstrap and destroy on AWS:
   --profile NAME          AWS CLI profile whose session runs OpenTofu
   --region NAME           region of the environment
   --broker-principal ARN  IAM role that the control plane runs as, from its home stack
-  --parameter-path PATH   Parameter Store path of the settings of the control plane, for
-                          example /src/prod. No agent role can read below it
+  --parameter-path PATH   Parameter Store path of the settings of the control plane, below
+                          /src, for example /src/prod. No agent role can read below /src
   --kms-key KEY           KMS key of those settings: bootstrap writes CLANKER_AWS_BOOTSTRAP
                           with it
 `

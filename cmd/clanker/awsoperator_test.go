@@ -18,7 +18,7 @@ func TestBootstrapOnAWSMovesTheStateIntoTheBucketAndWritesTheSetting(t *testing.
 		t.Fatal(err)
 	}
 	vars := "-var=broker_principal=arn:aws:iam::000000000000:role/test-core " +
-		"-var=core_parameter_path=/src/test -var=env_name=test-env -var=region=us-east-1 " +
+		"-var=env_name=test-env -var=region=us-east-1 " +
 		"-var=state_location=clanker-test-env-state-000000000000"
 	s3 := "-backend-config=bucket=clanker-test-env-state-000000000000 " +
 		"-backend-config=encrypt=true -backend-config=key=test-env/00-bootstrap.tfstate " +
@@ -172,12 +172,14 @@ func TestBootstrapOnAWSChecksTheFlagsBeforeAnyCall(t *testing.T) {
 		"a user as broker principal": func(o *options) {
 			o.brokerPrincipal = "arn:aws:iam::000000000000:user/x"
 		},
-		"no parameter path":            func(o *options) { o.parameterPath = "" },
-		"a parameter path with a /":    func(o *options) { o.parameterPath = "/src/" },
-		"no profile":                   func(o *options) { o.profile = "" },
-		"no region":                    func(o *options) { o.region = "" },
-		"an environment name with _":   func(o *options) { o.env = "test_env" },
-		"a region that does not exist": func(o *options) { o.region = "mars" },
+		"no parameter path":             func(o *options) { o.parameterPath = "" },
+		"a parameter path with a /":     func(o *options) { o.parameterPath = "/src/" },
+		"a parameter path outside /src": func(o *options) { o.parameterPath = "/team/src" },
+		"a parameter path next to /src": func(o *options) { o.parameterPath = "/srcx/prod" },
+		"no profile":                    func(o *options) { o.profile = "" },
+		"no region":                     func(o *options) { o.region = "" },
+		"an environment name with _":    func(o *options) { o.env = "test_env" },
+		"a region that does not exist":  func(o *options) { o.region = "mars" },
 	}
 	for name, change := range cases {
 		t.Run(name, func(t *testing.T) {

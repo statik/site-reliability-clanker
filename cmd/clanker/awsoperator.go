@@ -28,6 +28,11 @@ const standardParameterLimit = 4096
 // of layer 00-bootstrap (module "state_bucket" in platform/stacks/aws/00-bootstrap).
 const stateBucketModule = "module.state_bucket."
 
+// agentDeniedPath is the default of the input core_parameter_path of 00-bootstrap: no agent
+// role can read a parameter at this path or below it. The settings of every installation
+// are below it, so the deny covers all of them.
+const agentDeniedPath = "/src"
+
 var (
 	rolePattern          = regexp.MustCompile(`^arn:aws[a-z-]*:iam::[0-9]{12}:role/.+$`)
 	parameterPathPattern = regexp.MustCompile(`^(/[A-Za-z0-9_.-]+)+$`)
@@ -124,11 +129,10 @@ func (t awsTarget) layerJob(layer string, log io.Writer) runner.Job {
 // bootstrapJobs returns the two jobs of layer 00-bootstrap in the copy: with its state in
 // the bucket, and with its state in the state directory.
 func (t awsTarget) bootstrapJobs(w workCopy, log io.Writer) (runner.Job, runner.Job) {
+	// core_parameter_path keeps its default, /src: the deny of the agent roles covers the
+	// settings of every installation in the account.
 	vars := t.vars()
 	vars["broker_principal"] = t.o.brokerPrincipal
-	if t.o.parameterPath != "" {
-		vars["core_parameter_path"] = t.o.parameterPath
-	}
 	inBucket := runner.Job{Env: t.o.env, Cloud: "aws", Layer: bootstrapLayer,
 		Checkout: runner.Checkout{Dir: w.source}, DataDir: w.dataDir, Vars: vars, Log: log,
 		Backend: runner.S3Backend(t.bucket, t.o.region, t.o.env, bootstrapLayer)}
@@ -200,6 +204,13 @@ func checkBootstrapFlags(o options) error {
 		return fmt.Errorf("--parameter-path %q is not valid: give the Parameter Store path of "+
 			"the settings of the control plane, for example /src/prod, with no / at the end",
 			o.parameterPath)
+	}
+	if o.parameterPath != agentDeniedPath &&
+		!strings.HasPrefix(o.parameterPath, agentDeniedPath+"/") {
+		return fmt.Errorf("--parameter-path %s is outside %s: the permission boundary of the "+
+			"agent roles denies reads of %s and below, so a plan could read settings at %s. "+
+			"Keep the settings of the control plane below %s", o.parameterPath,
+			agentDeniedPath, agentDeniedPath, o.parameterPath, agentDeniedPath)
 	}
 	return nil
 }
