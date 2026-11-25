@@ -4,8 +4,12 @@
 # Usage: ops/run-local.sh <binary> [port]
 #
 # Environment:
-#   NANOS_ACCEL   hvf (default) or tcg. hvf needs the nightly Nanos kernel.
-#   NANOS_KERNEL  nightly (default) or release.
+#   NANOS_ACCEL   hvf (default) or tcg.
+#   NANOS_KERNEL  nightly (default), release for the newest release that ops knows, or the
+#                 version of a release, for example 0.1.55. The release 0.1.56 does not boot
+#                 with hvf: its early boot uses DC ZVA while the MMU is off, which faults on
+#                 a real arm64 CPU. The fix is Nanos commit 7ae67d4 (2026-10-10), which is
+#                 in the nightly kernel and not in 0.1.56.
 #   NANOS_CONFIG  optional ops configuration file, for example for "Env".
 #
 # The script starts QEMU directly, because `ops run` fails with QEMU 11.1 and later on
@@ -43,20 +47,35 @@ case "$kernel_kind" in
 nightly)
   build_args+=(-n)
   kernel=$ops_dir/nightly-arm/kernel.img
+  label="nightly kernel"
   ;;
-release)
-  kernel=$(find "$ops_dir" -maxdepth 2 -path '*-arm/kernel.img' ! -path '*nightly*' | sort -V | tail -1)
+release | [0-9]*.[0-9]*.[0-9]*)
+  version=$kernel_kind
+  if [ "$version" = release ]; then
+    if [ ! -f "$ops_dir/latest.txt" ]; then
+      echo "error: $ops_dir/latest.txt not found." \
+        "Run $ops_bin update, or set NANOS_KERNEL to a version" >&2
+      exit 1
+    fi
+    version=$(tr -d '[:space:]' <"$ops_dir/latest.txt")
+  fi
+  # The image and the kernel that QEMU starts come from the same release.
+  build_args+=(--nanos-version "$version")
+  kernel=$ops_dir/$version-arm/kernel.img
+  label="release kernel $version"
   ;;
 *)
-  echo "error: NANOS_KERNEL must be nightly or release, not $kernel_kind" >&2
+  echo "error: NANOS_KERNEL must be nightly, release or a version such as 0.1.55," \
+    "not $kernel_kind" >&2
   exit 2
   ;;
 esac
 
 case "$accel" in
 hvf)
-  if [ "$kernel_kind" = release ]; then
-    echo "error: Nanos 0.1.56 does not boot with hvf. Use NANOS_KERNEL=nightly or NANOS_ACCEL=tcg" >&2
+  if [ "${version:-}" = 0.1.56 ]; then
+    echo "error: Nanos 0.1.56 does not boot with hvf." \
+      "Use NANOS_KERNEL=nightly, another release or NANOS_ACCEL=tcg" >&2
     exit 2
   fi
   # From QEMU 11.1, hvf uses the vGIC of the kernel, which is GICv3 only. Nanos needs GICv2,
@@ -84,7 +103,7 @@ if [ ! -f "$kernel" ]; then
   exit 1
 fi
 
-echo "Nanos ($kernel_kind kernel, $accel) on http://127.0.0.1:$port. Stop with Ctrl-C." >&2
+echo "Nanos ($label, $accel) on http://127.0.0.1:$port. Stop with Ctrl-C." >&2
 exec qemu-system-aarch64 \
   -machine virt,gic-version=2 "${accel_args[@]}" -m 512M \
   -kernel "$kernel" -display none -serial stdio \
