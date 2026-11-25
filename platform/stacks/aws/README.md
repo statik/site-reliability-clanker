@@ -44,11 +44,23 @@ The permission boundary allows only the services that the platform uses. It deni
 and access keys, roles without the boundary, changes to the boundary and to the agent roles,
 changes to the configuration of the state and evidence buckets, and deletion of evidence.
 
+The boundary also denies two reads to every agent role, so that a plan of code from a pull
+request cannot get a secret of the control plane:
+
+- `ssm:GetParameter*` on the settings of the control plane. They hold its signing key and its
+  database URL. The input `core_parameter_path` of `00-bootstrap` names the path. The default
+  `/src` covers each path that the installer uses (`/src/<name>`).
+- `ecs:DescribeTasks` and `ecs:ListTasks`. The job token of a runner is an environment
+  override of `ecs:RunTask`, and `DescribeTasks` shows it.
+
 ## Bootstrap sequence
 
-1. In `00-bootstrap/terraform.tfvars`, set `state_location` to a bucket name that is free and
-   set `broker_principal` to the ARN of the broker's IAM role. The values in the file are
-   placeholders. Use the same `state_location` in the other five files.
+1. The `terraform.tfvars` files do not set `env_name`, `state_location`, `region` or
+   `broker_principal`, because a value in the file replaces a `TF_VAR_*` value. The job
+   gives them: `state_location` is a bucket name that is free for `00-bootstrap` and the
+   same bucket for the other five layers, and `broker_principal` is the ARN of the broker's
+   IAM role. With an S3 backend in the job, the runner sets `state_location` to the bucket
+   of the backend. A plan without these values fails with a missing variable.
 2. `00-bootstrap` creates the state bucket, so its first apply cannot use that bucket.
    `clanker bootstrap` applies the layer with local state and then moves the state to S3.
 3. Apply the layers in sequence from `10-network` to `50-app`. Each layer reads the layers

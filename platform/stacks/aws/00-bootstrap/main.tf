@@ -39,4 +39,5 @@ module "agent_identities" {
   applier_layers      = local.applier_layers
   state_bucket_arn    = module.state_bucket.arn
   evidence_bucket_arn = module.evidence_bucket.arn
+  core_parameter_path = var.core_parameter_path
 }

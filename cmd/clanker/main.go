@@ -303,10 +303,7 @@ func bootstrap(ctx context.Context, o options) error {
 	fmt.Printf("Applying layer 00-bootstrap of %s with your own credentials.\n", o.env)
 	job := runner.Job{Env: o.env, Cloud: o.cloud, Layer: "00-bootstrap", Checkout: runner.Checkout{Dir: o.sourceDir},
 		Log: os.Stdout}
-	if err := r.ApplyDirect(ctx, job); err != nil {
-		return err
-	}
-	outputs, err := r.Outputs(o.env, "00-bootstrap")
+	outputs, err := r.ApplyDirect(ctx, job)
 	if err != nil {
 		return err
 	}
@@ -332,12 +329,12 @@ func destroy(ctx context.Context, o options) error {
 		return fmt.Errorf("read the administrator kubeconfig of %s: %w", o.env, err)
 	}
 	for _, layer := range layers {
-		outputs, err := r.Outputs(o.env, layer)
-		if err != nil {
-			return err
-		}
-		if len(outputs) == 0 {
+		// A layer with no state file in the state directory was never applied here.
+		statePath := filepath.Join(r.StateDir(o.env), layer+".tfstate")
+		if _, err := os.Stat(statePath); errors.Is(err, os.ErrNotExist) {
 			continue
+		} else if err != nil {
+			return fmt.Errorf("check the state file %s: %w", statePath, err)
 		}
 		fmt.Printf("Destroying %s/%s\n", o.env, layer)
 		job := runner.Job{Env: o.env, Cloud: o.cloud, Layer: layer,
@@ -345,7 +342,6 @@ func destroy(ctx context.Context, o options) error {
 		if err := r.Destroy(ctx, job); err != nil {
 			return err
 		}
-		statePath := filepath.Join(r.StateDir(o.env), layer+".tfstate")
 		if err := os.Remove(statePath); err != nil {
 			return fmt.Errorf("remove state file %s: %w", statePath, err)
 		}

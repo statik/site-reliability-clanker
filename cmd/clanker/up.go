@@ -448,7 +448,7 @@ func publishImages(ctx context.Context, c *components, o options) error {
 	if o.app.Deploy.Build == "" {
 		return nil
 	}
-	outputs, err := c.runner.Outputs(o.env, "10-network")
+	outputs, err := store.LayerOutputs(c.db, o.env, "10-network")
 	if err != nil {
 		return err
 	}

@@ -130,7 +130,9 @@ Validated, with no cloud credentials:
 - `tofu fmt -check -recursive platform`
 - `tofu init -backend=false` and `tofu validate` in each of the six roots, with no errors and
   no warnings
-- Each `terraform.tfvars` sets each variable that has no default and no unknown variable
+- Each `terraform.tfvars` sets no unknown variable. It sets each variable that has no
+  default, except `env_name`, `state_location`, `broker_principal`, `project_id` and
+  `region`: the job gives them, because a value in the file replaces a `TF_VAR_*` value
 
 Not done:
 

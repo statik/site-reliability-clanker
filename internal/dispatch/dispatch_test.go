@@ -429,8 +429,10 @@ func planWithTofuEnv(t *testing.T, session *jobspec.AWSSession) (string, string,
 	var log bytes.Buffer
 	_, err := d.Run(context.Background(), jobspec.Job{Spec: jobspec.Spec{Kind: jobspec.KindPlan,
 		Env: "example", Cloud: "aws", Layer: "10-network", CheckoutID: "WI-0142/abc",
-		AWS: session}, Log: &log, Checkout: scripts(t, map[string]string{
-		"platform/stacks/aws/10-network/main.tf": "# empty\n"})})
+		AWS: session, Backend: map[string]string{"bucket": "state-of-example",
+			"key": "example/10-network.tfstate", "region": "us-east-1"}},
+		Log: &log, Checkout: scripts(t, map[string]string{
+			"platform/stacks/aws/10-network/main.tf": "# empty\n"})})
 	if err == nil || !strings.Contains(err.Error(), "tofu plan") {
 		t.Fatalf("error = %v, want the failure of the plan step of the stand-in", err)
 	}

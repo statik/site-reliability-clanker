@@ -23,6 +23,12 @@ variable "broker_principal" {
   type        = string
 }
 
+variable "core_parameter_path" {
+  description = "Parameter Store path of the control plane settings. Agent roles cannot read it."
+  type        = string
+  default     = "/src"
+}
+
 variable "ttl_hours" {
   description = "Lifetime of the environment in hours. 0 means no TTL."
   type        = number
