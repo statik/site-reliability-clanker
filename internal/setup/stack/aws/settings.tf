@@ -62,12 +62,16 @@ locals {
     CLANKER_OIDC_CLIENT_ID     = local.client_id
     CLANKER_OIDC_CLIENT_SECRET = random_password.client_secret.result
     CLANKER_ADMIN_EMAIL        = local.admin_email
+    CLANKER_APPROVER_EMAILS    = local.approver_email
     CLANKER_AWS_RUNNER         = local.runner_setting
   }
   # A for_each key cannot come from a map with secret values, so the names are a list.
   core_setting_names = toset(concat(
-    ["CLANKER_DATABASE_URL", "CLANKER_SIGNING_KEY", "CLANKER_PUBLIC_URL", "CLANKER_OIDC_ISSUER",
-    "CLANKER_OIDC_CLIENT_ID", "CLANKER_OIDC_CLIENT_SECRET", "CLANKER_ADMIN_EMAIL"],
+    [
+      "CLANKER_DATABASE_URL", "CLANKER_SIGNING_KEY", "CLANKER_PUBLIC_URL", "CLANKER_OIDC_ISSUER",
+      "CLANKER_OIDC_CLIENT_ID", "CLANKER_OIDC_CLIENT_SECRET", "CLANKER_ADMIN_EMAIL",
+      "CLANKER_APPROVER_EMAILS",
+    ],
     var.runner_image_digest == null ? [] : ["CLANKER_AWS_RUNNER"],
   ))
 

@@ -23,7 +23,7 @@ func clearChat(t *testing.T) {
 	t.Helper()
 	for _, name := range []string{slackSigningSecretEnv, slackBotTokenEnv, slackChannelEnv,
 		slackAPIURLEnv, teamsAppIDEnv, teamsAppSecretEnv, teamsTenantIDEnv, issuerEnv, clientIDEnv,
-		clientSecretEnv, publicURLEnv, adminEmailEnv} {
+		clientSecretEnv, publicURLEnv, adminEmailEnv, approverEmailsEnv} {
 		t.Setenv(name, "")
 	}
 }
