@@ -45,3 +45,41 @@ func TestTheTopologyHasThePlatformNodesAndTheServicesOfThePack(t *testing.T) {
 		}
 	}
 }
+
+func TestAnUnhealthyApplicationMarksEachComponentOfThePack(t *testing.T) {
+	app := packtest.Second(t)
+	renamed := map[string]string{}
+	for i, name := range []string{"gateway", "console", "jobs"} {
+		renamed[app.Components[i].Name] = name
+		app.Components[i].Name = name
+	}
+	for i, edge := range app.Topology.Edges {
+		for end, id := range edge {
+			if name, ok := renamed[id]; ok {
+				app.Topology.Edges[i][end] = name
+			}
+		}
+	}
+	layers := map[string]map[string]any{"30-data": {}, app.Layer: {}}
+	for _, incident := range []bool{false, true} {
+		nodes := topologyNodes(monitor.Snapshot{Layers: layers}, app)
+		markComponents(nodes, app, incident)
+		degraded := []string{}
+		for _, node := range nodes {
+			_, component := app.Component(node.ID)
+			if (node.Status == "degraded") != component ||
+				slices.Contains(node.Badges, "incident") != (component && incident) {
+				t.Errorf("incident %v: node %+v, component %v", incident, node, component)
+			}
+			if component {
+				degraded = append(degraded, node.ID)
+			}
+		}
+		if !slices.Equal(degraded, []string{"gateway", "console", "jobs"}) {
+			t.Errorf("incident %v: degraded nodes = %v", incident, degraded)
+		}
+		if len(nodes) == len(degraded) {
+			t.Errorf("the topology has only components: %+v", nodes)
+		}
+	}
+}

@@ -25,7 +25,9 @@ type Monitor struct {
 	DB    *sql.DB
 	Clock Clock
 	// App is the application pack. It names the layer, the outputs and the checks.
-	App    pack.Pack
+	App pack.Pack
+	// Wall gives the wall-clock time for the age of an observation. Nil is time.Now.
+	Wall   func() time.Time
 	client *http.Client
 }
 
@@ -171,9 +173,13 @@ func (m *Monitor) Verify(ctx context.Context, wi orchestrator.WorkItem) (orchest
 	}
 	base, _ := outputs[m.App.URLOutput].(string)
 	want, _ := outputs[m.App.VersionVariable].(string)
-	if base == "" {
+	if len(outputs) == 0 {
 		return orchestrator.VerifyResult{OK: true,
 			Checks: []string{"the application layer is not applied; no application check"}}, nil
+	}
+	if base == "" {
+		return orchestrator.VerifyResult{Reason: fmt.Sprintf("the layer %s has no output %s "+
+			"with the address of the application", m.App.Layer, m.App.URLOutput)}, nil
 	}
 	result := orchestrator.VerifyResult{}
 	deadline := time.Now().Add(90 * time.Second)

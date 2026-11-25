@@ -140,6 +140,8 @@ Types use OpenTofu syntax. "Local" shows how the local target satisfies the row.
 |---|---|---|
 | `app_namespace` | `string` | Namespace for Paperboat. Default `paperboat` |
 | `public_port` | `number` | Port of the public listener. Default `80` |
+| `collector_endpoint` | `string` | Address of the control plane for the data of the collector, for example `http://host:7070/otlp`. Default empty: no collector |
+| `collector_token` | `string`, sensitive | Token that the collector sends to the control plane. Default empty |
 
 | Output | Type | Meaning | Local |
 |---|---|---|---|
@@ -149,6 +151,10 @@ Types use OpenTofu syntax. "Local" shows how the local target satisfies the row.
 | `app_secret_name` | `string` | Kubernetes secret in `app_namespace` with keys `DATABASE_URL` | Same |
 | `shared_volume_claim` | `string` | `PersistentVolumeClaim` in `app_namespace`, `ReadWriteMany` | Same |
 | `targets` | `map(string)` | Where the application runs. The key `application` has the namespace of its components. The key `data` has the namespace of its data services, or it is empty when they are not in the cluster. The control plane reads the namespaces of a debug session and of the rights of its identities from this output, not from the application pack | `data` is the output `data_namespace` of `30-data` |
+| `collector_namespace` | `string` | Namespace of the OpenTelemetry Collector that sends the state of the workloads in `app_namespace` to the control plane. Empty when `collector_endpoint` is empty | `clanker-observe` when the control plane sets `collector_endpoint` |
+
+The control plane gives `collector_endpoint` and `collector_token` to the runner as
+`TF_VAR_collector_endpoint` and `TF_VAR_collector_token`; they are not in `terraform.tfvars`.
 
 ### 50-app
 

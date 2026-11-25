@@ -76,4 +76,6 @@ module "platform" {
   shared_fs_capacity_gb   = local.data.shared_fs_capacity_gb
   gateway_class           = "envoy"
   public_address          = local.cluster.public_address
+  collector_endpoint      = var.collector_endpoint
+  collector_token         = var.collector_token
 }

@@ -67,3 +67,16 @@ variable "service_annotations" {
   description = "Annotations for the load balancer Service of Envoy Gateway."
   default     = {}
 }
+
+variable "collector_endpoint" {
+  type        = string
+  description = "Address of the control plane for the data of the collector, for example http://host:7070/otlp. Empty: no collector."
+  default     = ""
+}
+
+variable "collector_token" {
+  type        = string
+  sensitive   = true
+  description = "Token that the collector sends to the control plane."
+  default     = ""
+}

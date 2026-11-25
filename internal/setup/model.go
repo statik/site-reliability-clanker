@@ -1,21 +1,18 @@
 package setup
 
 import (
-	"bufio"
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/statik/site-reliability-clanker/internal/ollama"
 )
 
 // The choices of the step "Language model". They are the values of State.KeyChoice.
@@ -37,11 +34,10 @@ func knownChoice(choice string) string {
 // The model on this machine. Ollama serves it. The variant is the same model with a larger
 // context: with its small default context, Ollama cuts a long prompt and reports nothing.
 const (
-	defaultOllamaURL = "http://127.0.0.1:11434"
-	localModel       = "qwen3.8:27b"
-	localVariant     = "src-local"
-	localContext     = 32768
-	localModelBytes  = 18 << 30
+	localModel      = "qwen3.8:27b"
+	localVariant    = ollama.Variant
+	localContext    = 32768
+	localModelBytes = 18 << 30
 	// A machine with 32 GB of memory reports a little less than 32 GiB on Linux.
 	minMemoryBytes = 30 << 30
 	gibibyte       = 1 << 30
@@ -68,171 +64,7 @@ var DiskFreeBytes = func() (uint64, error) {
 	return stat.Bavail * uint64(stat.Bsize), nil
 }
 
-// ollama talks to the Ollama program on this machine.
-type ollama struct{ base string }
-
-func (s *Server) ollama() ollama { return ollama{base: s.cfg.OllamaURL} }
-
-// get reads one JSON answer. Ollama answers these calls at once.
-func (o ollama) get(ctx context.Context, path string, into any) error {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, o.base+path, nil)
-	if err != nil {
-		return fmt.Errorf("build the request for Ollama: %w", err)
-	}
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		return fmt.Errorf("ask Ollama at %s: %w", o.base, err)
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("Ollama answered HTTP %d for %s", response.StatusCode, path)
-	}
-	if err := json.NewDecoder(response.Body).Decode(into); err != nil {
-		return fmt.Errorf("decode the answer of Ollama for %s: %w", path, err)
-	}
-	return nil
-}
-
-// version returns the version of Ollama, or an error when Ollama does not answer.
-func (o ollama) version(ctx context.Context) (string, error) {
-	var answer struct{ Version string }
-	if err := o.get(ctx, "/api/version", &answer); err != nil {
-		return "", err
-	}
-	return answer.Version, nil
-}
-
-// has reports whether Ollama holds a model. Ollama lists a model without a tag as
-// "name:latest".
-func (o ollama) has(ctx context.Context, model string) (bool, error) {
-	var answer struct {
-		Models []struct{ Name string }
-	}
-	if err := o.get(ctx, "/api/tags", &answer); err != nil {
-		return false, err
-	}
-	for _, held := range answer.Models {
-		if held.Name == model || held.Name == model+":latest" {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-// streamLine is one line of a streamed answer of Ollama.
-type streamLine struct {
-	Status    string
-	Error     string
-	Digest    string
-	Total     int64
-	Completed int64
-}
-
-// post sends a request and returns the open answer. The caller closes the body.
-func (o ollama) post(ctx context.Context, path string, body any) (*http.Response, error) {
-	encoded, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("encode the request for Ollama: %w", err)
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, o.base+path,
-		bytes.NewReader(encoded))
-	if err != nil {
-		return nil, fmt.Errorf("build the request for Ollama: %w", err)
-	}
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		return nil, fmt.Errorf("ask Ollama at %s: %w", o.base, err)
-	}
-	if response.StatusCode != http.StatusOK {
-		defer response.Body.Close()
-		text, _ := io.ReadAll(io.LimitReader(response.Body, 600))
-		return nil, fmt.Errorf("Ollama answered HTTP %d for %s: %s", response.StatusCode, path,
-			strings.TrimSpace(string(text)))
-	}
-	return response, nil
-}
-
-// stream posts a request and gives each line of the answer to onLine. Ollama can answer
-// HTTP 200 and report the failure in a later line, so stream reads to the end.
-func (o ollama) stream(ctx context.Context, path string, body any,
-	onLine func(streamLine)) error {
-	response, err := o.post(ctx, path, body)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-	lines := bufio.NewScanner(response.Body)
-	lines.Buffer(make([]byte, 0, 64<<10), 1<<20)
-	for lines.Scan() {
-		if len(bytes.TrimSpace(lines.Bytes())) == 0 {
-			continue
-		}
-		var line streamLine
-		if err := json.Unmarshal(lines.Bytes(), &line); err != nil {
-			return fmt.Errorf("decode a line of Ollama for %s: %w", path, err)
-		}
-		if line.Error != "" {
-			return fmt.Errorf("Ollama failed at %s: %s", path, line.Error)
-		}
-		onLine(line)
-	}
-	if err := lines.Err(); err != nil {
-		return fmt.Errorf("read the answer of Ollama for %s: %w", path, err)
-	}
-	return nil
-}
-
-// pull downloads a model. progress gets the bytes that are there and the bytes of all
-// layers that Ollama named so far.
-func (o ollama) pull(ctx context.Context, model string,
-	progress func(completed, total int64)) error {
-	type layer struct{ completed, total int64 }
-	layers := map[string]layer{}
-	succeeded := false
-	err := o.stream(ctx, "/api/pull", map[string]any{"model": model}, func(line streamLine) {
-		if line.Status == "success" {
-			succeeded = true
-		}
-		if line.Digest == "" || line.Total == 0 {
-			return
-		}
-		layers[line.Digest] = layer{line.Completed, line.Total}
-		var completed, total int64
-		for _, each := range layers {
-			completed, total = completed+each.completed, total+each.total
-		}
-		progress(completed, total)
-	})
-	if err != nil {
-		return err
-	}
-	if !succeeded {
-		return fmt.Errorf("the download of %s ended before Ollama reported success: "+
-			"start it again, and Ollama continues where it stopped", model)
-	}
-	return nil
-}
-
-// createVariant makes the variant of the model with the larger context. The variant shares
-// the weights of the model, so it needs almost no space.
-func (o ollama) createVariant(ctx context.Context) error {
-	succeeded := false
-	err := o.stream(ctx, "/api/create", map[string]any{"model": localVariant, "from": localModel,
-		"parameters": map[string]any{"num_ctx": localContext}}, func(line streamLine) {
-		if line.Status == "success" {
-			succeeded = true
-		}
-	})
-	if err != nil {
-		return err
-	}
-	if !succeeded {
-		return fmt.Errorf("Ollama did not report that it created %s", localVariant)
-	}
-	return nil
-}
+func (s *Server) ollama() ollama.Client { return ollama.Client{Base: s.cfg.OllamaURL} }
 
 // LocalModel is what the page shows for the model on this machine.
 type LocalModel struct {
@@ -246,10 +78,10 @@ type LocalModel struct {
 func (s *Server) localModelChecks(ctx context.Context) LocalModel {
 	found := LocalModel{Model: localModel}
 	server := Check{Name: "Ollama", Why: "serves the model on this machine"}
-	version, err := s.ollama().version(ctx)
+	version, err := s.ollama().Version(ctx)
 	if err == nil {
 		server.OK, server.Detail = true, "version "+version
-		found.Present, err = s.ollama().has(ctx, localModel)
+		found.Present, err = s.ollama().Has(ctx, localModel)
 	}
 	if err != nil {
 		server.OK, server.Detail = false, "does not answer at "+s.cfg.OllamaURL
@@ -310,14 +142,15 @@ func (s *Server) prepareLocalModel(ctx context.Context, log func(string)) error 
 		log("Ollama already holds " + localModel + ".")
 	} else {
 		log("Downloading " + localModel + " through Ollama. This is about 18 GB.")
-		if err := s.ollama().pull(ctx, localModel, s.setProgress); err != nil {
+		if err := s.ollama().Pull(ctx, localModel, s.setProgress); err != nil {
 			return err
 		}
 		log("The download is complete.")
 	}
 	log(fmt.Sprintf("Creating the variant %s with a context of %d tokens.", localVariant,
 		localContext))
-	if err := s.ollama().createVariant(ctx); err != nil {
+	if err := s.ollama().CreateVariant(ctx, localVariant, localModel,
+		localContext); err != nil {
 		return err
 	}
 	log("The model is ready.")

@@ -7,6 +7,7 @@ import {
   CircleDash,
   Edit,
   ErrorFilled,
+  Help,
   InProgress,
   Misuse,
   Pending,
@@ -18,6 +19,7 @@ import {
   WarningAltFilled,
   WarningFilled,
 } from "@carbon/icons-react";
+import type { ComponentState } from "@/api/types";
 
 export type TagType = "red" | "magenta" | "purple" | "blue" | "cyan" | "teal" | "green" | "gray"
   | "cool-gray" | "warm-gray" | "high-contrast" | "outline";
@@ -52,15 +54,27 @@ const TIER_LOOK: Record<string, Look> = {
   T3: { type: "red", icon: WarningAltFilled, label: "T3 High risk" },
 };
 
-const STATUS_LOOK: Record<string, Look> = {
+const COMPONENT_LOOK: Record<ComponentState, Look> = {
   ok: { type: "green", icon: CheckmarkFilled, label: "Healthy" },
+  degraded: { type: "magenta", icon: WarningFilled, label: "Degraded" },
+  down: { type: "red", icon: ErrorFilled, label: "Down" },
+  unknown: { type: "gray", icon: Help, label: "Unknown" },
+};
+
+/** The tag colour and the label of a live state. Each state has its own colour and label. */
+export function componentLook(state: ComponentState): { type: TagType; label: string } {
+  const look = COMPONENT_LOOK[state];
+  return { type: look.type, label: look.label };
+}
+
+const STATUS_LOOK: Record<string, Look> = {
+  ...COMPONENT_LOOK,
   current: { type: "green", icon: CheckmarkFilled, label: "Current" },
   succeeded: { type: "green", icon: CheckmarkFilled, label: "Succeeded" },
   sent: { type: "green", icon: CheckmarkFilled, label: "Sent" },
   merged: { type: "green", icon: CheckmarkFilled, label: "Merged" },
   used: { type: "gray", icon: CheckmarkOutline, label: "Used" },
   resolved: { type: "green", icon: CheckmarkFilled, label: "Resolved" },
-  degraded: { type: "magenta", icon: WarningFilled, label: "Degraded" },
   behind: { type: "magenta", icon: WarningFilled, label: "Behind" },
   running: { type: "blue", icon: InProgress, label: "Running" },
   active: { type: "blue", icon: InProgress, label: "Active" },

@@ -33,4 +33,6 @@ module "platform" {
   shared_fs_capacity_gb   = var.shared_fs_claim_gb
   gateway_class           = "nodeport"
   public_address          = "localhost:${var.public_port}"
+  collector_endpoint      = var.collector_endpoint
+  collector_token         = var.collector_token
 }

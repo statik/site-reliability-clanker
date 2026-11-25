@@ -8,6 +8,7 @@ import { CodePage, PullPage, RepoPage } from "@/pages/CodePages";
 import { ActivityPage, ApprovalsPage } from "@/pages/ListPages";
 import { NotificationsPage } from "@/pages/NotificationsPage";
 import { OverviewPage } from "@/pages/OverviewPage";
+import { SettingsPage } from "@/pages/SettingsPage";
 import { TimelinePage } from "@/pages/TimelinePage";
 import { TopologyPage } from "@/pages/TopologyPage";
 import { UpcomingPage } from "@/pages/UpcomingPage";
@@ -41,6 +42,7 @@ export function App() {
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/ask" element={<AskPage />} />
         <Route path="/demo" element={<DemoPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Shell>

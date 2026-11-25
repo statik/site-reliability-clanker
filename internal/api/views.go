@@ -413,12 +413,9 @@ func (s *Server) getTopology(r *http.Request) (any, error) {
 		if badge, ok := pending[nodes[i].Layer]; ok {
 			nodes[i].Badges = append(nodes[i].Badges, badge)
 		}
-		if nodes[i].ID == "api" && (unhealthy || incident) {
-			nodes[i].Status = "degraded"
-			if incident {
-				nodes[i].Badges = append(nodes[i].Badges, "incident")
-			}
-		}
+	}
+	if err := s.markHealth(nodes, env, asOf, unhealthy, incident); err != nil {
+		return nil, err
 	}
 	edges := []map[string]string{}
 	for _, e := range slices.Concat(s.App.Topology.Edges, platformEdges) {
@@ -429,6 +426,20 @@ func (s *Server) getTopology(r *http.Request) (any, error) {
 	return map[string]any{"env": env, "as_of": asOf, "snapshot_ts": snap.TS,
 		"snapshot_reason": snap.Reason, "layers": orchestrator.Layers, "nodes": nodes,
 		"edges": edges, "health": snap.Health}, nil
+}
+
+// markComponents shows each component of the pack as degraded. The health of the
+// application is one number, thus the view cannot tell which component has the fault.
+func markComponents(nodes []topoNode, app pack.Pack, incident bool) {
+	for i := range nodes {
+		if _, ok := app.Component(nodes[i].ID); !ok {
+			continue
+		}
+		nodes[i].Status = "degraded"
+		if incident {
+			nodes[i].Badges = append(nodes[i].Badges, "incident")
+		}
+	}
 }
 
 func minorsBehind(current, latest string) int {

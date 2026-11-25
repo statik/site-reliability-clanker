@@ -16,6 +16,10 @@ The app is a small window around the `clanker` program.
   The dashboard opens in a second window.
 - When the setup is finished, a later start of the app starts the control plane and shows
   the dashboard. The wizard does not start again.
+- The menu item **Settings…** of the S.R.C. menu (Command-comma) shows the page Settings of
+  the dashboard (`/settings`): the provider of the language model, and Start and Stop for
+  the local inference. The page is in the window that shows the dashboard, or in a new
+  window when no window shows the dashboard.
 - The app gives the program a search path with the login shell path and the usual install
   directories (`/opt/homebrew/bin`, `/usr/local/bin`, `~/.docker/bin`). An app that Finder
   starts gets only the system directories, and then the wizard does not find `docker`.

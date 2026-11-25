@@ -34,6 +34,8 @@ enum Menus {
         let about = #selector(NSApplication.orderFrontStandardAboutPanel(_:))
         menu.addItem(item("About S.R.C.", about))
         menu.addItem(.separator())
+        menu.addItem(item("Settings…", #selector(AppDelegate.showSettings(_:)), ","))
+        menu.addItem(.separator())
         menu.addItem(item("Hide S.R.C.", #selector(NSApplication.hide(_:)), "h"))
         menu.addItem(item(
             "Hide Others", #selector(NSApplication.hideOtherApplications(_:)), "h",

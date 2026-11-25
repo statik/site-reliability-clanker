@@ -30,3 +30,8 @@ output "targets" {
   }
   description = "Where the application runs: the namespace of its components and the namespace of its data services."
 }
+
+output "collector_namespace" {
+  value       = module.platform.collector_namespace
+  description = "Namespace of the collector. Empty when there is no collector."
+}

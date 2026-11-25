@@ -47,6 +47,10 @@ Usage:
   clanker pack validate DIR         check the application pack in a directory
   clanker pack import URL --tag TAG copy a version of a pack from a git repository to the
                                     data directory; --dir NAME is its directory there
+  clanker model status              print the language model that a running control plane
+                                    uses, and the state of the local inference
+  clanker model start               start the local inference of a running control plane
+  clanker model stop                stop the local inference of a running control plane
 
 Common flags:
   --data DIR     data directory of the control plane (default .clanker in a checkout,
@@ -378,6 +382,10 @@ func run() error {
 	// These commands talk to a control plane somewhere else, or read a pack. They need no
 	// checkout.
 	switch command {
+	case "model":
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		return runModel(ctx, args[1:], os.Stdout)
 	case "pack":
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
