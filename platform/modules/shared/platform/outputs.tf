@@ -3,14 +3,24 @@ output "app_namespace" {
   description = "Namespace for Paperboat."
 }
 
-output "gateway_class" {
-  value       = var.gateway_class
-  description = "GatewayClass name, or nodeport."
+output "gateway_name" {
+  value       = local.gateway_name
+  description = "Name of the Gateway that the routes of the application attach to."
+}
+
+output "gateway_namespace" {
+  value       = kubernetes_namespace_v1.gateway.metadata[0].name
+  description = "Namespace of the Gateway."
 }
 
 output "public_address" {
-  value       = var.public_address != "" ? var.public_address : local.gateway_address
-  description = "Host name or IP address that serves the application."
+  value       = local.public_address
+  description = "Address that serves the application. Empty while the load balancer has none."
+}
+
+output "envoy_service" {
+  value       = "${local.envoy_namespace}/${local.envoy_service_name}"
+  description = "Namespace and name of the Service of Envoy."
 }
 
 output "app_secret_name" {

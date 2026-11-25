@@ -1,0 +1,59 @@
+{{- $nodePort := eq .Values.envoyService.type "NodePort" -}}
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: {{ .Values.envoyProxyName }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        name: {{ .Values.envoyService.name }}
+        type: {{ .Values.envoyService.type }}
+        {{- with .Values.envoyService.annotations }}
+        annotations:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if $nodePort }}
+        # The host port of the local target maps to this node port on one node only, so
+        # every node must forward to Envoy.
+        externalTrafficPolicy: Cluster
+        patch:
+          type: StrategicMerge
+          value:
+            spec:
+              ports:
+                - port: {{ .Values.gateway.port }}
+                  nodePort: {{ .Values.envoyService.nodePort }}
+        {{- end }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: {{ .Values.gateway.className }}
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: {{ .Values.envoyProxyName }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Values.gateway.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  gatewayClassName: {{ .Values.gateway.className }}
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: {{ .Values.gateway.port }}
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              {{- toYaml .Values.gateway.routeNamespaceLabels | nindent 14 }}

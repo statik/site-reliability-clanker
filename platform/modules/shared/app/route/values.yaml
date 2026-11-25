@@ -1,0 +1,14 @@
+# Layer 50-app sets every value. These defaults only make the chart render alone.
+
+# Name of the HTTPRoute in the release namespace.
+name: paperboat
+
+# The Gateway of 40-platform.
+gateway:
+  name: clanker
+  namespace: clanker-gateway
+
+# The Service in the release namespace that gets every request.
+backend:
+  service: paperboat-web
+  port: 8080

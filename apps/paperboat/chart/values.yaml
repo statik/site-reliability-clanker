@@ -27,15 +27,5 @@ sharedVolume:
   # Existing ReadWriteMany claim in the release namespace. api and worker mount it at /data.
   claimName: paperboat-shared
 
-service:
-  # Type of the web service: NodePort on targets without Gateway API, otherwise ClusterIP.
-  type: ClusterIP
-  # Node port of the web service. Read only when type is NodePort.
-  nodePort: 30080
-
-gateway:
-  # GatewayClass name. When set, the chart creates a Gateway and an HTTPRoute to web.
-  className: ""
-
 # Bearer token for POST /api/admin/fault. Empty turns fault injection off.
 adminToken: ""

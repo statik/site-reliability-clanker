@@ -14,7 +14,7 @@ Each root takes `project_id` and `region` in addition to the contract inputs.
 | `10-network` | A custom-mode VPC network. One regional subnet with secondary ranges `pods` and `services`. A Cloud Router and Cloud NAT. A private services access range and connection for Cloud SQL and Filestore. One reserved regional external IP address. An Artifact Registry Docker repository |
 | `20-cluster` | A GKE Standard cluster with private nodes and a public control plane endpoint. One node pool. Workload Identity. The Filestore CSI driver add-on. The cluster is zonal when `zone_count` in `10-network` is `1`, and regional when it is larger |
 | `30-data` | A Cloud SQL for PostgreSQL instance (`db-f1-micro`, private IP only, daily backups), the database `paperboat` and the password of the `postgres` user in Secret Manager. A Filestore `BASIC_HDD` instance, the `StorageClass` `clanker-rwx` and one `ReadWriteMany` `PersistentVolume`. A backup bucket |
-| `40-platform` | Nothing on Google Cloud. It calls `modules/shared/platform` with `gateway_class = "envoy"` and the reserved IP address as `public_address` |
+| `40-platform` | Nothing on Google Cloud. It calls `modules/shared/platform` with the reserved IP address as `public_address`. That module installs Envoy Gateway and the Gateway of the platform |
 | `50-app` | Nothing on Google Cloud. It calls `modules/shared/app` |
 
 Layers `30-data`, `40-platform` and `50-app` configure the `kubernetes` provider with the

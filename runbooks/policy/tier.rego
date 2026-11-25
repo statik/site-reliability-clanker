@@ -36,6 +36,18 @@ stateful_types := {
 
 identity_prefixes := ["aws_iam_", "google_project_iam_", "google_service_account", "azurerm_role_"]
 
+# Kubernetes RBAC. The names without _v1 are the older names of the same resources.
+identity_types := {
+	"kubernetes_role_v1",
+	"kubernetes_cluster_role_v1",
+	"kubernetes_role_binding_v1",
+	"kubernetes_cluster_role_binding_v1",
+	"kubernetes_role",
+	"kubernetes_cluster_role",
+	"kubernetes_role_binding",
+	"kubernetes_cluster_role_binding",
+}
+
 high_risk_layers := {"00-bootstrap", "10-network"}
 
 changes contains rc if {
@@ -50,6 +62,8 @@ is_identity(rc) if {
 	some prefix in identity_prefixes
 	startswith(rc.type, prefix)
 }
+
+is_identity(rc) if rc.type in identity_types
 
 t3_reasons contains reason if {
 	some rc in changes

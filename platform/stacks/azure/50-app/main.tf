@@ -87,7 +87,8 @@ module "app" {
   app_namespace       = local.platform.app_namespace
   app_secret_name     = local.platform.app_secret_name
   shared_volume_claim = local.platform.shared_volume_claim
-  gateway_class       = local.platform.gateway_class
+  gateway_name        = local.platform.gateway_name
+  gateway_namespace   = local.platform.gateway_namespace
   public_address      = local.platform.public_address
   chart_path          = abspath("${path.root}/../../../../apps/paperboat/chart")
 }

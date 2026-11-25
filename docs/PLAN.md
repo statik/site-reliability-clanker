@@ -157,7 +157,7 @@ Each cloud implements the same module interface. Stacks above the contract are c
 | Kubernetes | cluster endpoint, auth | EKS | GKE | AKS | kind |
 | Postgres | host, port, admin secret ref | RDS for PostgreSQL | Cloud SQL for PostgreSQL | Azure Database for PostgreSQL flexible server | CloudNativePG in-cluster |
 | Shared file system | RWX `StorageClass` name | EFS + CSI driver | Filestore + CSI driver | Azure Files (NFS) + CSI driver | NFS provisioner |
-| Load balancer | `GatewayClass`, public address | NLB | Cloud Load Balancing | Azure Load Balancer | cloud-provider-kind |
+| Load balancer | Gateway, public address | NLB | Cloud Load Balancing | Azure Load Balancer | `NodePort` Service on the kind node |
 | Object storage | bucket for backups and evidence | S3 | Cloud Storage | Blob Storage | MinIO |
 | Secrets | secret store reference | Secrets Manager | Secret Manager | Key Vault | Kubernetes secrets |
 | Workload identity | pod-to-cloud identity binding | EKS Pod Identity | Workload Identity Federation | Entra Workload ID | none |
@@ -165,7 +165,7 @@ Each cloud implements the same module interface. Stacks above the contract are c
 | Cloud audit trail | source for cross-checking | CloudTrail | Cloud Audit Logs | Activity Log | Kubernetes audit log |
 
 Ingress uses the Kubernetes Gateway API with one portable implementation (Envoy Gateway) on
-every cloud, fronted by that cloud's L4 load balancer. That keeps application routing identical
+every target, fronted by that cloud's L4 load balancer. That keeps application routing identical
 everywhere while still provisioning a real cloud load balancer. Cloud-native L7 can be swapped in
 behind the same contract later.
 

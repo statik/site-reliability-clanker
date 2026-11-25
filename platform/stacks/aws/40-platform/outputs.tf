@@ -3,14 +3,29 @@ output "app_namespace" {
   value       = module.platform.app_namespace
 }
 
-output "gateway_class" {
-  description = "GatewayClass name."
-  value       = module.platform.gateway_class
+output "gateway_name" {
+  description = "Name of the Gateway that the routes of the application attach to."
+  value       = module.platform.gateway_name
+}
+
+output "gateway_namespace" {
+  description = "Namespace of the Gateway."
+  value       = module.platform.gateway_namespace
 }
 
 output "public_address" {
   description = "DNS name of the load balancer that serves the application."
   value       = module.platform.public_address
+
+  # Nothing waits for the load balancer: the module reads the Service once, after the
+  # release of the Gateway.
+  precondition {
+    condition = module.platform.public_address != ""
+    error_message = format(
+      "The Envoy Service %s has no load balancer address yet. Read the events of the Service.",
+      module.platform.envoy_service,
+    )
+  }
 }
 
 output "app_secret_name" {

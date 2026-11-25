@@ -1,4 +1,4 @@
-# The annotations of the Envoy Service in 40-platform. All IDs are fakes.
+# The load balancer of the Envoy Service in 40-platform. All IDs are fakes.
 
 mock_provider "aws" {}
 mock_provider "kubernetes" {}
@@ -44,18 +44,6 @@ override_data {
   values = { secret_string = "{\"password\":\"test-password\"}" }
 }
 
-override_module {
-  target = module.platform
-  outputs = {
-    app_namespace       = "paperboat"
-    gateway_class       = "envoy"
-    public_address      = "internal-test.elb.example.com"
-    app_secret_name     = "paperboat-db"
-    shared_volume_claim = "paperboat-shared"
-    collector_namespace = ""
-  }
-}
-
 variables {
   env_name       = "test-env"
   state_location = "test-state"
@@ -78,4 +66,42 @@ run "load_balancer_is_an_internal_nlb_in_the_private_subnets" {
     }
     error_message = "The Envoy Service must ask for an internal NLB in the private subnets."
   }
+}
+
+run "public_address_is_the_dns_name_of_the_load_balancer" {
+  command = apply
+
+  # The Envoy Service after the service controller made the load balancer.
+  override_data {
+    target = module.platform.data.kubernetes_service_v1.envoy
+    values = {
+      status = [{
+        load_balancer = [{
+          ingress = [{ hostname = "internal-test.elb.example.com", ip = "", ip_mode = "" }]
+        }]
+      }]
+    }
+  }
+
+  assert {
+    condition     = output.public_address == "internal-test.elb.example.com"
+    error_message = "public_address must be the DNS name from the Envoy Service."
+  }
+
+  assert {
+    condition     = output.gateway_name == "clanker" && output.gateway_namespace == "clanker-gateway"
+    error_message = "The Gateway is clanker in clanker-gateway."
+  }
+}
+
+# The release of the Gateway exists after the run above, so the plan reads the Service.
+run "an_envoy_service_without_an_address_fails_the_plan" {
+  command = plan
+
+  override_data {
+    target = module.platform.data.kubernetes_service_v1.envoy
+    values = { status = [{ load_balancer = [{ ingress = [] }] }] }
+  }
+
+  expect_failures = [output.public_address]
 }

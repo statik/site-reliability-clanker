@@ -54,9 +54,14 @@ variable "shared_volume_claim" {
   description = "ReadWriteMany claim for api and worker."
 }
 
-variable "gateway_class" {
+variable "gateway_name" {
   type        = string
-  description = "GatewayClass name, or nodeport."
+  description = "Name of the Gateway of 40-platform."
+}
+
+variable "gateway_namespace" {
+  type        = string
+  description = "Namespace of the Gateway of 40-platform."
 }
 
 variable "public_address" {

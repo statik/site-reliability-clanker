@@ -67,7 +67,6 @@ module "platform" {
   rwx_storage_class     = data.terraform_remote_state.data.outputs.rwx_storage_class
   shared_fs_capacity_gb = data.terraform_remote_state.data.outputs.shared_fs_capacity_gb
 
-  gateway_class  = "envoy"
   public_address = data.terraform_remote_state.network.outputs.public_address
 
   collector_endpoint = var.collector_endpoint

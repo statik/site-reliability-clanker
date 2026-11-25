@@ -125,7 +125,6 @@ module "platform" {
 
   # Envoy Gateway makes a Service of type LoadBalancer, and AWS gives that Service a load
   # balancer. Its DNS name does not exist before the apply, so the shared module finds it.
-  gateway_class  = "envoy"
   public_address = ""
 
   collector_endpoint = var.collector_endpoint

@@ -3,9 +3,14 @@ output "app_namespace" {
   value       = module.platform.app_namespace
 }
 
-output "gateway_class" {
-  description = "GatewayClass name."
-  value       = module.platform.gateway_class
+output "gateway_name" {
+  description = "Name of the Gateway that the routes of the application attach to."
+  value       = module.platform.gateway_name
+}
+
+output "gateway_namespace" {
+  description = "Namespace of the Gateway."
+  value       = module.platform.gateway_namespace
 }
 
 output "public_address" {

@@ -11,7 +11,7 @@ OpenTofu state. The building blocks are in `platform/modules/azure/`.
 | `10-network` | Virtual network, subnets `snet-nodes`, `snet-postgres` (delegated) and `snet-private-endpoints`. NAT gateway with one public IP. Private DNS zones for PostgreSQL and Azure Files. Azure Container Registry (Basic) |
 | `20-cluster` | AKS (Free tier, one node pool, Azure CNI Overlay, outbound through the NAT gateway). OIDC issuer, workload identity and the Azure Files CSI driver are on. Entra ID with Azure RBAC, no local accounts. A static public IP for the gateway, in the node resource group |
 | `30-data` | Key Vault with the PostgreSQL administrator password. PostgreSQL flexible server `B_Standard_B1ms` with private access and the `paperboat` database. Premium FileStorage account with one NFS share, a private endpoint and the `clanker-rwx` `StorageClass`. Storage account with the `postgres-backups` container |
-| `40-platform` | Calls `modules/shared/platform` with `gateway_class = "envoy"` and the static IP |
+| `40-platform` | Calls `modules/shared/platform` with the static IP. That module installs Envoy Gateway and the Gateway of the platform |
 | `50-app` | Calls `modules/shared/app` |
 
 Each root also takes `subscription_id` and `location`. Layers `30-data` to `50-app` take

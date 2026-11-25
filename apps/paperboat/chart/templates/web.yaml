@@ -39,13 +39,10 @@ metadata:
   labels:
     {{- include "paperboat.labels" $ctx | nindent 4 }}
 spec:
-  type: {{ .Values.service.type }}
+  type: ClusterIP
   selector:
     {{- include "paperboat.selector" $ctx | nindent 4 }}
   ports:
     - name: http
       port: 8080
       targetPort: http
-      {{- if eq .Values.service.type "NodePort" }}
-      nodePort: {{ .Values.service.nodePort }}
-      {{- end }}
