@@ -381,13 +381,22 @@ func (r *Runner) Apply(ctx context.Context, j Job, plan []byte, wantSHA256 strin
 	return r.Outputs(j.Env, j.Layer)
 }
 
-// Destroy removes every resource of a layer. Only the CLI teardown calls it.
+// destroyDataDir returns the directory for the working data of OpenTofu in a destroy of a
+// layer. It is below the directory of the runner, one for each environment and layer.
+func (r *Runner) destroyDataDir(env, layer string) string {
+	return filepath.Join(r.WorkRoot, "destroy", env, layer)
+}
+
+// Destroy removes every resource of a layer. Only the CLI teardown calls it. The teardown
+// gives the stack directories of the sources, which all data directories share. Thus the
+// working data of OpenTofu, which records the backend, stays out of the stack directory.
 func (r *Runner) Destroy(ctx context.Context, j Job) error {
 	p, done, err := r.prepare(j)
 	if err != nil {
 		return err
 	}
 	defer done()
+	p.environ = append(p.environ, "TF_DATA_DIR="+r.destroyDataDir(j.Env, j.Layer))
 	if err := r.init(ctx, p); err != nil {
 		return err
 	}

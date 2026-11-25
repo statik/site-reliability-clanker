@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
+	"io"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -224,43 +225,177 @@ func TestAStoppedContextStopsTheWait(t *testing.T) {
 	}
 }
 
-func TestASecondResultIsRefused(t *testing.T) {
-	d, l, server := setup(t)
-	l.silent = true
-	done := make(chan error, 1)
-	go func() {
-		_, err := d.Run(context.Background(), runbook(t, "hello", &bytes.Buffer{}))
-		done <- err
-	}()
+// waitForLaunch waits until the launcher got a token and returns it.
+func waitForLaunch(t *testing.T, l *launcher) string {
+	t.Helper()
 	deadline := time.Now().Add(3 * time.Second)
 	for {
 		l.mu.Lock()
 		launched := len(l.tokens) > 0
 		l.mu.Unlock()
-		if launched || time.Now().After(deadline) {
-			break
+		if launched {
+			return l.lastToken()
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the dispatcher launched no runner")
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	post := func() int {
-		request, _ := http.NewRequest(http.MethodPost, server.URL+"/runner/v1/job/result",
-			strings.NewReader(`{"status":"stale","error":"the state moved"}`))
-		request.Header.Set("Authorization", "Bearer "+l.lastToken())
-		response, err := http.DefaultClient.Do(request)
-		if err != nil {
-			t.Fatal(err)
-		}
-		response.Body.Close()
-		return response.StatusCode
+}
+
+// call sends one request of a runner with token and returns the status and the body.
+func call(t *testing.T, server *httptest.Server, token, method, path, body string) (int, string) {
+	t.Helper()
+	request, err := http.NewRequest(method, server.URL+"/runner/v1/"+path, strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if status := post(); status != http.StatusNoContent {
+	request.Header.Set("Authorization", "Bearer "+token)
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	answer, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return response.StatusCode, string(answer)
+}
+
+// runInBackground runs the job and sends the error of Run on the channel.
+func runInBackground(d *dispatch.Dispatcher, job jobspec.Job) chan error {
+	done := make(chan error, 1)
+	go func() {
+		_, err := d.Run(context.Background(), job)
+		done <- err
+	}()
+	return done
+}
+
+func TestASecondResultIsRefused(t *testing.T) {
+	d, l, server := setup(t)
+	l.silent = true
+	done := runInBackground(d, runbook(t, "hello", &bytes.Buffer{}))
+	token := waitForLaunch(t, l)
+	result := `{"status":"stale","error":"the state moved"}`
+	status, _ := call(t, server, token, http.MethodPost, "job/result", result)
+	if status != http.StatusNoContent {
 		t.Fatalf("first result: status %d", status)
 	}
 	if err := <-done; !errors.Is(err, jobspec.ErrStalePlan) {
 		t.Fatalf("error = %v, want a stale plan", err)
 	}
-	if status := post(); status != http.StatusUnauthorized && status != http.StatusConflict {
+	status, _ = call(t, server, token, http.MethodPost, "job/result", result)
+	if status != http.StatusUnauthorized && status != http.StatusConflict {
 		t.Fatalf("second result: status %d, want a refusal", status)
+	}
+}
+
+func TestARunnerThatNeverStartsFailsAfterTheStartGraceAndNotBefore(t *testing.T) {
+	d, l, _ := setup(t)
+	l.silent = true
+	d.Silence = time.Second
+	d.StartGrace = 2500 * time.Millisecond
+	started := time.Now()
+	_, err := d.Run(context.Background(), runbook(t, "hello", &bytes.Buffer{}))
+	if err == nil || !strings.Contains(err.Error(), "made no request") {
+		t.Fatalf("error = %v, want the failure to start", err)
+	}
+	waited := time.Since(started)
+	if waited < d.StartGrace || waited > 6*time.Second {
+		t.Fatalf("the job waited %s for a runner that never started, want the grace of %s",
+			waited, d.StartGrace)
+	}
+}
+
+func TestTheJobIsGivenToOneRunnerOnly(t *testing.T) {
+	d, l, server := setup(t)
+	l.silent = true
+	var log bytes.Buffer
+	done := runInBackground(d, runbook(t, "hello", &log))
+	token := waitForLaunch(t, l)
+
+	const fetches = 8
+	statuses := make(chan int, fetches)
+	var wait sync.WaitGroup
+	for range fetches {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			status, body := call(t, server, token, http.MethodGet, "job", "")
+			if status == http.StatusOK && !strings.Contains(body, `"runbook":"hello"`) {
+				t.Errorf("the job = %s, want the hello runbook", body)
+			}
+			statuses <- status
+		}()
+	}
+	wait.Wait()
+	close(statuses)
+	given := 0
+	for status := range statuses {
+		switch status {
+		case http.StatusOK:
+			given++
+		case http.StatusConflict:
+		default:
+			t.Errorf("a fetch of the job got status %d, want 200 or 409", status)
+		}
+	}
+	if given != 1 {
+		t.Fatalf("the job was given %d times, want once", given)
+	}
+	if status, _ := call(t, server, token, http.MethodGet, "job", ""); status != http.StatusConflict {
+		t.Fatalf("a later fetch got status %d, want 409", status)
+	}
+
+	// The runner that has the job works on with the same token.
+	steps := []struct{ method, path, body string }{
+		{http.MethodGet, "job/checkout", ""},
+		{http.MethodPost, "job/heartbeat", ""},
+		{http.MethodPost, "job/log", "hello carol\n"},
+		{http.MethodPost, "job/result", `{"status":"ok"}`},
+	}
+	for _, step := range steps {
+		if status, body := call(t, server, token, step.method, step.path, step.body); status >= 300 {
+			t.Fatalf("%s %s: status %d: %s", step.method, step.path, status, body)
+		}
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if log.String() != "hello carol\n" {
+		t.Fatalf("log = %q", log.String())
+	}
+}
+
+func TestTheRunnerFetchesItsJobOnce(t *testing.T) {
+	l := &launcher{dir: t.TempDir()}
+	d := dispatch.New(l)
+	var mu sync.Mutex
+	fetches := 0
+	handler := d.Handler()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/runner/v1/job" {
+			mu.Lock()
+			fetches++
+			mu.Unlock()
+		}
+		handler.ServeHTTP(w, r)
+	}))
+	t.Cleanup(server.Close)
+	l.url = server.URL
+	var log bytes.Buffer
+	if _, err := d.Run(context.Background(), runbook(t, "hello", &log)); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if fetches != 1 {
+		t.Fatalf("the runner fetched its job %d times, want once", fetches)
+	}
+	if !strings.Contains(log.String(), "hello carol") {
+		t.Fatalf("log = %q", log.String())
 	}
 }
 

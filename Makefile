@@ -1,4 +1,4 @@
-.PHONY: build web demo test lint lint-core destroy clean-data bundle release dmg
+.PHONY: build web demo test lint lint-core destroy clean-data bundle release dmg runner-image
 
 build:
 	go build -o bin/clanker ./cmd/clanker
@@ -35,6 +35,14 @@ dmg: release
 	scripts/macos/package.sh $(VERSION)
 	cd dist && shasum -a 256 clanker-* SRC.dmg > checksums.txt
 
+RUNNER_IMAGE ?= clanker-runner:$(VERSION)
+
+# The image of the runner for a Fargate task on ARM64, loaded into the local Docker. The
+# binary in it has the flags of a release, from the same commit as the core.
+runner-image: bundle
+	docker buildx build --platform linux/arm64 --build-arg VERSION=$(VERSION) \
+		--file build/runner/Dockerfile --tag $(RUNNER_IMAGE) --load .
+
 test:
 	go test ./...
 	cd apps/paperboat && go test ./...
@@ -53,8 +61,9 @@ lint: lint-core
 	tofu fmt -check -recursive platform
 	opa check runbooks/policy
 	shellcheck apps/paperboat/runbooks/*.sh apps/paperboat/build.sh ops/run-local.sh scripts/*.sh \
-		scripts/verify/*.sh scripts/macos/*.sh
-	shfmt -i 2 -d apps/paperboat/runbooks apps/paperboat/build.sh ops/run-local.sh scripts
+		scripts/verify/*.sh scripts/macos/*.sh build/runner/*.sh
+	shfmt -i 2 -d apps/paperboat/runbooks apps/paperboat/build.sh ops/run-local.sh scripts \
+		build/runner
 
 destroy: build
 	./bin/clanker destroy --env local
