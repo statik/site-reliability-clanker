@@ -163,9 +163,18 @@ video and the local demo. No pull request is open.
     - The approval page has no own display of the targets (`docs/PACKS.md` section B.14
       says why). With this, step 1 of the build order is complete.
   - Found: `clanker destroy` runs OpenTofu in the stack directories of its source. With a
-    second data directory it fails with "Backend configuration changed", because those
+    second data directory it failed with "Backend configuration changed", because those
     directories keep the backend of the first one. The run above was destroyed from a
-    copy of the sources.
+    copy of the sources. Fixed: `Runner.Destroy` sets `TF_DATA_DIR` to
+    `work/destroy/<environment>/<layer>` below the data directory, so a destroy does not
+    read or write the `.terraform` directory of the stack. A test with a fake `tofu`
+    checks the environment. Ran on 2026-11-25 from one checkout, with no model key: the
+    first deployment to `Done` and a destroy on data directory A, then the same on data
+    directory B. Both destroys passed and left no kind cluster, and no `.terraform` came
+    into the stack directories. With the `.terraform` of another data directory in the
+    stack of `00-bootstrap`, the binary before the fix failed the destroy with "Backend
+    configuration changed" and the binary with the fix passed. `clanker bootstrap` still
+    has this defect (#140).
   - Fixed: the topology shows each component of the pack as degraded when the application
     is unhealthy or has an open incident. Before, only a node with the ID `api` changed.
   - Fixed: the check after an apply fails when the layer of the application has outputs
@@ -809,8 +818,24 @@ What ran on the build of commit `376617b`, the last change to the Go code:
    - Ran: `core-check.sh` and `nanos-check.sh` with a fake identity provider
      (`scripts/verify/fakeidp`), and `web/scripts/signin-check.mjs` in a real browser on
      the local target. The results are in the pull request.
-   - Not run: a real provider (Okta, Google, Entra). The sign-in needs the claim
-     `email_verified`, which some providers do not send; that will show with a real one.
+   - Ran with a real provider: `scripts/verify/keycloak-signin-check.sh` against Keycloak
+     26.8.2 in production mode with plain HTTP and the realm of
+     `scripts/verify/keycloak/realm.json`. The core and Keycloak listened on a private
+     address of the machine, not on loopback. One more run with a changed copy of the
+     script put Keycloak on a second address, so that the two are not the same site. The
+     core read the discovery document and the keys. The admin signed in in a real browser.
+     Under an `http://` public address the session cookie is not `Secure`, and the browser
+     kept it; a build that sets `Secure` failed the sign-in. `clanker login` was approved
+     in that browser session. A person who is not in the users table got 403. Keycloak
+     sends `email_verified`, and the core refused the sign-in after the flag was set to
+     false.
+   - With the realm setting "require SSL: external requests", Keycloak showed the login
+     form to source addresses in 10/8, 172.16/12 and 192.168/16, and answered "HTTPS
+     required" to 203.0.113.7 and to the tailnet address 100.64.0.1 (100.64.0.0/10).
+     Plain HTTP works when Keycloak sees a private source address, for example behind a
+     Tailscale subnet router that translates the source address. Which address Keycloak
+     sees in a VPC is not checked yet.
+   - Not run: Okta, Google, Entra; the admin console of Keycloak over plain HTTP.
    - **Done: the device flow for a program** (`internal/signin/device.go`). It follows the
      OAuth 2.0 device authorization grant, and the core is its own authorization server.
      A program asks `POST /auth/device/code` for a code. A person who is signed in in a
