@@ -1089,7 +1089,7 @@ Limits:
 | Item | State |
 |---|---|
 | AWS, Google Cloud, Azure stacks | 18 root modules pass `tofu validate`. Nothing was planned or applied. No cloud account was used |
-| Nix flake | Written. Not evaluated, because Nix is not installed on the build machine |
+| Nix flake | The dev shell only. Written. Not evaluated, because Nix is not installed on the build machine. The runner image is `build/runner/Dockerfile` (#133 step A4); `scripts/verify/runner-image-check.sh` passed on 2026-11-25 |
 
 ## What exists but was not run
 
