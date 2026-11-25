@@ -198,8 +198,22 @@ git -C "${work}/runbooks" checkout -q main
 
 git -C "${work}/runbooks" fsck --strict --no-dangling >/dev/null || fail "fsck of runbooks"
 git -C "${work}/platform-live" fsck --strict --no-dangling >/dev/null || fail "fsck of platform-live"
-if [ "$(git -C "${work}/runbooks" rev-parse 'HEAD^{tree}')" != "$(git -C "${repo}" rev-parse 'HEAD:runbooks')" ]; then
-  fail "the tree of the runbooks repository is not the tree of runbooks/ in the checkout"
+# The core seeds runbooks/ of its source files and, in jobs/, the runbooks of the one pack in
+# apps/ of the bundle, from the directory that the manifest of the pack names (seedForge in
+# cmd/clanker/up.go).
+manifest="$(tar -tzf "${repo}/internal/bundle/bundle.tar.gz" | grep -E '^apps/[^/]+/pack\.json$')"
+pack_runbooks="$(git -C "${repo}" show "HEAD:${manifest}" |
+  python3 -c 'import json, sys; print(json.load(sys.stdin).get("runbooks", ""))')"
+jobs_tree=""
+if [ -n "${pack_runbooks}" ]; then
+  jobs_tree="$(git -C "${repo}" rev-parse "HEAD:${manifest%/pack.json}/${pack_runbooks}")"
+fi
+expected_runbooks="$({
+  git -C "${repo}" ls-tree HEAD:runbooks
+  if [ -n "${jobs_tree}" ]; then printf '040000 tree %s\tjobs\n' "${jobs_tree}"; fi
+} | git -C "${work}/runbooks" mktree --missing)"
+if [ "$(git -C "${work}/runbooks" rev-parse 'HEAD^{tree}')" != "${expected_runbooks}" ]; then
+  fail "the runbooks repository is not runbooks/ of the checkout with the pack runbooks in jobs/"
 fi
 if [ "$(git -C "${work}/platform-live" rev-parse 'HEAD:platform')" != "$(git -C "${repo}" rev-parse 'HEAD:platform')" ]; then
   fail "platform/ in the platform-live repository is not platform/ in the checkout"
