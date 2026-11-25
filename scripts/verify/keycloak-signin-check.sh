@@ -188,6 +188,8 @@ echo "== in a browser: the admin signs in, approves the code; the approver is re
 if ! node "${repo}/web/scripts/keycloak-signin-check.mjs" signin "${base}" \
   "${CLANKER_ADMIN_EMAIL}" "${REALM_APPROVER_EMAIL}" "${page}"; then
   fail "the sign-in in the browser"
+  # Nobody approved the code, and clanker login would wait ten minutes for it.
+  kill "${login}" 2>/dev/null || true
 fi
 if wait "${login}"; then
   token="$(HOME="${work}/client" "${work}/clanker" token --server "${base}" || true)"
@@ -195,7 +197,7 @@ if wait "${login}"; then
   echo "  GET /api/v1/me with the token of clanker login: ${me}"
   if [[ "${me}" != *'"role":"admin"'* ]]; then fail "the token of clanker login does not act as the admin"; fi
 else
-  fail "clanker login did not end well; see ${work}/login.log"
+  fail "clanker login did not end with a token; see ${work}/login.log"
 fi
 login=""
 for request in "GET /realms/clanker/protocol/openid-connect/certs" \
@@ -210,7 +212,7 @@ done
 echo "== the core refuses an email address that Keycloak did not confirm"
 KC_CLI_PASSWORD="${KC_BOOTSTRAP_ADMIN_PASSWORD}" docker exec -e KC_CLI_PASSWORD "${keycloak}" \
   /opt/keycloak/bin/kcadm.sh config credentials --config /tmp/kcadm.config \
-  --server http://localhost:8080 --realm master --user bootstrap >/dev/null
+  --server http://localhost:8080 --realm master --user bootstrap >"${work}/kcadm.log" 2>&1
 approver="$(kcadm get users -r clanker -q "email=${REALM_APPROVER_EMAIL}" --fields id --format csv --noquotes)"
 kcadm update "users/${approver}" -r clanker -s emailVerified=false
 if ! node "${repo}/web/scripts/keycloak-signin-check.mjs" unverified "${base}" \
