@@ -96,6 +96,28 @@ jobs:
             echo "::endgroup::"
           done
 
+  home-stack:
+    name: Home stack format, validate and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: 1.12.3
+      - run: tofu fmt -check -recursive internal/setup/stack
+      - name: Validate and test each home stack
+        run: |
+          set -euo pipefail
+          for stack in internal/setup/stack/*/; do
+            echo "::group::${stack}"
+            tofu -chdir="${stack}" init -backend=false -input=false
+            tofu -chdir="${stack}" validate
+            tofu -chdir="${stack}" test
+            echo "::endgroup::"
+          done
+
   web:
     name: Dashboard lint, types, tests and build
     runs-on: ubuntu-latest
