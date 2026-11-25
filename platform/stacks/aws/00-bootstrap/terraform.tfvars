@@ -1,1 +1,1 @@
-ttl_hours = 72
+ttl_hours = 168

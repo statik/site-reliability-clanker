@@ -1,5 +1,6 @@
 locals {
-  layer = "10-network"
+  layer    = "10-network"
+  existing = var.existing_network_id != ""
 }
 
 data "terraform_remote_state" "bootstrap" {
@@ -26,14 +27,24 @@ provider "aws" {
 
 module "network" {
   source = "../../../modules/aws/network"
+  count  = local.existing ? 0 : 1
 
   name       = "clanker-${var.env_name}"
   cidr       = var.network_cidr
   zone_count = var.zone_count
 }
 
-module "registry" {
-  source = "../../../modules/aws/registry"
+# In existing-network mode the layer only reads the subnets, so that a wrong ID stops the
+# plan of this layer and not the apply of a layer above it.
+data "aws_subnet" "existing" {
+  for_each = toset(var.existing_private_subnet_ids)
 
-  repository_name = "paperboat"
+  id = each.value
+
+  lifecycle {
+    postcondition {
+      condition     = self.vpc_id == var.existing_network_id
+      error_message = "A subnet in existing_private_subnet_ids is not in existing_network_id."
+    }
+  }
 }
