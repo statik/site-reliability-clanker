@@ -149,6 +149,7 @@ func TestTheSessionLivesAsLongAsTheGrantInsideTheLimitsOfSTS(t *testing.T) {
 		{900 * time.Second, 900},
 		{901 * time.Second, 901},
 		{20*time.Minute + 900*time.Millisecond, 1200},
+		{time.Hour - 2*time.Second, 3598},
 		{time.Hour, 3600},
 		{2 * time.Hour, 3600},
 	}

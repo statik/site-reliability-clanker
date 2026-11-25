@@ -54,6 +54,17 @@
       "credentials": [
         { "type": "password", "value": "${REALM_APPROVER_PASSWORD}", "temporary": false }
       ]
+    },
+    {
+      "username": "outsider",
+      "email": "${REALM_OUTSIDER_EMAIL}",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "No",
+      "lastName": "Role",
+      "credentials": [
+        { "type": "password", "value": "${REALM_OUTSIDER_PASSWORD}", "temporary": false }
+      ]
     }
   ]
 }

@@ -2,7 +2,8 @@
 # Sign in to the core through a real Keycloak over plain HTTP, in the shape of a core in a VPC
 # that people reach through Tailscale. Keycloak runs in production mode (kc.sh start) with the
 # realm of scripts/verify/keycloak/realm.json. The core runs as it runs on a cloud, with its
-# own PostgreSQL container.
+# own PostgreSQL container. The realm has three people: the first admin, a second approver
+# that the core makes from CLANKER_APPROVER_EMAILS, and a person with no role in the core.
 #
 # The core and Keycloak listen on the private address of this machine and not on 127.0.0.1:
 # a browser treats a loopback address as a secure context, and Keycloak asks for HTTPS only
@@ -72,10 +73,13 @@ CLANKER_OIDC_CLIENT_SECRET="$(secret)"
 export CLANKER_OIDC_CLIENT_SECRET
 export CLANKER_ADMIN_EMAIL=admin@example.com
 export REALM_APPROVER_EMAIL=approver@example.com
+export REALM_OUTSIDER_EMAIL=outsider@example.com
 REALM_ADMIN_PASSWORD="$(secret)"
 REALM_APPROVER_PASSWORD="$(secret)"
+REALM_OUTSIDER_PASSWORD="$(secret)"
 KC_BOOTSTRAP_ADMIN_PASSWORD="$(secret)"
-export REALM_ADMIN_PASSWORD REALM_APPROVER_PASSWORD KC_BOOTSTRAP_ADMIN_PASSWORD
+export REALM_ADMIN_PASSWORD REALM_APPROVER_PASSWORD REALM_OUTSIDER_PASSWORD
+export KC_BOOTSTRAP_ADMIN_PASSWORD
 
 # start_keycloak starts Keycloak in production mode with plain HTTP and imports the realm. $1
 # is the name of the container and $2 its port; the other arguments go to kc.sh start. The
@@ -86,6 +90,7 @@ start_keycloak() {
   docker run -d --name "${name}" -p "${address}:${listen}:8080" \
     -e CLANKER_PUBLIC_URL -e CLANKER_OIDC_CLIENT_SECRET -e CLANKER_ADMIN_EMAIL \
     -e REALM_APPROVER_EMAIL -e REALM_ADMIN_PASSWORD -e REALM_APPROVER_PASSWORD \
+    -e REALM_OUTSIDER_EMAIL -e REALM_OUTSIDER_PASSWORD \
     -e KC_BOOTSTRAP_ADMIN_USERNAME=bootstrap -e KC_BOOTSTRAP_ADMIN_PASSWORD \
     -v "${repo}/scripts/verify/keycloak/realm.json:/opt/keycloak/data/import/realm.json:ro" \
     "${image}" start --http-enabled=true --hostname="http://${address}:${listen}" \
@@ -154,19 +159,26 @@ for from in 10.0.0.5 172.16.0.5 192.168.0.5; do expect_from "${from}" "the login
 for from in 100.64.0.1 203.0.113.7; do expect_from "${from}" "HTTPS required"; done
 docker rm -f "${probe}" >/dev/null
 
-echo "== start the core with the sign-in of Keycloak"
+echo "== start the core with the sign-in of Keycloak and a second approver"
 mkdir "${work}/cwd" "${work}/home" "${work}/client"
 before="$(core_requests "GET /realms/clanker/.well-known/openid-configuration")"
 address_of_database="$(docker port "${database}" 5432/tcp | head -n 1)"
-(
-  cd "${work}/cwd"
-  unset OPENROUTER_API_KEY
-  HOME="${work}/home" CLANKER_OIDC_ISSUER="${issuer}" CLANKER_OIDC_CLIENT_ID=clanker \
-    CLANKER_DATABASE_URL="postgres://postgres:check@${address_of_database}/clanker?sslmode=disable" \
-    CLANKER_SIGNING_KEY="$(head -c 64 /dev/urandom | base64 | tr -d '\n')" \
-    exec "${work}/clanker" up --cloud aws --env prod --demo=false --addr "${address}:${port}"
-) >"${work}/up.log" 2>&1 &
-core=$!
+signing_key="$(head -c 64 /dev/urandom | base64 | tr -d '\n')"
+
+# start_core starts the core in the background with the approvers of $1 and its log in $2.
+start_core() {
+  (
+    cd "${work}/cwd"
+    unset OPENROUTER_API_KEY
+    HOME="${work}/home" CLANKER_OIDC_ISSUER="${issuer}" CLANKER_OIDC_CLIENT_ID=clanker \
+      CLANKER_APPROVER_EMAILS="$1" CLANKER_SIGNING_KEY="${signing_key}" \
+      CLANKER_DATABASE_URL="postgres://postgres:check@${address_of_database}/clanker?sslmode=disable" \
+      exec "${work}/clanker" up --cloud aws --env prod --demo=false --addr "${address}:${port}"
+  ) >"$2" 2>&1 &
+  core=$!
+}
+
+start_core "${REALM_APPROVER_EMAIL}" "${work}/up.log"
 wait_for "${base}/healthz"
 if [ "$(core_requests "GET /realms/clanker/.well-known/openid-configuration")" -le "${before}" ]; then
   fail "the core did not read the discovery document of Keycloak"
@@ -184,9 +196,10 @@ done
 page="$(grep -o "${base}/auth/device?user_code=[A-Z-]*" "${work}/login.log" | head -n 1 || true)"
 if [ -z "${page}" ]; then fail "clanker login showed no code; see ${work}/login.log"; fi
 
-echo "== in a browser: the admin signs in, approves the code; the approver is refused"
+echo "== in a browser: the admin signs in and approves the code, the approver acts as an"
+echo "   approver, and a person with no role is refused"
 if ! node "${repo}/web/scripts/keycloak-signin-check.mjs" signin "${base}" \
-  "${CLANKER_ADMIN_EMAIL}" "${REALM_APPROVER_EMAIL}" "${page}"; then
+  "${CLANKER_ADMIN_EMAIL}" "${REALM_APPROVER_EMAIL}" "${REALM_OUTSIDER_EMAIL}" "${page}"; then
   fail "the sign-in in the browser"
   # Nobody approved the code, and clanker login would wait ten minutes for it.
   kill "${login}" 2>/dev/null || true
@@ -226,6 +239,24 @@ core=""
 if grep -q "level=ERROR" "${work}/up.log"; then
   fail "error lines in the log of the core; see ${work}/up.log"
 fi
+
+echo "== the core refuses to start when the approvers name the admin"
+start_core "${REALM_APPROVER_EMAIL},${CLANKER_ADMIN_EMAIL}" "${work}/up-refused.log"
+for _ in $(seq 1 60); do
+  if ! kill -0 "${core}" 2>/dev/null; then break; fi
+  sleep 1
+done
+if kill -0 "${core}" 2>/dev/null; then
+  fail "the core still runs with the admin among the approvers; see ${work}/up-refused.log"
+elif wait "${core}"; then
+  fail "the core ended without an error with the admin among the approvers"
+elif ! grep -q "CLANKER_APPROVER_EMAILS is not valid: ${CLANKER_ADMIN_EMAIL} is the admin" \
+  "${work}/up-refused.log"; then
+  fail "the core stopped without the reason; see ${work}/up-refused.log"
+else
+  echo "  $(grep "CLANKER_APPROVER_EMAILS is not valid" "${work}/up-refused.log" | head -n 1)"
+fi
+core=""
 
 if [ "${failures}" -ne 0 ]; then
   echo "RESULT: ${failures} checks failed. The files are in ${work}"

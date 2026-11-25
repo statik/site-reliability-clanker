@@ -58,8 +58,9 @@ With one window or more, an approved tier T3 change applies only inside a window
   `Scheduled` and waits for the start of the next window.
 - When the last approval comes inside a window with 30 minutes or more left, the change
   applies at once. With less than 30 minutes left, it waits for the next window. The
-  apply grant of one layer lasts 30 minutes. The rule is for the start of the apply: an
-  apply of several layers can end after the window.
+  apply grant of one layer lasts 30 minutes, and one hour on AWS. The rule is for the
+  start of the apply: on AWS the apply of one layer, and anywhere an apply of several
+  layers, can end after the window.
 - When an approver sets a time for the apply, the change applies at the first moment at or
   after that time that is inside a window with 30 minutes or more left.
 

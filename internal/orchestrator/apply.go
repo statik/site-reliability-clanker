@@ -271,7 +271,7 @@ func (o *Orchestrator) afterApproval(ctx context.Context, wi WorkItem, d Decisio
 		return WorkItem{}, err
 	}
 	if !waits {
-		o.applies.Go(func() { o.applyInBackground(wi.ID) })
+		o.applies.Go(func() { o.applyInBackground(wi) })
 	}
 	return wi, nil
 }
@@ -310,11 +310,21 @@ func (o *Orchestrator) wait(wi *WorkItem, windows policy.Windows) (bool, error) 
 	return true, nil
 }
 
-func (o *Orchestrator) applyInBackground(id string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Minute)
+// applyMargin is how long the apply of a work item can run after the apply windows of its
+// layers: for the plans of deferred layers, the verification and a rollback.
+const applyMargin = 15 * time.Minute
+
+// applyTimeout returns how long the apply of a work item can take: the apply window of
+// each of its layers, and applyMargin.
+func (o *Orchestrator) applyTimeout(wi WorkItem) time.Duration {
+	return time.Duration(len(wi.Layers))*o.Envs[wi.Env].ApplyWindow() + applyMargin
+}
+
+func (o *Orchestrator) applyInBackground(wi WorkItem) {
+	ctx, cancel := context.WithTimeout(context.Background(), o.applyTimeout(wi))
 	defer cancel()
-	if _, err := o.Apply(ctx, id); err != nil {
-		o.emit(audit.Event{Type: "apply.error", Actor: "orchestrator", WorkItem: id,
+	if _, err := o.Apply(ctx, wi.ID); err != nil {
+		o.emit(audit.Event{Type: "apply.error", Actor: "orchestrator", WorkItem: wi.ID,
 			Summary: "Apply stopped: " + err.Error()})
 	}
 }
@@ -337,7 +347,7 @@ func (o *Orchestrator) RunDue() error {
 		if err != nil {
 			failures = append(failures, fmt.Errorf("start scheduled %s: %w", wi.ID, err))
 		} else if ready {
-			o.applies.Go(func() { o.applyInBackground(wi.ID) })
+			o.applies.Go(func() { o.applyInBackground(wi) })
 		}
 	}
 	return errors.Join(failures...)
@@ -504,7 +514,7 @@ func (o *Orchestrator) applyPlan(ctx context.Context, wi WorkItem, plan Plan,
 	layer := plan.Layer
 	grant, err := o.Broker.Issue(broker.Request{WorkItem: wi.ID, Env: wi.Env, Layer: layer,
 		Kind: broker.KindApply, Commit: wi.Commit, PlanSHA256: plan.SHA256, Tier: wi.Tier,
-		Approvers: approvers, Duration: policy.WindowReserve})
+		Approvers: approvers, Duration: o.Envs[wi.Env].ApplyWindow()})
 	if err != nil {
 		return err
 	}
