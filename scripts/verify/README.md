@@ -64,6 +64,10 @@ the environment variable `NAME`: `CLANKER_PUBLIC_URL`, `CLANKER_OIDC_CLIENT_SECR
 as literal text, so a missing client secret becomes the known text
 `${CLANKER_OIDC_CLIENT_SECRET}`. Keycloak imports a realm only when it does not exist yet.
 
+The home stack on AWS (`internal/setup/stack/aws`) imports the same file through its input
+`keycloak_realm`. Its plan fails when the realm reads a variable that the container does not
+get, and its container stops when such a variable is empty.
+
 - The approvals go through the API with the user header. This is the demo identity, not a
   sign-in. A person must test an approval from the dashboard or the iOS application.
 - `fresh-run.sh` deletes the demo. It stops when the destroy fails, so it does not throw away

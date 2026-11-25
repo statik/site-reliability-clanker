@@ -20,9 +20,16 @@ type PriceList struct {
 	Lines   []PriceLine `json:"lines"`
 }
 
+// The lines of the load balancer, of Keycloak and of the key were read on 2026-11-25 from
+// the examples of their price pages, which use the prices of US East (N. Virginia). The
+// pages did not show the prices of Oregon.
 var awsPrices = PriceList{Region: "US West (Oregon)", Checked: "2026-11-18", Lines: []PriceLine{
 	{Item: "Virtual machine of the control plane", Size: "t4g.small", Hourly: 0.0168},
 	{Item: "PostgreSQL database", Size: "db.t4g.micro", Hourly: 0.016},
+	{Item: "Internal load balancer", Size: "Application Load Balancer", Hourly: 0.0225},
+	{Item: "Keycloak, the identity provider", Size: "Fargate ARM64, 1 vCPU, 2 GiB",
+		Hourly: 0.03238 + 2*0.00356},
+	{Item: "Key of the settings", Size: "KMS customer key, 1 USD a month", Hourly: 1.0 / 730},
 }}
 
 // planTagKey is the tag that every resource of S.R.C. carries. Its value is the name of
@@ -57,8 +64,10 @@ func awsPlan(state State) *AWSPlan {
 	}
 	plan := AWSPlan{Network: "The network " + state.Network + ", which exists. S.R.C. " +
 		"changes nothing in it.", TagKey: planTagKey, TagValue: state.Env,
-		Prices:    PriceList{Region: awsPrices.Region, Checked: awsPrices.Checked},
-		NotPriced: []string{"the storage of the database, of the machine image and of its snapshot"}}
+		Prices: PriceList{Region: awsPrices.Region, Checked: awsPrices.Checked},
+		NotPriced: []string{"the storage of the database, of the machine image and of its snapshot",
+			"the capacity units of the load balancer", "the runner tasks on Fargate",
+			"the transfer of the container images into the network"}}
 	router := "the router of your private network"
 	plan.Access = "A Tailscale subnet router serves this network. You reach the control " +
 		"plane through it."
@@ -78,11 +87,19 @@ func awsPlan(state State) *AWSPlan {
 			"replaces a machine that fails. It runs the control plane as a Nanos unikernel."},
 		PlanItem{"One PostgreSQL database", "db.t4g.micro. It holds all state of the control plane."},
 		PlanItem{"One machine image and its snapshot", "built on this machine with the ops tool"},
-		PlanItem{"Roles", "one for the virtual machine and one for the short-lived runners " +
-			"on Fargate, which run the jobs"},
+		PlanItem{"One internal load balancer", "with TLS: a certificate and two names in " +
+			"your DNS zone, one for the control plane and one for its identity provider"},
+		PlanItem{"One identity provider", "Keycloak on Fargate with two users, for the " +
+			"sign-in. S.R.C. does not manage it."},
+		PlanItem{"Runners", "a container registry for the runner image and a Fargate " +
+			"cluster for the short-lived runners, which run the jobs"},
+		PlanItem{"Roles", "one for the virtual machine, one for the runners and one for " +
+			"Keycloak"},
 		PlanItem{"Parameters", "the settings of the control plane, in Parameter Store " +
-			"below " + parameterPath(state.Env)},
-		PlanItem{"One security group", "it admits only " + router})
+			"below " + parameterPath(state.Env) + ", with a key that only the control " +
+			"plane and Keycloak can use"},
+		PlanItem{"Security groups", "the load balancer admits only " + router +
+			" and the addresses of the network; each other part admits only its callers"})
 	for _, line := range awsPrices.Lines {
 		line.Weekly = line.Hourly * hoursEachWeek
 		plan.Prices.Lines = append(plan.Prices.Lines, line)
