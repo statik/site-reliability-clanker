@@ -163,9 +163,18 @@ video and the local demo. No pull request is open.
     - The approval page has no own display of the targets (`docs/PACKS.md` section B.14
       says why). With this, step 1 of the build order is complete.
   - Found: `clanker destroy` runs OpenTofu in the stack directories of its source. With a
-    second data directory it fails with "Backend configuration changed", because those
+    second data directory it failed with "Backend configuration changed", because those
     directories keep the backend of the first one. The run above was destroyed from a
-    copy of the sources.
+    copy of the sources. Fixed: `Runner.Destroy` sets `TF_DATA_DIR` to
+    `work/destroy/<environment>/<layer>` below the data directory, so a destroy does not
+    read or write the `.terraform` directory of the stack. A test with a fake `tofu`
+    checks the environment. Ran on 2026-11-25 from one checkout, with no model key: the
+    first deployment to `Done` and a destroy on data directory A, then the same on data
+    directory B. Both destroys passed and left no kind cluster, and no `.terraform` came
+    into the stack directories. With the `.terraform` of another data directory in the
+    stack of `00-bootstrap`, the binary before the fix failed the destroy with "Backend
+    configuration changed" and the binary with the fix passed. `clanker bootstrap` still
+    has this defect (#140).
   - Fixed: the topology shows each component of the pack as degraded when the application
     is unhealthy or has an open incident. Before, only a node with the ID `api` changed.
   - Fixed: the check after an apply fails when the layer of the application has outputs
