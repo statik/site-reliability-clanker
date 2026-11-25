@@ -47,6 +47,7 @@ starts. The image of the core holds only the path and the region (output `core_i
 | `CLANKER_OIDC_CLIENT_ID` | The first client of the realm |
 | `CLANKER_OIDC_CLIENT_SECRET` | Random, also in `/src/<env>/idp` for Keycloak |
 | `CLANKER_ADMIN_EMAIL` | `admin@src-<env>-idp.<zone>` |
+| `CLANKER_APPROVER_EMAILS` | `approver@src-<env>-idp.<zone>`: the core makes this user an approver when it starts, so a T3 change has its second approver |
 | `CLANKER_AWS_RUNNER` | Phase 2: cluster, task definition, container, private subnets and the runner security group |
 | `CLANKER_AWS_BOOTSTRAP` | A placeholder for the outputs of `00-bootstrap` (`tofu output -json`). `clanker bootstrap --cloud aws --parameter-path <parameter_path> --kms-key <parameter_key_arn>` overwrites the parameter as a SecureString with that key, as the person who applies this stack. The stack ignores later changes of the value. With the placeholder the core does not start |
 
