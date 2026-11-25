@@ -42,6 +42,10 @@ type Dispatcher struct {
 	// Silence is how long a runner can say nothing before its job fails. A runner sends a
 	// heartbeat every few seconds.
 	Silence time.Duration
+	// StartGrace is how long a runner has from its launch to its first request. A runner in
+	// the cloud must first get a machine and pull its image. When it is 0, Silence counts
+	// from the launch.
+	StartGrace time.Duration
 
 	mu      sync.Mutex
 	pending map[string]*pending
@@ -57,17 +61,32 @@ type pending struct {
 	job  jobspec.Job
 	done chan struct{}
 
-	mu       sync.Mutex
-	seen     time.Time
+	mu sync.Mutex
+	// seen is the launch, and after the first request of the runner its last request.
+	seen    time.Time
+	started bool
+	// bound is true when the runner has the job. A token gives its job once.
+	bound    bool
 	plan     []byte
 	planJSON []byte
 	result   *jobspec.Result
 }
 
-func (p *pending) touch() {
+func (p *pending) touch(now time.Time) {
 	p.mu.Lock()
-	p.seen = time.Now()
+	p.seen, p.started = now, true
 	p.mu.Unlock()
+}
+
+// bind gives the job to the runner that asks first. It is false when the job was given.
+func (p *pending) bind() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.bound {
+		return false
+	}
+	p.bound = true
+	return true
 }
 
 func (p *pending) finish(result jobspec.Result) bool {
@@ -127,18 +146,34 @@ func (d *Dispatcher) Run(ctx context.Context, job jobspec.Job) (jobspec.Result, 
 				return jobspec.Result{}, fmt.Errorf("the runner of the %s job gave no result: %w",
 					job.Kind, err)
 			}
-		case <-check.C:
-			p.mu.Lock()
-			silent := time.Since(p.seen)
-			p.mu.Unlock()
-			if silent > d.Silence {
-				return jobspec.Result{}, fmt.Errorf("the runner of the %s job said nothing for %s",
-					job.Kind, silent.Round(time.Second))
+		case now := <-check.C:
+			if err := d.overdue(p, now); err != nil {
+				return jobspec.Result{}, err
 			}
 		case <-ctx.Done():
 			return jobspec.Result{}, fmt.Errorf("the %s job was stopped: %w", job.Kind, ctx.Err())
 		}
 	}
+}
+
+// overdue returns an error when the runner of p was quiet at now for longer than it may be.
+// Before its first request StartGrace applies, after it Silence.
+func (d *Dispatcher) overdue(p *pending, now time.Time) error {
+	p.mu.Lock()
+	silent, started := now.Sub(p.seen), p.started
+	p.mu.Unlock()
+	if !started && d.StartGrace > 0 {
+		if silent > d.StartGrace {
+			return fmt.Errorf("the runner of the %s job made no request in the %s after its launch",
+				p.job.Kind, silent.Round(time.Second))
+		}
+		return nil
+	}
+	if silent > d.Silence {
+		return fmt.Errorf("the runner of the %s job said nothing for %s", p.job.Kind,
+			silent.Round(time.Second))
+	}
+	return nil
 }
 
 func outcome(job jobspec.Job, result jobspec.Result) (jobspec.Result, error) {
@@ -156,7 +191,8 @@ func outcome(job jobspec.Job, result jobspec.Result) (jobspec.Result, error) {
 }
 
 // Handler serves the runners. Mount it at "/runner/v1/". A request carries the token of its
-// job as a bearer token, and reaches only that job.
+// job as a bearer token, and reaches only that job. The first GET of the job specification
+// binds the job to its runner: a later GET gets 409 Conflict.
 func (d *Dispatcher) Handler() http.Handler {
 	mux := http.NewServeMux()
 	route := func(pattern string, handle func(p *pending, w http.ResponseWriter, r *http.Request)) {
@@ -169,11 +205,15 @@ func (d *Dispatcher) Handler() http.Handler {
 				http.Error(w, "the token opens no running job", http.StatusUnauthorized)
 				return
 			}
-			p.touch()
+			p.touch(time.Now())
 			handle(p, w, r)
 		})
 	}
 	route("GET /runner/v1/job", func(p *pending, w http.ResponseWriter, _ *http.Request) {
+		if !p.bind() {
+			http.Error(w, "the job was given to a runner already", http.StatusConflict)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(p.job.Spec)
 	})
