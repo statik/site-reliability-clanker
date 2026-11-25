@@ -25,7 +25,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/jobspec"
 )
@@ -200,11 +199,13 @@ func (r *Runner) credentialFile(text string) (string, func(), error) {
 	return file.Name(), remove, nil
 }
 
-// run is one prepared job: where its stack is, and its environment.
+// run is one prepared job: where its stack is, its environment, and the arguments of
+// `tofu init` that say where its state is.
 type run struct {
 	job     Job
 	stack   string
 	environ []string
+	backend []string
 }
 
 func (r *Runner) prepare(j Job) (run, func(), error) {
@@ -216,8 +217,13 @@ func (r *Runner) prepare(j Job) (run, func(), error) {
 	if _, err := os.Stat(stack); err != nil {
 		return run{}, nil, fmt.Errorf("find stack for %s/%s in the checkout: %w", j.Env, j.Layer, err)
 	}
-	if err := os.MkdirAll(r.StateDir(j.Env), 0o755); err != nil {
-		return run{}, nil, fmt.Errorf("create state directory for %s: %w", j.Env, err)
+	backend, err := r.backendConfig(j)
+	if err != nil {
+		return run{}, nil, err
+	}
+	stateLocation, err := r.stateLocation(j)
+	if err != nil {
+		return run{}, nil, err
 	}
 	kubeconfig, remove, err := r.credentialFile(j.KubeConfig)
 	if err != nil {
@@ -227,9 +233,14 @@ func (r *Runner) prepare(j Job) (run, func(), error) {
 		"TF_IN_AUTOMATION=1",
 		"TF_INPUT=0",
 		"TF_PLUGIN_CACHE_DIR="+r.PluginCache,
-		"TF_VAR_state_location="+r.StateDir(j.Env),
-		"KIND_EXPERIMENTAL_DOCKER_NETWORK=clanker-"+j.Env,
 	)
+	if stateLocation != "" {
+		env = append(env, "TF_VAR_state_location="+stateLocation)
+	}
+	if j.Cloud == "local" {
+		env = append(env, "KIND_EXPERIMENTAL_DOCKER_NETWORK=clanker-"+j.Env)
+	}
+	// The variables of the job come after the values above, so they replace them.
 	env = append(env, r.ExtraEnv...)
 	if r.dockerHost != "" {
 		env = append(env, "DOCKER_HOST="+r.dockerHost)
@@ -246,7 +257,22 @@ func (r *Runner) prepare(j Job) (run, func(), error) {
 			"AWS_SECRET_ACCESS_KEY="+j.AWS.SecretAccessKey,
 			"AWS_SESSION_TOKEN="+j.AWS.SessionToken)
 	}
-	return run{job: j, stack: stack, environ: env}, remove, nil
+	return run{job: j, stack: stack, environ: env, backend: backend}, remove, nil
+}
+
+// stateLocation returns the value of the input state_location of the stacks. With a
+// backend it is the bucket of the backend. A backend with no bucket gives an empty value,
+// and the variables of the job must then give it. Without a backend it is the state
+// directory of the environment, which it creates.
+func (r *Runner) stateLocation(j Job) (string, error) {
+	if len(j.Backend) > 0 {
+		return j.Backend["bucket"], nil
+	}
+	dir := r.StateDir(j.Env)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("create state directory for %s: %w", j.Env, err)
+	}
+	return dir, nil
 }
 
 func (r *Runner) tofu(ctx context.Context, p run, log, capture io.Writer, args ...string) error {
@@ -280,10 +306,17 @@ func (r *Runner) tofu(ctx context.Context, p run, log, capture io.Writer, args .
 }
 
 // backendConfig returns the arguments of `tofu init` that say where the state of the job is.
-func (r *Runner) backendConfig(j Job) []string {
+// Only the stacks of the local target have the local backend, which takes a path. A job on
+// another target must bring the settings of its backend.
+func (r *Runner) backendConfig(j Job) ([]string, error) {
 	if len(j.Backend) == 0 {
+		if j.Cloud != "local" {
+			return nil, fmt.Errorf("the job for %s/%s on %s has no backend settings: only the "+
+				"stacks of the local target keep their state in the state directory", j.Env,
+				j.Layer, j.Cloud)
+		}
 		statePath := filepath.Join(r.StateDir(j.Env), j.Layer+".tfstate")
-		return []string{"-backend-config=path=" + statePath}
+		return []string{"-backend-config=path=" + statePath}, nil
 	}
 	names := make([]string, 0, len(j.Backend))
 	for name := range j.Backend {
@@ -294,11 +327,11 @@ func (r *Runner) backendConfig(j Job) []string {
 	for _, name := range names {
 		config = append(config, "-backend-config="+name+"="+j.Backend[name])
 	}
-	return config
+	return config, nil
 }
 
 func (r *Runner) init(ctx context.Context, p run) error {
-	args := append([]string{"init", "-no-color", "-input=false"}, r.backendConfig(p.job)...)
+	args := append([]string{"init", "-no-color", "-input=false"}, p.backend...)
 	return r.tofu(ctx, p, p.job.Log, nil, args...)
 }
 
@@ -378,7 +411,31 @@ func (r *Runner) Apply(ctx context.Context, j Job, plan []byte, wantSHA256 strin
 		"-lock-timeout=60s", path); err != nil {
 		return nil, err
 	}
-	return r.Outputs(j.Env, j.Layer)
+	return r.outputs(ctx, p)
+}
+
+// outputs returns the outputs of the layer that are not sensitive. `tofu output -json`
+// reads them from the backend of the job, so a bucket gives them as a local file does. It
+// prints the sensitive values too, so what it prints goes to no log.
+func (r *Runner) outputs(ctx context.Context, p run) (map[string]any, error) {
+	var printed bytes.Buffer
+	if err := r.tofu(ctx, p, p.job.Log, &printed, "output", "-json"); err != nil {
+		return nil, err
+	}
+	var all map[string]struct {
+		Value     any  `json:"value"`
+		Sensitive bool `json:"sensitive"`
+	}
+	if err := json.Unmarshal(printed.Bytes(), &all); err != nil {
+		return nil, fmt.Errorf("decode the outputs of %s/%s: %w", p.job.Env, p.job.Layer, err)
+	}
+	outputs := make(map[string]any, len(all))
+	for name, output := range all {
+		if !output.Sensitive {
+			outputs[name] = output.Value
+		}
+	}
+	return outputs, nil
 }
 
 // destroyDataDir returns the directory for the working data of OpenTofu in a destroy of a
@@ -403,57 +460,23 @@ func (r *Runner) Destroy(ctx context.Context, j Job) error {
 	return r.tofu(ctx, p, j.Log, nil, "destroy", "-no-color", "-input=false", "-auto-approve")
 }
 
-// ApplyDirect plans and applies a layer in one step with the credentials of the operator.
-// Only `clanker bootstrap` calls it, for layer 00-bootstrap.
-func (r *Runner) ApplyDirect(ctx context.Context, j Job) error {
+// ApplyDirect plans and applies a layer in one step with the credentials of the operator,
+// and returns the outputs of the layer. Only `clanker bootstrap` calls it, for layer
+// 00-bootstrap.
+func (r *Runner) ApplyDirect(ctx context.Context, j Job) (map[string]any, error) {
 	p, done, err := r.prepare(j)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer done()
 	if err := r.init(ctx, p); err != nil {
-		return err
+		return nil, err
 	}
-	return r.tofu(ctx, p, j.Log, nil, "apply", "-no-color", "-input=false", "-auto-approve")
-}
-
-// Outputs reads the outputs of a layer from its state file. A layer that was never applied
-// gives an empty map.
-func (r *Runner) Outputs(env, layer string) (map[string]any, error) {
-	path := filepath.Join(r.StateDir(env), layer+".tfstate")
-	var state struct {
-		Outputs map[string]struct {
-			Value     any  `json:"value"`
-			Sensitive bool `json:"sensitive"`
-		} `json:"outputs"`
+	if err := r.tofu(ctx, p, j.Log, nil, "apply", "-no-color", "-input=false",
+		"-auto-approve"); err != nil {
+		return nil, err
 	}
-	// OpenTofu rewrites the state file during an apply. A read at that moment can see a
-	// partial file, so a decode failure is tried again before it is an error.
-	var decodeErr error
-	for attempt := 0; attempt < 5; attempt++ {
-		raw, err := os.ReadFile(path)
-		if errors.Is(err, os.ErrNotExist) {
-			return map[string]any{}, nil
-		}
-		if err != nil {
-			return nil, fmt.Errorf("read state of %s/%s: %w", env, layer, err)
-		}
-		if decodeErr = json.Unmarshal(raw, &state); decodeErr == nil {
-			break
-		}
-		time.Sleep(150 * time.Millisecond)
-	}
-	if decodeErr != nil {
-		return nil, fmt.Errorf("decode state of %s/%s: %w", env, layer, decodeErr)
-	}
-	outputs := map[string]any{}
-	for name, o := range state.Outputs {
-		if o.Sensitive {
-			continue
-		}
-		outputs[name] = o.Value
-	}
-	return outputs, nil
+	return r.outputs(ctx, p)
 }
 
 // RunbookJob is one run of a script from the runbooks repository.

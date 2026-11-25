@@ -240,15 +240,13 @@ func (h *harness) applyJob(ctx context.Context, plan jobspec.Result) {
 		"the apply job applies the approved plan in a new container: error %v", err)
 	h.check(result.ToolDigest == h.opts.digest, "the apply job reports the tool digest %s",
 		result.ToolDigest)
-	// The runner reads the outputs of an apply from a local state file, which does not exist
-	// with an S3 backend (#137). The check script reads them from the state in the bucket.
-	if len(result.Outputs) == 0 {
-		fmt.Println("note: the apply job reported no outputs; with an S3 backend the runner " +
-			"reads them from a local file (#137)")
-		return
-	}
+	// The runner reads the outputs from the state in the bucket. The container of the
+	// apply has no state file of its own.
 	h.check(result.Outputs["message"] == h.opts.message,
 		"the apply job reports the output message %v", result.Outputs["message"])
+	h.check(result.Outputs["state_location"] == h.opts.bucket,
+		"the apply job reports the output state_location %v, the bucket of the backend",
+		result.Outputs["state_location"])
 }
 
 func run() error {
