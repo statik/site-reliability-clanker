@@ -98,6 +98,14 @@ run "launch_template_carries_the_instance_tags" {
 
   assert {
     condition = (
+      aws_launch_template.node.metadata_options[0].http_tokens == "required"
+      && aws_launch_template.node.metadata_options[0].http_put_response_hop_limit == 2
+    )
+    error_message = "The nodes must require IMDSv2 with a hop limit of 2."
+  }
+
+  assert {
+    condition = (
       aws_eks_node_group.default.launch_template[0].id == aws_launch_template.node.id
       && aws_eks_node_group.default.ami_type == "AL2023_ARM_64_STANDARD"
       && aws_eks_node_group.default.instance_types == tolist(["t4g.medium"])

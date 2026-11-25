@@ -58,6 +58,14 @@ resource "aws_launch_template" "node" {
     }
   }
 
+  # IMDSv2 only. The EKS guide for launch templates asks for a hop limit of 2, so that a
+  # container that uses IMDSv2 reaches it.
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
+  }
+
   dynamic "tag_specifications" {
     for_each = toset(["instance", "volume"])
 
