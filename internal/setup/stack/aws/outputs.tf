@@ -46,12 +46,12 @@ output "parameter_path" {
 }
 
 output "parameter_key_arn" {
-  description = "KMS key of the settings. `clanker bootstrap` passes it with --key-id."
+  description = "KMS key of the settings. A writer of bootstrap_parameter passes it as --key-id."
   value       = aws_kms_key.settings.arn
 }
 
 output "bootstrap_parameter" {
-  description = "Parameter that `clanker bootstrap` overwrites with the outputs of 00-bootstrap."
+  description = "Slot for the outputs of 00-bootstrap. Overwrite it with parameter_key_arn."
   value       = aws_ssm_parameter.bootstrap.name
 }
 

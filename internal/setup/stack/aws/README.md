@@ -47,7 +47,7 @@ starts. The image of the core holds only the path and the region (output `core_i
 | `CLANKER_OIDC_CLIENT_SECRET` | Random, also in `/src/<env>/idp` for Keycloak |
 | `CLANKER_ADMIN_EMAIL` | `admin@src-<env>-idp.<zone>` |
 | `CLANKER_AWS_RUNNER` | Phase 2: cluster, task definition, container, private subnets and the runner security group |
-| `CLANKER_AWS_BOOTSTRAP` | A placeholder. `clanker bootstrap` writes the outputs of `00-bootstrap` here with `--key-id <parameter_key_arn>`. The stack ignores later changes of the value |
+| `CLANKER_AWS_BOOTSTRAP` | A placeholder for the outputs of `00-bootstrap` (`tofu output -json`). Nothing writes them yet: `clanker bootstrap --cloud aws` refuses today. The writer must overwrite the parameter as a SecureString with `--key-id <parameter_key_arn>`, as the role that applies this stack. The stack ignores later changes of the value. With the placeholder the core does not start |
 
 No value holds the address of an instance: people, Keycloak (the redirect URI) and the
 collector (output `collector_endpoint`) reach the core by its name. The runners get the
@@ -65,7 +65,8 @@ private address of the core from the core, for each task.
 ### Keycloak
 
 Keycloak imports the realm of the input `keycloak_realm`: the content of
-`scripts/verify/keycloak/realm.json`. Keycloak keeps a `${NAME}` whose variable is not set as
+`scripts/verify/keycloak/realm.json`. A released binary does not carry `scripts/verify`, so
+the realm comes from a checkout until the installer carries it. Keycloak keeps a `${NAME}` whose variable is not set as
 literal text. Two checks stop that:
 
 - The plan fails when the realm reads a variable that the container does not get.
@@ -103,8 +104,9 @@ The owner gives the values of one account in `terraform.tfvars` (git ignores it;
 2. Push the runner image (`make runner-image`) to `runner_repository_url`, and note its
    digest.
 3. Build the image of the core with `ops`, with `core_image_env` as its `Env`.
-4. Apply `00-bootstrap` with `broker_principal = <core_role_arn>` (`clanker bootstrap`).
-   It writes the outputs of `00-bootstrap` to `bootstrap_parameter`.
+4. Apply `00-bootstrap` with `broker_principal = <core_role_arn>`, and write its outputs to
+   `bootstrap_parameter` (see the table above). `clanker bootstrap` is to do both; it does
+   not do them on AWS yet.
 5. **Phase 2.** Apply with `runner_image_digest` and `core_image_id`. The apply waits until
    the core answers `/healthz` behind the load balancer (up to 15 minutes).
 
@@ -184,6 +186,11 @@ Validated:
   with Go `crypto/ed25519`.
 - `keycloak-start.sh` in the pinned Keycloak image with Docker: it stops on a missing or
   empty variable, and imports the realm with the values when all are set.
+- The same image with the environment of the task definition (an `https://` name and
+  `KC_PROXY_HEADERS=xforwarded`): a health check over plain HTTP without forwarded headers
+  gets the discovery document with the `https://` issuer, and a request with
+  `X-Forwarded-Proto: https` gets the login form from a tailnet address and from a public
+  address.
 
 Not done: no `tofu plan` and no `tofu apply` against AWS. Key policy, IAM conditions, the
 availability of PostgreSQL 18 on `db.t4g.micro` in the region, service quotas and the tag
