@@ -5,8 +5,6 @@ package awstarget
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"regexp"
 	"time"
@@ -60,30 +58,10 @@ func NewSTS(region string) STS {
 
 var roleARN = regexp.MustCompile(`^arn:aws[a-z-]*:iam::[0-9]{12}:role/.+$`)
 
-// ParseRoles reads the output `identities` of layer 00-bootstrap as JSON: a role ARN for
-// each identity, for example for `planner` and `applier-30-data`.
-func ParseRoles(text string) (map[string]string, error) {
-	roles := map[string]string{}
-	if err := json.Unmarshal([]byte(text), &roles); err != nil {
-		return nil, fmt.Errorf("the roles of the identities are not a JSON object of text "+
-			"values: %w", err)
-	}
-	if len(roles) == 0 {
-		return nil, errors.New("the roles of the identities name no identity")
-	}
-	for identity, arn := range roles {
-		if !roleARN.MatchString(arn) {
-			return nil, fmt.Errorf("the role of the identity %s is %q, which is not the ARN "+
-				"of an IAM role", identity, arn)
-		}
-	}
-	return roles, nil
-}
-
 // Credentials issues the credentials of grants on AWS.
 type Credentials struct {
 	STS STS
-	// Roles gives the role ARN of each identity. ParseRoles makes it.
+	// Roles gives the role ARN of each identity: Bootstrap.Roles.
 	Roles map[string]string
 	// Record appends an event to the audit log.
 	Record func(audit.Event) error

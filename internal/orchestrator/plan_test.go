@@ -2,6 +2,7 @@ package orchestrator_test
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
@@ -29,12 +30,26 @@ func TestLayersForPaths(t *testing.T) {
 			[]string{"40-platform"}},
 		{"unrelated file", "local", []string{"README.md"}, []string{}},
 		{"no paths", "local", nil, []string{}},
+		{"bootstrap on the local target", "local",
+			[]string{"platform/stacks/local/00-bootstrap/main.tf"}, []string{"00-bootstrap"}},
 	}
 	for _, tc := range cases {
-		got := orchestrator.LayersForPaths(tc.cloud, packtest.Example(t), tc.paths)
-		if !slices.Equal(got, tc.want) {
-			t.Errorf("%s: want %q, got %q", tc.name, tc.want, got)
+		got, err := orchestrator.LayersForPaths(tc.cloud, packtest.Example(t), tc.paths)
+		if err != nil || !slices.Equal(got, tc.want) {
+			t.Errorf("%s: want %q, got %q, %v", tc.name, tc.want, got, err)
 		}
+	}
+}
+
+func TestAChangeToTheBootstrapLayerOfACloudIsRefused(t *testing.T) {
+	paths := []string{"platform/stacks/aws/10-network/main.tf",
+		"platform/stacks/aws/00-bootstrap/variables.tf"}
+	got, err := orchestrator.LayersForPaths("aws", packtest.Example(t), paths)
+	want := "the change touches layer 00-bootstrap of cloud aws, which the control plane " +
+		"does not apply: there is no applier role for it. Apply it with `clanker bootstrap " +
+		"--cloud aws`"
+	if err == nil || !strings.Contains(err.Error(), want) || got != nil {
+		t.Fatalf("layers = %q, error = %v, want %q", got, err, want)
 	}
 }
 
@@ -54,15 +69,16 @@ func TestTemplateExplanationUsesOnlyPlanFacts(t *testing.T) {
 
 func TestAChartOfAnotherPackTouchesItsLayer(t *testing.T) {
 	second := packtest.Second(t)
-	got := orchestrator.LayersForPaths("local", second, []string{"apps/harbor/chart/values.yaml"})
-	if len(got) != 1 || got[0] != second.Layer {
-		t.Errorf("layers = %v, want the layer of the pack", got)
+	got, err := orchestrator.LayersForPaths("local", second,
+		[]string{"apps/harbor/chart/values.yaml"})
+	if err != nil || len(got) != 1 || got[0] != second.Layer {
+		t.Errorf("layers = %v, %v, want the layer of the pack", got, err)
 	}
 	example := packtest.Example(t)
-	other := orchestrator.LayersForPaths("local", second,
+	other, err := orchestrator.LayersForPaths("local", second,
 		[]string{example.ChartMount() + "/values.yaml"})
-	if len(other) != 0 {
-		t.Errorf("the chart of another application touched %v", other)
+	if err != nil || len(other) != 0 {
+		t.Errorf("the chart of another application touched %v, %v", other, err)
 	}
 }
 

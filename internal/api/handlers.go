@@ -622,9 +622,9 @@ func (s *Server) startEnvironmentWork(r *http.Request, kind, title, trigger stri
 	if err != nil {
 		return nil, err
 	}
-	wi, err := s.Orch.Create(orchestrator.NewWorkItem{Title: title, Kind: kind,
-		Env: r.PathValue("env"), Layers: orchestrator.Layers, Trigger: trigger,
-		Actor: user.Name})
+	env := r.PathValue("env")
+	wi, err := s.Orch.Create(orchestrator.NewWorkItem{Title: title, Kind: kind, Env: env,
+		Layers: s.Orch.Envs[env].BlankSlateLayers(), Trigger: trigger, Actor: user.Name})
 	if err != nil {
 		return nil, badRequest("%v", err)
 	}

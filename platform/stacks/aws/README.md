@@ -67,8 +67,11 @@ when it can do so. The session tags are in CloudTrail for each call. The broker 
 `clanker_work_item` and `clanker_plan`, the first 12 characters of the plan hash, which no
 condition reads. The role session name is the work item and the grant ID.
 
-The control plane reads the role ARNs from the setting `CLANKER_AWS_IDENTITIES`: the output
-`identities` of `00-bootstrap` as JSON.
+The control plane reads the setting `CLANKER_AWS_BOOTSTRAP`: what `tofu output -json` prints
+in `00-bootstrap`. It takes the role ARNs from the output `identities`, and the state backend
+and the region of the other layers from the output `state_backend`. At each start it records
+these outputs as the outputs of `00-bootstrap`. A setting with an output that the layer does
+not have, with a missing output or with a sensitive output stops the start.
 
 The permission boundary allows only the services that the platform uses. It denies IAM users
 and access keys, roles without the boundary, changes to the boundary and to the agent roles,

@@ -301,24 +301,6 @@ func TestWithdrawRecordsThatTheSessionIsLeftToExpire(t *testing.T) {
 	}
 }
 
-func TestParseRolesTakesTheIdentitiesOutputAndRefusesOtherText(t *testing.T) {
-	roles, err := ParseRoles(`{"planner": "` + plannerRole + `"}`)
-	if err != nil || roles["planner"] != plannerRole {
-		t.Fatalf("roles = %v, error = %v", roles, err)
-	}
-	for text, want := range map[string]string{
-		"":                               "not a JSON object",
-		`["` + plannerRole + `"]`:        "not a JSON object",
-		`{}`:                             "name no identity",
-		`{"planner": "clanker-planner"}`: "not the ARN of an IAM role",
-		`{"planner": "arn:aws:iam::111122223333:user/example"}`: "not the ARN of an IAM role",
-	} {
-		if _, err := ParseRoles(text); err == nil || !strings.Contains(err.Error(), want) {
-			t.Errorf("ParseRoles(%q) error = %v, want %q", text, err, want)
-		}
-	}
-}
-
 const assumeRoleAnswer = `<AssumeRoleResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">
   <AssumeRoleResult>
     <Credentials>
