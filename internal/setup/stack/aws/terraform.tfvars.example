@@ -1,0 +1,28 @@
+# Copy this file to terraform.tfvars in this directory and replace each value. Git ignores
+# *.tfvars here: the values describe one AWS account and must not go into the repository.
+#
+# The realm of Keycloak is not in this file, because a tfvars file cannot read a file:
+#   export TF_VAR_keycloak_realm="$(cat <checkout>/scripts/verify/keycloak/realm.json)"
+
+env_name = "prod"
+region   = "us-west-2"
+
+# The existing VPC, its private subnets behind a NAT gateway (two zones or more), and the
+# security group of its Tailscale subnet router.
+vpc_id                   = "vpc-0123456789abcdef0"
+private_subnet_ids       = ["subnet-0123456789abcdef0", "subnet-0123456789abcdef1"]
+router_security_group_id = "sg-0123456789abcdef0"
+
+# A public Route 53 zone of the same account, for example the zone of example.com. The stack
+# adds src-<env_name>.example.com and src-<env_name>-idp.example.com.
+zone_id = "Z0EXAMPLE"
+
+# The tags that the organization requires, for example on ec2:RunInstances. Use {} for none.
+required_tags = {
+  "example:project" = "example"
+  "example:owner"   = "owner@example.com"
+}
+
+# Phase 2. Leave both unset for phase 1. See README.md.
+# runner_image_digest = "sha256:<64 hexadecimal digits>"
+# core_image_id       = "ami-0123456789abcdef0"

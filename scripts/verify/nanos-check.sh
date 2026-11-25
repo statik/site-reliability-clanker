@@ -6,7 +6,8 @@
 # Usage: scripts/verify/nanos-check.sh
 #
 # Environment:
-#   NANOS_ACCEL  hvf (default) or tcg; see ops/run-local.sh.
+#   NANOS_ACCEL   hvf (default) or tcg; see ops/run-local.sh.
+#   NANOS_KERNEL  nightly (default), release or a release version; see ops/run-local.sh.
 #
 # It needs ops, QEMU and Docker. It is for an Apple Silicon Mac, as ops/run-local.sh is.
 # The database address and the signing key go into the image as `Env`. That is correct
@@ -56,6 +57,7 @@ boot() {
     >"${work}/$1.log" 2>&1 &
   for _ in $(seq 1 120); do
     if curl -fs -m 2 -o /dev/null "${base}/healthz"; then
+      grep -m 1 '^Nanos (' "${work}/$1.log" || true
       echo "the API answered $(($(date +%s) - started)) s after the start of the image build"
       return
     fi
@@ -136,8 +138,22 @@ echo "== clone a seeded repository and push a branch"
 # git sends the session of the admin here. core-check.sh covers the device flow for git.
 git -c http.cookieFile="${jar}" clone -q "${base}/git/runbooks.git" "${work}/runbooks" 2>>"${work}/git.log"
 git -C "${work}/runbooks" fsck --strict --no-dangling >/dev/null || fail "fsck of runbooks"
-if [ "$(git -C "${work}/runbooks" rev-parse 'HEAD^{tree}')" != "$(git -C "${repo}" rev-parse 'HEAD:runbooks')" ]; then
-  fail "the tree of the runbooks repository is not the tree of runbooks/ in the checkout"
+# The core seeds runbooks/ of its source files and, in jobs/, the runbooks of the one pack in
+# apps/ of the bundle, from the directory that the manifest of the pack names (seedForge in
+# cmd/clanker/up.go).
+manifest="$(tar -tzf "${repo}/internal/bundle/bundle.tar.gz" | grep -E '^apps/[^/]+/pack\.json$')"
+pack_runbooks="$(git -C "${repo}" show "HEAD:${manifest}" |
+  python3 -c 'import json, sys; print(json.load(sys.stdin).get("runbooks", ""))')"
+jobs_tree=""
+if [ -n "${pack_runbooks}" ]; then
+  jobs_tree="$(git -C "${repo}" rev-parse "HEAD:${manifest%/pack.json}/${pack_runbooks}")"
+fi
+expected_runbooks="$({
+  git -C "${repo}" ls-tree HEAD:runbooks
+  if [ -n "${jobs_tree}" ]; then printf '040000 tree %s\tjobs\n' "${jobs_tree}"; fi
+} | git -C "${work}/runbooks" mktree --missing)"
+if [ "$(git -C "${work}/runbooks" rev-parse 'HEAD^{tree}')" != "${expected_runbooks}" ]; then
+  fail "the runbooks repository is not runbooks/ of the checkout with the pack runbooks in jobs/"
 fi
 git -C "${work}/runbooks" checkout -q -b nanos-check
 echo "written through a unikernel" >"${work}/runbooks/nanos-check.txt"

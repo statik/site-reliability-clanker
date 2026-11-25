@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -23,8 +24,9 @@ import (
 
 // LayersForPaths returns the layers of cloud that the changed paths touch, in apply order.
 // A change to a shared module or to the chart of the application pack touches the layer
-// that uses it.
-func LayersForPaths(cloud string, app pack.Pack, paths []string) []string {
+// that uses it. On a cloud a change to layer 00-bootstrap is an error: an operator applies
+// that layer with `clanker bootstrap`, and no agent role can apply it.
+func LayersForPaths(cloud string, app pack.Pack, paths []string) ([]string, error) {
 	touched := map[string]bool{}
 	chart, appLayer := app.ChartMount(), app.Layer
 	stackPrefix := "platform/stacks/" + cloud + "/"
@@ -40,13 +42,20 @@ func LayersForPaths(cloud string, app pack.Pack, paths []string) []string {
 			touched[appLayer] = true
 		}
 	}
+	bootstrap := Layers[0]
+	if touched[bootstrap] && (EnvConfig{Cloud: cloud}).OnCloud() {
+		return nil, fmt.Errorf("the change touches layer %s of cloud %s, which the control "+
+			"plane does not apply: there is no applier role for it. Apply it with `clanker "+
+			"bootstrap --cloud %s`, and give its new outputs to the control plane", bootstrap,
+			cloud, cloud)
+	}
 	layers := []string{}
 	for _, layer := range Layers {
 		if touched[layer] {
 			layers = append(layers, layer)
 		}
 	}
-	return layers
+	return layers, nil
 }
 
 // AttachPull links a pull request to a work item and derives the layers from its diff.
@@ -63,7 +72,10 @@ func (o *Orchestrator) AttachPull(id string, prID int64, actor string) (WorkItem
 	if err != nil {
 		return WorkItem{}, err
 	}
-	wi.Layers = LayersForPaths(o.Envs[wi.Env].Cloud, o.App, paths)
+	wi.Layers, err = LayersForPaths(o.Envs[wi.Env].Cloud, o.App, paths)
+	if err != nil {
+		return WorkItem{}, fmt.Errorf("attach pull request %d to %s: %w", prID, id, err)
+	}
 	if len(wi.Layers) == 0 {
 		return WorkItem{}, fmt.Errorf("attach pull request %d to %s: the diff touches no layer "+
 			"of environment %s", prID, id, wi.Env)
@@ -83,15 +95,45 @@ func (o *Orchestrator) AttachPull(id string, prID int64, actor string) (WorkItem
 }
 
 // layerJob returns a job for one layer of the work item, with the tree of its commit. The
-// plan and the apply of one commit share one checkout on the runner.
+// plan and the apply of one commit share one checkout on the runner. On a cloud the job
+// names its state in the backend of the environment and gives the layer the common inputs
+// of the platform contract. On the local target the runner keeps the state and the
+// terraform.tfvars files of the stacks hold those inputs.
 func (o *Orchestrator) layerJob(wi WorkItem, kind, layer string) (jobspec.Job, error) {
+	env := o.Envs[wi.Env]
+	spec := jobspec.Spec{Kind: kind, Env: wi.Env, Cloud: env.Cloud, Layer: layer,
+		CheckoutID: wi.ID + "/" + wi.Commit, Variables: o.JobVariables}
+	if env.OnCloud() {
+		if len(env.Backend) == 0 {
+			return jobspec.Job{}, fmt.Errorf("%s of environment %s on %s: the control plane "+
+				"has no state backend for the environment. Give it the outputs of layer "+
+				"00-bootstrap", layer, wi.Env, env.Cloud)
+		}
+		spec.Backend, spec.Variables = cloudState(env, layer, o.JobVariables)
+	}
 	archive, err := o.Forge.Archive(PlatformRepo, wi.Commit)
 	if err != nil {
 		return jobspec.Job{}, err
 	}
-	return jobspec.Job{Spec: jobspec.Spec{Kind: kind, Env: wi.Env, Cloud: o.Envs[wi.Env].Cloud,
-		Layer: layer, CheckoutID: wi.ID + "/" + wi.Commit, Variables: o.JobVariables},
-		Checkout: archive}, nil
+	return jobspec.Job{Spec: spec, Checkout: archive}, nil
+}
+
+// cloudState returns the backend settings and the variables of a job for a layer of an
+// environment on a cloud. The state key and the inputs are those of the platform contract:
+// the layers above read layer 00-bootstrap at <env>/00-bootstrap.tfstate in the bucket
+// state_location of the region.
+func cloudState(env EnvConfig, layer string, shared map[string]string) (
+	map[string]string, map[string]string) {
+	backend := maps.Clone(env.Backend)
+	backend["key"] = env.Name + "/" + layer + ".tfstate"
+	variables := maps.Clone(shared)
+	if variables == nil {
+		variables = map[string]string{}
+	}
+	variables["TF_VAR_env_name"] = env.Name
+	variables["TF_VAR_state_location"] = env.Backend["bucket"]
+	variables["TF_VAR_region"] = env.Region
+	return backend, variables
 }
 
 // run gives the job to a runner and records the tool versions that the runner reports.
@@ -266,11 +308,15 @@ func (o *Orchestrator) endJob(job Job, log *jobLog, jobErr error) {
 	}
 }
 
-// planCredential gets a read-only credential for a plan job. A layer that needs no cluster
-// credential, or an environment without a cluster, gets an empty credential.
+// planCredential gets a read-only credential for a plan job. On a cloud with an issuer
+// every plan gets one: OpenTofu reads the state and the resources of the cloud for each
+// layer. On the local target a layer that needs no cluster credential, or an environment
+// without a cluster, gets an empty credential.
 func (o *Orchestrator) planCredential(ctx context.Context, wi WorkItem, layer string) (
 	broker.Grant, broker.Credential, error) {
-	if !o.layerApplied(wi.Env, "20-cluster") || slices.Index(Layers, layer) < 3 {
+	cloudIssuer := o.Envs[wi.Env].OnCloud() && o.Broker.HasIssuer()
+	inCluster := o.layerApplied(wi.Env, "20-cluster") && slices.Index(Layers, layer) >= 3
+	if !cloudIssuer && !inCluster {
 		return broker.Grant{}, broker.Credential{}, nil
 	}
 	grant, err := o.Broker.Issue(broker.Request{WorkItem: wi.ID, Env: wi.Env, Layer: layer,

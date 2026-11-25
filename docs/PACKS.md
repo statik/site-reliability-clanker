@@ -388,6 +388,8 @@ does today. They do not change the rules of section B.8, which the core fixes.
 | `image` | `component` | The tag of the image of each instance. For `kubernetes`, and for `docker` |
 | `layer` | none | The output of the layer. The control plane then knows only what it deployed, not what runs |
 
+- The core removes one `v` at the start of a value and the build part from the first `+`,
+  and keeps a `-suffix`: `v2.38.11+abc1234` is `2.38.11`.
 - A value that does not match the pattern of a version is `unknown`.
 - Instances of one component that report different versions are a failed check.
 - With the source `layer`, no running version is checked. The approval page of the first
@@ -854,8 +856,12 @@ Each step is one pull request or a few, and each leaves Paperboat working.
    containers to the record, keeps the newest record of each environment and shows the
    state of each component in the topology view. A record with no new data for 60 seconds
    has each state `unknown`. The record has no checks and no volumes yet, and the version
-   of an instance is the tag of its image. No collector ran against this endpoint yet.
+   of an instance is the tag of its image. On 2026-11-25 the collector in the kind cluster
+   of the local target sent to this endpoint at `host.docker.internal` while the core
+   listened on `127.0.0.1:7070`, and the record of the environment was fresh. An image
+   `<repository>:<tag>@sha256:<digest>` gave the tag as the version of the instance.
 3. **The rules of B.8**, the `tcp` check, the `image` version, the state `unknown`.
+   Built so far: the `image` version for `kubernetes`.
 4. **The site runner.** Enrolment and the jobs of a site.
 5. **Access to a host.** The certificate in the broker, the host kit with the collector
    and the helper, and a test machine that runs systemd.

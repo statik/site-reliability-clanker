@@ -488,12 +488,17 @@ type RunbookJob struct {
 	Name       string
 	Params     map[string]string
 	KubeConfig string
-	Log        io.Writer
+	// Namespace and DataNamespace are the targets of the environment: the namespace of the
+	// application, and the namespace of its data services or "" when there is none.
+	Namespace     string
+	DataNamespace string
+	Log           io.Writer
 }
 
-// Runbook runs the script with the credential and the parameters in its environment. It
-// returns the outputs that the script wrote to the file that OUTPUT_FILE names, one
-// "name=value" on each line. The core checks them against the definition of the runbook.
+// Runbook runs the script with the credential, the targets and the parameters in its
+// environment. It returns the outputs that the script wrote to the file that OUTPUT_FILE
+// names, one "name=value" on each line. The core checks them against the definition of
+// the runbook.
 func (r *Runner) Runbook(ctx context.Context, j RunbookJob) (map[string]any, error) {
 	checkout, err := r.checkoutDir(j.Checkout)
 	if err != nil {
@@ -515,7 +520,8 @@ func (r *Runner) Runbook(ctx context.Context, j RunbookJob) (map[string]any, err
 	defer removeOutputs()
 	cmd := exec.CommandContext(ctx, "bash", script)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig, "STATE_DIR="+r.StateDir(j.Env),
-		"OUTPUT_FILE="+outputFile)
+		"OUTPUT_FILE="+outputFile, "TARGET_APPLICATION="+j.Namespace,
+		"TARGET_DATA="+j.DataNamespace)
 	cmd.Env = append(cmd.Env, paramEnv(j.Params)...)
 	cmd.Stdout, cmd.Stderr = j.Log, j.Log
 	if err := cmd.Run(); err != nil {

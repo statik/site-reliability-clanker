@@ -55,6 +55,18 @@ run "boundary_denies_the_settings_of_the_control_plane" {
     error_message = "The boundary must deny ssm:GetParameter* on /src and on every parameter below it."
   }
 
+  # A recursive GetParametersByPath on / is checked against / only, so the deny must cover
+  # every path.
+  assert {
+    condition = anytrue([
+      for s in data.aws_iam_policy_document.boundary.statement :
+      s.sid == "NoParameterReadsByPath" && s.effect == "Deny" &&
+      toset(s.actions) == toset(["ssm:GetParametersByPath"]) &&
+      toset(s.resources) == toset(["*"])
+    ])
+    error_message = "The boundary must deny ssm:GetParametersByPath on every path."
+  }
+
   assert {
     condition     = aws_iam_policy.boundary.policy == data.aws_iam_policy_document.boundary.json
     error_message = "The boundary policy must be the rendered boundary document."

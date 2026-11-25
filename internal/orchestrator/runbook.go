@@ -130,17 +130,27 @@ func (o *Orchestrator) checkRunbook(name string, params map[string]string) (
 }
 
 // runbookJob returns the job for a checked request at a commit of the runbooks repository.
+// The job has the targets of the environment, so a script names no namespace.
 func (o *Orchestrator) runbookJob(req RunbookRequest, commit string) (jobspec.Job, error) {
 	if _, err := o.Forge.ReadFile(RunbooksRepo, commit, "jobs/"+req.Name+".sh"); err != nil {
 		return jobspec.Job{}, fmt.Errorf("runbook %s has a definition and no script jobs/%s.sh "+
 			"in the runbooks repository at %s", req.Name, req.Name, commit[:8])
+	}
+	if _, configured := o.Envs[req.Env]; !configured {
+		return jobspec.Job{}, fmt.Errorf("runbook %s: environment %q is not configured",
+			req.Name, req.Env)
+	}
+	targets, err := o.Targets(req.Env)
+	if err != nil {
+		return jobspec.Job{}, fmt.Errorf("runbook %s: %w", req.Name, err)
 	}
 	archive, err := o.Forge.Archive(RunbooksRepo, commit)
 	if err != nil {
 		return jobspec.Job{}, err
 	}
 	return jobspec.Job{Spec: jobspec.Spec{Kind: jobspec.KindRunbook, Env: req.Env,
-		CheckoutID: "runbooks/" + commit, Runbook: req.Name, Params: req.Params},
+		CheckoutID: "runbooks/" + commit, Runbook: req.Name, Params: req.Params,
+		Namespace: targets.Namespace, DataNamespace: targets.DataNamespace},
 		Checkout: archive}, nil
 }
 
@@ -257,6 +267,8 @@ func (o *Orchestrator) runRunbookJob(ctx context.Context, job *Job, log io.Write
 	fmt.Fprintf(log, "grant %s accepted: %s\n$ %s.sh\n", grant.ID, cred.Mechanism,
 		definition.Name)
 	writeSorted(log, "param", spec.Params)
+	writeSorted(log, "target", map[string]string{"application": spec.Namespace,
+		"data": spec.DataNamespace})
 	spec.KubeConfig, spec.Log = cred.KubeConfig, log
 	result, err := o.run(ctx, job, spec)
 	if err != nil {

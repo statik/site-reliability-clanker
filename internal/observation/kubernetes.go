@@ -225,11 +225,12 @@ func instanceOf(name string, found *pod, previous map[string]int) (Instance, int
 	return instance, sum
 }
 
-// versionOf returns the one image tag of the containers of an instance when it has the
-// form of a version. A tag is text of the cluster, so no other tag enters the record.
+// versionOf returns the version of the one image tag of the containers of an instance, as
+// NormalizeVersion reads it. A tag is text of the cluster, so no other tag enters the
+// record.
 func versionOf(tags []string) string {
-	if len(tags) == 1 && IsVersion(tags[0]) {
-		return tags[0]
+	if len(tags) == 1 {
+		return NormalizeVersion(tags[0])
 	}
 	return ""
 }

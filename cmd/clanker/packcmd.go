@@ -78,7 +78,7 @@ func packFacts(app pack.Pack) []string {
 		fmt.Sprintf("diagnostics: %d reads, and the state of the pods and the deployments",
 			len(app.Diagnostics)),
 		fmt.Sprintf("checks: %s", strings.Join(checkFacts(app), ", ")),
-		fmt.Sprintf("version: %s %s", app.AppVersion.Source, app.AppVersion.Path),
+		"version: " + versionFact(app),
 		"incident: " + incidentFact(app),
 	}
 	for _, part := range app.CheckParts() {
@@ -113,6 +113,15 @@ func checkFacts(app pack.Pack) []string {
 		facts = append(facts, fact)
 	}
 	return facts
+}
+
+// versionFact says where the monitor reads the version that runs.
+func versionFact(app pack.Pack) string {
+	if app.AppVersion.Source == pack.VersionImage {
+		return fmt.Sprintf("%s, the tag of each instance of %s, from the collector",
+			pack.VersionImage, app.AppVersion.Component)
+	}
+	return fmt.Sprintf("%s %s", app.AppVersion.Source, app.AppVersion.Path)
 }
 
 func incidentFact(app pack.Pack) string {

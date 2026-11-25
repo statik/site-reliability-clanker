@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -146,10 +147,33 @@ type Job struct {
 	EndedAt    string `json:"ended_at"`
 }
 
+// localCloud is the cloud of the local target. Its runner keeps the state of each layer
+// in its own directory, and the orchestrator applies every layer there.
+const localCloud = "local"
+
 // EnvConfig describes one environment.
 type EnvConfig struct {
 	Name  string `json:"name"`
 	Cloud string `json:"cloud"`
+	// Region is the region of an environment on a cloud. It is empty on the local target.
+	Region string `json:"region,omitempty"`
+	// Backend holds the settings of the state backend of the layers on a cloud, without the
+	// key of a layer: the output state_backend of layer 00-bootstrap. It is empty on the
+	// local target, and on a cloud before layer 00-bootstrap exists.
+	Backend map[string]string `json:"backend,omitempty"`
+}
+
+// OnCloud reports whether the environment is on a cloud and not on the local target.
+func (e EnvConfig) OnCloud() bool { return e.Cloud != localCloud }
+
+// BlankSlateLayers returns the layers of the first deployment of an environment. On a
+// cloud an operator applies layer 00-bootstrap with `clanker bootstrap`, and no agent role
+// can apply it, so the first deployment starts at the layer above it.
+func (e EnvConfig) BlankSlateLayers() []string {
+	if e.OnCloud() {
+		return slices.Clone(Layers[1:])
+	}
+	return slices.Clone(Layers)
 }
 
 // Clock gives the virtual time.
