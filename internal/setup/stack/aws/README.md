@@ -24,7 +24,8 @@ The stack uses an existing VPC and changes nothing in it.
 | Database | RDS for PostgreSQL 18 (the current minor version of RDS), `db.t4g.micro`, 20 GiB gp3, encrypted, private, one zone, one day of automatic backups, no deletion protection, no final snapshot. The URL has `sslmode=require` |
 | Settings | A customer KMS key (deletion window of 7 days) and SecureString parameters below `/src/<env>`. Keycloak's own parameters are below `/src/<env>/idp` |
 | Roles | The role of the core (the broker principal of `00-bootstrap`) with its instance profile. The execution roles of the runner and of Keycloak. No task role |
-| Runners | ECR repository, ECS cluster, log group (7 days) and, in phase 2, the Fargate task definition (ARM64, 1 vCPU, 2 GiB) with the image by its digest |
+| Registry | ECR repository `clanker-<env>/runner` for the runner image |
+| Runners | ECS cluster, log group (7 days) and, in phase 2, the Fargate task definition (ARM64, 1 vCPU, 2 GiB) with the runner image by its digest |
 | Keycloak | Log group (7 days), Fargate task definition (ARM64, 1 vCPU, 2 GiB) and a service of one task behind the load balancer. Keycloak 26.8.2, pinned by digest, in production mode with `--db=dev-file` |
 | Security groups | Load balancer: 443 and 80 from the router and the VPC. Core: 7070 from the load balancer and the runners. Keycloak: 8080 from the load balancer. Database: 5432 from the core. The core, the runners and Keycloak send to any address through the NAT gateway |
 
@@ -66,8 +67,9 @@ private address of the core from the core, for each task.
 
 Keycloak imports the realm of the input `keycloak_realm`: the content of
 `scripts/verify/keycloak/realm.json`. A released binary does not carry `scripts/verify`, so
-the realm comes from a checkout until the installer carries it. Keycloak keeps a `${NAME}` whose variable is not set as
-literal text. Two checks stop that:
+the realm comes from a checkout until the installer carries it.
+
+Keycloak keeps a `${NAME}` whose variable is not set as literal text. Two checks stop that:
 
 - The plan fails when the realm reads a variable that the container does not get.
 - The entry point `keycloak-start.sh` stops the container when such a variable is empty. The

@@ -91,7 +91,7 @@ func awsPlan(state State) *AWSPlan {
 			"your DNS zone, one for the control plane and one for its identity provider"},
 		PlanItem{"One identity provider", "Keycloak on Fargate with two users, for the " +
 			"sign-in. S.R.C. does not manage it."},
-		PlanItem{"Runners", "a container registry for the runner image and a Fargate " +
+		PlanItem{"Runners", "a container repository for the runner image and a Fargate " +
 			"cluster for the short-lived runners, which run the jobs"},
 		PlanItem{"Roles", "one for the virtual machine, one for the runners and one for " +
 			"Keycloak"},

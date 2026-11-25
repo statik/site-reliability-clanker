@@ -1,15 +1,5 @@
 # The runners: one Fargate task for each job, from the image of build/runner/Dockerfile.
 
-resource "aws_ecr_repository" "runner" {
-  name                 = "${local.name}-runner"
-  image_tag_mutability = "MUTABLE"
-  force_delete         = true
-
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-}
-
 resource "aws_ecs_cluster" "this" {
   name = local.name
 }

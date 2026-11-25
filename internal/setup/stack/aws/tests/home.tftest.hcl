@@ -583,6 +583,7 @@ run "the_database_is_private_and_everything_can_be_removed" {
       !aws_db_instance.core.deletion_protection && aws_db_instance.core.skip_final_snapshot &&
       aws_db_instance.core.delete_automated_backups &&
       aws_ecr_repository.runner.force_delete &&
+      aws_ecr_repository.runner.name == "clanker-test/runner" &&
       aws_kms_key.settings.deletion_window_in_days == 7 &&
       alltrue([for record in aws_route53_record.validation : record.allow_overwrite]) &&
       aws_cloudwatch_log_group.runner.retention_in_days == 7 &&
