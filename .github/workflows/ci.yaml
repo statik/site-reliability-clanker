@@ -77,7 +77,7 @@ jobs:
         with:
           tofu_version: 1.12.3
       - run: tofu fmt -check -recursive platform
-      - name: Validate each layer
+      - name: Validate and test each layer
         env:
           CLOUD: ${{ matrix.cloud }}
         run: |
@@ -90,6 +90,9 @@ jobs:
             echo "::group::${layer}"
             tofu -chdir="${layer}" init -backend=false -input=false
             tofu -chdir="${layer}" validate
+            if [ -d "${layer}tests" ]; then
+              tofu -chdir="${layer}" test
+            fi
             echo "::endgroup::"
           done
 
