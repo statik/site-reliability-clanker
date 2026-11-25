@@ -27,3 +27,18 @@ variable "evidence_bucket_arn" {
   description = "ARN of the audit evidence bucket."
   type        = string
 }
+
+variable "core_parameter_path" {
+  description = <<-EOT
+    Parameter Store path of the settings of the control plane. No agent role can read a
+    parameter at this path or below it. The installer keeps the settings below /src/<name>,
+    so the default /src covers every installation in the account.
+  EOT
+  type        = string
+  default     = "/src"
+
+  validation {
+    condition     = can(regex("^(/[A-Za-z0-9_.-]+)+$", var.core_parameter_path))
+    error_message = "core_parameter_path must start with / and not end with /, for example /src."
+  }
+}

@@ -1,5 +1,13 @@
 locals {
   protected_bucket_arns = [var.state_bucket_arn, var.evidence_bucket_arn]
+
+  # The ARN of the parameter /src/prod/X is parameter/src/prod/X. GetParametersByPath names
+  # the path itself, so both the path and everything below it are in the list.
+  parameter_arn_prefix = "arn:${local.partition}:ssm:*:${local.account_id}:parameter"
+  core_parameter_arns = [
+    "${local.parameter_arn_prefix}${var.core_parameter_path}",
+    "${local.parameter_arn_prefix}${var.core_parameter_path}/*",
+  ]
 }
 
 data "aws_iam_policy_document" "boundary" {
@@ -128,6 +136,25 @@ data "aws_iam_policy_document" "boundary" {
     effect    = "Deny"
     actions   = ["s3:DeleteObject", "s3:DeleteObjectVersion"]
     resources = ["${var.evidence_bucket_arn}/*"]
+  }
+
+  # The settings of the control plane include its signing key and its database URL. A plan
+  # runs code from a pull request, so no agent role may read them.
+  statement {
+    sid       = "NoControlPlaneSettings"
+    effect    = "Deny"
+    actions   = ["ssm:GetParameter*"]
+    resources = local.core_parameter_arns
+  }
+
+  # The job token of a runner is an environment override of ecs:RunTask. DescribeTasks shows
+  # the overrides of a task, and ListTasks finds the tasks. The Allow statement above has no
+  # ecs action, so this statement keeps it that way if a later change adds one.
+  statement {
+    sid       = "NoRunnerTaskDetails"
+    effect    = "Deny"
+    actions   = ["ecs:DescribeTasks", "ecs:ListTasks"]
+    resources = ["*"]
   }
 }
 
