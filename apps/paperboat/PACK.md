@@ -45,8 +45,9 @@ built.
 | `incident` | Optional. The `runbook` and the `component` that an incident proposes when no model gives a diagnosis. Without it, such an incident goes to a person |
 | `diagnostics` | The reads of a debug session, 1 to 8. A read is `{"read": "logs", "component": …, "lines": …}` with 1 to 200 lines, or `{"read": "events"}` |
 | `checks` | The HTTP checks, 1 to 8. Each has a `name`, the `kind` `http`, a `path` and optionally the `status` that passes (the default is 200; a value from 200 to 299). Exactly one has `"primary": true` |
-| `app_version.source` | Where the monitor reads the version that runs. This version reads `http-json` |
-| `app_version.path` | Answers with a JSON object that has the field `version` |
+| `app_version.source` | Where the monitor reads the version that runs: `http-json` or `image` |
+| `app_version.path` | With `http-json` only. Answers with a JSON object that has the field `version` |
+| `app_version.component` | With `image` only. A component of the pack. The version is the image tag of each of its instances, as the collector reports it |
 | `topology.extra` | Optional. Nodes of the topology view that are not components |
 | `topology.edges` | Edges between two nodes of the application, or one of them and a node of the platform |
 | `runbooks` | Optional. The directory of the runbooks, inside the pack |
@@ -55,6 +56,13 @@ built.
 **The checks.** The monitor repeats the primary check to measure the error rate. Its name
 is in a finding: "fails 9 of 20 inventory requests". After an apply, each other check must
 pass before the canary measures the primary check.
+
+**The version.** The monitor removes one `v` at the start of a version and the build part
+from the first `+`, and keeps a `-suffix`: `v2.38.11+abc1234` is `2.38.11`. A value that
+is then not a version is unknown. With the source `image`, the check after an apply waits
+for data from the collector that arrives after the apply. In that data each instance of
+the component must be `ok` and run the wanted version. With no data from the collector
+the check fails.
 
 **The debug session.** The pack gives no command. The core starts with two commands of
 its own, `kubectl get pods -o wide` and `kubectl get deployments`, and then makes one
@@ -120,6 +128,12 @@ its script makes the name of the deployment. At the first start, the control pla
 runbooks repository, beside the policies and the notification routes of the core. A pack
 can put files only there: it cannot bring a policy, change a risk tier or add a route.
 `runbooks/README.md` has the format of a definition.
+
+A script names no namespace. The runner gives it the targets of the environment as
+`TARGET_APPLICATION` and `TARGET_DATA`; `runbooks/README.md` has the full environment.
+`TARGET_DATA` is empty on AWS, GCP and Azure, where the database is not in the cluster,
+so the database runbooks of Paperboat (`db-backup`, `db-maintenance`, `restore-drill`)
+stop there with a message before they run a command.
 
 ## Eval cases
 
@@ -211,5 +225,3 @@ The core on a cloud has no disk. It reads only the pack that it carries.
 - The recorded model answers in `internal/agent/replay` are answers about Paperboat.
 - The eval tasks other than `investigator_diagnosis` have their samples in the code of the
   suite, and those samples are about Paperboat.
-- The scripts of the runbooks of Paperboat have the namespaces `paperboat` and
-  `paperboat-data` in their text. They do not read the targets.

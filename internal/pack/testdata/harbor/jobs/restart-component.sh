@@ -2,6 +2,7 @@
 # Restart one Harbor component and wait for the rollout.
 set -euo pipefail
 
+namespace="${TARGET_APPLICATION:?is empty: the control plane sets the namespace of the application}"
 component="${PARAM_COMPONENT:?the control plane sets this input}"
 
 case "${component}" in
@@ -14,5 +15,5 @@ worker) deployment="harbor-jobs" ;;
   ;;
 esac
 
-kubectl -n harbor rollout restart "deployment/${deployment}"
-kubectl -n harbor rollout status "deployment/${deployment}" --timeout=180s
+kubectl -n "${namespace}" rollout restart "deployment/${deployment}"
+kubectl -n "${namespace}" rollout status "deployment/${deployment}" --timeout=180s

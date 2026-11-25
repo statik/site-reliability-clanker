@@ -103,7 +103,7 @@ head of `main` and checks each request against it before a work item or a grant 
   "inputs": {
     "component": {
       "type": "string",
-      "description": "The component to restart. Its deployment is in the namespace paperboat.",
+      "description": "The component to restart. Its deployment is in the namespace of the application.",
       "values": ["api", "web", "worker"]
     }
   }
@@ -136,8 +136,21 @@ The script is the steps of the runbook. The runner starts it with this environme
 |---|---|
 | `PARAM_<NAME>` | The value of the input `<name>`, with the name in upper case. A mitigation gets `PARAM_COMPONENT`, the name of a component. The script makes the name of the deployment from it |
 | `KUBECONFIG` | The file with the short-lived credential of this run |
+| `TARGET_APPLICATION` | The namespace of the application on this environment, for example `paperboat` |
+| `TARGET_DATA` | The namespace of the data services of the application, for example `paperboat-data`. It is empty when the data services are not in the cluster, as on AWS, GCP and Azure |
 | `OUTPUT_FILE` | The file for the outputs. Append one line `name=value` for each output |
 | `STATE_DIR` | The state directory of the environment on the runner |
+
+The two targets come from the output `targets` of the layer `40-platform`, as its last
+apply wrote it. A script uses them in place of the names of namespaces. A script that
+needs a target stops with a message when that target is empty, before it runs a command:
+
+```bash
+data="${TARGET_DATA:?is empty: the database of this environment is not in the cluster}"
+```
+
+The control plane runs no runbook on an environment whose layer `40-platform` has no
+output `targets`.
 
 A script that ends with a status other than 0 fails the run, and its outputs are not read.
 
@@ -146,7 +159,7 @@ A script that ends with a status other than 0 fails the run, and its outputs are
 - The audit event `runbook.succeeded` has the inputs (`params`), the outputs with their
   declared types (`outputs`), the commit of the runbooks repository, the job and the grant.
 - The audit event `runbook.failed` has the inputs and the error.
-- The log of the job has a line for each input and each output.
+- The log of the job has a line for each input, each target and each output.
 
 A run fails when the script reports an output that the definition does not declare, does
 not report a declared output, or reports text for an integer.

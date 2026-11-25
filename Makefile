@@ -58,12 +58,12 @@ lint: lint-core
 	test -z "$$(gofmt -l cmd internal scripts apps/paperboat)"
 	go vet ./...
 	cd apps/paperboat && go vet ./...
-	tofu fmt -check -recursive platform
+	tofu fmt -check -recursive platform internal/setup/stack
 	opa check runbooks/policy
 	shellcheck apps/paperboat/runbooks/*.sh apps/paperboat/build.sh ops/run-local.sh scripts/*.sh \
-		scripts/verify/*.sh scripts/macos/*.sh build/runner/*.sh
+		scripts/verify/*.sh scripts/macos/*.sh build/runner/*.sh internal/setup/stack/*/*.sh
 	shfmt -i 2 -d apps/paperboat/runbooks apps/paperboat/build.sh ops/run-local.sh scripts \
-		build/runner
+		build/runner internal/setup/stack
 
 destroy: build
 	./bin/clanker destroy --env local
