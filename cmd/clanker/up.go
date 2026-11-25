@@ -362,7 +362,7 @@ func build(ctx context.Context, o options) (*components, error) {
 			return nil, err
 		}
 	}
-	if c.dispatcher, err = newDispatcher(o); err != nil {
+	if c.dispatcher, err = newDispatcher(ctx, o); err != nil {
 		return nil, err
 	}
 	c.broker, err = broker.New(c.db, c.clock, secret.signingKey, on.issuer,

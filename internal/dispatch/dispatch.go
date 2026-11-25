@@ -29,6 +29,13 @@ type Launcher interface {
 	Launch(ctx context.Context, token string) error
 }
 
+// Environment variables that tell a runner where its core is and which job is its own.
+// Each launcher gives them to the runner that it starts.
+const (
+	CoreURLEnv = "CLANKER_CORE_URL"
+	TokenEnv   = "CLANKER_JOB_TOKEN"
+)
+
 const (
 	// maxPlan bounds an uploaded plan file or plan JSON.
 	maxPlan = 256 << 20
