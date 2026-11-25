@@ -147,6 +147,16 @@ data "aws_iam_policy_document" "boundary" {
     resources = local.core_parameter_arns
   }
 
+  # Parameter Store checks GetParametersByPath against the requested path only, so a
+  # recursive read of / or of any parent of core_parameter_path would still return the
+  # settings. No layer reads parameters by path, so the call is denied on every path.
+  statement {
+    sid       = "NoParameterReadsByPath"
+    effect    = "Deny"
+    actions   = ["ssm:GetParametersByPath"]
+    resources = ["*"]
+  }
+
   # The job token of a runner is an environment override of ecs:RunTask. DescribeTasks shows
   # the overrides of a task, and ListTasks finds the tasks. The Allow statement above has no
   # ecs action, so this statement keeps it that way if a later change adds one.

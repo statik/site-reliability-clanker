@@ -41,12 +41,14 @@ The permission boundary allows only the services that the platform uses. It deni
 and access keys, roles without the boundary, changes to the boundary and to the agent roles,
 changes to the configuration of the state and evidence buckets, and deletion of evidence.
 
-The boundary also denies two reads to every agent role, so that a plan of code from a pull
+The boundary also denies these reads to every agent role, so that a plan of code from a pull
 request cannot get a secret of the control plane:
 
 - `ssm:GetParameter*` on the settings of the control plane. They hold its signing key and its
   database URL. The input `core_parameter_path` of `00-bootstrap` names the path. The default
   `/src` covers each path that the installer uses (`/src/<name>`).
+- `ssm:GetParametersByPath` on every path. Parameter Store checks this call against the
+  requested path only, so a recursive read of `/` would return the settings anyway.
 - `ecs:DescribeTasks` and `ecs:ListTasks`. The job token of a runner is an environment
   override of `ecs:RunTask`, and `DescribeTasks` shows it.
 
