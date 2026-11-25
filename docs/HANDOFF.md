@@ -818,8 +818,24 @@ What ran on the build of commit `376617b`, the last change to the Go code:
    - Ran: `core-check.sh` and `nanos-check.sh` with a fake identity provider
      (`scripts/verify/fakeidp`), and `web/scripts/signin-check.mjs` in a real browser on
      the local target. The results are in the pull request.
-   - Not run: a real provider (Okta, Google, Entra). The sign-in needs the claim
-     `email_verified`, which some providers do not send; that will show with a real one.
+   - Ran with a real provider: `scripts/verify/keycloak-signin-check.sh` against Keycloak
+     26.8.2 in production mode with plain HTTP and the realm of
+     `scripts/verify/keycloak/realm.json`. The core and Keycloak listened on a private
+     address of the machine, not on loopback. One more run with a changed copy of the
+     script put Keycloak on a second address, so that the two are not the same site. The
+     core read the discovery document and the keys. The admin signed in in a real browser.
+     Under an `http://` public address the session cookie is not `Secure`, and the browser
+     kept it; a build that sets `Secure` failed the sign-in. `clanker login` was approved
+     in that browser session. A person who is not in the users table got 403. Keycloak
+     sends `email_verified`, and the core refused the sign-in after the flag was set to
+     false.
+   - With the realm setting "require SSL: external requests", Keycloak showed the login
+     form to source addresses in 10/8, 172.16/12 and 192.168/16, and answered "HTTPS
+     required" to 203.0.113.7 and to the tailnet address 100.64.0.1 (100.64.0.0/10).
+     Plain HTTP works when Keycloak sees a private source address, for example behind a
+     Tailscale subnet router that translates the source address. Which address Keycloak
+     sees in a VPC is not checked yet.
+   - Not run: Okta, Google, Entra; the admin console of Keycloak over plain HTTP.
    - **Done: the device flow for a program** (`internal/signin/device.go`). It follows the
      OAuth 2.0 device authorization grant, and the core is its own authorization server.
      A program asks `POST /auth/device/code` for a code. A person who is signed in in a
