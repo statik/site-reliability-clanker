@@ -168,7 +168,13 @@ video and the local demo. No pull request is open.
     copy of the sources. Fixed: `Runner.Destroy` sets `TF_DATA_DIR` to
     `work/destroy/<environment>/<layer>` below the data directory, so a destroy does not
     read or write the `.terraform` directory of the stack. A test with a fake `tofu`
-    checks the environment. A real destroy with two data directories did not run.
+    checks the environment. Ran on 2026-11-25 from one checkout, with no model key: the
+    first deployment to `Done` and a destroy on data directory A, then the same on data
+    directory B. Both destroys passed and left no kind cluster, and no `.terraform` came
+    into the stack directories. With the `.terraform` of another data directory in the
+    stack of `00-bootstrap`, the binary before the fix failed the destroy with "Backend
+    configuration changed" and the binary with the fix passed. `clanker bootstrap` still
+    has this defect (#140).
   - Fixed: the topology shows each component of the pack as degraded when the application
     is unhealthy or has an open incident. Before, only a node with the ID `api` changed.
   - Fixed: the check after an apply fails when the layer of the application has outputs
