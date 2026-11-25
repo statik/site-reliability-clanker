@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 
@@ -65,8 +66,9 @@ func TestWithoutTheRunnerSettingTheCoreOnAWSHasNoLauncher(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, none := d.Launcher.(noLauncher); !none {
-		t.Fatalf("launcher = %#v, want noLauncher", d.Launcher)
+	if _, none := d.Launcher.(noLauncher); !none || d.StartGrace != 0 {
+		t.Fatalf("launcher = %#v, start grace = %s, want noLauncher and none", d.Launcher,
+			d.StartGrace)
 	}
 }
 
@@ -96,6 +98,9 @@ func TestTheDispatcherOnAWSUsesFargateWithTheRunnerSetting(t *testing.T) {
 	fargate, isFargate := d.Launcher.(awsrunner.Fargate)
 	if !isFargate || fargate.ECS == nil || fargate.CoreURL != "http://10.0.1.5:7070" {
 		t.Fatalf("launcher = %#v, want Fargate with an ECS client", d.Launcher)
+	}
+	if d.StartGrace != 5*time.Minute {
+		t.Fatalf("start grace = %s, want 5m0s", d.StartGrace)
 	}
 }
 

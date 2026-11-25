@@ -455,6 +455,8 @@ Merged for this:
   - Exit code 0 of the runner container is success. Another exit code, or a task that
     stopped without one, is an error with the stop code and `stoppedReason`. When the job
     ends first, the core calls `StopTask`. No error and no log line holds the job token.
+  - The dispatcher gives a Fargate task a start grace of 5 minutes before its first
+    request.
   - Limit: a principal with `ecs:DescribeTasks` on the cluster can read the job token in
     the overrides of a task. The `planner` role has `ReadOnlyAccess`, which probably
     allows it (not checked). It must be denied before a live run.

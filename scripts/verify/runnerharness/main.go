@@ -28,7 +28,6 @@ import (
 
 	"github.com/statik/site-reliability-clanker/internal/dispatch"
 	"github.com/statik/site-reliability-clanker/internal/jobspec"
-	"github.com/statik/site-reliability-clanker/internal/launch"
 )
 
 //go:embed fixture/main.tf
@@ -104,9 +103,9 @@ type containerLauncher struct {
 
 func (l containerLauncher) Launch(ctx context.Context, token string) error {
 	cmd := exec.CommandContext(ctx, "docker", "run", "--rm", "--platform", "linux/arm64",
-		"--network", l.network, "--env", launch.CoreURLEnv+"="+l.coreURL,
-		"--env", launch.TokenEnv, l.image)
-	cmd.Env = append(os.Environ(), launch.TokenEnv+"="+token)
+		"--network", l.network, "--env", dispatch.CoreURLEnv+"="+l.coreURL,
+		"--env", dispatch.TokenEnv, l.image)
+	cmd.Env = append(os.Environ(), dispatch.TokenEnv+"="+token)
 	var output bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &output, &output
 	if err := cmd.Run(); err != nil {

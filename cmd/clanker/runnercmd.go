@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/awsrunner"
 	"github.com/statik/site-reliability-clanker/internal/dispatch"
@@ -39,6 +40,10 @@ func runRunner(ctx context.Context, args []string) error {
 	return client.Serve(ctx)
 }
 
+// fargateStartGrace is how long a runner task on Fargate has from its launch to its first
+// request.
+const fargateStartGrace = 5 * time.Minute
+
 // noLauncher is the launcher of a cloud that has none yet, and of AWS without the setting
 // of the runners.
 type noLauncher struct{ cloud string }
@@ -65,7 +70,10 @@ func newDispatcher(ctx context.Context, o options) (*dispatch.Dispatcher, error)
 			return nil, err
 		}
 		if fargate != nil {
-			return dispatch.New(fargate), nil
+			d := dispatch.New(fargate)
+			// A task must get a machine and pull the runner image before its first request.
+			d.StartGrace = fargateStartGrace
+			return d, nil
 		}
 	}
 	return dispatch.New(noLauncher{cloud: o.cloud}), nil
