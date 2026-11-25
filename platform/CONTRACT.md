@@ -26,7 +26,7 @@ Each root module has one OpenTofu state. A root module contains:
 | `variables.tf` | The inputs in section 3 |
 | `main.tf` | Provider configuration and module calls |
 | `outputs.tf` | The outputs in section 3 |
-| `terraform.tfvars` | The values for this environment. The agent edits this file |
+| `terraform.tfvars` | The values for this environment. The agent edits this file. On a cloud target it does not set the inputs that the job gives (see "State backends") |
 
 ## 2. Rules for every root module
 
@@ -55,6 +55,20 @@ Each root module has one OpenTofu state. A root module contains:
 The backend block in `versions.tf` is empty (`backend "s3" {}`). The runner supplies the
 values with `tofu init -backend-config=...`. Layer `00-bootstrap` creates the backend, so its
 own state starts local and `clanker bootstrap` migrates it.
+
+- On a cloud target the job carries the backend settings. The runner passes them to
+  `tofu init` and, when the settings have a `bucket`, sets `TF_VAR_state_location` to it.
+  A job on a cloud target without backend settings fails before `tofu` runs.
+- On the local target the job has no backend settings. The runner passes
+  `-backend-config=path=<state directory>/<layer>.tfstate` and sets `TF_VAR_state_location`
+  to the state directory.
+- After an apply the runner reads the outputs with `tofu output -json`, so they come from
+  the backend of the job. It leaves out the sensitive outputs.
+- A value in `terraform.tfvars` replaces a `TF_VAR_*` value; only `-var` replaces the file.
+  So on a cloud target `terraform.tfvars` does not set `env_name`, `state_location` or
+  `broker_principal`, and does not set the inputs that name the region or the account
+  (`region`, `location`, `project_id`, `subscription_id`, `broker_issuer`). The job must
+  give them.
 
 ### The home of the control plane is not a layer
 
