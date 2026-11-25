@@ -17,7 +17,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/statik/site-reliability-clanker/internal/awsparams"
 	"github.com/statik/site-reliability-clanker/internal/bundle"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
 	"github.com/statik/site-reliability-clanker/internal/pack"
@@ -91,6 +90,10 @@ type options struct {
 	// profile and region are the AWS CLI profile and the region of `clanker discover`.
 	profile string
 	region  string
+	// fakeAWS is for the checks only: the core on AWS calls the stand-in at
+	// CLANKER_TEST_AWS_ENDPOINT. aws makes the clients of AWS for `up`.
+	fakeAWS bool
+	aws     awsAPIs
 }
 
 func parse(command string, args []string) (options, error) {
@@ -111,6 +114,8 @@ func parse(command string, args []string) (options, error) {
 	flags.BoolVar(&o.demo, "demo", true, "demo mode: simulator, local mail and webhook sink")
 	flags.StringVar(&o.profile, "profile", "", "AWS CLI profile of the account to survey")
 	flags.StringVar(&o.region, "region", "", "region to survey (default: the most used one)")
+	flags.BoolVar(&o.fakeAWS, "fake-aws", false, "for the checks only: send the AWS calls of "+
+		"the core to the stand-in at "+testEndpointEnv)
 	if err := flags.Parse(args); err != nil {
 		return options{}, err
 	}
@@ -433,7 +438,11 @@ func run() error {
 				return err
 			}
 		}
-		if err := loadParameters(ctx, o, awsparams.NewStore); err != nil {
+		var err error
+		if o.aws, err = chooseAWSAPIs(o.fakeAWS, os.Getenv); err != nil {
+			return err
+		}
+		if err := loadParameters(ctx, o, o.aws.parameters); err != nil {
 			return err
 		}
 		return up(ctx, o)

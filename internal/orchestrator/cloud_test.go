@@ -152,6 +152,34 @@ func TestTheFirstPlanOnACloudIsLayer10WithAPlannerSessionTheBackendAndTheInputs(
 	}
 }
 
+func TestAJobOfALayerOnACloudGetsTheVariablesOfTheAccount(t *testing.T) {
+	withVariables := sandbox
+	withVariables.Variables = map[string]string{
+		"TF_VAR_existing_network_id": "vpc-0a1b2c3d4e5f60718",
+		"TF_VAR_instance_tags":       `{"team":"check-team-value"}`,
+		// The inputs of the platform contract win over a variable of the account.
+		"TF_VAR_env_name": "another-environment"}
+	o, runners := cloudOrchestrator(t, withVariables, &sessionIssuer{}, "00-bootstrap")
+	if _, err := planNew(t, o, sandbox.Name, []string{"10-network"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(runners.jobs) != 1 {
+		t.Fatalf("jobs = %+v, want one", runners.jobs)
+	}
+	want := map[string]string{"TF_VAR_admin_token": "example-admin-token",
+		"TF_VAR_env_name": "aws-sandbox", "TF_VAR_region": "eu-west-1",
+		"TF_VAR_state_location":      "clanker-example-state-111122223333",
+		"TF_VAR_existing_network_id": "vpc-0a1b2c3d4e5f60718",
+		"TF_VAR_instance_tags":       `{"team":"check-team-value"}`}
+	if got := runners.jobs[0].Variables; !reflect.DeepEqual(got, want) {
+		t.Errorf("variables = %v, want %v", got, want)
+	}
+	if len(o.JobVariables) != len(sharedVariables) {
+		t.Errorf("the variables of the account went into the shared variables: %v",
+			o.JobVariables)
+	}
+}
+
 func TestEveryPlanOnACloudGetsAPlannerSessionAndTheKeyOfItsLayer(t *testing.T) {
 	issuer := &sessionIssuer{}
 	o, runners := cloudOrchestrator(t, sandbox, issuer, Layers[:5]...)

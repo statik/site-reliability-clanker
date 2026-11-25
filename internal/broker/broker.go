@@ -4,6 +4,7 @@
 package broker
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"database/sql"
@@ -80,6 +81,13 @@ func New(db *sql.DB, clock Clock, key []byte, issuer Issuer,
 	if len(key) != ed25519.PrivateKeySize {
 		return nil, fmt.Errorf("the broker signing key has %d bytes, want %d", len(key),
 			ed25519.PrivateKeySize)
+	}
+	// A key is the seed and then its public key. With any other second half no signature
+	// of the broker verifies, and the first grant fails.
+	if !bytes.Equal(ed25519.NewKeyFromSeed(key[:ed25519.SeedSize]), key) {
+		return nil, errors.New("the broker signing key is not an Ed25519 private key: its " +
+			"last 32 bytes are not the public key of its first 32 bytes. Make a new key " +
+			"(scripts/verify/signing-key.sh prints one)")
 	}
 	return &Broker{db: db, clock: clock, key: key, issuer: issuer, approvals: approvals}, nil
 }

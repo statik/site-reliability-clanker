@@ -17,7 +17,9 @@ target and Python 3.
 | `nanos-check.sh` | Builds the same binary for `linux/arm64` and boots it as a Nanos unikernel under QEMU (`ops/run-local.sh`), with its own PostgreSQL container. It signs the first admin in through the fake identity provider, checks the dashboard and the seeded forge, pushes a branch with the git client, boots a second unikernel on the same database and looks for the branch. It needs `ops` and QEMU on an Apple Silicon Mac. It does not touch the local demo | About 1 minute |
 | `restart_check.py <new directory>` | Starts a second control plane on the database of the demo, which must wait. Then it opens a pull request and kills the control plane in the middle of the plan: after the start the plan must run again and end in a request for approval. It approves, kills the control plane in the middle of the apply and starts it again. The work item must be `Failed`, its job `lost` and no grant open. It leaves a failed work item and possibly a partly applied change: run `fresh-run.sh` afterward | About 4 minutes |
 | `runner-image-check.sh` | Builds the runner image for `linux/arm64` with `make runner-image` and checks its user, entrypoint, OpenTofu version (the CI pin) and that `tofu init` of each AWS stack needs no network. Then `runnerharness` (a Go program) serves the runner routes of the dispatcher and starts each job in a new container: a plan, an apply with a changed plan file (refused) and the apply of the plan. The state is in an S3 bucket in a MinIO container. The check compares the plan hash, the tool digest and the outputs that the apply job reports, and reads the state and the absence of a lock from the bucket with the AWS CLI of the image. It needs Docker Desktop. It does not touch the local demo | About 2 minutes after the first build |
-| `fakeidp` | A fake identity provider (a Go program) for the two checks above and for `web/scripts/signin-check.mjs`. It signs in whoever a check names, with no password. Never use it for a real control plane | - |
+| `aws-core-check.sh` | Starts the core in AWS mode (`clanker up --cloud aws --demo=false --fake-aws`) against stand-ins on this machine: `fakeaws` for Parameter Store, STS and ECS, MinIO for the state bucket, the fake identity provider, and the stand-in stacks of `fakeaws/fixture` as layers 10 to 50. The environment of the core holds only the parameter path, the region and `CLANKER_TEST_AWS_ENDPOINT`; every other setting comes from the stand-in for Parameter Store. Without `CLANKER_AWS_RUNNER` the core must stand by and name the setting. With every setting it must plan `10-network` (outputs only) in a runner task with an STS session and wait for approval. The admin and a second approver approve through the API, and each layer must be planned and applied in runner tasks. The check reads the calls to the stand-in, the state and its encryption in the bucket, the outputs in the database, the Slack link and the log of the core. No call goes to AWS. It needs Docker Desktop. It builds the runner image unless `RUNNER_IMAGE` names one. It does not touch the local demo or kind | About 5 minutes after the first image build |
+| `fakeidp` | A fake identity provider (a Go program) for the checks above and for `web/scripts/signin-check.mjs`. It signs in whoever a check names, with no password. Never use it for a real control plane | - |
+| `fakeaws` | The stand-in for AWS of `aws-core-check.sh` (a Go program): SSM `GetParametersByPath` from a file, STS `AssumeRole` passed on to MinIO, and ECS `RunTask`, `DescribeTasks` and `StopTask`, where a task is a container of the runner image. The core calls it only with `--fake-aws` and `CLANKER_TEST_AWS_ENDPOINT` on the loopback interface, and Parameter Store cannot give that setting. Never use it for a real control plane | - |
 
 ## What a good run looks like
 
@@ -34,6 +36,10 @@ target and Python 3.
   Before it, the harness prints that the apply job reports the outputs `message` and
   `state_location` (the bucket of the backend), which the runner reads with
   `tofu output -json` from the state in the bucket.
+- `aws-core-check.sh`: the last line is
+  `RESULT: the core on AWS read its settings from Parameter Store, planned 10-network in a runner task with an STS session and S3 state, and applied layers 10 to 50 after two approvals`.
+  Before it, the check prints 10 STS sessions, 10 runner tasks and 10 `credential.issued`
+  events: a plan and an apply for each layer.
 - `fresh-run.sh`: thirteen work items. Twelve end in `Done`. `WI-0005` (the faulty release)
   ends in `RolledBack`. The last line before the error count is
   `chain: {'ok': True, 'count': 317, ...}`. The error count is 0.
@@ -47,7 +53,13 @@ target and Python 3.
 ## Limits
 
 - `nanos-check.sh` uses the nightly Nanos kernel on arm64 under QEMU. It says nothing
-  about x86 or EC2. The core on a cloud proposes no deployment yet, so no job runs in it.
+  about x86 or EC2. The core there has no AWS setting, so it proposes no deployment and no
+  job runs in it.
+- `aws-core-check.sh` replaces AWS with stand-ins. It says nothing about IAM, the trust
+  policies of the roles, the session tags that a trust policy needs, Fargate start times,
+  the network between a task and the core, or KMS. MinIO has no roles: each STS session has
+  the rights of the MinIO user. The second approver is a row that the check writes into the
+  users table, because no setting or API makes a second user yet.
 - `core-check.sh` runs the core as a process on this machine. It says nothing about Nanos.
   It looks for files only in the working directory, the home directory and the temporary
   directory of the core.

@@ -161,6 +161,10 @@ type EnvConfig struct {
 	// key of a layer: the output state_backend of layer 00-bootstrap. It is empty on the
 	// local target, and on a cloud before layer 00-bootstrap exists.
 	Backend map[string]string `json:"backend,omitempty"`
+	// Variables are the inputs of the layers on a cloud that belong to its account, as
+	// TF_VAR_<name> to the value. Only the jobs of the layers get them. The common inputs
+	// of the platform contract replace a variable of the same name.
+	Variables map[string]string `json:"-"`
 }
 
 // OnCloud reports whether the environment is on a cloud and not on the local target.

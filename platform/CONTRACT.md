@@ -75,6 +75,13 @@ own state starts local and `clanker bootstrap` migrates it.
   (the bucket of `state_backend`) and `TF_VAR_region` (its region). The control plane reads
   `state_backend` from the setting `CLANKER_AWS_BOOTSTRAP`. On a cloud the first deployment
   starts at `10-network`, and the control plane refuses a change to `00-bootstrap`.
+- On AWS the inputs that belong to one account (`existing_network_id`,
+  `existing_private_subnet_ids`, `image_registry`, `instance_tags`,
+  `operator_principal_arn`) are not in a file of this repository. The setting
+  `CLANKER_AWS_LAYER_VARIABLES` holds them as a JSON object from the name of a variable to a
+  string, a list of strings or a map of strings. The jobs of layers `10-network` to `50-app`
+  get each one as `TF_VAR_<name>`. The control plane refuses a name that no layer declares,
+  that a `terraform.tfvars` file sets, or that it sets itself.
 
 ### The home of the control plane is not a layer
 

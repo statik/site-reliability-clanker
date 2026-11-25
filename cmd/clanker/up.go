@@ -21,7 +21,6 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/agent"
 	"github.com/statik/site-reliability-clanker/internal/api"
 	"github.com/statik/site-reliability-clanker/internal/audit"
-	"github.com/statik/site-reliability-clanker/internal/awstarget"
 	"github.com/statik/site-reliability-clanker/internal/broker"
 	"github.com/statik/site-reliability-clanker/internal/detect"
 	"github.com/statik/site-reliability-clanker/internal/dispatch"
@@ -46,13 +45,6 @@ const (
 	mailpitContainer = "clanker-mailpit"
 	demoAdminToken   = "local-demo-token"
 )
-
-func envOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
-}
 
 func runSink(ctx context.Context, addr string) error {
 	server := &http.Server{Addr: addr, Handler: (&sink.Sink{}).Handler(),
@@ -221,8 +213,7 @@ func adapters(c *components, o options) ([]notify.Adapter, error) {
 	if c.chat, err = buildChat(c, o); err != nil {
 		return nil, err
 	}
-	smtpAddr := envOr("CLANKER_SMTP_ADDR", "127.0.0.1:1025")
-	sinkURL := "http://" + o.sinkAddr
+	where := channelTargets(o.cloud, o.sinkAddr, os.Getenv)
 	recipients := func(audience string) []string {
 		role := map[string]string{"approvers": "approver", "admins": "admin"}[audience]
 		query := `SELECT email FROM users WHERE role IN ('approver', 'admin')`
@@ -244,19 +235,68 @@ func adapters(c *components, o options) ([]notify.Adapter, error) {
 		}
 		return emails
 	}
-	if o.demo {
-		if err := ensureMailpit(smtpAddr); err != nil {
+	if o.demo && where.email != "" {
+		if err := ensureMailpit(where.email); err != nil {
 			return nil, err
 		}
 	}
-	slack, teams := c.chat.adapters(
-		notify.Slack{WebhookURL: envOr("CLANKER_SLACK_WEBHOOK", sinkURL+"/slack")},
-		notify.Teams{WebhookURL: envOr("CLANKER_TEAMS_WEBHOOK", sinkURL+"/teams")})
-	return []notify.Adapter{
-		notify.Email{Addr: smtpAddr, From: "clanker@example.com", Recipients: recipients},
-		slack, teams,
-		notify.Discord{WebhookURL: envOr("CLANKER_DISCORD_WEBHOOK", sinkURL+"/discord")},
-	}, nil
+	var slack, teams notify.Adapter
+	if where.slack != "" {
+		slack = notify.Slack{WebhookURL: where.slack}
+	}
+	if where.teams != "" {
+		teams = notify.Teams{WebhookURL: where.teams}
+	}
+	slack, teams = c.chat.adapters(slack, teams)
+	channels := []notify.Adapter{}
+	if where.email != "" {
+		channels = append(channels, notify.Email{Addr: where.email, From: "clanker@example.com",
+			Recipients: recipients})
+	}
+	for _, adapter := range []notify.Adapter{slack, teams} {
+		if adapter != nil {
+			channels = append(channels, adapter)
+		}
+	}
+	if where.discord != "" {
+		channels = append(channels, notify.Discord{WebhookURL: where.discord})
+	}
+	return channels, nil
+}
+
+// targets are where the channels of the notifier send: the SMTP address of the email and
+// the webhook of each chat platform. An empty target means that the channel does not exist.
+type targets struct{ email, slack, teams, discord string }
+
+// channelTargets reads the targets of the channels. On the local target a channel with no
+// setting sends to Mailpit or to the webhook sink on this machine. On a cloud nothing
+// listens there, so a channel with no setting does not exist.
+func channelTargets(cloud, sinkAddr string, getenv func(string) string) targets {
+	where := targets{email: getenv("CLANKER_SMTP_ADDR"), slack: getenv("CLANKER_SLACK_WEBHOOK"),
+		teams: getenv("CLANKER_TEAMS_WEBHOOK"), discord: getenv("CLANKER_DISCORD_WEBHOOK")}
+	if cloud != "local" {
+		return where
+	}
+	sinkURL := "http://" + sinkAddr
+	for _, fill := range []struct {
+		target   *string
+		fallback string
+	}{{&where.email, "127.0.0.1:1025"}, {&where.slack, sinkURL + "/slack"},
+		{&where.teams, sinkURL + "/teams"}, {&where.discord, sinkURL + "/discord"}} {
+		if *fill.target == "" {
+			*fill.target = fill.fallback
+		}
+	}
+	return where
+}
+
+// linkBase returns the start of the links in notifications: the public URL of the
+// dashboard that people open, or, on a machine without one, the listen address.
+func linkBase(addr string, getenv func(string) string) string {
+	if public := strings.TrimRight(getenv(publicURLEnv), "/"); public != "" {
+		return public
+	}
+	return "http://" + addr
 }
 
 // components holds everything that `up` starts.
@@ -359,7 +399,10 @@ func build(ctx context.Context, o options) (*components, error) {
 	c.forge = forge.New(c.db)
 	env := orchestrator.EnvConfig{Name: o.env, Cloud: o.cloud}
 	if o.cloud == "aws" {
-		if env, on.issuer, err = awsEnvironment(c, env, awstarget.NewSTS); err != nil {
+		if env, on.issuer, err = awsEnvironment(c, env, o.aws.sts); err != nil {
+			return nil, err
+		}
+		if env.Variables, err = layerVariables(o.source, o.cloud, os.Getenv); err != nil {
 			return nil, err
 		}
 	}
@@ -396,7 +439,7 @@ func build(ctx context.Context, o options) (*components, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.notifier = notify.New(c.db, c.log, c.clock, "http://"+o.addr, channelAdapters,
+	c.notifier = notify.New(c.db, c.log, c.clock, linkBase(o.addr, os.Getenv), channelAdapters,
 		func() (notify.Rules, error) {
 			raw, err := c.forge.ReadFile(orchestrator.RunbooksRepo, "main",
 				"notifications/routes.json")
@@ -525,6 +568,48 @@ func firstRun(ctx context.Context, c *components, o options) error {
 	return nil
 }
 
+// standbyReason says why the control plane cannot plan the layers of its environment, or
+// is empty when it can: on the local target, and on AWS when the broker has an issuer of
+// STS sessions, the dispatcher has a launcher of runner tasks, and the environment has a
+// state backend.
+func standbyReason(cloud string, env orchestrator.EnvConfig, hasIssuer bool,
+	launcher dispatch.Launcher) string {
+	switch cloud {
+	case "local":
+		return ""
+	case "aws":
+		missing := []string{}
+		if !hasIssuer || len(env.Backend) == 0 {
+			missing = append(missing, bootstrapEnv)
+		}
+		if _, none := launcher.(noLauncher); none {
+			missing = append(missing, awsRunnerEnv)
+		}
+		if len(missing) == 0 {
+			return ""
+		}
+		return "set " + strings.Join(missing, " and ")
+	default:
+		return "the control plane cannot plan a layer on " + cloud + " yet"
+	}
+}
+
+// startWork starts the monitor, the detector and the first deployment of the environment
+// when the control plane can plan its layers. Otherwise the control plane serves the
+// dashboard, proposes no deployment and logs why.
+func startWork(ctx context.Context, c *components, o options) error {
+	reason := standbyReason(o.cloud, c.orch.Envs[o.env], c.broker.HasIssuer(),
+		c.dispatcher.Launcher)
+	if reason != "" {
+		slog.Warn("the control plane stands by: it plans no layer and proposes no deployment",
+			"cloud", o.cloud, "env", o.env, "reason", reason)
+		return nil
+	}
+	go c.monitor.Run(ctx, []string{o.env}, 10*time.Second)
+	go c.detector.Run(ctx, []string{o.env}, 20*time.Second)
+	return firstRun(ctx, c, o)
+}
+
 func schedulerLoop(ctx context.Context, c *components) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -642,17 +727,8 @@ func up(ctx context.Context, o options) error {
 	go c.notifier.Run(ctx)
 	go c.chat.run(ctx)
 	go schedulerLoop(ctx, c)
-	if o.cloud == "local" {
-		go c.monitor.Run(ctx, []string{o.env}, 10*time.Second)
-		go c.detector.Run(ctx, []string{o.env}, 20*time.Second)
-		if err := firstRun(ctx, c, o); err != nil {
-			return err
-		}
-	} else {
-		// The runner and the broker can apply only the local target today. On a cloud the
-		// control plane starts and serves the dashboard, and proposes no deployment.
-		slog.Warn("the control plane does not install an environment on this cloud yet",
-			"cloud", o.cloud, "env", o.env)
+	if err := startWork(ctx, c, o); err != nil {
+		return err
 	}
 	httpServer := &http.Server{Addr: o.addr, Handler: handler,
 		ReadHeaderTimeout: 10 * time.Second}
@@ -664,9 +740,14 @@ func up(ctx context.Context, o options) error {
 			slog.Error("stop control plane", "error", err)
 		}
 	}()
-	slog.Info("control plane listens", "dashboard", "http://"+o.addr,
-		"agent_mode", c.agent.LLM.Mode(), "mail", "http://127.0.0.1:8025",
-		"webhook_sink", "http://"+o.sinkAddr)
+	if o.demo {
+		slog.Info("control plane listens", "dashboard", "http://"+o.addr,
+			"agent_mode", c.agent.LLM.Mode(), "mail", "http://127.0.0.1:8025",
+			"webhook_sink", "http://"+o.sinkAddr)
+	} else {
+		slog.Info("control plane listens", "address", o.addr,
+			"dashboard", linkBase(o.addr, os.Getenv), "agent_mode", c.agent.LLM.Mode())
+	}
 	if err := httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("control plane on %s: %w", o.addr, err)
 	}

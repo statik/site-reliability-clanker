@@ -163,7 +163,7 @@ address_of_database="$(docker port "${database}" 5432/tcp | head -n 1)"
   unset OPENROUTER_API_KEY
   HOME="${work}/home" CLANKER_OIDC_ISSUER="${issuer}" CLANKER_OIDC_CLIENT_ID=clanker \
     CLANKER_DATABASE_URL="postgres://postgres:check@${address_of_database}/clanker?sslmode=disable" \
-    CLANKER_SIGNING_KEY="$(head -c 64 /dev/urandom | base64 | tr -d '\n')" \
+    CLANKER_SIGNING_KEY="$("${repo}/scripts/verify/signing-key.sh")" \
     exec "${work}/clanker" up --cloud aws --env prod --demo=false --addr "${address}:${port}"
 ) >"${work}/up.log" 2>&1 &
 core=$!
