@@ -69,6 +69,12 @@ own state starts local and `clanker bootstrap` migrates it.
   `broker_principal`, and does not set the inputs that name the region or the account
   (`region`, `location`, `project_id`, `subscription_id`, `broker_issuer`). The job must
   give them.
+- On AWS the control plane makes the jobs of layers `10-network` to `50-app`. Their backend
+  settings are the output `state_backend` of `00-bootstrap` with
+  `key = <env_name>/<layer>.tfstate`. They get `TF_VAR_env_name`, `TF_VAR_state_location`
+  (the bucket of `state_backend`) and `TF_VAR_region` (its region). The control plane reads
+  `state_backend` from the setting `CLANKER_AWS_BOOTSTRAP`. On a cloud the first deployment
+  starts at `10-network`, and the control plane refuses a change to `00-bootstrap`.
 
 ### The home of the control plane is not a layer
 
