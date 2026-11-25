@@ -14,7 +14,9 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/broker"
 	"github.com/statik/site-reliability-clanker/internal/forge"
 	"github.com/statik/site-reliability-clanker/internal/jobspec"
+	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/pack/packtest"
+	"github.com/statik/site-reliability-clanker/internal/store"
 	"github.com/statik/site-reliability-clanker/internal/store/storetest"
 )
 
@@ -66,10 +68,22 @@ func runbookOrchestrator(t *testing.T, extra fs.FS) (*Orchestrator, *fakeRunners
 		t.Fatal(err)
 	}
 	runners := &fakeRunners{}
-	return &Orchestrator{DB: db, Audit: audit.New(db, clock), Forge: f, Broker: b, Clock: clock,
+	o := &Orchestrator{DB: db, Audit: audit.New(db, clock), Forge: f, Broker: b, Clock: clock,
 		App:     packtest.Example(t),
 		Runners: runners, Envs: map[string]EnvConfig{"local": {Name: "local", Cloud: "local"}},
-	}, runners
+	}
+	setTargets(t, o, "local", map[string]any{"application": "shop", "data": "shop-data"})
+	return o, runners
+}
+
+// setTargets records the output targets of the layer of the platform, as an apply of that
+// layer writes it.
+func setTargets(t *testing.T, o *Orchestrator, env string, targets map[string]any) {
+	t.Helper()
+	if err := store.SetLayerOutputs(o.DB, env, pack.TargetsLayer,
+		map[string]any{pack.TargetsOutput: targets}, "2026-11-25T12:00:00Z"); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func count(t *testing.T, o *Orchestrator, table string) int {
@@ -157,10 +171,11 @@ func TestARequestIsRefusedBeforeAWorkItemOrAGrantExists(t *testing.T) {
 }
 
 // TestARunStopsBeforeAWorkItemForOtherFaults has the faults that are not in the request:
-// the definition is bad, nobody signed, the script is missing, or the environment is not
-// known.
+// the definition is bad, nobody signed, the script is missing, the environment is not
+// known, or the environment has no targets because its platform layer is not applied.
 func TestARunStopsBeforeAWorkItemForOtherFaults(t *testing.T) {
 	o, runners := runbookOrchestrator(t, extraRunbooks)
+	o.Envs["bare"] = EnvConfig{Name: "bare", Cloud: "local"}
 	sign(t, o, "restart-component", "no-script")
 	web := map[string]string{"component": "web"}
 	cases := map[string]struct {
@@ -175,6 +190,8 @@ func TestARunStopsBeforeAWorkItemForOtherFaults(t *testing.T) {
 			"no script"},
 		"an unknown environment": {RunbookRequest{Env: "moon", Name: "restart-component",
 			Params: web}, "is not configured"},
+		"an environment without targets": {RunbookRequest{Env: "bare",
+			Name: "restart-component", Params: web}, "has no output targets"},
 	}
 	for label, tc := range cases {
 		_, err := o.RunRunbook(context.Background(), tc.request)
@@ -247,9 +264,28 @@ func TestARunGivesTheRunnerTheRunbookAtTheCommitOfTheWorkItem(t *testing.T) {
 		t.Fatalf("the runner got %d jobs", len(runners.jobs))
 	}
 	wantJob := jobspec.Spec{Kind: jobspec.KindRunbook, Env: "local", Runbook: "db-backup",
-		CheckoutID: "runbooks/" + wi.Commit}
+		CheckoutID: "runbooks/" + wi.Commit, Namespace: "shop", DataNamespace: "shop-data"}
 	if !reflect.DeepEqual(runners.jobs[0], wantJob) {
 		t.Errorf("runner job = %+v, want %+v", runners.jobs[0], wantJob)
+	}
+}
+
+// On a cloud the data services are not in the cluster. The job has no data namespace, and
+// the script decides whether it can run without one.
+func TestARunOnAnEnvironmentWithoutADataNamespaceHasOnlyTheApplication(t *testing.T) {
+	o, runners := runbookOrchestrator(t, nil)
+	o.Envs["prod"] = EnvConfig{Name: "prod", Cloud: "aws"}
+	setTargets(t, o, "prod", map[string]any{"application": "shop", "data": ""})
+	sign(t, o, "restart-component")
+	wi, err := o.RunRunbook(context.Background(), RunbookRequest{Env: "prod",
+		Name: "restart-component", Params: map[string]string{"component": "api"},
+		Actor: "carol"})
+	if err != nil || wi.State != StateDone {
+		t.Fatalf("state %s, %v; want a finished run", wi.State, err)
+	}
+	if got := runners.jobs[0]; got.Namespace != "shop" || got.DataNamespace != "" {
+		t.Errorf("runner job targets = %q and %q, want shop and none", got.Namespace,
+			got.DataNamespace)
 	}
 }
 
@@ -276,8 +312,11 @@ func TestARunRecordsItsTypedOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(log, "output objects=31") {
-		t.Errorf("job log = %q", log)
+	for _, line := range []string{"target application=shop\ntarget data=shop-data\n",
+		"output objects=31"} {
+		if !strings.Contains(log, line) {
+			t.Errorf("job log does not have %q: %q", line, log)
+		}
 	}
 }
 

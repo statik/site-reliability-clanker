@@ -195,7 +195,8 @@ func (c *Client) execute(ctx context.Context, spec jobspec.Spec, log io.Writer) 
 		return jobspec.Result{Outputs: outputs}, err
 	case jobspec.KindRunbook:
 		outputs, err := c.Runner.Runbook(ctx, RunbookJob{Env: spec.Env, Checkout: checkout,
-			Name: spec.Runbook, Params: spec.Params, KubeConfig: spec.KubeConfig, Log: log})
+			Name: spec.Runbook, Params: spec.Params, KubeConfig: spec.KubeConfig,
+			Namespace: spec.Namespace, DataNamespace: spec.DataNamespace, Log: log})
 		return jobspec.Result{Outputs: outputs}, err
 	case jobspec.KindDiagnose:
 		kubectl := func(args ...string) ([]byte, error) {

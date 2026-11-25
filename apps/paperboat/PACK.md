@@ -121,6 +121,12 @@ runbooks repository, beside the policies and the notification routes of the core
 can put files only there: it cannot bring a policy, change a risk tier or add a route.
 `runbooks/README.md` has the format of a definition.
 
+A script names no namespace. The runner gives it the targets of the environment as
+`TARGET_APPLICATION` and `TARGET_DATA`; `runbooks/README.md` has the full environment.
+`TARGET_DATA` is empty on AWS, GCP and Azure, where the database is not in the cluster,
+so the database runbooks of Paperboat (`db-backup`, `db-maintenance`, `restore-drill`)
+stop there with a message before they run a command.
+
 ## Eval cases
 
 `evals/investigator_diagnosis.json` has the incidents that the eval suite gives to the
@@ -211,5 +217,3 @@ The core on a cloud has no disk. It reads only the pack that it carries.
 - The recorded model answers in `internal/agent/replay` are answers about Paperboat.
 - The eval tasks other than `investigator_diagnosis` have their samples in the code of the
   suite, and those samples are about Paperboat.
-- The scripts of the runbooks of Paperboat have the namespaces `paperboat` and
-  `paperboat-data` in their text. They do not read the targets.

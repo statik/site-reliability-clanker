@@ -77,10 +77,14 @@ type Spec struct {
 	// Runbook is the name of the script of a runbook job, and Params are its parameters.
 	Runbook string            `json:"runbook,omitempty"`
 	Params  map[string]string `json:"params,omitempty"`
-	// Namespace and Reads are the reads of a diagnose job: what to read, and where. The
-	// job carries no command.
+	// Namespace is the namespace of the application, from the targets of the environment.
+	// A diagnose job reads there, and a runbook job gets it as TARGET_APPLICATION.
 	Namespace string `json:"namespace,omitempty"`
-	Reads     []Read `json:"reads,omitempty"`
+	// DataNamespace is the namespace of the data services of the application. A runbook job
+	// gets it as TARGET_DATA. It is empty when the data services are not in the cluster.
+	DataNamespace string `json:"data_namespace,omitempty"`
+	// Reads are the reads of a diagnose job. The job carries no command.
+	Reads []Read `json:"reads,omitempty"`
 	// Variables are added to the environment of OpenTofu, for example TF_VAR_admin_token.
 	Variables map[string]string `json:"variables,omitempty"`
 	// Backend holds the settings of the state backend, as `tofu init -backend-config`

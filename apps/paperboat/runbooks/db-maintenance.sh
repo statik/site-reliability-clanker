@@ -2,8 +2,10 @@
 # Routine database upkeep: report dead rows, then vacuum and analyze every table.
 set -euo pipefail
 
+data="${TARGET_DATA:?is empty: the database of this environment is not in the cluster}"
+
 psql_prod() {
-  kubectl -n paperboat-data exec postgres-0 -- psql -U postgres -d paperboat -c "$1"
+  kubectl -n "${data}" exec postgres-0 -- psql -U postgres -d paperboat -c "$1"
 }
 
 echo "dead rows before maintenance:"
