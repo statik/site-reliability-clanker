@@ -310,14 +310,21 @@ func (o *Orchestrator) wait(wi *WorkItem, windows policy.Windows) (bool, error) 
 	return true, nil
 }
 
-// applyMargin is how long the apply of a work item can run after the apply windows of its
-// layers: for the plans of deferred layers, the verification and a rollback.
-const applyMargin = 15 * time.Minute
+// defaultApplyTimeout is how long the apply of a work item can take off AWS.
+const defaultApplyTimeout = 45 * time.Minute
 
-// applyTimeout returns how long the apply of a work item can take: the apply window of
-// each of its layers, and applyMargin.
+// awsApplyMargin is how long the apply of a work item on AWS can run after the apply
+// windows of its layers: for the plans of deferred layers, the verification and a rollback.
+const awsApplyMargin = 15 * time.Minute
+
+// applyTimeout returns how long the apply of a work item can take. On AWS each layer can
+// use its apply window, and awsApplyMargin follows. Elsewhere it is defaultApplyTimeout.
 func (o *Orchestrator) applyTimeout(wi WorkItem) time.Duration {
-	return time.Duration(len(wi.Layers))*o.Envs[wi.Env].ApplyWindow() + applyMargin
+	env := o.Envs[wi.Env]
+	if env.Cloud != awsCloud {
+		return defaultApplyTimeout
+	}
+	return time.Duration(len(wi.Layers))*env.ApplyWindow() + awsApplyMargin
 }
 
 func (o *Orchestrator) applyInBackground(wi WorkItem) {

@@ -176,6 +176,9 @@ func (e EnvConfig) BlankSlateLayers() []string {
 	return slices.Clone(Layers)
 }
 
+// awsCloud is the cloud of an environment on AWS.
+const awsCloud = "aws"
+
 // awsApplyWindow is the apply window of a layer on AWS. It is the longest session that STS
 // gives when the role of the control plane assumes an agent role (role chaining), and
 // creating a cluster with its add-ons can take close to 30 minutes.
@@ -185,7 +188,7 @@ const awsApplyWindow = time.Hour
 // credential of the target. On AWS it is one hour. Elsewhere it is policy.WindowReserve,
 // the time that must be left in a maintenance window when an apply starts.
 func (e EnvConfig) ApplyWindow() time.Duration {
-	if e.Cloud == "aws" {
+	if e.Cloud == awsCloud {
 		return awsApplyWindow
 	}
 	return policy.WindowReserve

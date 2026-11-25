@@ -256,7 +256,7 @@ func TestTheApplyWindowIsOneHourOnAWSAndTheReserveElsewhere(t *testing.T) {
 	}
 }
 
-func TestTheApplyOfAWorkItemCanUseTheWindowOfEachLayer(t *testing.T) {
+func TestAnApplyOnAWSCanUseTheWindowOfEachLayerAndLocally45Minutes(t *testing.T) {
 	o := &Orchestrator{Envs: map[string]EnvConfig{sandbox.Name: sandbox,
 		localEnv.Name: localEnv}}
 	cases := []struct {
@@ -264,10 +264,12 @@ func TestTheApplyOfAWorkItemCanUseTheWindowOfEachLayer(t *testing.T) {
 		want time.Duration
 	}{
 		{WorkItem{Env: localEnv.Name, Layers: []string{"50-app"}}, 45 * time.Minute},
-		{WorkItem{Env: localEnv.Name, Layers: Layers}, 6*30*time.Minute + 15*time.Minute},
+		{WorkItem{Env: localEnv.Name, Layers: Layers}, 45 * time.Minute},
+		{WorkItem{Env: localEnv.Name}, 45 * time.Minute},
 		{WorkItem{Env: sandbox.Name, Layers: sandbox.BlankSlateLayers()},
 			5*time.Hour + 15*time.Minute},
-		{WorkItem{Env: sandbox.Name}, 15 * time.Minute},
+		{WorkItem{Env: sandbox.Name, Layers: []string{"20-cluster"}},
+			time.Hour + 15*time.Minute},
 	}
 	for _, c := range cases {
 		if got := o.applyTimeout(c.wi); got != c.want {
