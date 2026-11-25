@@ -34,6 +34,9 @@ type Issuer interface {
 	Withdraw(ctx context.Context, g Grant) error
 }
 
+// HasIssuer reports whether the broker exchanges grants for credentials of its target.
+func (b *Broker) HasIssuer() bool { return b.issuer != nil }
+
 // Exchange checks the grant and returns a credential that expires with it.
 func (b *Broker) Exchange(ctx context.Context, g Grant, p Presentation) (Credential, error) {
 	if err := b.Check(g, p); err != nil {

@@ -286,8 +286,8 @@ type components struct {
 }
 
 // target holds the parts that only one kind of target has. On a cloud manualChange is nil:
-// the drift scene reports that it cannot run. On AWS the issuer is nil without the roles
-// of the identities: the broker then exchanges no grant. On a cloud localModel is nil: the
+// the drift scene reports that it cannot run. On AWS the issuer is nil without the outputs
+// of layer 00-bootstrap: the broker then exchanges no grant. On a cloud localModel is nil: the
 // core starts no program, so it cannot start a model server.
 type target struct {
 	issuer       broker.Issuer
@@ -357,8 +357,9 @@ func build(ctx context.Context, o options) (*components, error) {
 	}
 	c.log = audit.New(c.db, c.clock)
 	c.forge = forge.New(c.db)
+	env := orchestrator.EnvConfig{Name: o.env, Cloud: o.cloud}
 	if o.cloud == "aws" {
-		if on.issuer, err = awsIssuer(c.log, awstarget.NewSTS); err != nil {
+		if env, on.issuer, err = awsEnvironment(c, env, awstarget.NewSTS); err != nil {
 			return nil, err
 		}
 	}
@@ -372,8 +373,7 @@ func build(ctx context.Context, o options) (*components, error) {
 	}
 	c.orch = &orchestrator.Orchestrator{DB: c.db, Audit: c.log, Forge: c.forge,
 		Runners: c.dispatcher, Broker: c.broker, Clock: c.clock, DataDir: o.dataDir,
-		Envs: map[string]orchestrator.EnvConfig{o.env: {Name: o.env, Cloud: o.cloud}},
-		App:  o.app}
+		Envs: map[string]orchestrator.EnvConfig{o.env: env}, App: o.app}
 	if o.demo {
 		c.orch.JobVariables = map[string]string{"TF_VAR_admin_token": demoAdminToken}
 		scrub.Add(demoAdminToken)
@@ -418,7 +418,13 @@ func build(ctx context.Context, o options) (*components, error) {
 		Detector: c.detector, Orch: c.orch, Monitor: c.monitor, Notifier: c.notifier,
 		AdminToken: demoAdminToken, ManualChange: on.manualChange,
 		Env: o.env, App: o.app}
-	c.orch.Hooks = orchestrator.Hooks{Explain: c.agent.Explain, Review: c.agent.Review,
+	c.orch.Hooks = orchestratorHooks(c, o)
+	return c, nil
+}
+
+// orchestratorHooks connects the agent, the monitor and the image build to the pipeline.
+func orchestratorHooks(c *components, o options) orchestrator.Hooks {
+	return orchestrator.Hooks{Explain: c.agent.Explain, Review: c.agent.Review,
 		Verify: c.monitor.Verify,
 		LayerApplied: func(ctx context.Context, wi orchestrator.WorkItem, layer string) error {
 			if !o.demo || o.cloud != "local" || layer != "10-network" {
@@ -431,7 +437,6 @@ func build(ctx context.Context, o options) (*components, error) {
 				slog.Error("take snapshot", "work_item", wi.ID, "error", err)
 			}
 		}}
-	return c, nil
 }
 
 // publishImages builds the releases of the application and pushes them to the registry of
@@ -506,8 +511,9 @@ func firstRun(ctx context.Context, c *components, o options) error {
 	}
 	wi, err := c.orch.Create(orchestrator.NewWorkItem{
 		Title: "Blank-slate deployment of " + o.env, Kind: orchestrator.KindBlankSlate, Env: o.env,
-		Layers: orchestrator.Layers, Trigger: "First run: no layer of this environment exists",
-		Actor: "orchestrator"})
+		Layers:  c.orch.Envs[o.env].BlankSlateLayers(),
+		Trigger: "First run: no layer of this environment exists",
+		Actor:   "orchestrator"})
 	if err != nil {
 		return err
 	}
