@@ -219,6 +219,21 @@ func TestLoadRefusesAManifestThatIsNotSafe(t *testing.T) {
 			"app_version.path"},
 		"a version from another source": {in("app_version", "source", "file"),
 			"app_version.source"},
+		"a version path with a component": {in("app_version", "component", "api"),
+			`app_version.component is "api"; the source http-json has no component`},
+		"a version path with no path": {set("app_version", map[string]any{
+			"source": "http-json"}), `app_version.path is ""`},
+		"an image version with a path": {set("app_version", map[string]any{
+			"source": "image", "component": "api", "path": "/api/version"}),
+			`app_version.path is "/api/version"; the source image has no path`},
+		"an image version with no component": {set("app_version", map[string]any{
+			"source": "image"}), `app_version.component "" is not one of the components`},
+		"an image version of a component that is not in the list": {set("app_version",
+			map[string]any{"source": "image", "component": "coredns"}),
+			`app_version.component "coredns" is not one of the components`},
+		"an image version with a field that does not exist": {set("app_version",
+			map[string]any{"source": "image", "component": "api", "tag": "latest"}),
+			"unknown field"},
 		"an extra node with the name of a platform node": {in("topology", "extra",
 			[]string{"postgres"}), `topology node "postgres"`},
 		"an extra node with the name of a component": {in("topology", "extra",
@@ -233,6 +248,19 @@ func TestLoadRefusesAManifestThatIsNotSafe(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%s: error %v, want one with %q", name, err, tc.want)
 		}
+	}
+}
+
+func TestAPackCanReadTheVersionFromTheImageOfAComponent(t *testing.T) {
+	raw := manifest(t, set("app_version", map[string]any{"source": "image",
+		"component": "web"}))
+	app, err := pack.Load(packFiles(raw), "p")
+	if err != nil {
+		t.Fatalf("the pack does not load: %v", err)
+	}
+	want := pack.AppVersion{Source: pack.VersionImage, Component: "web"}
+	if app.AppVersion != want {
+		t.Errorf("AppVersion = %+v, want %+v", app.AppVersion, want)
 	}
 }
 
