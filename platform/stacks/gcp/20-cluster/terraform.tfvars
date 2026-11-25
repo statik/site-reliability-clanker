@@ -1,9 +1,3 @@
-env_name       = "gcp-sandbox"
-state_location = "clanker-sandbox-gcp-sandbox-tfstate"
-
-project_id = "clanker-sandbox"
-region     = "us-central1"
-
 kubernetes_version = "1.36"
 node_image_version = ""
 node_count         = 2

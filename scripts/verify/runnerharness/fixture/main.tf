@@ -16,10 +16,19 @@ variable "message" {
   type = string
 }
 
+# The runner sets it to the bucket of the backend of the job.
+variable "state_location" {
+  type = string
+}
+
 resource "terraform_data" "marker" {
   input = var.message
 }
 
 output "message" {
   value = terraform_data.marker.output
+}
+
+output "state_location" {
+  value = var.state_location
 }
