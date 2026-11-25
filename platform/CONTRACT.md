@@ -56,9 +56,17 @@ The backend block in `versions.tf` is empty (`backend "s3" {}`). The runner supp
 values with `tofu init -backend-config=...`. Layer `00-bootstrap` creates the backend, so its
 own state starts local and `clanker bootstrap` migrates it.
 
+- On AWS, `clanker bootstrap --cloud aws` applies `00-bootstrap` in a copy below the data
+  directory, with a local backend override and its inputs as `-var`. Then it moves the state
+  to `<env_name>/00-bootstrap.tfstate` in the bucket `clanker-<env_name>-state-<account>`
+  with `tofu init -migrate-state -force-copy`. `clanker destroy --cloud aws` reads the state
+  of every layer first, destroys the layers with resources from `50-app` down, then moves
+  the state of `00-bootstrap` back to a local file and destroys it.
 - On a cloud target the job carries the backend settings. The runner passes them to
   `tofu init` and, when the settings have a `bucket`, sets `TF_VAR_state_location` to it.
-  A job on a cloud target without backend settings fails before `tofu` runs.
+  A job on a cloud target without backend settings fails before `tofu` runs. On AWS the
+  settings must be exactly `bucket`, `key`, `region`, `use_lockfile = "true"` and
+  `encrypt = "true"`, so no setting of the local backend reaches an `s3` backend.
 - On the local target the job has no backend settings. The runner passes
   `-backend-config=path=<state directory>/<layer>.tfstate` and sets `TF_VAR_state_location`
   to the state directory.

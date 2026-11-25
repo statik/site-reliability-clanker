@@ -95,11 +95,29 @@ type Job struct {
 	// Backend holds the settings of a remote state backend, as `tofu init -backend-config`
 	// takes them. When it is empty the state is a file in the state directory.
 	Backend map[string]string
-	Log     io.Writer
+	// LocalState keeps the state of a job on a cloud target in the state directory, with
+	// the local backend. The stack must then have a local backend: the commands of the
+	// operator give layer 00-bootstrap one with an override file in a copy of the stack,
+	// while the bucket that the layer creates does not hold its state.
+	LocalState bool
+	// DataDir is the directory for the working data of OpenTofu (TF_DATA_DIR), which
+	// records the backend. Empty: the directory .terraform of the stack, or for the
+	// commands of the operator a directory below the work directory of the runner.
+	DataDir string
+	// Vars are given with -var to an apply or a destroy without a saved plan, so they
+	// replace the values of terraform.tfvars. Only the commands of the operator set them.
+	Vars map[string]string
+	Log  io.Writer
 }
 
 // StateDir returns the state directory of an environment.
 func (r *Runner) StateDir(env string) string { return filepath.Join(r.StateRoot, env) }
+
+// StatePath returns the state file of a layer in the state directory: the state of every
+// layer on the local target, and of layer 00-bootstrap on a cloud while it is local.
+func (r *Runner) StatePath(env, layer string) string {
+	return filepath.Join(r.StateDir(env), layer+".tfstate")
+}
 
 // checkoutDir returns the directory with the tree of the checkout. It unpacks the archive
 // on the first use of an ID.
@@ -245,6 +263,9 @@ func (r *Runner) prepare(j Job) (run, func(), error) {
 	if r.dockerHost != "" {
 		env = append(env, "DOCKER_HOST="+r.dockerHost)
 	}
+	if j.DataDir != "" {
+		env = append(env, "TF_DATA_DIR="+j.DataDir)
+	}
 	if kubeconfig != "" {
 		env = append(env, "KUBE_CONFIG_PATH="+kubeconfig, "KUBECONFIG="+kubeconfig)
 	} else {
@@ -263,7 +284,8 @@ func (r *Runner) prepare(j Job) (run, func(), error) {
 // stateLocation returns the value of the input state_location of the stacks. With a
 // backend it is the bucket of the backend. A backend with no bucket gives an empty value,
 // and the variables of the job must then give it. Without a backend it is the state
-// directory of the environment, which it creates.
+// directory of the environment, which it creates. On a cloud target a local state is not
+// the state location: the job gives the bucket in its variables.
 func (r *Runner) stateLocation(j Job) (string, error) {
 	if len(j.Backend) > 0 {
 		return j.Backend["bucket"], nil
@@ -271,6 +293,9 @@ func (r *Runner) stateLocation(j Job) (string, error) {
 	dir := r.StateDir(j.Env)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("create state directory for %s: %w", j.Env, err)
+	}
+	if j.Cloud != "local" {
+		return "", nil
 	}
 	return dir, nil
 }
@@ -306,17 +331,26 @@ func (r *Runner) tofu(ctx context.Context, p run, log, capture io.Writer, args .
 }
 
 // backendConfig returns the arguments of `tofu init` that say where the state of the job is.
-// Only the stacks of the local target have the local backend, which takes a path. A job on
-// another target must bring the settings of its backend.
+// The stacks of the local target, and a stack with LocalState, have the local backend,
+// which takes a path. A job on another target must bring the settings of its backend. On
+// AWS they are checked, so that an s3 backend gets complete settings and no local one.
 func (r *Runner) backendConfig(j Job) ([]string, error) {
+	if j.LocalState && len(j.Backend) > 0 {
+		return nil, fmt.Errorf("the job for %s/%s has backend settings and keeps its state in "+
+			"the state directory: give one of them", j.Env, j.Layer)
+	}
 	if len(j.Backend) == 0 {
-		if j.Cloud != "local" {
+		if j.Cloud != "local" && !j.LocalState {
 			return nil, fmt.Errorf("the job for %s/%s on %s has no backend settings: only the "+
 				"stacks of the local target keep their state in the state directory", j.Env,
 				j.Layer, j.Cloud)
 		}
-		statePath := filepath.Join(r.StateDir(j.Env), j.Layer+".tfstate")
-		return []string{"-backend-config=path=" + statePath}, nil
+		return []string{"-backend-config=path=" + r.StatePath(j.Env, j.Layer)}, nil
+	}
+	if j.Cloud == "aws" {
+		if err := checkS3Backend(j.Backend); err != nil {
+			return nil, fmt.Errorf("the job for %s/%s: %w", j.Env, j.Layer, err)
+		}
 	}
 	names := make([]string, 0, len(j.Backend))
 	for name := range j.Backend {
@@ -438,26 +472,21 @@ func (r *Runner) outputs(ctx context.Context, p run) (map[string]any, error) {
 	return outputs, nil
 }
 
-// destroyDataDir returns the directory for the working data of OpenTofu in a destroy of a
-// layer. It is below the directory of the runner, one for each environment and layer.
-func (r *Runner) destroyDataDir(env, layer string) string {
-	return filepath.Join(r.WorkRoot, "destroy", env, layer)
-}
-
 // Destroy removes every resource of a layer. Only the CLI teardown calls it. The teardown
 // gives the stack directories of the sources, which all data directories share. Thus the
 // working data of OpenTofu, which records the backend, stays out of the stack directory.
 func (r *Runner) Destroy(ctx context.Context, j Job) error {
-	p, done, err := r.prepare(j)
+	p, done, err := r.prepare(r.withOperatorDataDir(j))
 	if err != nil {
 		return err
 	}
 	defer done()
-	p.environ = append(p.environ, "TF_DATA_DIR="+r.destroyDataDir(j.Env, j.Layer))
 	if err := r.init(ctx, p); err != nil {
 		return err
 	}
-	return r.tofu(ctx, p, j.Log, nil, "destroy", "-no-color", "-input=false", "-auto-approve")
+	args := append([]string{"destroy", "-no-color", "-input=false", "-auto-approve"},
+		varArgs(j.Vars)...)
+	return r.tofu(ctx, p, j.Log, nil, args...)
 }
 
 // ApplyDirect plans and applies a layer in one step with the credentials of the operator,
@@ -472,8 +501,9 @@ func (r *Runner) ApplyDirect(ctx context.Context, j Job) (map[string]any, error)
 	if err := r.init(ctx, p); err != nil {
 		return nil, err
 	}
-	if err := r.tofu(ctx, p, j.Log, nil, "apply", "-no-color", "-input=false",
-		"-auto-approve"); err != nil {
+	args := append([]string{"apply", "-no-color", "-input=false", "-auto-approve"},
+		varArgs(j.Vars)...)
+	if err := r.tofu(ctx, p, j.Log, nil, args...); err != nil {
 		return nil, err
 	}
 	return r.outputs(ctx, p)

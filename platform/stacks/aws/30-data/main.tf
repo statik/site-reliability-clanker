@@ -113,5 +113,6 @@ resource "kubernetes_storage_class_v1" "rwx" {
 module "backup_bucket" {
   source = "../../../modules/aws/bucket"
 
-  name = "${local.name}-backup-${data.aws_caller_identity.current.account_id}"
+  name          = "${local.name}-backup-${data.aws_caller_identity.current.account_id}"
+  force_destroy = tonumber(local.bootstrap.clanker_ttl) > 0
 }

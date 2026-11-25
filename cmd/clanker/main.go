@@ -4,7 +4,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -13,16 +12,13 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
-	"slices"
 	"strings"
 	"syscall"
 
 	"github.com/statik/site-reliability-clanker/internal/awsparams"
 	"github.com/statik/site-reliability-clanker/internal/bundle"
-	"github.com/statik/site-reliability-clanker/internal/orchestrator"
 	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/packstore"
-	"github.com/statik/site-reliability-clanker/internal/runner"
 	"github.com/statik/site-reliability-clanker/internal/setup"
 )
 
@@ -37,8 +33,21 @@ Usage:
   clanker discover --profile NAME   survey an AWS account and propose where to install; it
                                     only reads. --region NAME surveys that region
   clanker bootstrap --cloud local   apply layer 00-bootstrap with your own credentials
+  clanker bootstrap --cloud aws --env NAME --profile NAME --region NAME
+          --broker-principal ARN --parameter-path PATH [--kms-key KEY]
+                                    apply layer 00-bootstrap on AWS with the session of the
+                                    profile, move its state into the bucket that it creates
+                                    and print the setting CLANKER_AWS_BOOTSTRAP. With
+                                    --kms-key it also writes the setting below PATH in
+                                    Parameter Store
   clanker up                        start the control plane and the dashboard
   clanker destroy --env local       destroy every layer of an environment
+  clanker destroy --cloud aws --env NAME --profile NAME --region NAME --broker-principal ARN
+                                    check the state of each layer of an AWS environment,
+                                    destroy each layer with resources from 50-app down, then
+                                    move 00-bootstrap out of its bucket and destroy it. An
+                                    input that neither terraform.tfvars nor the command gives,
+                                    such as image_registry of 10-network, comes from TF_VAR_*
   clanker reset                     destroy the local environment and remove its history
                                     and its saved setup; the next start begins again
   clanker sink                      run the local webhook sink alone
@@ -59,6 +68,15 @@ Common flags:
                  carries the files and needs no checkout)
   --pack DIR     application pack of setup and up (default: the pack that comes with the
                  control plane)
+
+Flags of bootstrap and destroy on AWS:
+  --profile NAME          AWS CLI profile whose session runs OpenTofu
+  --region NAME           region of the environment
+  --broker-principal ARN  IAM role that the control plane runs as, from its home stack
+  --parameter-path PATH   Parameter Store path of the settings of the control plane, for
+                          example /src/prod. No agent role can read below it
+  --kms-key KEY           KMS key of those settings: bootstrap writes CLANKER_AWS_BOOTSTRAP
+                          with it
 `
 
 // options are the settings shared by the commands.
@@ -88,9 +106,15 @@ type options struct {
 	noBrowser bool
 	// inApp says that the macOS app started the wizard and shows it in its own window.
 	inApp bool
-	// profile and region are the AWS CLI profile and the region of `clanker discover`.
+	// profile and region are the AWS CLI profile and the region of `clanker discover`, and
+	// of bootstrap and destroy on AWS.
 	profile string
 	region  string
+	// brokerPrincipal, parameterPath and kmsKey come from the home stack of the control
+	// plane on AWS. Bootstrap and destroy on AWS use them.
+	brokerPrincipal string
+	parameterPath   string
+	kmsKey          string
 }
 
 func parse(command string, args []string) (options, error) {
@@ -109,8 +133,13 @@ func parse(command string, args []string) (options, error) {
 		"source files or on this machine (default: the one pack in apps)")
 	flags.StringVar(&o.cloud, "cloud", "local", "cloud of the environment")
 	flags.BoolVar(&o.demo, "demo", true, "demo mode: simulator, local mail and webhook sink")
-	flags.StringVar(&o.profile, "profile", "", "AWS CLI profile of the account to survey")
-	flags.StringVar(&o.region, "region", "", "region to survey (default: the most used one)")
+	flags.StringVar(&o.profile, "profile", "", "AWS CLI profile of the account")
+	flags.StringVar(&o.region, "region", "", "AWS region (discover: default the most used one)")
+	flags.StringVar(&o.brokerPrincipal, "broker-principal", "", "ARN of the IAM role that the "+
+		"control plane runs as")
+	flags.StringVar(&o.parameterPath, "parameter-path", "", "Parameter Store path of the "+
+		"settings of the control plane")
+	flags.StringVar(&o.kmsKey, "kms-key", "", "KMS key of the settings of the control plane")
 	if err := flags.Parse(args); err != nil {
 		return options{}, err
 	}
@@ -290,66 +319,6 @@ func preflight(target string) error {
 	return nil
 }
 
-func bootstrap(ctx context.Context, o options) error {
-	if o.cloud != "local" {
-		return fmt.Errorf("bootstrap for cloud %q is not enabled: the %s modules are validated "+
-			"but not applied. Approve the expected cost first; see docs/HANDOFF.md", o.cloud,
-			o.cloud)
-	}
-	r, err := runner.New(o.dataDir)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Applying layer 00-bootstrap of %s with your own credentials.\n", o.env)
-	job := runner.Job{Env: o.env, Cloud: o.cloud, Layer: "00-bootstrap", Checkout: runner.Checkout{Dir: o.sourceDir},
-		Log: os.Stdout}
-	outputs, err := r.ApplyDirect(ctx, job)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("\nBootstrap of %s is complete. It created:\n", o.env)
-	fmt.Printf("  state backend:   %v\n", outputs["state_backend"])
-	fmt.Printf("  evidence bucket: %v\n", outputs["evidence_bucket"])
-	fmt.Printf("  identities:      %v\n", outputs["identities"])
-	fmt.Println("No credential of yours is stored. Next: clanker up")
-	return nil
-}
-
-func destroy(ctx context.Context, o options) error {
-	r, err := runner.New(o.dataDir)
-	if err != nil {
-		return err
-	}
-	layers := slices.Clone(orchestrator.Layers)
-	slices.Reverse(layers)
-	// The teardown uses the administrator kubeconfig of the operator. Before the cluster
-	// exists there is none, and the layers below the cluster need none.
-	admin, err := os.ReadFile(filepath.Join(r.StateDir(o.env), "kubeconfig"))
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("read the administrator kubeconfig of %s: %w", o.env, err)
-	}
-	for _, layer := range layers {
-		// A layer with no state file in the state directory was never applied here.
-		statePath := filepath.Join(r.StateDir(o.env), layer+".tfstate")
-		if _, err := os.Stat(statePath); errors.Is(err, os.ErrNotExist) {
-			continue
-		} else if err != nil {
-			return fmt.Errorf("check the state file %s: %w", statePath, err)
-		}
-		fmt.Printf("Destroying %s/%s\n", o.env, layer)
-		job := runner.Job{Env: o.env, Cloud: o.cloud, Layer: layer,
-			Checkout: runner.Checkout{Dir: o.sourceDir}, KubeConfig: string(admin), Log: os.Stdout}
-		if err := r.Destroy(ctx, job); err != nil {
-			return err
-		}
-		if err := os.Remove(statePath); err != nil {
-			return fmt.Errorf("remove state file %s: %w", statePath, err)
-		}
-	}
-	fmt.Printf("Environment %s is destroyed.\n", o.env)
-	return nil
-}
-
 func run() error {
 	args := os.Args[1:]
 	if len(args) == 0 {
@@ -423,8 +392,10 @@ func run() error {
 		fmt.Println("All required tools are present and Docker answers.")
 		return nil
 	case "bootstrap":
-		if err := preflight(setup.TargetLocal); err != nil {
-			return err
+		if o.cloud == setup.TargetLocal || o.cloud == setup.TargetAWS {
+			if err := preflight(o.cloud); err != nil {
+				return err
+			}
 		}
 		return bootstrap(ctx, o)
 	case "up":
@@ -438,6 +409,11 @@ func run() error {
 		}
 		return up(ctx, o)
 	case "destroy":
+		if o.cloud == setup.TargetAWS {
+			if err := preflight(o.cloud); err != nil {
+				return err
+			}
+		}
 		return destroy(ctx, o)
 	case "reset":
 		return newResetter(os.Stdout).run(ctx, o)

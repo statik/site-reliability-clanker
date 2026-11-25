@@ -40,6 +40,7 @@ var localTools = []tool{
 
 var awsTools = []tool{
 	{"aws", "signs in to your AWS account and reads it", "brew install awscli"},
+	{"tofu", "applies layer 00-bootstrap from this machine", "brew install opentofu"},
 }
 
 // LookPath finds a program. Tests replace it.
