@@ -208,7 +208,11 @@ The core on a cloud has no disk. It reads only the pack that it carries.
   time, so the runbooks and the chart of a new version do not reach it.
 - The scenes of the simulator are the story of the Paperboat releases 1.1.0, 1.1.1 and
   1.2.0.
-- The recorded model answers in `internal/agent/replay` are answers about Paperboat.
+- The recorded model answers in `internal/agent/replay` are answers about Paperboat. Each
+  file name starts with `paperboat_`, the name of the pack, and the replay mode reads only
+  the files of the pack that runs. Another pack gets the template text of the Explainer and
+  of the Investigator, no review, and no pull request from the Author for a release or an
+  advisory.
 - The eval tasks other than `investigator_diagnosis` have their samples in the code of the
   suite, and those samples are about Paperboat.
 - The scripts of the runbooks of Paperboat have the namespaces `paperboat` and

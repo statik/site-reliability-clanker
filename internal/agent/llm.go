@@ -47,7 +47,8 @@ type Request struct {
 	Model    string
 	Messages []ChatMessage
 	Tools    []Tool
-	// ReplayKey selects the recording in replay mode.
+	// ReplayKey selects the recording in replay mode. Agent.complete puts the name of the
+	// pack and "_" in front of it, so that a pack never replays the answers about another.
 	ReplayKey string
 	// Step is the index of this request inside one agent loop.
 	Step int

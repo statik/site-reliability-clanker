@@ -104,7 +104,7 @@ func TestTheWorkItemOfAMitigationHasTheTitleOfTheRunbook(t *testing.T) {
 // The recorded answer of the Investigator must still pass the check of the definition.
 func TestTheRecordedDiagnosisProposesAMitigationThatExists(t *testing.T) {
 	a := agentWithRunbooks(t)
-	raw, err := os.ReadFile(filepath.Join("replay", "investigate_incident.json"))
+	raw, err := os.ReadFile(filepath.Join("replay", a.App.Name+"_investigate_incident.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
