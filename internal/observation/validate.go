@@ -3,6 +3,7 @@ package observation
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/statik/site-reliability-clanker/internal/pack"
 )
@@ -149,6 +150,18 @@ func validState(where string, state State) error {
 // IsVersion reports whether text has the form of a version, as Validate asks of each
 // version in a record.
 func IsVersion(text string) bool { return versionPattern.MatchString(text) }
+
+// NormalizeVersion returns the version that an application or an image tag reports, in
+// the form that IsVersion asks for, or "" when text has no such version. It removes one
+// "v" at the start and the build part from the first "+", and it keeps a "-suffix". So
+// "v2.38.11+abc1234" is "2.38.11" and "2.39.0-rc.1" is "".
+func NormalizeVersion(text string) string {
+	text, _, _ = strings.Cut(strings.TrimPrefix(text, "v"), "+")
+	if !IsVersion(text) {
+		return ""
+	}
+	return text
+}
 
 func validVersion(where, version string) error {
 	if version == "" || IsVersion(version) {
