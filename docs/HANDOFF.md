@@ -430,9 +430,25 @@ Merged for this:
     its expiry, at most 900 seconds after a grant that had less time left.
   - Limit: the request has no session policy. The permissions are those of the role inside
     its permission boundary.
-  - Not built: a launcher on AWS, so no job runs there yet. A plan of layers 00 to 20 asks
-    the broker for no credential (`planCredential`), on every target. A runbook job and a
-    diagnose job get no AWS keys.
+  - A plan of layers 00 to 20 asks the broker for no credential (`planCredential`), on
+    every target. A runbook job and a diagnose job get no AWS keys.
+- #133 step A5: the launcher on AWS (`internal/awsrunner`). With `CLANKER_AWS_RUNNER` and
+  `AWS_REGION`, `up --cloud aws` starts each runner as one ECS task on Fargate and waits
+  until the task stops. It ran against a fake ECS client only, never against AWS.
+  - `CLANKER_AWS_RUNNER` is JSON: `cluster`, `task_definition`, `container`, `subnets`,
+    `security_groups`. It can come from Parameter Store. Without it the dispatcher on AWS
+    has no launcher, as before. A value that is not valid, or no `AWS_REGION`, stops the
+    start.
+  - The task runs in the private subnets with no public IP. Its runner container gets
+    `CLANKER_CORE_URL` and `CLANKER_JOB_TOKEN` as environment overrides of `RunTask`. The
+    core URL is `CLANKER_CORE_URL` of the core, or else the private IPv4 address of the
+    instance from IMDSv2 with the port of `--addr`.
+  - Exit code 0 of the runner container is success. Another exit code, or a task that
+    stopped without one, is an error with the stop code and `stoppedReason`. When the job
+    ends first, the core calls `StopTask`. No error and no log line holds the job token.
+  - Limit: a principal with `ecs:DescribeTasks` on the cluster can read the job token in
+    the overrides of a task. The `planner` role has `ReadOnlyAccess`, which probably
+    allows it (not checked). It must be denied before a live run.
 
 Ran against a real account, read calls only: `clanker discover` and the browser walk of the
 step "Network". Both proposed the VPC that the owner had chosen by hand.
@@ -1020,8 +1036,9 @@ group. Section 12 of the plan records the five decisions that follow from the la
 - **Still not ready for the unikernel:**
   - A cloud needs the signing key and the database address from a secret store (issue
     #40), and a `broker.Issuer` that uses the API of the cloud.
-  - There is no launcher for a cloud (a Fargate task), and the runner has no remote state
-    backend. The job specification has a field for the backend settings.
+  - The launcher for AWS (a Fargate task) ran against a fake ECS client only, and the
+    runner has no remote state backend. The job specification has a field for the backend
+    settings.
   - A job in flight is lost when the core stops. The work item must be reconciled at start.
 - **Nanos boot test (2026-11-17, a throwaway probe, on a laptop):** a Go program as a Nanos
   image read its environment from the image configuration, made an outbound HTTPS request,

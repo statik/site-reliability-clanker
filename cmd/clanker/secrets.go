@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/statik/site-reliability-clanker/internal/broker"
-	"github.com/statik/site-reliability-clanker/internal/launch"
+	"github.com/statik/site-reliability-clanker/internal/dispatch"
 	"github.com/statik/site-reliability-clanker/internal/scrub"
 )
 
@@ -30,7 +30,7 @@ type secrets struct {
 // secrets.env and Parameter Store put their settings into the environment before the core
 // reads it, so this list covers them too.
 var secretSettings = []string{signingKeyEnv, clientSecretEnv, slackSigningSecretEnv,
-	slackBotTokenEnv, teamsAppSecretEnv, launch.TokenEnv, "OPENROUTER_API_KEY",
+	slackBotTokenEnv, teamsAppSecretEnv, dispatch.TokenEnv, "OPENROUTER_API_KEY",
 	"CLANKER_LLM_API_KEY"}
 
 // registerSecrets gives the scrubber the values of the secrets that the core holds, so

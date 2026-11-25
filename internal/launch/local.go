@@ -8,12 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-)
 
-// Environment variables that tell a runner where its core is and which job is its own.
-const (
-	CoreURLEnv = "CLANKER_CORE_URL"
-	TokenEnv   = "CLANKER_JOB_TOKEN"
+	"github.com/statik/site-reliability-clanker/internal/dispatch"
 )
 
 // Local starts each runner as a process on the machine of the control plane. It is the
@@ -30,7 +26,8 @@ type Local struct {
 // Launch runs one runner process and returns when it ends.
 func (l Local) Launch(ctx context.Context, token string) error {
 	cmd := exec.CommandContext(ctx, l.Binary, "runner", "--data", l.Dir)
-	cmd.Env = append(os.Environ(), CoreURLEnv+"="+l.CoreURL, TokenEnv+"="+token)
+	cmd.Env = append(os.Environ(), dispatch.CoreURLEnv+"="+l.CoreURL,
+		dispatch.TokenEnv+"="+token)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
