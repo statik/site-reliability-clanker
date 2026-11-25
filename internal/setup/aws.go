@@ -29,13 +29,19 @@ func realCLI(ctx context.Context, args ...string) ([]byte, error) {
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
-		text := strings.TrimSpace(stderr.String())
-		if len(text) > 600 {
-			text = text[len(text)-600:]
-		}
-		return nil, fmt.Errorf("aws %s: %w: %s", args[0]+" "+args[1], err, text)
+		return nil, fmt.Errorf("aws %s: %w: %s", args[0]+" "+args[1], err,
+			lastPart(stderr.String()))
 	}
 	return stdout.Bytes(), nil
+}
+
+// lastPart returns the end of the output of a program, where its error is.
+func lastPart(output string) string {
+	text := strings.TrimSpace(output)
+	if len(text) > 600 {
+		text = text[len(text)-600:]
+	}
+	return text
 }
 
 // AWS talks to one account through one profile of the AWS CLI. The wizard uses the

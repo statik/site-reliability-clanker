@@ -1,7 +1,5 @@
 package setup
 
-import "fmt"
-
 // hoursEachWeek turns a price for each hour into a price for one week.
 const hoursEachWeek = 168
 
@@ -82,8 +80,8 @@ func awsPlan(state State) *AWSPlan {
 		PlanItem{"One machine image and its snapshot", "built on this machine with the ops tool"},
 		PlanItem{"Roles", "one for the virtual machine and one for the short-lived runners " +
 			"on Fargate, which run the jobs"},
-		PlanItem{"Parameters", fmt.Sprintf("the settings of the control plane, in Parameter "+
-			"Store below /src/%s", state.Env)},
+		PlanItem{"Parameters", "the settings of the control plane, in Parameter Store " +
+			"below " + parameterPath(state.Env)},
 		PlanItem{"One security group", "it admits only " + router})
 	for _, line := range awsPrices.Lines {
 		line.Weekly = line.Hourly * hoursEachWeek
