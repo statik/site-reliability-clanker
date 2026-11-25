@@ -6,7 +6,7 @@
   "inputs": {
     "component": {
       "type": "string",
-      "description": "The component to restart. Its deployment is in the namespace paperboat.",
+      "description": "The component to restart. Its deployment is in the namespace of the application.",
       "values": ["api", "web", "worker"]
     }
   }

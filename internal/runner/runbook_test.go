@@ -12,12 +12,19 @@ import (
 
 func runScript(t *testing.T, body string) (map[string]any, string, error) {
 	t.Helper()
+	return runScriptOn(t, body, "harbor", "harbor-store")
+}
+
+// runScriptOn runs a script on an environment with the given targets.
+func runScriptOn(t *testing.T, body, namespace, dataNamespace string) (map[string]any,
+	string, error) {
+	t.Helper()
 	r := newRunner(t)
 	checkout := Checkout{ID: "runbooks/abc", Archive: archive(t,
 		entry{"jobs/job.sh", "#!/bin/bash\nset -euo pipefail\n" + body, 0o755})}
 	var log bytes.Buffer
 	outputs, err := r.Runbook(context.Background(), RunbookJob{Env: "local", Checkout: checkout,
-		Name: "job", Log: &log})
+		Name: "job", Namespace: namespace, DataNamespace: dataNamespace, Log: &log})
 	left, globErr := filepath.Glob(filepath.Join(r.WorkRoot, "outputs-*"))
 	if globErr != nil || len(left) != 0 {
 		t.Errorf("the output file was not removed: %v, %v", left, globErr)
@@ -43,6 +50,27 @@ func TestRunbookReturnsTheOutputsOfTheScript(t *testing.T) {
 	}
 	if strings.Contains(log, "backup_file") {
 		t.Errorf("the outputs are in the log: %q", log)
+	}
+}
+
+// The targets are set for every script, also when one is empty, and they replace a value
+// of the same name in the environment of the runner.
+func TestRunbookGetsTheTargetsOfTheEnvironment(t *testing.T) {
+	t.Setenv("TARGET_APPLICATION", "from-the-runner")
+	t.Setenv("TARGET_DATA", "from-the-runner")
+	body := `echo "application=[${TARGET_APPLICATION-unset}] data=[${TARGET_DATA-unset}]"` + "\n"
+	cases := map[string]struct{ data, want string }{
+		"a data namespace":  {"harbor-store", "application=[harbor] data=[harbor-store]"},
+		"no data namespace": {"", "application=[harbor] data=[]"},
+	}
+	for label, tc := range cases {
+		_, log, err := runScriptOn(t, body, "harbor", tc.data)
+		if err != nil {
+			t.Fatalf("%s: %v", label, err)
+		}
+		if !strings.Contains(log, tc.want) {
+			t.Errorf("%s: log = %q, want %q", label, log, tc.want)
+		}
 	}
 }
 
@@ -79,19 +107,31 @@ exit 3
 
 // fakeKubectl answers what the runbooks of the repository ask. It is not a cluster: the
 // tests below check what the scripts do with the answers, and nothing about PostgreSQL.
+// It writes each command to the error output, which a script does not read, so the log has
+// every command.
 const fakeKubectl = `#!/bin/bash
+echo "kubectl $*" >&2
 case "$*" in
 *"pg_restore --list"*) echo "      ${FAKE_OBJECTS}" ;;
 *jsonpath*) echo "14" ;;
 *"ls -1t"*) echo "/backups/paperboat-20261101T000000Z.dump" ;;
 *"SELECT count"*) echo "7" ;;
-*) echo "kubectl $*" ;;
 esac
 `
 
-// runRepositoryRunbook runs a runbook of the example pack of this repository with fakeKubectl.
+// runRepositoryRunbook runs a runbook of the example pack of this repository with
+// fakeKubectl. The targets are not the namespaces of the example pack, so a namespace that
+// a script names in its text shows in the log.
 func runRepositoryRunbook(t *testing.T, name string, params map[string]string) (
 	map[string]any, string, error) {
+	t.Helper()
+	return runRepositoryRunbookOn(t, RunbookJob{Name: name, Params: params,
+		Namespace: "harbor", DataNamespace: "harbor-store"})
+}
+
+// runRepositoryRunbookOn runs a runbook of the example pack with the name, the parameters
+// and the targets of job.
+func runRepositoryRunbookOn(t *testing.T, job RunbookJob) (map[string]any, string, error) {
 	t.Helper()
 	bin := t.TempDir()
 	if err := os.WriteFile(filepath.Join(bin, "kubectl"), []byte(fakeKubectl), 0o755); err != nil {
@@ -105,8 +145,8 @@ func runRepositoryRunbook(t *testing.T, name string, params map[string]string) (
 		t.Fatal(err)
 	}
 	var log bytes.Buffer
-	outputs, err := newRunner(t).Runbook(context.Background(), RunbookJob{Env: "local",
-		Checkout: Checkout{Dir: runbooks}, Name: name, Params: params, Log: &log})
+	job.Env, job.Checkout, job.Log = "local", Checkout{Dir: runbooks}, &log
+	outputs, err := newRunner(t).Runbook(context.Background(), job)
 	return outputs, log.String(), err
 }
 
@@ -123,8 +163,42 @@ func TestBackupRunbookReportsItsOutputs(t *testing.T) {
 	if outputs["objects"] != "31" || len(outputs) != 2 {
 		t.Errorf("outputs = %#v", outputs)
 	}
-	if !strings.Contains(log, "objects in backup: 31") || !strings.Contains(log, "-mtime +14") {
-		t.Errorf("log = %q", log)
+	for _, want := range []string{"objects in backup: 31", "-mtime +14",
+		"kubectl -n harbor-store exec postgres-0 -- pg_dump"} {
+		if !strings.Contains(log, want) {
+			t.Errorf("log does not have %q: %q", want, log)
+		}
+	}
+}
+
+// A runbook that needs a target stops before its first command when the target is empty,
+// as the data target is on a cloud, where the database is not in the cluster.
+func TestRunbooksStopWithoutTheTargetThatTheyNeed(t *testing.T) {
+	web := map[string]string{"component": "web"}
+	cases := map[string]struct {
+		job  RunbookJob
+		want string
+	}{
+		"db-backup": {RunbookJob{Name: "db-backup", Namespace: "harbor"},
+			"TARGET_DATA: is empty"},
+		"db-maintenance": {RunbookJob{Name: "db-maintenance", Namespace: "harbor"},
+			"TARGET_DATA: is empty"},
+		"restore-drill": {RunbookJob{Name: "restore-drill", Namespace: "harbor"},
+			"TARGET_DATA: is empty"},
+		"restart-component": {RunbookJob{Name: "restart-component", Params: web,
+			DataNamespace: "harbor-store"}, "TARGET_APPLICATION: is empty"},
+	}
+	for label, tc := range cases {
+		outputs, log, err := runRepositoryRunbookOn(t, tc.job)
+		if err == nil || outputs != nil {
+			t.Errorf("%s: error = %v, outputs = %v; want a failure", label, err, outputs)
+		}
+		if !strings.Contains(log, tc.want) {
+			t.Errorf("%s: log = %q, want %q", label, log, tc.want)
+		}
+		if strings.Contains(log, "kubectl ") {
+			t.Errorf("%s: a command ran without the target: %q", label, log)
+		}
 	}
 }
 
@@ -156,7 +230,7 @@ func TestRestartRunbookNeedsItsInput(t *testing.T) {
 	if err != nil || len(outputs) != 0 {
 		t.Fatalf("error = %v, outputs = %v\n%s", err, outputs, log)
 	}
-	if !strings.Contains(log, "rollout restart deployment/paperboat-web") {
+	if !strings.Contains(log, "kubectl -n harbor rollout restart deployment/paperboat-web") {
 		t.Errorf("log = %q", log)
 	}
 	_, log, err = runRepositoryRunbook(t, "restart-component", nil)
@@ -169,5 +243,28 @@ func TestMaintenanceRunbookReportsNoOutput(t *testing.T) {
 	outputs, log, err := runRepositoryRunbook(t, "db-maintenance", nil)
 	if err != nil || len(outputs) != 0 {
 		t.Fatalf("error = %v, outputs = %v\n%s", err, outputs, log)
+	}
+}
+
+// No script of the example pack names a namespace: every command runs in a target.
+func TestRepositoryRunbooksRunOnlyInTheTargets(t *testing.T) {
+	web := map[string]string{"component": "web"}
+	for _, job := range []RunbookJob{{Name: "db-backup"}, {Name: "db-maintenance"},
+		{Name: "restore-drill"}, {Name: "restart-component", Params: web}} {
+		t.Setenv("FAKE_OBJECTS", "31")
+		job.Namespace, job.DataNamespace = "harbor", "harbor-store"
+		_, log, err := runRepositoryRunbookOn(t, job)
+		if err != nil {
+			t.Fatalf("%s: %v\n%s", job.Name, err, log)
+		}
+		for line := range strings.Lines(log) {
+			if !strings.HasPrefix(line, "kubectl ") {
+				continue
+			}
+			if !strings.HasPrefix(line, "kubectl -n harbor ") &&
+				!strings.HasPrefix(line, "kubectl -n harbor-store ") {
+				t.Errorf("%s: a command outside the targets: %q", job.Name, line)
+			}
+		}
 	}
 }
