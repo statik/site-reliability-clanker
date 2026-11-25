@@ -1,6 +1,7 @@
 locals {
   layer     = "40-platform"
   bootstrap = data.terraform_remote_state.bootstrap.outputs
+  network   = data.terraform_remote_state.network.outputs
   cluster   = data.terraform_remote_state.cluster.outputs
   data      = data.terraform_remote_state.data.outputs
 
@@ -9,6 +10,23 @@ locals {
   ]
 
   postgres_admin = jsondecode(data.aws_secretsmanager_secret_version.postgres_admin.secret_string)
+
+  # The service controller of the AWS cloud provider in EKS makes the load balancer of the
+  # Envoy Service. These annotations make it an internal Network Load Balancer in the
+  # private subnets of 10-network. Without the type annotation the controller makes a
+  # Classic Load Balancer; without the internal annotation it is internet-facing. With
+  # explicit subnets the controller needs no kubernetes.io/role/* tags on the subnets.
+  load_balancer_subnets = join(",", local.network.private_subnet_ids)
+  service_annotations = {
+    "service.beta.kubernetes.io/aws-load-balancer-type"     = "nlb"
+    "service.beta.kubernetes.io/aws-load-balancer-internal" = "true"
+    "service.beta.kubernetes.io/aws-load-balancer-subnets"  = local.load_balancer_subnets
+    "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags" = join(",", [
+      "clanker_env=${var.env_name}",
+      "clanker_layer=${local.layer}",
+      "clanker_ttl=${local.bootstrap.clanker_ttl}",
+    ])
+  }
 }
 
 data "terraform_remote_state" "bootstrap" {
@@ -17,6 +35,16 @@ data "terraform_remote_state" "bootstrap" {
   config = {
     bucket = var.state_location
     key    = "${var.env_name}/00-bootstrap.tfstate"
+    region = var.region
+  }
+}
+
+data "terraform_remote_state" "network" {
+  backend = "s3"
+
+  config = {
+    bucket = var.state_location
+    key    = "${var.env_name}/10-network.tfstate"
     region = var.region
   }
 }
@@ -103,14 +131,5 @@ module "platform" {
   collector_endpoint = var.collector_endpoint
   collector_token    = var.collector_token
 
-  # Without the first annotation the cloud controller in EKS makes a Classic Load Balancer.
-  # The load balancer is internet-facing by default and goes into the public subnets.
-  service_annotations = {
-    "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
-    "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags" = join(",", [
-      "clanker_env=${var.env_name}",
-      "clanker_layer=${local.layer}",
-      "clanker_ttl=${local.bootstrap.clanker_ttl}",
-    ])
-  }
+  service_annotations = local.service_annotations
 }

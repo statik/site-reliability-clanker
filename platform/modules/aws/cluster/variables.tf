@@ -19,8 +19,30 @@ variable "node_count" {
 }
 
 variable "node_size" {
-  description = "EC2 instance type of the worker nodes. Must be an x86_64 type."
+  description = "EC2 instance type of the worker nodes. Its architecture must match ami_type."
   type        = string
+}
+
+variable "ami_type" {
+  description = <<-EOT
+    EKS AMI type of the nodes. The launch template names the root volume of Amazon Linux 2023,
+    so only the AL2023 standard types are allowed.
+  EOT
+  type        = string
+
+  validation {
+    condition     = contains(["AL2023_ARM_64_STANDARD", "AL2023_x86_64_STANDARD"], var.ami_type)
+    error_message = "ami_type must be AL2023_ARM_64_STANDARD or AL2023_x86_64_STANDARD."
+  }
+}
+
+variable "instance_tags" {
+  description = <<-EOT
+    Extra tags for each node instance and its volumes, for example the tags that an
+    organization requires on each instance launch. The clanker_* tags are added to them.
+  EOT
+  type        = map(string)
+  default     = {}
 }
 
 variable "subnet_ids" {
