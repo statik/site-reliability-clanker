@@ -251,6 +251,22 @@ func TestACancelledJobStopsItsTask(t *testing.T) {
 	}
 }
 
+func TestADescribeErrorAtTheCancelIsNotAFailureOfECS(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	calls := 0
+	fake := &fakeECS{replies: []reply{{err: errors.New("throttled")}}, onDescribe: func() {
+		if calls++; calls == 3 {
+			cancel()
+		}
+	}}
+	err := launcher(fake).Launch(ctx, token)
+	if !errors.Is(err, context.Canceled) || len(fake.stopIn) != 1 {
+		t.Fatalf("error = %v, %d StopTask requests, want context.Canceled and 1", err,
+			len(fake.stopIn))
+	}
+}
+
 func TestNoErrorAndNoLogLineHoldsTheToken(t *testing.T) {
 	buffer := logs(t)
 	echo := errors.New("InvalidParameterException: environment value " + token)

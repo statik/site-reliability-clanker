@@ -93,9 +93,9 @@ func (f Fargate) run(ctx context.Context, token string, hide func(string) string
 	out, err := f.ECS.RunTask(ctx, f.runInput(token))
 	if err != nil {
 		return "", fmt.Errorf("start a runner task in the ECS cluster %s: %s. The role of the "+
-			"instance needs ecs:RunTask and ecs:TagResource on the task definition %s, and "+
-			"iam:PassRole on its execution role", f.Config.Cluster, hide(err.Error()),
-			f.Config.TaskDefinition)
+			"instance needs ecs:RunTask on the task definition %s, ecs:TagResource for the "+
+			"tag of the task, and iam:PassRole on the execution role", f.Config.Cluster,
+			hide(err.Error()), f.Config.TaskDefinition)
 	}
 	if len(out.Tasks) != 1 || out.Tasks[0].TaskArn == nil {
 		return "", fmt.Errorf("ECS started no runner task in the cluster %s: %s",
@@ -132,11 +132,7 @@ func (f Fargate) runInput(token string) *ecs.RunTaskInput {
 // wait looks at the task until it stopped, and returns its outcome. When ctx ends, or ECS
 // cannot describe the task several times in a row, it stops the task.
 func (f Fargate) wait(ctx context.Context, arn string, hide func(string) string) error {
-	poll := f.Poll
-	if poll <= 0 {
-		poll = defaultPoll
-	}
-	tick := time.NewTicker(poll)
+	tick := time.NewTicker(f.interval())
 	defer tick.Stop()
 	misses := 0
 	for {
@@ -147,21 +143,30 @@ func (f Fargate) wait(ctx context.Context, arn string, hide func(string) string)
 		case <-tick.C:
 		}
 		task, err := f.describe(ctx, arn, hide)
-		switch {
-		case err != nil && ctx.Err() != nil:
-			continue
-		case err != nil:
-			misses++
-			if misses < maxMisses {
-				slog.Warn("cannot describe the runner task", "task", arn, "error", err)
-				continue
+		if err == nil {
+			if aws.ToString(task.LastStatus) == stopped {
+				return f.outcome(task, arn, hide)
 			}
-			return f.stop(ctx, arn, hide, err)
-		case aws.ToString(task.LastStatus) == stopped:
-			return f.outcome(task, arn, hide)
+			misses = 0
+			continue
 		}
-		misses = 0
+		// The next turn of the loop stops the task.
+		if ctx.Err() != nil {
+			continue
+		}
+		if misses++; misses >= maxMisses {
+			return f.stop(ctx, arn, hide, err)
+		}
+		slog.Warn("cannot describe the runner task", "task", arn, "error", err)
 	}
+}
+
+// interval returns the time between two looks at a running task.
+func (f Fargate) interval() time.Duration {
+	if f.Poll <= 0 {
+		return defaultPoll
+	}
+	return f.Poll
 }
 
 func (f Fargate) describe(ctx context.Context, arn string, hide func(string) string) (
