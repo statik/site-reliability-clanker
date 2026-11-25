@@ -204,7 +204,7 @@ passes. It runs in CI nightly against all four targets using ephemeral environme
 | Orchestrator | Work-item state machine, scheduling, maintenance windows, webhooks | Go service, Postgres for state |
 | Agent runtime | LLM loop with typed tools, per-role tool sets, cost budget | Go, OpenRouter chat completions with tool calling |
 | Policy engine | Turns a plan into a risk tier and approval requirement | OPA/Rego over `tofu show -json` output |
-| Runner | Runs plan, policy check and apply in a throwaway container | One container per job, built with Nix, no network egress beyond what the job needs |
+| Runner | Runs plan, policy check and apply in a throwaway container | One container per job from `build/runner/Dockerfile`, no network egress beyond what the job needs |
 | Access broker | Verifies grants, mints short-lived credentials, revokes on completion | Go service, the only component holding cloud trust |
 | Git forge | Hosts repos, PRs, code browsing | Forgejo, bundled |
 | Audit log | Append-only, hash-chained event record; evidence export | Postgres table plus periodic export to object storage |
@@ -332,18 +332,20 @@ Constraints:
 - **Delivery is audited.** Each send, failure and retry is an audit event, so "who was told,
   and when" is answerable.
 
-### 5.5 Reproducible toolchain with Nix
+### 5.5 Pinned toolchain
 
-Nix is used in two places and deliberately nowhere else.
-
-- **Runner image.** The image that executes `tofu`, the policy checker, Helm and `kubectl`
-  against real environments is built from a Nix flake, so every tool is pinned to an exact
-  version and the image is reproducible. Its digest is recorded on each job's audit event next
-  to the plan hash. An approval therefore covers the tooling as well as the plan, and upgrading
-  OpenTofu or a provider toolchain is itself a reviewed change to `flake.lock`.
-- **Developer and CI shell.** The same flake provides a dev shell with `tofu`, `kubectl`,
+- **Runner image.** The image that executes `tofu`, Helm, `kubectl` and the AWS CLI against
+  real environments is `build/runner/Dockerfile` (`make runner-image`), decided in #133. It
+  replaces the Nix runner image, which was never built. Each tool is pinned to a version and
+  to the SHA-256 of its download, each base image to a digest, and the providers of the AWS
+  stacks are in the image. The `clanker` binary in it comes from the same commit as the core.
+  Each job records a tool digest (a hash of the `tofu`, `helm` and `kubectl` versions) next to
+  the plan hash, and upgrading OpenTofu or a provider is a reviewed change to the Dockerfile
+  or a lock file.
+- **Developer and CI shell.** The Nix flake provides a dev shell with `tofu`, `kubectl`,
   `helm`, `kind`, Go, Node and the policy tools, so contributors and CI use identical versions
-  and "works on my machine" differences disappear from the conformance suite.
+  and "works on my machine" differences disappear from the conformance suite. Nix is used
+  nowhere else.
 
 What Nix is not used for:
 
@@ -734,7 +736,8 @@ Ordering notes:
 /runbooks               runbook scripts with their typed definitions, policy rules, notification routes
 /conformance            cross-cloud test suite
 /deploy                 compose file and control-plane chart
-/flake.nix, /flake.lock pinned toolchain: dev shell and runner image
+/flake.nix, /flake.lock pinned toolchain: dev shell
+/build/runner           runner image (Dockerfile)
 /site                   concept website, walkthrough and video build
 /docs                   this plan, handoff, ADRs, demo script
 ```
