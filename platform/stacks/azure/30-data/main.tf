@@ -99,7 +99,6 @@ module "postgres" {
   delegated_subnet_id   = local.network.subnet_ids["postgres"]
   private_dns_zone_id   = local.network.private_dns_zone_ids["postgres"]
   key_vault_id          = module.key_vault.key_vault_id
-  database_name         = "paperboat"
   tags                  = local.tags
 }
 

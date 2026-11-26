@@ -864,7 +864,7 @@ Each step is one pull request or a few, and each leaves Paperboat working.
    after the change of the prompt, with the same scores as before.
 
    The approval page has no own display of the targets. On Kubernetes the targets come
-   from the variable `app_namespace` of the layer `40-platform` and from the code of the
+   from the variable `app_name` of the layer `40-platform` and from the code of the
    layer `30-data`, and a change of either is a change of the platform repository, which
    the approval page shows as a diff and a plan. An own display comes with the runtime
    on hosts, where the targets are a list of addresses. With this, step 1 is complete.

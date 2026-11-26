@@ -137,6 +137,19 @@ run "runbook_has_only_its_kubernetes_group" {
   }
 }
 
+run "debugger_has_only_its_kubernetes_group" {
+  command = plan
+
+  assert {
+    condition = (
+      local.access_entries["debugger"].principal_arn == "arn:aws:iam::000000000000:role/clanker/test-debugger"
+      && local.access_entries["debugger"].kubernetes_groups == ["clanker-debugger"]
+      && !contains(keys(local.access_entries["debugger"]), "policy")
+    )
+    error_message = "The debugger role must map to the group clanker-debugger with no access policy."
+  }
+}
+
 run "runners_reach_the_api_from_the_network" {
   command = plan
 

@@ -1,6 +1,6 @@
 output "app_namespace" {
   value       = module.platform.app_namespace
-  description = "Namespace for Paperboat."
+  description = "Namespace of the application. It has the name of the pack."
 }
 
 output "gateway_name" {
@@ -20,12 +20,12 @@ output "public_address" {
 
 output "app_secret_name" {
   value       = module.platform.app_secret_name
-  description = "Secret with the key DATABASE_URL."
+  description = "Kubernetes secret in app_namespace with the credential of the database role of the application."
 }
 
 output "shared_volume_claim" {
   value       = module.platform.shared_volume_claim
-  description = "ReadWriteMany claim for api and worker."
+  description = "ReadWriteMany PersistentVolumeClaim in app_namespace."
 }
 
 output "targets" {

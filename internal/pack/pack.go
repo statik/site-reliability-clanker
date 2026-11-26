@@ -175,10 +175,11 @@ var PlatformNodes = []string{"network", "registry", "cluster", "nodes", "postgre
 	"backups", "lb", "secrets"}
 
 // reservedNames are the names that a pack cannot have, because the platform names the
-// namespaces of a pack after it: namespaces of Kubernetes, of the control plane, and of
-// the parts that the platform installs.
+// namespaces, the database role and the database of a pack after it: namespaces of
+// Kubernetes, of the control plane and of the parts that the platform installs, and the
+// administrator and the databases that every PostgreSQL server has.
 var reservedNames = []string{"default", "kube", "clanker", "envoy-gateway-system",
-	"local-path-storage"}
+	"local-path-storage", "postgres", "template0", "template1"}
 
 // reservedPrefixes are the prefixes of names that belong to Kubernetes and to the control
 // plane.
@@ -383,7 +384,8 @@ func (p Pack) checkValues() error {
 	}
 	if reservedName(p.Name) {
 		return fmt.Errorf("name %q belongs to Kubernetes, to the control plane or to the "+
-			"platform; the namespaces of a pack have its name", p.Name)
+			"platform; the namespaces, the database role and the database of a pack have "+
+			"its name", p.Name)
 	}
 	return nil
 }

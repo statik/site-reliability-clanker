@@ -21,8 +21,11 @@ const (
 )
 
 // reservedNamespaces belong to the cluster or to the control plane, as each namespace
-// with the prefix "kube-" does. No application runs there, so no debug session reads
-// there and no identity gets rights there.
+// with the prefix "kube-" does. No application and no data service runs there, so no
+// debug session reads there and no identity gets rights there. The namespace of the
+// application has the name of its pack, so it follows the rule of the names of packs,
+// which also reserves the prefix "clanker-" for the platform. The data services can be
+// in a namespace of the platform, for example clanker-data on the local target.
 var reservedNamespaces = []string{"default", "clanker-system"}
 
 const clusterPrefix = "kube-"
@@ -88,6 +91,11 @@ func checkNamespace(key, name string) error {
 	if !namePattern.MatchString(name) {
 		return fmt.Errorf("the namespace %q of %s in the output %s must match %s", name, key,
 			TargetsOutput, namePattern)
+	}
+	if key == targetApplication && reservedName(name) {
+		return fmt.Errorf("the namespace %q of %s in the output %s belongs to the cluster, "+
+			"to the control plane or to the platform; it must be the name of the pack",
+			name, key, TargetsOutput)
 	}
 	if slices.Contains(reservedNamespaces, name) || strings.HasPrefix(name, clusterPrefix) {
 		return fmt.Errorf("the namespace %q of %s in the output %s belongs to the cluster or "+

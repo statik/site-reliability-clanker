@@ -1,6 +1,6 @@
 output "app_namespace" {
   value       = kubernetes_namespace_v1.app.metadata[0].name
-  description = "Namespace for Paperboat."
+  description = "Namespace of the application. It has the name of the pack."
 }
 
 output "gateway_name" {
@@ -25,12 +25,12 @@ output "envoy_service" {
 
 output "app_secret_name" {
   value       = kubernetes_secret_v1.database.metadata[0].name
-  description = "Secret with the key DATABASE_URL."
+  description = "Secret with the credential of the role of the application: PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD, PGSSLMODE and DATABASE_URL."
 }
 
 output "shared_volume_claim" {
   value       = kubernetes_persistent_volume_claim_v1.shared.metadata[0].name
-  description = "ReadWriteMany claim for api and worker."
+  description = "ReadWriteMany claim of the application."
 }
 
 output "collector_namespace" {

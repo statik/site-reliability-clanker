@@ -24,7 +24,7 @@ the contract. The next table lists them.
 | `10-network` | VPC, one public and one private subnet in each of `zone_count` zones, internet gateway, one NAT gateway, route tables. With `existing_network_id`: nothing. The layer reads each subnet and stops the plan if a subnet is not in the VPC |
 | `20-cluster` | EKS control plane, one managed node group (Amazon Linux 2023, arm64 on `t4g.medium` by default) with a launch template that requires IMDSv2 and tags each instance and volume, the EKS Pod Identity agent add-on, the EFS CSI driver add-on with its pod identity role, IAM roles for the cluster and the nodes, EKS access entries for the agent roles and the operator, a rule that lets the address ranges of the VPC reach the private endpoint of the API server on port 443 (the runners of the control plane run in the VPC) |
 | `30-data` | RDS for PostgreSQL (`db.t4g.micro`, one zone, gp3, encrypted, private, admin password in Secrets Manager), EFS file system with one mount target in each private subnet, `StorageClass` `efs-rwx`, S3 backup bucket (removed with its objects when `00-bootstrap` has a TTL) |
-| `40-platform` | Calls `modules/shared/platform`. That module installs Envoy Gateway and the Gateway of the platform. The annotations from this root make the service controller of EKS create an internal Network Load Balancer for the Envoy `Service` (`clanker-envoy`), in the private subnets of `10-network`. `modules/aws/service-address` waits in the first apply until that `Service` has the DNS name of the load balancer, and reads it. A `Role` gives the group `clanker-runbook` its rights in the application namespace |
+| `40-platform` | Calls `modules/shared/platform`. That module installs Envoy Gateway and the Gateway of the platform. The annotations from this root make the service controller of EKS create an internal Network Load Balancer for the Envoy `Service` (`clanker-envoy`), in the private subnets of `10-network`. `modules/aws/service-address` waits in the first apply until that `Service` has the DNS name of the load balancer, and reads it. A Job in the cluster makes the database and the role of the application in RDS. A `Role` gives the group `clanker-runbook` its rights in the application namespace, and a `RoleBinding` gives the group `clanker-debugger` the `ClusterRole` `view` there |
 | `50-app` | Calls `modules/shared/app`, which installs the Paperboat chart |
 
 ### The load balancer
@@ -68,6 +68,10 @@ gives it an access entry with the Kubernetes group `clanker-runbook` and no acce
 `40-platform` binds that group to the rights of the runbook identity of the local target in
 the application namespace: `get`, `list` and `patch` on deployments, `get` and `list` on pods
 and their logs.
+
+`debugger` has the same kind of access entry, with the group `clanker-debugger`.
+`40-platform` binds that group to the `ClusterRole` `view` in the application namespace, as
+the local target does for its debugger.
 
 ### Debug sessions and runbooks
 
@@ -185,15 +189,15 @@ Not done:
 - The applier roles have service-level permissions inside the boundary. Make them narrower
   after the first real plan shows the exact actions.
 - `applier-30-data`, `applier-40-platform` and `applier-50-app` are cluster administrators in
-  Kubernetes. `debugger` can edit only the `paperboat` namespace: more than the `view` of the
-  local target (#148 design 1.16).
+  Kubernetes.
 - With `existing_network_id`, `10-network` checks that each subnet is in the VPC. It does not
   check that the subnets are private or that each is in a different zone. EFS, RDS and the
   load balancer need one subnet in each zone.
 - AWS gives the service controller of the cloud provider only critical bug fixes, and
   recommends the AWS Load Balancer Controller for new load balancers.
-- The RDS admin secret rotates. After a rotation, apply `40-platform` again to refresh
-  `DATABASE_URL`.
+- The RDS admin secret rotates. The application connects as its own role, so a rotation
+  does not change its `DATABASE_URL`. Each apply of `40-platform` reads the admin password
+  again and writes it into the secret of the Job before the Job runs.
 - The Kubernetes API endpoint is public and private. IAM protects the public endpoint. The
   address ranges of the VPC reach the private endpoint.
 - The wait for the load balancer address runs in the first apply of `40-platform` only. If the

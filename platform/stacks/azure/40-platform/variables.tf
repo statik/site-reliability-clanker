@@ -24,10 +24,9 @@ variable "kubelogin_login" {
   default     = "azurecli"
 }
 
-variable "app_namespace" {
+variable "app_name" {
   type        = string
-  description = "Namespace for Paperboat."
-  default     = "paperboat"
+  description = "Name of the application pack. The namespace, the database role, the database, the Secret <name>-db and the claim <name>-shared have this name."
 }
 
 variable "public_port" {

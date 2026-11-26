@@ -137,7 +137,7 @@ The script is the steps of the runbook. The runner starts it with this environme
 | `PARAM_<NAME>` | The value of the input `<name>`, with the name in upper case. A mitigation gets `PARAM_COMPONENT`, the name of a component. The script makes the name of the deployment from it |
 | `KUBECONFIG` | The file with the short-lived credential of this run |
 | `TARGET_APPLICATION` | The namespace of the application on this environment, for example `paperboat` |
-| `TARGET_DATA` | The namespace of the data services of the application, for example `paperboat-data`. It is empty when the data services are not in the cluster, as on AWS, GCP and Azure |
+| `TARGET_DATA` | The namespace of the data services of the application, for example `clanker-data` on the local target. It is empty when the data services are not in the cluster, as on AWS, GCP and Azure |
 | `OUTPUT_FILE` | The file for the outputs. Append one line `name=value` for each output |
 | `STATE_DIR` | The state directory of the environment on the runner |
 

@@ -1,10 +1,10 @@
-# The rights of the runbook identity in Kubernetes: the rights that the local target gives
-# it in the application namespace (internal/localtarget/identities-app.yaml). 20-cluster
-# maps the runbook role to the group clanker-runbook with no access policy, so the group has
-# only these rights. The data services are not in the cluster, so no data namespace gets a
-# role.
+# The rights of the runbook and debugger identities in Kubernetes: the rights that the local
+# target gives them in the application namespace (internal/localtarget/identities-app.yaml).
+# 20-cluster maps each role to its group with no access policy, so a group has only these
+# rights. The data services are not in the cluster, so no data namespace gets a role.
 locals {
-  runbook_group = "clanker-runbook"
+  runbook_group  = "clanker-runbook"
+  debugger_group = "clanker-debugger"
 }
 
 resource "kubernetes_role_v1" "runbook" {
@@ -52,5 +52,31 @@ resource "kubernetes_role_binding_v1" "runbook" {
     api_group = "rbac.authorization.k8s.io"
     kind      = "Group"
     name      = local.runbook_group
+  }
+}
+
+# A debug session reads the application namespace only, the targets.application of this
+# layer.
+resource "kubernetes_role_binding_v1" "debugger" {
+  metadata {
+    name      = "clanker-debugger"
+    namespace = module.platform.app_namespace
+
+    labels = {
+      clanker_env   = var.env_name
+      clanker_layer = local.layer
+    }
+  }
+
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "ClusterRole"
+    name      = "view"
+  }
+
+  subject {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "Group"
+    name      = local.debugger_group
   }
 }

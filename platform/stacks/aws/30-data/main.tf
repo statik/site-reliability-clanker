@@ -72,7 +72,6 @@ module "postgres" {
   engine_version           = var.postgres_version
   storage_gb               = var.postgres_storage_gb
   backup_retention_days    = var.backup_retention_days
-  database_name            = "paperboat"
   admin_username           = "postgres"
   vpc_id                   = local.network.network_id
   subnet_ids               = local.network.private_subnet_ids

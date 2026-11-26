@@ -32,7 +32,7 @@ override_data {
     outputs = {
       postgres_host             = "db.example.com"
       postgres_port             = 5432
-      postgres_database         = "paperboat"
+      postgres_sslmode          = "require"
       postgres_admin_secret_ref = "test-secret"
       rwx_storage_class         = "efs-rwx"
       shared_fs_capacity_gb     = 5
@@ -49,6 +49,7 @@ variables {
   env_name       = "test-env"
   state_location = "test-state"
   region         = "us-east-1"
+  app_name       = "paperboat"
 }
 
 run "load_balancer_is_an_internal_nlb_in_the_private_subnets" {

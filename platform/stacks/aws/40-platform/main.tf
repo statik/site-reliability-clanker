@@ -112,13 +112,13 @@ data "aws_secretsmanager_secret_version" "postgres_admin" {
 module "platform" {
   source = "../../../modules/shared/platform"
 
-  env_name      = var.env_name
-  app_namespace = var.app_namespace
-  public_port   = var.public_port
+  env_name    = var.env_name
+  app_name    = var.app_name
+  public_port = var.public_port
 
   postgres_host           = local.data.postgres_host
   postgres_port           = local.data.postgres_port
-  postgres_database       = local.data.postgres_database
+  postgres_sslmode        = local.data.postgres_sslmode
   postgres_admin_password = local.postgres_admin.password
   rwx_storage_class       = local.data.rwx_storage_class
   shared_fs_capacity_gb   = local.data.shared_fs_capacity_gb
