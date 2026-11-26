@@ -7,6 +7,12 @@ spec:
   parentRefs:
     - name: {{ .Values.gateway.name }}
       namespace: {{ .Values.gateway.namespace }}
+  {{- with .Values.route.hostnames }}
+  hostnames:
+    {{- range . }}
+    - {{ . | quote }}
+    {{- end }}
+  {{- end }}
   rules:
     - backendRefs:
         - name: {{ .Values.route.service }}

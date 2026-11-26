@@ -18,6 +18,16 @@ output "public_address" {
   value       = module.platform.public_address
 }
 
+output "public_port" {
+  value       = module.platform.public_port
+  description = "Port of the public listener."
+}
+
+output "app_domain" {
+  value       = module.platform.app_domain
+  description = "Domain of the host names of the applications. Empty: this target has none yet."
+}
+
 output "app_secret_name" {
   description = "Kubernetes secret in app_namespace with the credential of the database role of the application."
   value       = module.platform.app_secret_name

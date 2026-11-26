@@ -676,8 +676,8 @@ Schema 2 replaces schema 1. The loader reads one schema.
 
 The deploy fields of the kind `helm` (issue #148, sections 1.2 to 1.7). The loader checks
 them, and the application layer of the core uses them (`platform/CONTRACT.md`, `50-app`
-and section 4), except the host name of the route and `workloads_namespace`, which come
-later. `apps/paperboat/PACK.md` has the bounds of each field.
+and section 4), except `workloads_namespace`, which comes later.
+`apps/paperboat/PACK.md` has the bounds of each field.
 
 | Field | Content |
 |---|---|

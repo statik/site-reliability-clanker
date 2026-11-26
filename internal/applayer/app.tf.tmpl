@@ -51,6 +51,8 @@ locals {
       port = {{.Route.Port}}
       paths = {{list .Route.Paths}}
       timeout_seconds = {{.Route.Timeout}}
+      hostname = {{.Route.Hostname}}
+      wildcard = {{.Route.Wildcard}}
     }
   }
 }

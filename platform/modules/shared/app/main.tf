@@ -36,7 +36,15 @@ locals {
     "${var.pack_dir}/chart"
   )
 
-  url              = "http://${var.public_address}"
+  # A route with a host name gets <name>.<app_domain>, and with a wildcard every name below
+  # it. Without app_domain the application has no host name, and its URL is the public
+  # address of the target.
+  hostname = var.app.route.hostname && var.app_domain != "" ? "${local.name}.${var.app_domain}" : ""
+  wildcard = local.hostname != "" && var.app.route.wildcard ? "*.${local.hostname}" : ""
+  url = (
+    local.hostname != "" ? "http://${local.hostname}:${var.public_port}" :
+    "http://${var.public_address}"
+  )
   generated_secret = length(var.app.secrets) > 0 ? "${local.name}-generated" : ""
 
   # The values that every chart of the pack gets from the platform (platform/CONTRACT.md
@@ -46,7 +54,7 @@ locals {
     namespace         = var.app_namespace
     version           = local.version
     url               = local.url
-    hostname          = ""
+    hostname          = local.hostname
     imageRegistry     = var.image_registry
     databaseSecret    = var.app_secret_name
     sharedVolumeClaim = var.shared_volume_claim
@@ -91,15 +99,16 @@ resource "helm_release" "platform" {
       namespace = var.gateway_namespace
     }
     route = {
-      service = var.app.route.service
-      port    = var.app.route.port
-      paths   = var.app.route.paths
-      timeout = var.app.route.timeout_seconds == null ? "" : "${var.app.route.timeout_seconds}s"
+      service   = var.app.route.service
+      port      = var.app.route.port
+      paths     = var.app.route.paths
+      timeout   = var.app.route.timeout_seconds == null ? "" : "${var.app.route.timeout_seconds}s"
+      hostnames = compact([local.hostname, local.wildcard])
     }
     platform = {
       APP_URL           = local.url
-      APP_HOSTNAME      = ""
-      APP_WILDCARD_HOST = ""
+      APP_HOSTNAME      = local.hostname
+      APP_WILDCARD_HOST = local.wildcard
       APP_VERSION       = local.version
     }
   })]

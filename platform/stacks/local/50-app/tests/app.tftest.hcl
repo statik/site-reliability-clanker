@@ -34,6 +34,8 @@ run "the_root_gives_the_module_the_example_pack" {
         gateway_name        = "clanker"
         gateway_namespace   = "clanker-gateway"
         public_address      = "localhost:8088"
+        public_port         = 8088
+        app_domain          = "127-0-0-1.sslip.io"
       }
     }
   }
@@ -62,6 +64,8 @@ run "a_version_that_is_not_a_release_is_refused" {
         gateway_name        = "clanker"
         gateway_namespace   = "clanker-gateway"
         public_address      = "localhost:8088"
+        public_port         = 8088
+        app_domain          = "127-0-0-1.sslip.io"
       }
     }
   }
@@ -91,6 +95,8 @@ run "a_setting_outside_its_bounds_is_refused" {
         gateway_name        = "clanker"
         gateway_namespace   = "clanker-gateway"
         public_address      = "localhost:8088"
+        public_port         = 8088
+        app_domain          = "127-0-0-1.sslip.io"
       }
     }
   }
@@ -120,6 +126,8 @@ run "a_setting_that_is_not_whole_is_refused" {
         gateway_name        = "clanker"
         gateway_namespace   = "clanker-gateway"
         public_address      = "localhost:8088"
+        public_port         = 8088
+        app_domain          = "127-0-0-1.sslip.io"
       }
     }
   }
@@ -148,7 +156,7 @@ run "a_pack_without_values_or_records_gets_its_chart_and_the_platform_values" {
       timeout_seconds = 300
       secrets         = []
       settings        = { "api.replicas" = "2", "loadgen.enabled" = "false" }
-      route           = { service = "paperboat-web", port = 8080, paths = [], timeout_seconds = null }
+      route           = { service = "paperboat-web", port = 8080, paths = [], timeout_seconds = null, hostname = false, wildcard = false }
     }
     cloud               = "local"
     pack_dir            = "../../../../apps/paperboat"
@@ -159,6 +167,8 @@ run "a_pack_without_values_or_records_gets_its_chart_and_the_platform_values" {
     gateway_name        = "clanker"
     gateway_namespace   = "clanker-gateway"
     public_address      = "localhost:8088"
+    public_port         = 8088
+    app_domain          = ""
   }
 
   assert {
@@ -203,7 +213,7 @@ run "a_pack_without_values_or_records_gets_its_chart_and_the_platform_values" {
   assert {
     condition = (
       yamldecode(helm_release.platform.values[0]).route == {
-        service = "paperboat-web", port = 8080, paths = [], timeout = ""
+        service = "paperboat-web", port = 8080, paths = [], timeout = "", hostnames = []
       }
       && yamldecode(helm_release.platform.values[0]).platform.APP_VERSION == "1.1.0"
       && length(random_password.generated) == 0
@@ -230,7 +240,7 @@ run "a_pack_gets_its_values_in_order_its_secrets_and_its_extras" {
       timeout_seconds = 600
       secrets         = ["admin-password", "api-key"]
       settings        = { replicaCount = "2" }
-      route           = { service = "demo-web", port = 80, paths = ["/api", "/ui"], timeout_seconds = 0 }
+      route           = { service = "demo-web", port = 80, paths = ["/api", "/ui"], timeout_seconds = 0, hostname = false, wildcard = false }
     }
     cloud               = "local"
     pack_dir            = "tests/pack"
@@ -241,6 +251,8 @@ run "a_pack_gets_its_values_in_order_its_secrets_and_its_extras" {
     gateway_name        = "clanker"
     gateway_namespace   = "clanker-gateway"
     public_address      = "localhost:8088"
+    public_port         = 8088
+    app_domain          = ""
     admin_token         = "test-token"
   }
 
@@ -276,7 +288,7 @@ run "a_pack_gets_its_values_in_order_its_secrets_and_its_extras" {
   assert {
     condition = (
       yamldecode(helm_release.platform.values[0]).route == {
-        service = "demo-web", port = 80, paths = ["/api", "/ui"], timeout = "0s"
+        service = "demo-web", port = 80, paths = ["/api", "/ui"], timeout = "0s", hostnames = []
       }
     )
     error_message = "The route must have the paths of the pack and no request timeout."
@@ -290,6 +302,152 @@ run "a_pack_gets_its_values_in_order_its_secrets_and_its_extras" {
       && yamldecode(helm_release.extras[0].values[0]).platform.name == "demo"
     )
     error_message = "The extras chart must be the second release, with the values of the platform."
+  }
+}
+
+run "a_route_with_a_host_name_and_a_wildcard_gets_both_names_and_its_url" {
+  command = plan
+
+  module {
+    source = "../../../modules/shared/app"
+  }
+
+  variables {
+    app = {
+      name            = "demo"
+      version         = "2.0.0"
+      values          = false
+      extras          = true
+      records         = false
+      timeout_seconds = 300
+      secrets         = []
+      settings        = {}
+      route           = { service = "demo-web", port = 80, paths = [], timeout_seconds = 0, hostname = true, wildcard = true }
+    }
+    cloud               = "local"
+    pack_dir            = "tests/pack"
+    image_registry      = "localhost:5001"
+    app_namespace       = "demo"
+    app_secret_name     = "demo-db"
+    shared_volume_claim = "demo-shared"
+    gateway_name        = "clanker"
+    gateway_namespace   = "clanker-gateway"
+    public_address      = "localhost:8088"
+    public_port         = 8088
+    app_domain          = "127-0-0-1.sslip.io"
+  }
+
+  assert {
+    condition     = output.url == "http://demo.127-0-0-1.sslip.io:8088"
+    error_message = "The URL must be the host name of the pack on the domain, with the public port."
+  }
+
+  assert {
+    condition = (
+      yamldecode(helm_release.platform.values[0]).route.hostnames == [
+        "demo.127-0-0-1.sslip.io", "*.demo.127-0-0-1.sslip.io",
+      ]
+      && yamldecode(helm_release.platform.values[0]).platform == {
+        APP_URL           = "http://demo.127-0-0-1.sslip.io:8088"
+        APP_HOSTNAME      = "demo.127-0-0-1.sslip.io"
+        APP_WILDCARD_HOST = "*.demo.127-0-0-1.sslip.io"
+        APP_VERSION       = "2.0.0"
+      }
+    )
+    error_message = "The route must have the host name and the wildcard, and the ConfigMap must have them too."
+  }
+
+  assert {
+    condition = (
+      yamldecode(helm_release.app.values[0]).platform.hostname == "demo.127-0-0-1.sslip.io"
+      && yamldecode(helm_release.app.values[0]).platform.url == "http://demo.127-0-0-1.sslip.io:8088"
+      && yamldecode(helm_release.extras[0].values[0]).platform.hostname == "demo.127-0-0-1.sslip.io"
+    )
+    error_message = "The charts of the pack must get the host name and the URL in the values of the platform."
+  }
+}
+
+run "a_route_with_a_host_name_and_no_wildcard_gets_one_name" {
+  command = plan
+
+  module {
+    source = "../../../modules/shared/app"
+  }
+
+  variables {
+    app = {
+      name            = "demo"
+      version         = "2.0.0"
+      values          = false
+      extras          = false
+      records         = false
+      timeout_seconds = 300
+      secrets         = []
+      settings        = {}
+      route           = { service = "demo-web", port = 80, paths = [], timeout_seconds = null, hostname = true, wildcard = false }
+    }
+    cloud               = "local"
+    pack_dir            = "tests/pack"
+    image_registry      = "localhost:5001"
+    app_namespace       = "demo"
+    app_secret_name     = "demo-db"
+    shared_volume_claim = "demo-shared"
+    gateway_name        = "clanker"
+    gateway_namespace   = "clanker-gateway"
+    public_address      = "localhost:8088"
+    public_port         = 8088
+    app_domain          = "127-0-0-1.sslip.io"
+  }
+
+  assert {
+    condition = (
+      yamldecode(helm_release.platform.values[0]).route.hostnames == ["demo.127-0-0-1.sslip.io"]
+      && yamldecode(helm_release.platform.values[0]).platform.APP_WILDCARD_HOST == ""
+    )
+    error_message = "A route without a wildcard must have only the host name of the pack."
+  }
+}
+
+run "a_host_name_without_a_domain_keeps_the_public_address" {
+  command = plan
+
+  module {
+    source = "../../../modules/shared/app"
+  }
+
+  variables {
+    app = {
+      name            = "demo"
+      version         = "2.0.0"
+      values          = false
+      extras          = false
+      records         = false
+      timeout_seconds = 300
+      secrets         = []
+      settings        = {}
+      route           = { service = "demo-web", port = 80, paths = [], timeout_seconds = null, hostname = true, wildcard = true }
+    }
+    cloud               = "aws"
+    pack_dir            = "tests/pack"
+    image_registry      = "registry.example.com/demo"
+    app_namespace       = "demo"
+    app_secret_name     = "demo-db"
+    shared_volume_claim = "demo-shared"
+    gateway_name        = "clanker"
+    gateway_namespace   = "clanker-gateway"
+    public_address      = "demo.example.com"
+    public_port         = 80
+    app_domain          = ""
+  }
+
+  assert {
+    condition = (
+      output.url == "http://demo.example.com"
+      && yamldecode(helm_release.platform.values[0]).route.hostnames == []
+      && yamldecode(helm_release.platform.values[0]).platform.APP_HOSTNAME == ""
+      && yamldecode(helm_release.app.values[0]).platform.hostname == ""
+    )
+    error_message = "Without app_domain the route has no host name and the URL is the public address."
   }
 }
 
@@ -310,7 +468,7 @@ run "a_record_with_an_archive_installs_the_archive" {
       timeout_seconds = 300
       secrets         = []
       settings        = {}
-      route           = { service = "demo-web", port = 80, paths = [], timeout_seconds = null }
+      route           = { service = "demo-web", port = 80, paths = [], timeout_seconds = null, hostname = false, wildcard = false }
     }
     cloud               = "aws"
     pack_dir            = "tests/pack"
@@ -321,6 +479,8 @@ run "a_record_with_an_archive_installs_the_archive" {
     gateway_name        = "clanker"
     gateway_namespace   = "clanker-gateway"
     public_address      = "demo.example.com"
+    public_port         = 8088
+    app_domain          = ""
   }
 
   assert {
@@ -349,7 +509,7 @@ run "a_record_with_an_oci_chart_pins_the_digest" {
       timeout_seconds = 300
       secrets         = []
       settings        = {}
-      route           = { service = "demo-web", port = 80, paths = [], timeout_seconds = null }
+      route           = { service = "demo-web", port = 80, paths = [], timeout_seconds = null, hostname = false, wildcard = false }
     }
     cloud               = "gcp"
     pack_dir            = "tests/pack"
@@ -360,6 +520,8 @@ run "a_record_with_an_oci_chart_pins_the_digest" {
     gateway_name        = "clanker"
     gateway_namespace   = "clanker-gateway"
     public_address      = "demo.example.com"
+    public_port         = 8088
+    app_domain          = ""
   }
 
   assert {
@@ -389,7 +551,7 @@ run "a_record_with_an_https_chart_names_the_repository" {
       timeout_seconds = 300
       secrets         = []
       settings        = {}
-      route           = { service = "demo-web", port = 80, paths = [], timeout_seconds = null }
+      route           = { service = "demo-web", port = 80, paths = [], timeout_seconds = null, hostname = false, wildcard = false }
     }
     cloud               = "azure"
     pack_dir            = "tests/pack"
@@ -400,6 +562,8 @@ run "a_record_with_an_https_chart_names_the_repository" {
     gateway_name        = "clanker"
     gateway_namespace   = "clanker-gateway"
     public_address      = "demo.example.com"
+    public_port         = 8088
+    app_domain          = ""
   }
 
   assert {
@@ -429,7 +593,7 @@ run "an_archive_with_another_sha256_is_refused" {
       timeout_seconds = 300
       secrets         = []
       settings        = {}
-      route           = { service = "demo-web", port = 80, paths = [], timeout_seconds = null }
+      route           = { service = "demo-web", port = 80, paths = [], timeout_seconds = null, hostname = false, wildcard = false }
     }
     cloud               = "local"
     pack_dir            = "tests/pack"
@@ -440,6 +604,8 @@ run "an_archive_with_another_sha256_is_refused" {
     gateway_name        = "clanker"
     gateway_namespace   = "clanker-gateway"
     public_address      = "localhost:8088"
+    public_port         = 8088
+    app_domain          = ""
   }
 
   expect_failures = [helm_release.app]
@@ -462,7 +628,7 @@ run "a_version_without_a_record_is_refused" {
       timeout_seconds = 300
       secrets         = []
       settings        = {}
-      route           = { service = "demo-web", port = 80, paths = [], timeout_seconds = null }
+      route           = { service = "demo-web", port = 80, paths = [], timeout_seconds = null, hostname = false, wildcard = false }
     }
     cloud               = "local"
     pack_dir            = "tests/pack"
@@ -473,6 +639,8 @@ run "a_version_without_a_record_is_refused" {
     gateway_name        = "clanker"
     gateway_namespace   = "clanker-gateway"
     public_address      = "localhost:8088"
+    public_port         = 8088
+    app_domain          = ""
   }
 
   expect_failures = [helm_release.app]
