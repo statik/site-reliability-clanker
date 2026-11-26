@@ -1,0 +1,8 @@
+apiVersion: v2
+name: keycloak
+description: >-
+  One Keycloak server on PostgreSQL. The pack writes this chart for the platform: it reads
+  the values of the platform (platform/CONTRACT.md section 4) for its address, its database
+  and the password of its first administrator.
+type: application
+version: 0.1.0

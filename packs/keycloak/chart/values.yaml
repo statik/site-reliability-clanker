@@ -1,0 +1,42 @@
+# The image. The release record of each release sets the tag and the digest.
+image:
+  repository: quay.io/keycloak/keycloak
+  tag: ""
+  digest: ""
+
+# The number of Keycloak pods. The setting keycloak_replicas sets it, from 1 to 3. The pods
+# find each other through the database (the jdbc-ping stack of Keycloak).
+replicaCount: 1
+
+# The temporary administrator of the master realm. Keycloak makes it only at the first start
+# of an empty database. The password is the key admin-password of the Secret
+# platform.generatedSecret.
+admin:
+  username: admin
+  passwordKey: admin-password
+
+# The time that a pod gets to stop: Keycloak finishes its requests and hands its cache
+# entries to the other pods.
+terminationGracePeriodSeconds: 60
+
+# The values files of the pack set the requests and limits for each target.
+resources: {}
+
+# Layer 50-app sets every value of the platform. These defaults only make the chart render
+# alone.
+platform:
+  name: keycloak
+  namespace: keycloak
+  version: "26.8.1"
+  # The public address of Keycloak. It is the issuer of every token, so it is the same on
+  # every pod.
+  url: http://localhost:8088
+  hostname: ""
+  imageRegistry: ""
+  # The Secret with the libpq keys PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD and
+  # PGSSLMODE of the database role of the pack.
+  databaseSecret: keycloak-db
+  sharedVolumeClaim: keycloak-shared
+  # The Secret with a random value for each key of deploy.secrets of the manifest.
+  generatedSecret: keycloak-generated
+  adminToken: ""

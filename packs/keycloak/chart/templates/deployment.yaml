@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  # Every pod stops before a new one starts. A new release migrates the database at its
+  # start, and an older Keycloak must not run on the new schema. A restart is a short
+  # outage; the sessions are in the database and stay.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "keycloak.selector" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "keycloak.labels" . | nindent 8 }}
+      annotations:
+        checksum/realm: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 0
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: keycloak
+          image: {{ include "keycloak.image" . }}
+          args: ["start", "--import-realm"]
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 9000
+            - name: jgroups
+              containerPort: 7800
+            - name: jgroups-fd
+              containerPort: 57800
+          env:
+            - name: KC_HOSTNAME
+              value: {{ required "platform.url is required" .Values.platform.url | quote }}
+            # The gateway of the platform ends the connection of the client and sends the
+            # request over HTTP with X-Forwarded-For, -Proto and -Host.
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_METRICS_ENABLED
+              value: "true"
+            - name: KC_CACHE_EMBEDDED_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: KC_DB
+              value: postgres
+            {{- include "keycloak.dbEnv" (dict "root" . "name" "KC_DB_URL_HOST" "key" "PGHOST") | nindent 12 }}
+            {{- include "keycloak.dbEnv" (dict "root" . "name" "KC_DB_URL_PORT" "key" "PGPORT") | nindent 12 }}
+            {{- include "keycloak.dbEnv" (dict "root" . "name" "KC_DB_URL_DATABASE" "key" "PGDATABASE") | nindent 12 }}
+            {{- include "keycloak.dbEnv" (dict "root" . "name" "KC_DB_USERNAME" "key" "PGUSER") | nindent 12 }}
+            {{- include "keycloak.dbEnv" (dict "root" . "name" "KC_DB_PASSWORD" "key" "PGPASSWORD") | nindent 12 }}
+            # PGSSLMODE comes before KC_DB_URL_PROPERTIES, which reads it.
+            {{- include "keycloak.dbEnv" (dict "root" . "name" "PGSSLMODE" "key" "PGSSLMODE") | nindent 12 }}
+            - name: KC_DB_URL_PROPERTIES
+              value: "?sslmode=$(PGSSLMODE)"
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: {{ .Values.admin.username | quote }}
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "platform.generatedSecret is required" .Values.platform.generatedSecret }}
+                  key: {{ .Values.admin.passwordKey }}
+          # The management port serves the health checks. With health on, Keycloak reports
+          # started and live early and ready only after the migration of the database.
+          startupProbe:
+            httpGet:
+              path: /health/started
+              port: management
+            periodSeconds: 5
+            failureThreshold: 120
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: management
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: management
+            periodSeconds: 10
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          # The root file system stays writable: the command start builds the server for the
+          # options of this chart into /opt/keycloak/lib when the image was built for others.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: realm
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+      volumes:
+        - name: realm
+          configMap:
+            name: {{ .Release.Name }}-realm

@@ -1,0 +1,51 @@
+{
+  "schema": 2,
+  "name": "keycloak",
+  "title": "Keycloak",
+  "version": "0.1.0",
+  "description": "Identity and access management: OpenID Connect and SAML single sign-on, with its data in PostgreSQL.",
+  "layer": "50-app",
+  "version_variable": "keycloak_version",
+  "url_output": "keycloak_url",
+  "releases": {
+    "repository": "keycloak",
+    "directory": "releases",
+    "first": "26.8.1"
+  },
+  "deploy": {
+    "kind": "helm",
+    "chart": "chart",
+    "values": "values",
+    "settings": [
+      {"variable": "keycloak_replicas", "type": "number", "min": 1, "max": 3, "default": 1,
+       "value": "replicaCount"}
+    ],
+    "secrets": ["admin-password"],
+    "route": {
+      "service": "keycloak",
+      "port": 8080,
+      "paths": ["/realms", "/resources", "/.well-known", "/admin"],
+      "hostname": false
+    },
+    "timeout_seconds": 900
+  },
+  "runbooks": "runbooks",
+  "evals": "evals",
+  "components": [
+    {"name": "server", "runtime": "kubernetes", "workload": "keycloak", "required": true}
+  ],
+  "incident": {"runbook": "restart-component", "component": "server"},
+  "diagnostics": [
+    {"read": "logs", "component": "server", "lines": 80},
+    {"read": "events"}
+  ],
+  "checks": [
+    {"name": "discovery", "kind": "http", "path": "/realms/apps/.well-known/openid-configuration",
+     "primary": true},
+    {"name": "jwks", "kind": "http", "path": "/realms/apps/protocol/openid-connect/certs"}
+  ],
+  "app_version": {"source": "image", "component": "server"},
+  "topology": {
+    "edges": [["lb", "server"], ["server", "postgres"], ["server", "secrets"]]
+  }
+}
