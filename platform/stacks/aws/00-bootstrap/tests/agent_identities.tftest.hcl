@@ -161,3 +161,33 @@ run "bootstrap_plans_with_a_custom_parameter_path" {
     core_parameter_path = "/team/control-plane"
   }
 }
+
+# The runbook role needs a grant like the debugger, and has no IAM policy: its session only
+# signs the tokens of the cluster.
+run "runbook_role_needs_a_grant_and_has_no_policy" {
+  command = plan
+
+  module {
+    source = "../../../modules/aws/agent-identities"
+  }
+
+  assert {
+    condition     = contains(keys(aws_iam_role.gated), "runbook")
+    error_message = "The runbook role must be a role with no standing use."
+  }
+
+  assert {
+    condition = anytrue([
+      for s in data.aws_iam_policy_document.trust_gated["runbook"].statement : (
+        toset([for c in s.condition : c.variable]) ==
+        toset(["aws:RequestTag/clanker_grant", "aws:RequestTag/clanker_env"])
+      )
+    ])
+    error_message = "Assuming the runbook role must need the tags clanker_grant and clanker_env."
+  }
+
+  assert {
+    condition     = !contains(keys(aws_iam_role_policy.applier), "runbook")
+    error_message = "The runbook role must have no IAM policy."
+  }
+}

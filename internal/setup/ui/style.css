@@ -197,3 +197,14 @@ tfoot td { font-weight: 600; }
 .facts dt { font-size: 0.75rem; color: var(--text-helper); }
 .facts dd { margin-top: 0.2rem; font-family: var(--font-mono); font-size: 0.875rem;
   overflow-wrap: anywhere; }
+
+/* The steps of the installer and of the removal, inside a page. */
+.job-steps { margin-top: 1.5rem; max-width: 52rem; }
+.job-steps li.is-failed { border-left-color: var(--support-error); color: var(--text-primary);
+  font-weight: 600; }
+.job-steps li.is-failed::before { content: "\2715"; color: var(--support-error); }
+.btn-danger { background: var(--support-error); color: var(--text-on-color); }
+.btn-danger:hover { background: color-mix(in srgb, var(--support-error) 85%, black); }
+.tag-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; margin-top: 1rem; }
+.tag-row .field { margin-top: 0; }
+.tag-row button { min-height: 2.5rem; padding: 0.5rem 1rem; }

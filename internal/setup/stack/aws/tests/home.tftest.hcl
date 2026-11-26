@@ -152,6 +152,13 @@ override_resource {
 }
 
 override_resource {
+  target = aws_ecr_repository.application
+  values = {
+    repository_url = "123456789012.dkr.ecr.us-west-2.amazonaws.com/clanker-test/paperboat"
+  }
+}
+
+override_resource {
   target = aws_security_group.runner
   values = { id = "sg-0123456789abcdef0" }
 }
@@ -164,7 +171,7 @@ variables {
   router_security_group_id = "sg-0fedcba9876543210"
   zone_id                  = "ZZONETEST"
   required_tags            = { "example:team" = "platform", "example:owner" = "owner@example.com" }
-  keycloak_realm           = file("../../../../scripts/verify/keycloak/realm.json")
+  keycloak_realm           = file("../keycloak-realm.json")
 }
 
 run "phase_one_creates_no_instance_and_no_runner_task" {
@@ -331,9 +338,9 @@ run "settings_are_secure_parameters_below_one_path" {
     condition = toset(keys(aws_ssm_parameter.core)) == toset([
       "CLANKER_DATABASE_URL", "CLANKER_SIGNING_KEY", "CLANKER_PUBLIC_URL", "CLANKER_OIDC_ISSUER",
       "CLANKER_OIDC_CLIENT_ID", "CLANKER_OIDC_CLIENT_SECRET", "CLANKER_ADMIN_EMAIL",
-      "CLANKER_APPROVER_EMAILS",
+      "CLANKER_APPROVER_EMAILS", "CLANKER_AWS_LAYER_VARIABLES",
     ])
-    error_message = "Phase 1 must write the database URL, the signing key and the sign-in."
+    error_message = "Phase 1 must write the database, the key, the sign-in and the layer inputs."
   }
 
   assert {
@@ -369,6 +376,56 @@ run "settings_are_secure_parameters_below_one_path" {
       output.core_image_env.CLANKER_PARAMETER_PATH == "/src/test"
     )
     error_message = "The outputs must name the parameter path."
+  }
+}
+
+run "the_layers_get_the_inputs_of_the_account" {
+  command = apply
+
+  assert {
+    condition = jsondecode(nonsensitive(
+      aws_ssm_parameter.core["CLANKER_AWS_LAYER_VARIABLES"].value
+      )) == {
+      existing_network_id         = "vpc-0123456789abcdef0"
+      existing_private_subnet_ids = ["subnet-0123456789abcdef0", "subnet-0123456789abcdef1"]
+      image_registry              = "123456789012.dkr.ecr.us-west-2.amazonaws.com/clanker-test"
+      instance_tags = {
+        "example:team" = "platform", "example:owner" = "owner@example.com"
+      }
+      operator_principal_arn = "arn:aws:iam::123456789012:role/admin/operator"
+    }
+    error_message = "The layer inputs must be the network, the registry, the tags and the operator."
+  }
+
+  assert {
+    condition = (
+      output.image_registry == "123456789012.dkr.ecr.us-west-2.amazonaws.com/clanker-test" &&
+      aws_ecr_repository.application.name == "clanker-test/paperboat" &&
+      aws_ecr_repository.application.force_delete
+    )
+    error_message = "Paperboat images go to <image_registry>/paperboat, which a destroy removes."
+  }
+
+  assert {
+    condition     = !contains(keys(aws_ssm_parameter.core), "OPENROUTER_API_KEY")
+    error_message = "Without a model key there must be no parameter OPENROUTER_API_KEY."
+  }
+}
+
+run "a_model_key_becomes_a_setting_of_the_core" {
+  command = apply
+
+  variables {
+    model_api_key = "sk-or-v1-test-key-of-the-stack"
+  }
+
+  assert {
+    condition = (
+      nonsensitive(aws_ssm_parameter.core["OPENROUTER_API_KEY"].value) ==
+      "sk-or-v1-test-key-of-the-stack" &&
+      aws_ssm_parameter.core["OPENROUTER_API_KEY"].name == "/src/test/OPENROUTER_API_KEY"
+    )
+    error_message = "The model key must be the parameter OPENROUTER_API_KEY below /src/test."
   }
 }
 

@@ -26,6 +26,11 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
     CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH" go build -tags bundle -trimpath \
     -ldflags "-s -w -X main.version=${VERSION}" -o /out/clanker ./cmd/clanker
 
+# The binary alone, for the machine image of the core: the installer exports it with
+# `--target core --output type=local,dest=DIR`, so the core and the runner come from one build.
+FROM scratch AS core
+COPY --from=build /out/clanker /clanker
+
 FROM debian:trixie-slim@sha256:8aa5a7bf5a1955bddbe7d74fcdd0b91ab30e74362a8b73af672b0481b35b44a0 AS tools
 ARG TARGETARCH
 ARG TOFU_VERSION=1.12.3

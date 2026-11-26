@@ -7,9 +7,11 @@
 //   - ECS RunTask, DescribeTasks and StopTask: RunTask runs the runner image with Docker,
 //     with the environment of the container override, as Fargate runs a runner task.
 //
-// It also takes the webhook of a chat platform at /hooks/<name>. It writes one JSON line for
-// each call to the record file, and the job token of each task to the tokens file, so that
-// the check can look for a token in the log of the core. The record holds no token.
+// It also takes the webhook of a chat platform at /hooks/<name>, and serves a stand-in for the
+// API server of an EKS cluster over TLS at --kube-addr (kube.go). `fakeaws cert DIR` writes
+// the certificate of that server. It writes one JSON line for each call to the record file,
+// and the job token of each task to the tokens file, so that the check can look for a token
+// in the log of the core. The record holds no token.
 package main
 
 import (
@@ -41,6 +43,9 @@ type options struct {
 	minio       string
 	minioKey    string
 	minioSecret string
+	kubeAddr    string
+	kubeCert    string
+	kubeKey     string
 }
 
 func parseOptions() (options, error) {
@@ -55,10 +60,14 @@ func parseOptions() (options, error) {
 	flag.StringVar(&o.minio, "minio", "", "the address of MinIO from this machine")
 	flag.StringVar(&o.minioKey, "minio-access-key", "", "the access key of MinIO")
 	flag.StringVar(&o.minioSecret, "minio-secret-key", "", "the secret key of MinIO")
+	flag.StringVar(&o.kubeAddr, "kube-addr", "", "listen address of the stand-in API server")
+	flag.StringVar(&o.kubeCert, "kube-cert", "", "certificate of the stand-in API server")
+	flag.StringVar(&o.kubeKey, "kube-key", "", "key of the stand-in API server")
 	flag.Parse()
 	for name, value := range map[string]string{"parameters": o.parameters, "record": o.record,
 		"tokens": o.tokens, "logs": o.logs, "image": o.image, "network": o.network,
-		"minio": o.minio, "minio-access-key": o.minioKey, "minio-secret-key": o.minioSecret} {
+		"minio": o.minio, "minio-access-key": o.minioKey, "minio-secret-key": o.minioSecret,
+		"kube-addr": o.kubeAddr, "kube-cert": o.kubeCert, "kube-key": o.kubeKey} {
 		if value == "" {
 			return o, fmt.Errorf("the flag --%s is required", name)
 		}
@@ -211,17 +220,40 @@ func run() error {
 	defer stop()
 	defer s.ecs.stopAll()
 	httpServer := &http.Server{Addr: opts.addr, Handler: s, ReadHeaderTimeout: 10 * time.Second}
+	kubeServer := &http.Server{Addr: opts.kubeAddr, Handler: kubeHandler(s.record),
+		ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
 		_ = httpServer.Close()
+		_ = kubeServer.Close()
+	}()
+	kubeFailed := make(chan error, 1)
+	go func() {
+		err := kubeServer.ListenAndServeTLS(opts.kubeCert, opts.kubeKey)
+		if !errors.Is(err, http.ErrServerClosed) {
+			kubeFailed <- err
+			_ = httpServer.Close()
+		}
 	}()
 	if err := httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
-	return nil
+	select {
+	case err := <-kubeFailed:
+		return fmt.Errorf("the stand-in API server: %w", err)
+	default:
+		return nil
+	}
 }
 
 func main() {
+	if len(os.Args) == 3 && os.Args[1] == "cert" {
+		if err := writeKubeCertificate(os.Args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, "fakeaws cert:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "fakeaws:", err)
 		os.Exit(1)

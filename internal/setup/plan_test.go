@@ -8,7 +8,9 @@ import (
 	"testing"
 )
 
-func TestAWSPathEndsAtTheReviewAndOnlyReads(t *testing.T) {
+// Until the person chooses the zone, the tags and the checkout and presses Create, the
+// wizard only reads the account.
+func TestAWSPathOnlyReadsUntilCreate(t *testing.T) {
 	cli := accountCLI()
 	cli.answers["ec2 describe-regions"] = `[]`
 	server, handler := newServer(t, cli)
@@ -27,7 +29,7 @@ func TestAWSPathEndsAtTheReviewAndOnlyReads(t *testing.T) {
 	}
 	code, body := post(t, server, handler, "/api/deploy", "")
 	message, _ := body["error"].(string)
-	if code != http.StatusBadRequest || !strings.Contains(message, "creates nothing on AWS") {
+	if code != http.StatusBadRequest || !strings.Contains(message, "Names and tags") {
 		t.Fatalf("deploy: status = %d, error = %q", code, message)
 	}
 	for _, path := range []string{"/api/connect", "/api/destroy", "/api/key"} {

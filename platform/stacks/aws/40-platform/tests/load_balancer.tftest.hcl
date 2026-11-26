@@ -18,9 +18,10 @@ override_data {
   target = data.terraform_remote_state.cluster
   values = {
     outputs = {
-      cluster_name           = "clanker-test-env"
-      cluster_endpoint       = "https://cluster.example.com"
-      cluster_ca_certificate = "test-ca"
+      cluster_name                       = "clanker-test-env"
+      cluster_endpoint                   = "https://cluster.example.com"
+      cluster_ca_certificate             = "test-ca"
+      cluster_certificate_authority_data = "dGVzdC1jYQ=="
     }
   }
 }
@@ -68,19 +69,14 @@ run "load_balancer_is_an_internal_nlb_in_the_private_subnets" {
   }
 }
 
+# The module that waits for the address runs a script with aws and kubectl in an apply, so
+# the runs replace it with its output. tests/service_address.tftest.hcl plans the module.
 run "public_address_is_the_dns_name_of_the_load_balancer" {
   command = apply
 
-  # The Envoy Service after the service controller made the load balancer.
-  override_data {
-    target = module.platform.data.kubernetes_service_v1.envoy
-    values = {
-      status = [{
-        load_balancer = [{
-          ingress = [{ hostname = "internal-test.elb.example.com", ip = "", ip_mode = "" }]
-        }]
-      }]
-    }
+  override_module {
+    target  = module.load_balancer
+    outputs = { address = "internal-test.elb.example.com" }
   }
 
   assert {
@@ -94,13 +90,13 @@ run "public_address_is_the_dns_name_of_the_load_balancer" {
   }
 }
 
-# The release of the Gateway exists after the run above, so the plan reads the Service.
+# A later plan reads the Service. A Service that lost its address fails the plan.
 run "an_envoy_service_without_an_address_fails_the_plan" {
   command = plan
 
-  override_data {
-    target = module.platform.data.kubernetes_service_v1.envoy
-    values = { status = [{ load_balancer = [{ ingress = [] }] }] }
+  override_module {
+    target  = module.load_balancer
+    outputs = { address = "" }
   }
 
   expect_failures = [output.public_address]

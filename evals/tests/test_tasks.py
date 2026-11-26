@@ -85,10 +85,10 @@ def run(
 @pytest.mark.parametrize(
     ("sample", "replay"),
     [
-        ("release-1.1.0", "author_release_local_1.1.0"),
-        ("release-1.2.0-bad-exact-tag", "author_release_local_1.2.0-bad"),
-        ("advisory-base-image", "author_advisory_local_PB-2026-014"),
-        ("advisory-postgres-minor", "author_advisory_local_PG-17.12"),
+        ("release-1.1.0", "paperboat_author_release_local_1.1.0"),
+        ("release-1.2.0-bad-exact-tag", "paperboat_author_release_local_1.2.0-bad"),
+        ("advisory-base-image", "paperboat_author_advisory_local_PB-2026-014"),
+        ("advisory-postgres-minor", "paperboat_author_advisory_local_PG-17.12"),
     ],
 )
 def test_author_recordings_score_full(sample: str, replay: str, tmp_path: Path) -> None:
@@ -99,10 +99,10 @@ def test_author_recordings_score_full(sample: str, replay: str, tmp_path: Path) 
 @pytest.mark.parametrize(
     ("sample", "replay"),
     [
-        ("app-upgrade-1.1.0", "explain_app-upgrade_1.1.0"),
-        ("app-upgrade-1.2.0-bad", "explain_app-upgrade_1.2.0-bad"),
-        ("postgres-minor-patch", "explain_postgres-patch_17.12"),
-        ("drift-reconciliation", "explain_drift"),
+        ("app-upgrade-1.1.0", "paperboat_explain_app-upgrade_1.1.0"),
+        ("app-upgrade-1.2.0-bad", "paperboat_explain_app-upgrade_1.2.0-bad"),
+        ("postgres-minor-patch", "paperboat_explain_postgres-patch_17.12"),
+        ("drift-reconciliation", "paperboat_explain_drift"),
     ],
 )
 def test_explainer_recordings_score_full(sample: str, replay: str, tmp_path: Path) -> None:
@@ -111,7 +111,7 @@ def test_explainer_recordings_score_full(sample: str, replay: str, tmp_path: Pat
 
 
 def test_investigator_recording_scores_full(tmp_path: Path) -> None:
-    outputs = recording("investigate_incident")
+    outputs = recording("paperboat_investigate_incident")
     value = run(investigator_diagnosis(), "memory-fault-healthy-pods", outputs, tmp_path)
     assert value == dict.fromkeys(value, 1.0)
 
@@ -186,7 +186,7 @@ def test_explainer_reported_tier_is_cleared_by_the_grader(tmp_path: Path) -> Non
 
 
 def test_explainer_count_from_plan_detail_is_grounded(tmp_path: Path) -> None:
-    answer = json.loads(recording("explain_drift")[0].completion)
+    answer = json.loads(recording("paperboat_explain_drift")[0].completion)
     answer["sentence"] = "The API goes from 3 replicas back to 1. It does not touch 7 pods."
     outputs = [text(json.dumps(answer))]
     value = run(explainer_faithfulness(), "drift-reconciliation", outputs, tmp_path)
@@ -198,7 +198,7 @@ def test_explainer_count_from_plan_detail_is_grounded(tmp_path: Path) -> None:
 
 
 def test_pod_at_line_start_of_framed_transcript_is_grounded(tmp_path: Path) -> None:
-    answer = json.loads(recording("investigate_incident")[0].completion)
+    answer = json.loads(recording("paperboat_investigate_incident")[0].completion)
     answer["evidence"] += " postgres-0 and paperboat-api-6d9f7c5b8-x2k4q are Running."
     outputs = [text(json.dumps(answer))]
     value = run(investigator_diagnosis(), "memory-fault-healthy-pods", outputs, tmp_path)
@@ -222,7 +222,7 @@ def test_investigator_unlisted_runbook_fails(tmp_path: Path) -> None:
 
 
 def diagnosis(runbook: str, component: str) -> list[ModelOutput]:
-    answer = json.loads(recording("investigate_incident")[0].completion)
+    answer = json.loads(recording("paperboat_investigate_incident")[0].completion)
     answer["proposed_runbook"], answer["component"] = runbook, component
     return [text(json.dumps(answer))]
 

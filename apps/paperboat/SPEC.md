@@ -11,8 +11,10 @@ between Paperboat and the rest of the repository.
 - One static binary, `paperboat`, with subcommands `api`, `worker`, `migrate`, `loadgen`, `web`.
 - One image for each release: `<registry>/paperboat:<version>`. `CGO_ENABLED=0`, distroless
   static base, non-root user.
-- `apps/paperboat/build.sh <registry>` builds and pushes all four releases. Each release is a
-  directory or build argument, not a git branch, so one checkout builds all of them.
+- `apps/paperboat/build.sh [--platform PLATFORM] <registry>` builds and pushes all four
+  releases, for this host or for the platform, for example `linux/arm64` for the nodes on AWS.
+  Each release is a directory or build argument, not a git branch, so one checkout builds all
+  of them.
 - Helm chart in `apps/paperboat/chart`. The chart values are in `platform/CONTRACT.md` section 4.
 
 ## 2. Services

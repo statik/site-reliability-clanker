@@ -63,6 +63,13 @@ type Credentials struct {
 	STS STS
 	// Roles gives the role ARN of each identity: Bootstrap.Roles.
 	Roles map[string]string
+	// Region is the region of the environment: Bootstrap.Region. The kubeconfig of a grant
+	// asks for the tokens of the cluster there.
+	Region string
+	// ClusterOutputs returns the outputs of layer 20-cluster of an environment, as its last
+	// apply reported them. The kubeconfig of a debug or runbook grant names the cluster
+	// from them.
+	ClusterOutputs func(env string) (map[string]any, error)
 	// Record appends an event to the audit log.
 	Record func(audit.Event) error
 }
@@ -115,15 +122,42 @@ func sessionTags(g broker.Grant) []types.Tag {
 	return tags
 }
 
+// kubeconfig returns the kubeconfig of a grant whose job runs kubectl, and the name of the
+// cluster. A grant of another kind gets neither.
+func (c Credentials) kubeconfig(g broker.Grant) (string, string, error) {
+	if !needsKubeconfig(g) {
+		return "", "", nil
+	}
+	outputs, err := c.ClusterOutputs(g.Env)
+	if err != nil {
+		return "", "", fmt.Errorf("grant %s: %w", g.ID, err)
+	}
+	cluster, err := ParseCluster(g.Env, outputs)
+	if err != nil {
+		return "", "", fmt.Errorf("grant %s: %w", g.ID, err)
+	}
+	text, err := Kubeconfig(cluster, c.Region, g.Identity)
+	if err != nil {
+		return "", "", fmt.Errorf("grant %s: %w", g.ID, err)
+	}
+	return text, cluster.Name, nil
+}
+
 // Issue returns an STS session for the role of the identity of a grant that the broker
 // checked. The request has no session policy: the permissions are those of the role, inside
 // its permission boundary. Layer 00-bootstrap owns both, and the trust policy of the role.
+// A debug or runbook grant also gets a kubeconfig for the cluster of the environment, which
+// gets its tokens with the keys of the session.
 func (c Credentials) Issue(ctx context.Context, g broker.Grant, remaining time.Duration) (
 	broker.Credential, error) {
 	role, found := c.Roles[g.Identity]
 	if !found {
 		return broker.Credential{}, fmt.Errorf("grant %s: layer 00-bootstrap gives no role for "+
 			"the identity %s on AWS", g.ID, g.Identity)
+	}
+	kubeconfig, cluster, err := c.kubeconfig(g)
+	if err != nil {
+		return broker.Credential{}, err
 	}
 	name := SessionName(g)
 	out, err := c.STS.AssumeRole(ctx, &sts.AssumeRoleInput{RoleArn: aws.String(role),
@@ -143,17 +177,24 @@ func (c Credentials) Issue(ctx context.Context, g broker.Grant, remaining time.D
 		SessionToken:    aws.ToString(out.Credentials.SessionToken),
 		Expires:         out.Credentials.Expiration.UTC()}
 	expires := session.Expires.Format(time.RFC3339)
+	data := map[string]any{"grant": g.ID, "role_arn": role, "session_name": name,
+		"expires": expires}
+	mechanism := fmt.Sprintf("STS AssumeRole for the role %s, session %s, expires %s", role,
+		name, expires)
+	if kubeconfig != "" {
+		data["cluster"] = cluster
+		mechanism += fmt.Sprintf("; a kubeconfig for the EKS cluster %s that gets its tokens "+
+			"with aws eks get-token", cluster)
+	}
 	// Without the event nobody can join the session to the grant, so the keys are dropped
 	// when the audit log does not take it.
 	if err := c.Record(audit.Event{Type: "credential.issued", Actor: "broker", Env: g.Env,
 		Layer: g.Layer, WorkItem: g.WorkItem,
 		Summary: fmt.Sprintf("STS session %s issued for grant %s", name, g.ID),
-		Data: map[string]any{"grant": g.ID, "role_arn": role, "session_name": name,
-			"expires": expires}}); err != nil {
+		Data:    data}); err != nil {
 		return broker.Credential{}, fmt.Errorf("record the STS session of grant %s: %w", g.ID, err)
 	}
-	return broker.Credential{AWS: session, Mechanism: fmt.Sprintf(
-		"STS AssumeRole for the role %s, session %s, expires %s", role, name, expires)}, nil
+	return broker.Credential{AWS: session, KubeConfig: kubeconfig, Mechanism: mechanism}, nil
 }
 
 // Withdraw records that the grant ended. It does not make the session invalid: STS cannot

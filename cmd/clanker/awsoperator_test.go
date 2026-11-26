@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -14,7 +15,7 @@ import (
 
 func TestBootstrapOnAWSMovesTheStateIntoTheBucketAndWritesTheSetting(t *testing.T) {
 	f := newOperatorFake(t)
-	if err := bootstrapAWS(context.Background(), f.options(), f.aws); err != nil {
+	if err := bootstrapAWS(context.Background(), f.options(), f.aws, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	vars := "-var=broker_principal=arn:aws:iam::000000000000:role/test-core " +
@@ -69,7 +70,7 @@ func checkWrittenSetting(t *testing.T, f *operatorFake) {
 func TestBootstrapOnAWSRunsWithTheSessionOfTheProfile(t *testing.T) {
 	f := newOperatorFake(t)
 	t.Setenv("AWS_ACCESS_KEY_ID", "key-of-the-shell")
-	if err := bootstrapAWS(context.Background(), f.options(), f.aws); err != nil {
+	if err := bootstrapAWS(context.Background(), f.options(), f.aws, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	session, err := os.ReadFile(filepath.Join(f.dir, "session"))
@@ -92,7 +93,7 @@ func TestBootstrapOnAWSLeavesNothingInTheSourceFiles(t *testing.T) {
 	f.write(filepath.Join(stack, ".terraform", "terraform.tfstate"), `{"backend":"old"}`)
 	f.write(filepath.Join(stack, "terraform.tfstate"), appliedState)
 	before := listFiles(t, f.source)
-	if err := bootstrapAWS(context.Background(), f.options(), f.aws); err != nil {
+	if err := bootstrapAWS(context.Background(), f.options(), f.aws, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if after := listFiles(t, f.source); !slices.Equal(before, after) {
@@ -124,7 +125,7 @@ func TestBootstrapOnAWSAppliesWithTheStateThatTheBucketHolds(t *testing.T) {
 	f := newOperatorFake(t)
 	f.stateInBucket = true
 	f.write(f.s3Path("00-bootstrap"), appliedState)
-	if err := bootstrapAWS(context.Background(), f.options(), f.aws); err != nil {
+	if err := bootstrapAWS(context.Background(), f.options(), f.aws, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	for _, call := range f.calls() {
@@ -141,7 +142,7 @@ func TestBootstrapOnAWSMovesALocalStateFromAnEarlierRunAgain(t *testing.T) {
 	f := newOperatorFake(t)
 	f.stateInBucket = true
 	f.write(f.localState(), appliedState)
-	if err := bootstrapAWS(context.Background(), f.options(), f.aws); err != nil {
+	if err := bootstrapAWS(context.Background(), f.options(), f.aws, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if len(f.callsOf("00-bootstrap", "init -no-color -input=false -migrate-state")) != 1 {
@@ -158,7 +159,7 @@ func TestBootstrapOnAWSWithoutAKMSKeyWritesNoParameter(t *testing.T) {
 	f := newOperatorFake(t)
 	o := f.options()
 	o.kmsKey = ""
-	if err := bootstrapAWS(context.Background(), o, f.aws); err != nil {
+	if err := bootstrapAWS(context.Background(), o, f.aws, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if f.put != nil {
@@ -186,7 +187,7 @@ func TestBootstrapOnAWSChecksTheFlagsBeforeAnyCall(t *testing.T) {
 			f := newOperatorFake(t)
 			o := f.options()
 			change(&o)
-			if err := bootstrapAWS(context.Background(), o, f.aws); err == nil {
+			if err := bootstrapAWS(context.Background(), o, f.aws, io.Discard); err == nil {
 				t.Fatal("no error")
 			}
 			if len(f.awsCalls) != 0 || len(f.calls()) != 0 {
@@ -209,7 +210,7 @@ func withLayerStates(f *operatorFake) {
 func TestDestroyOnAWSDestroysTheLayersWithResourcesAfterCheckingEach(t *testing.T) {
 	f := newOperatorFake(t)
 	withLayerStates(f)
-	if err := destroyAWS(context.Background(), f.options(), f.aws); err != nil {
+	if err := destroyAWS(context.Background(), f.options(), f.aws, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	destroyed, pulls, lastPull, firstDestroy := destroyOrder(f.calls())
@@ -265,7 +266,7 @@ func TestDestroyOnAWSDestroysNothingWhenALayerCannotBeRead(t *testing.T) {
 	f := newOperatorFake(t)
 	withLayerStates(f)
 	f.write(f.s3Path("20-cluster"), "unreadable")
-	err := destroyAWS(context.Background(), f.options(), f.aws)
+	err := destroyAWS(context.Background(), f.options(), f.aws, io.Discard)
 	if err == nil || !strings.Contains(err.Error(), "check layer 20-cluster") {
 		t.Fatalf("error = %v, want one that names 20-cluster", err)
 	}
@@ -280,7 +281,7 @@ func TestDestroyOnAWSDestroysNothingWhenTheBootstrapStateCannotBeRead(t *testing
 	f := newOperatorFake(t)
 	withLayerStates(f)
 	f.write(f.s3Path("00-bootstrap"), "unreadable")
-	err := destroyAWS(context.Background(), f.options(), f.aws)
+	err := destroyAWS(context.Background(), f.options(), f.aws, io.Discard)
 	if err == nil || !strings.Contains(err.Error(), "check layer 00-bootstrap") {
 		t.Fatalf("error = %v, want one that names 00-bootstrap", err)
 	}
@@ -292,7 +293,7 @@ func TestDestroyOnAWSDestroysNothingWhenTheBootstrapStateCannotBeRead(t *testing
 func TestDestroyOnAWSUsesALocalStateOfBootstrapWithoutABucket(t *testing.T) {
 	f := newOperatorFake(t)
 	f.write(f.localState(), stateWithoutBucket)
-	if err := destroyAWS(context.Background(), f.options(), f.aws); err != nil {
+	if err := destroyAWS(context.Background(), f.options(), f.aws, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	for _, layer := range upperLayersTopDown() {
@@ -313,7 +314,7 @@ func TestTheCheckSaysWhetherItReadTheLayersAboveBootstrap(t *testing.T) {
 	for local, want := range map[string]bool{stateWithoutBucket: false, appliedState: true} {
 		f := newOperatorFake(t)
 		f.write(f.localState(), local)
-		target, err := openAWSTarget(context.Background(), f.options(), f.aws)
+		target, err := openAWSTarget(context.Background(), f.options(), f.aws, io.Discard)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -345,7 +346,7 @@ func TestDestroyOnAWSChecksTheLayersWhenTheLocalStateHasTheBucket(t *testing.T) 
 	f.write(f.localState(), appliedState)
 	f.write(f.s3Path("10-network"), appliedState)
 	f.write(f.s3Path("00-bootstrap"), "unreadable")
-	if err := destroyAWS(context.Background(), f.options(), f.aws); err != nil {
+	if err := destroyAWS(context.Background(), f.options(), f.aws, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if len(f.callsOf("10-network", "destroy")) != 1 {
@@ -360,7 +361,7 @@ func TestDestroyOnAWSChecksTheBrokerPrincipalBeforeAnyCall(t *testing.T) {
 	f := newOperatorFake(t)
 	o := f.options()
 	o.brokerPrincipal = "core"
-	if err := destroyAWS(context.Background(), o, f.aws); err == nil {
+	if err := destroyAWS(context.Background(), o, f.aws, io.Discard); err == nil {
 		t.Fatal("no error for a broker principal that is not a role ARN")
 	}
 	if len(f.awsCalls) != 0 || len(f.calls()) != 0 {
@@ -392,7 +393,7 @@ func TestBootstrapOnAWSStopsWhenTheOutputsAreNotAValidSetting(t *testing.T) {
 	f := newOperatorFake(t)
 	f.write(filepath.Join(f.dir, "outputs.json"),
 		`{"evidence_bucket": {"sensitive": false, "type": "string", "value": "evidence"}}`)
-	err := bootstrapAWS(context.Background(), f.options(), f.aws)
+	err := bootstrapAWS(context.Background(), f.options(), f.aws, io.Discard)
 	if err == nil || !strings.Contains(err.Error(), "CLANKER_AWS_BOOTSTRAP") {
 		t.Fatalf("error = %v, want a refusal of the setting", err)
 	}

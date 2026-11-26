@@ -7,7 +7,7 @@ import (
 // clearPlacement forgets where the control plane goes. The caller holds the lock.
 func (s *Server) clearPlacement() {
 	s.state.PlaceMode, s.state.Network, s.state.Subnets = "", "", nil
-	s.state.NetworkCIDR, s.state.Access = "", ""
+	s.state.NetworkCIDR, s.state.Access, s.state.RouterGroup = "", "", ""
 }
 
 // postDiscover surveys the account of a profile and proposes where the control plane goes.
@@ -50,6 +50,7 @@ func placeIn(found Discovery, id string) (State, error) {
 			Subnets: subnetsFor(network), Access: AccessNone}
 		if covered(network) {
 			placed.Access = AccessTailscale
+			placed.RouterGroup = network.Router.SecurityGroup
 		}
 		return placed, nil
 	}
@@ -88,6 +89,7 @@ func (s *Server) postPlace(r *http.Request) (any, error) {
 	s.state.PlaceMode, s.state.Network = placed.PlaceMode, placed.Network
 	s.state.Subnets = placed.Subnets
 	s.state.NetworkCIDR, s.state.Access = placed.NetworkCIDR, placed.Access
+	s.state.RouterGroup = placed.RouterGroup
 	s.review = nil
 	return s.state, s.save()
 }

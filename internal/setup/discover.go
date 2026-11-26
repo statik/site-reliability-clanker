@@ -53,6 +53,9 @@ type Router struct {
 	Routes  []string `json:"routes"`
 	// Covers is true when the routes hold the whole address range of the network.
 	Covers bool `json:"covers"`
+	// SecurityGroup is the first security group of the service. The load balancer of the
+	// control plane admits it.
+	SecurityGroup string `json:"security_group,omitempty"`
 }
 
 // Network is one VPC with what decides whether the control plane fits in it.

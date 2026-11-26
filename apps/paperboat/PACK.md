@@ -47,7 +47,7 @@ built.
 | `deploy.chart` | The directory of the main chart, inside the pack, with a `Chart.yaml`. Optional when every release has a record that names a chart |
 | `deploy.values` | Optional. A directory with `values.yaml` and, for each cloud that needs other values, `values-<cloud>.yaml` (`local`, `aws`, `gcp`, `azure`). Files only, each 256 KiB or less |
 | `deploy.extras` | Optional. The directory of a second chart, with a `Chart.yaml`, that the layer installs after the main chart: for objects that a chart of another project does not have |
-| `deploy.build` | Optional. The build program, inside the pack. A pack with none has its images in a registry already |
+| `deploy.build` | Optional. The build program, inside the pack. It gets the registry as its last argument. The installer on AWS gives `--platform linux/arm64` before it. A pack with none has its images in a registry already |
 | `deploy.settings` | Optional. 1 to 16 variables of the layer that a change can set. Each has a `variable` (not the version variable and not a variable of the core), a `type` (`number`, a whole number from `min` to `max` within 0 to 1000000, or `bool` with no bounds), a `default` for a new environment, and the `value`: the dotted Helm path that it sets (names only, not below `platform`, and not inside the path of another setting) |
 | `deploy.secrets` | Optional. 1 to 8 key names. The layer makes a secret with a random value for each key |
 | `deploy.route` | The route of the application on the gateway of the platform: the `service` and the `port` that get the requests; optionally 1 to 8 path prefixes in `paths` (with none, every path), `timeout_seconds` from 0 (no timeout) to 3600 (with none, the default of the gateway), `hostname` (a host name of its own) and `wildcard` (every name below that host name; needs `hostname`) |
@@ -308,6 +308,10 @@ The core on a cloud has no disk. It reads only the pack that it carries.
   time, so the runbooks and the chart of a new version do not reach it.
 - The scenes of the simulator are the story of the Paperboat releases 1.1.0, 1.1.1 and
   1.2.0.
-- The recorded model answers in `internal/agent/replay` are answers about Paperboat.
+- The recorded model answers in `internal/agent/replay` are answers about Paperboat. Each
+  file name starts with `paperboat_`, the name of the pack, and the replay mode reads only
+  the files of the pack that runs. Another pack gets the template text of the Explainer and
+  of the Investigator, no review, and no pull request from the Author for a release or an
+  advisory.
 - The eval tasks other than `investigator_diagnosis` have their samples in the code of the
   suite, and those samples are about Paperboat.

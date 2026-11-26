@@ -24,7 +24,7 @@ The stack uses an existing VPC and changes nothing in it.
 | Database | RDS for PostgreSQL 18 (the current minor version of RDS), `db.t4g.micro`, 20 GiB gp3, encrypted, private, one zone, one day of automatic backups, no deletion protection, no final snapshot. The URL has `sslmode=require` |
 | Settings | A customer KMS key (deletion window of 7 days) and SecureString parameters below `/src/<env>`. Keycloak's own parameters are below `/src/<env>/idp` |
 | Roles | The role of the core (the broker principal of `00-bootstrap`) with its instance profile. The execution roles of the runner and of Keycloak. No task role |
-| Registry | ECR repository `clanker-<env>/runner` for the runner image |
+| Registry | ECR repositories `clanker-<env>/runner` for the runner image and `clanker-<env>/<application_name>` for the images of the application (`image_registry` is `<registry>/clanker-<env>`) |
 | Runners | ECS cluster, log group (7 days) and, in phase 2, the Fargate task definition (ARM64, 1 vCPU, 2 GiB) with the runner image by its digest |
 | Keycloak | Log group (7 days), Fargate task definition (ARM64, 1 vCPU, 2 GiB) and a service of one task behind the load balancer. Keycloak 26.8.2, pinned by digest, in production mode with `--db=dev-file` |
 | Security groups | Load balancer: 443 and 80 from the router and the VPC. Core: 7070 from the load balancer and the runners. Keycloak: 8080 from the load balancer. Database: 5432 from the core. The core, the runners and Keycloak send to any address through the NAT gateway |
@@ -49,6 +49,8 @@ starts. The image of the core holds only the path and the region (output `core_i
 | `CLANKER_ADMIN_EMAIL` | `admin@src-<env>-idp.<zone>` |
 | `CLANKER_APPROVER_EMAILS` | `approver@src-<env>-idp.<zone>`: the core makes this user an approver when it starts, so a T3 change has its second approver |
 | `CLANKER_AWS_RUNNER` | Phase 2: cluster, task definition, container, private subnets and the runner security group |
+| `CLANKER_AWS_LAYER_VARIABLES` | The inputs of layers 10 to 50 that belong to this account: `existing_network_id`, `existing_private_subnet_ids`, `image_registry`, `instance_tags` (the required tags) and `operator_principal_arn` (the role of the person who applies this stack) |
+| `OPENROUTER_API_KEY` | Only with the input `model_api_key` |
 | `CLANKER_AWS_BOOTSTRAP` | A placeholder for the outputs of `00-bootstrap` (`tofu output -json`). `clanker bootstrap --cloud aws --parameter-path <parameter_path> --kms-key <parameter_key_arn>` overwrites the parameter as a SecureString with that key, as the person who applies this stack. The stack ignores later changes of the value. With the placeholder the core does not start |
 
 No value holds the address of an instance: people, Keycloak (the redirect URI) and the
@@ -67,8 +69,7 @@ private address of the core from the core, for each task.
 ### Keycloak
 
 Keycloak imports the realm of the input `keycloak_realm`: the content of
-`scripts/verify/keycloak/realm.json`. A released binary does not carry `scripts/verify`, so
-the realm comes from a checkout until the installer carries it.
+`internal/setup/stack/keycloak-realm.json`, which the binary carries and the installer gives.
 
 Keycloak keeps a `${NAME}` whose variable is not set as literal text. Two checks stop that:
 
@@ -83,8 +84,10 @@ realm again, and sessions end.
 
 ## Inputs
 
-The owner gives the values of one account in `terraform.tfvars` (git ignores it; see
-`terraform.tfvars.example`) and the realm in `TF_VAR_keycloak_realm`.
+`clanker install --cloud aws` writes the values of one account to
+`~/.clanker/aws/<env>/home.tfvars` (mode 0600; see `terraform.tfvars.example`) and gives the
+realm in `TF_VAR_keycloak_realm`. By hand, put them in `terraform.tfvars` here, which git
+ignores.
 
 | Input | Meaning |
 |---|---|
@@ -96,26 +99,37 @@ The owner gives the values of one account in `terraform.tfvars` (git ignores it;
 | `required_tags` | The tags that the organization requires. `{}` for none |
 | `keycloak_realm` | The realm, as JSON text |
 | `core_instance_type` | Default `t4g.small`. It must match the architecture of the image |
+| `model_api_key` | Optional. The OpenRouter API key of the core |
+| `application_name` | Default `paperboat`. The name of the application pack, and of the repository of its images |
 | `runner_image_digest` | Phase 2 |
 | `core_image_id` | Phase 2. It needs `runner_image_digest` |
 
 ## Order
+
+`clanker install --cloud aws` and the wizard (`clanker setup`, its button Create) do all of
+this from a checkout, with the working copy in `~/.clanker/aws/<env>/stack`, the state in
+`home.tfstate` and the working data of OpenTofu in `tfdata` (`TF_DATA_DIR`) next to it. Their
+record `install.json` lets a run continue after a failed step and lets `clanker uninstall
+--cloud aws` (or Remove in the wizard) find what is outside the state. By hand:
 
 1. **Phase 1.** Apply without `runner_image_digest` and `core_image_id`. This creates
    everything except the runner task definition and the core. The apply waits until Keycloak
    answers the discovery document of the realm behind the load balancer.
 2. Push the runner image (`make runner-image`) to `runner_repository_url`, and note its
    digest.
-3. Build the image of the core with `ops`, with `core_image_env` as its `Env`.
-4. Apply `00-bootstrap` and write its outputs to `bootstrap_parameter` (see the table
+3. Push the images of the application for `linux/arm64` to `image_registry`
+   with the build program of the pack (`apps/paperboat/build.sh --platform linux/arm64
+   <image_registry>`): the core on a cloud does not publish them.
+4. Build the image of the core with `ops`, with `core_image_env` as its `Env`.
+5. Apply `00-bootstrap` and write its outputs to `bootstrap_parameter` (see the table
    above): `clanker bootstrap --cloud aws --env <env_name> --profile <profile> --region
    <region> --broker-principal <core_role_arn> --parameter-path <parameter_path> --kms-key
    <parameter_key_arn>`.
-5. **Phase 2.** Apply with `runner_image_digest` and `core_image_id`. The apply waits until
+6. **Phase 2.** Apply with `runner_image_digest` and `core_image_id`. The apply waits until
    the core answers `/healthz` behind the load balancer (up to 15 minutes).
 
 The core reads its settings and the discovery document of Keycloak only when it starts, and
-stops when one of them is missing. Phase 2 therefore comes after step 4, and the auto
+stops when one of them is missing. Phase 2 therefore comes after step 5, and the auto
 scaling group depends on the Keycloak service, the DNS names, the listener rules and every
 parameter. A new runner digest changes `CLANKER_AWS_RUNNER`: the core reads it at its next
 start. A new image of the core replaces the instance.
@@ -157,6 +171,10 @@ with no traffic.
 
 ## Teardown
 
+`clanker uninstall --cloud aws` does these steps and checks each one. It first sets the
+auto scaling group of the core to no instance, so that the core starts no runner task. By
+hand:
+
 1. Stop the runner tasks that still run in the cluster. A cluster with a running task
    cannot be deleted.
 2. `clanker destroy --cloud aws --env <env_name> --profile <profile> --region <region>
@@ -165,9 +183,9 @@ with no traffic.
    before this stack.
 3. `tofu destroy` here, with the same inputs. It terminates the instance, stops Keycloak,
    deletes the database without a final snapshot and with its automatic backups, deletes the
-   repository with its images, the parameters (with `CLANKER_AWS_BOOTSTRAP`), the log groups,
-   the certificate, its validation records and the alias records, and schedules the
-   deletion of the key (7 days).
+   two repositories with their images, the parameters (with `CLANKER_AWS_BOOTSTRAP`), the
+   log groups, the certificate, its validation records and the alias records, and schedules
+   the deletion of the key (7 days).
 4. Delete what is outside the state: the image of the core and its snapshot (`ops` made
    them), and the task definitions of the two families. `tofu destroy` only deregisters a
    task definition, which stays `INACTIVE`:
@@ -185,9 +203,10 @@ Validated:
 - `tofu test` with mock providers (`tests/home.tftest.hcl`): phase 1 and phase 2, the internal
   load balancer with TLS, no IP address in any output, parameter or Keycloak variable, the
   principals of the key policy, the statements of the role of the core, no task role, the
-  value of `CLANKER_AWS_RUNNER`, the tags of the launch template, the signing key of a known
-  Ed25519 key, the database, the settings that let a destroy remove everything, and the plan
-  failure for a realm variable that the container does not get.
+  value of `CLANKER_AWS_RUNNER` and of `CLANKER_AWS_LAYER_VARIABLES`, the repository of the
+  application, the parameter of the model key, the tags of the launch template, the signing
+  key of a known Ed25519 key, the database, the settings that let a destroy remove
+  everything, and the plan failure for a realm variable that the container does not get.
 - The conversion of the signing key with 300 keys of the real `tls` provider, each checked
   with Go `crypto/ed25519`.
 - `keycloak-start.sh` in the pinned Keycloak image with Docker: it stops on a missing or

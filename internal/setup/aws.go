@@ -29,10 +29,36 @@ func realCLI(ctx context.Context, args ...string) ([]byte, error) {
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("aws %s: %w: %s", args[0]+" "+args[1], err,
-			lastPart(stderr.String()))
+		return nil, &CLIError{Command: "aws " + strings.Join(args[:min(2, len(args))], " "),
+			Err: err, Stderr: stderr.String()}
 	}
 	return stdout.Bytes(), nil
+}
+
+// CLIError is a failed run of the aws program. Its text names the command, never its
+// arguments, and has the end of what the program printed on standard error. Stderr has all
+// of it, for an answer that is longer than that end, such as an encoded authorization
+// message.
+type CLIError struct {
+	Command string
+	Err     error
+	Stderr  string
+}
+
+func (e *CLIError) Error() string {
+	return fmt.Sprintf("%s: %v: %s", e.Command, e.Err, lastPart(e.Stderr))
+}
+
+func (e *CLIError) Unwrap() error { return e.Err }
+
+// stderrOf returns all that the aws program printed on standard error for a failed call,
+// or the text of another error.
+func stderrOf(err error) string {
+	var failed *CLIError
+	if errors.As(err, &failed) {
+		return failed.Stderr
+	}
+	return err.Error()
 }
 
 // lastPart returns the end of the output of a program, where its error is.

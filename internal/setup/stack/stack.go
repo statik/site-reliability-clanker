@@ -14,8 +14,20 @@ import (
 //go:embed aws/*.tf aws/.terraform.lock.hcl aws/keycloak-start.sh
 var files embed.FS
 
+// keycloakRealm is the realm that Keycloak imports, the input keycloak_realm of the home
+// stack on AWS. It holds no secret: Keycloak replaces each ${NAME} in it with a variable of
+// its container.
+//
+//go:embed keycloak-realm.json
+var keycloakRealm string
+
 // AWS returns the files of the home stack on AWS, with paths relative to its root module.
 // aws/README.md describes the inputs and the order of the two phases.
 func AWS() (fs.FS, error) {
 	return fs.Sub(files, "aws")
+}
+
+// KeycloakRealm returns the realm of Keycloak as JSON text.
+func KeycloakRealm() string {
+	return keycloakRealm
 }

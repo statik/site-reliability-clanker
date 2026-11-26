@@ -15,12 +15,11 @@ output "gateway_namespace" {
 
 output "public_address" {
   description = "DNS name of the load balancer that serves the application."
-  value       = module.platform.public_address
+  value       = module.load_balancer.address
 
-  # Nothing waits for the load balancer: the module reads the Service once, after the
-  # release of the Gateway.
+  # The first apply waits for the address. A later plan reads it, and the Service can lose it.
   precondition {
-    condition = module.platform.public_address != ""
+    condition = module.load_balancer.address != ""
     error_message = format(
       "The Envoy Service %s has no load balancer address yet. Read the events of the Service.",
       module.platform.envoy_service,

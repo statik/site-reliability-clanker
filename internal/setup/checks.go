@@ -1,7 +1,8 @@
 // Package setup is the first-run wizard: a small web application on the loopback address
 // that checks the machine and chooses the language model. On this machine it starts the
-// control plane and hands over to it. On AWS it signs in, surveys the account and shows
-// what the control plane needs there.
+// control plane and hands over to it. On AWS it signs in, surveys the account, shows what
+// the control plane needs there and its price, and creates it when the person presses
+// Create: with the Installer of this package, which `clanker install --cloud aws` runs too.
 package setup
 
 import (
@@ -92,4 +93,47 @@ func Missing(checks []Check) []string {
 		}
 	}
 	return missing
+}
+
+// installTools are the programs that the installer on AWS needs besides those of awsTools.
+var installTools = []tool{
+	{"docker", "builds the runner image, the core and the application images",
+		"Install Docker Desktop, then start it."},
+	{"make", "builds the files that the core carries", "xcode-select --install"},
+	{"git", "names the release of the checkout", "xcode-select --install"},
+	{"pnpm", "builds the dashboard that the core carries", "brew install pnpm"},
+}
+
+// DockerBuilds reports whether Docker answers and has buildx, which builds for linux/arm64.
+// Tests replace it.
+var DockerBuilds = func() bool {
+	return exec.Command("docker", "buildx", "version").Run() == nil && DockerAnswers()
+}
+
+// InstallChecks returns the requirements of the installer on AWS and whether this machine
+// meets each one.
+func InstallChecks() []Check {
+	checks, _ := Checks(TargetAWS)
+	for _, t := range installTools {
+		check := Check{Name: t.name, Why: t.why}
+		if path, err := LookPath(t.name); err == nil {
+			check.OK, check.Detail = true, path
+		} else {
+			check.Detail, check.Fix = "not installed", t.fix
+		}
+		checks = append(checks, check)
+	}
+	ops := Check{Name: "ops", Why: "builds the machine image of the core"}
+	if path, err := findOps(); err == nil {
+		ops.OK, ops.Detail = true, path
+	} else {
+		ops.Detail, ops.Fix = "not installed", "Install it from https://ops.city."
+	}
+	daemon := Check{Name: "Docker buildx", Why: "builds the images for linux/arm64"}
+	if DockerBuilds() {
+		daemon.OK, daemon.Detail = true, "answers"
+	} else {
+		daemon.Detail, daemon.Fix = "does not answer", "Start Docker Desktop, then check again."
+	}
+	return append(checks, ops, daemon)
 }

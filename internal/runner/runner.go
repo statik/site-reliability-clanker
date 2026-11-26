@@ -271,14 +271,21 @@ func (r *Runner) prepare(j Job) (run, func(), error) {
 	} else {
 		env = append(env, "KUBE_CONFIG_PATH=", "KUBECONFIG=/dev/null")
 	}
-	if j.AWS != nil {
-		// The keys exist only in the environment of the tofu processes of this job. They
-		// come last, so they replace keys that the runner itself has. No file holds them.
-		env = append(env, "AWS_ACCESS_KEY_ID="+j.AWS.AccessKeyID,
-			"AWS_SECRET_ACCESS_KEY="+j.AWS.SecretAccessKey,
-			"AWS_SESSION_TOKEN="+j.AWS.SessionToken)
-	}
+	env = append(env, awsEnv(j.AWS)...)
 	return run{job: j, stack: stack, environ: env, backend: backend}, remove, nil
+}
+
+// awsEnv returns the keys of the AWS session of a job as environment variables, or none
+// for a job without one. The keys exist only in the environment of the programs of the
+// job, which `aws eks get-token` in a kubeconfig also reads. They come last, so they replace
+// keys that the runner itself has. No file holds them.
+func awsEnv(session *jobspec.AWSSession) []string {
+	if session == nil {
+		return nil
+	}
+	return []string{"AWS_ACCESS_KEY_ID=" + session.AccessKeyID,
+		"AWS_SECRET_ACCESS_KEY=" + session.SecretAccessKey,
+		"AWS_SESSION_TOKEN=" + session.SessionToken}
 }
 
 // stateLocation returns the value of the input state_location of the stacks. With a
@@ -518,6 +525,9 @@ type RunbookJob struct {
 	Name       string
 	Params     map[string]string
 	KubeConfig string
+	// AWS is the AWS session of the grant of the run. It is nil when the run has none. On
+	// AWS the kubeconfig gets its tokens with it.
+	AWS *jobspec.AWSSession
 	// Namespace and DataNamespace are the targets of the environment: the namespace of the
 	// application, and the namespace of its data services or "" when there is none.
 	Namespace     string
@@ -525,10 +535,10 @@ type RunbookJob struct {
 	Log           io.Writer
 }
 
-// Runbook runs the script with the credential, the targets and the parameters in its
-// environment. It returns the outputs that the script wrote to the file that OUTPUT_FILE
-// names, one "name=value" on each line. The core checks them against the definition of
-// the runbook.
+// Runbook runs the script with the credential, the AWS session, the targets and the
+// parameters in its environment. It returns the outputs that the script wrote to the file
+// that OUTPUT_FILE names, one "name=value" on each line. The core checks them against the
+// definition of the runbook.
 func (r *Runner) Runbook(ctx context.Context, j RunbookJob) (map[string]any, error) {
 	checkout, err := r.checkoutDir(j.Checkout)
 	if err != nil {
@@ -553,6 +563,7 @@ func (r *Runner) Runbook(ctx context.Context, j RunbookJob) (map[string]any, err
 		"OUTPUT_FILE="+outputFile, "TARGET_APPLICATION="+j.Namespace,
 		"TARGET_DATA="+j.DataNamespace)
 	cmd.Env = append(cmd.Env, paramEnv(j.Params)...)
+	cmd.Env = append(cmd.Env, awsEnv(j.AWS)...)
 	cmd.Stdout, cmd.Stderr = j.Log, j.Log
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("runbook %s: %w", j.Name, err)
@@ -617,14 +628,17 @@ func parseOutputs(text string) (map[string]any, error) {
 }
 
 // Kubectl runs one kubectl command with the credential and returns what it printed. The
-// output comes back also when the command fails.
-func (r *Runner) Kubectl(ctx context.Context, kubeConfig string, args ...string) ([]byte, error) {
+// output comes back also when the command fails. session is the AWS session of the
+// grant, or nil: on AWS the kubeconfig gets its tokens with it.
+func (r *Runner) Kubectl(ctx context.Context, kubeConfig string, session *jobspec.AWSSession,
+	args ...string) ([]byte, error) {
 	path, remove, err := r.credentialFile(kubeConfig)
 	if err != nil {
 		return nil, err
 	}
 	defer remove()
 	cmd := exec.CommandContext(ctx, "kubectl", append([]string{"--kubeconfig", path}, args...)...)
+	cmd.Env = append(os.Environ(), awsEnv(session)...)
 	return cmd.CombinedOutput()
 }
 

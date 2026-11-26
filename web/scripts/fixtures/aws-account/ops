@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
+# A stand-in for ops, for the installer on AWS. `ops image create` checks the program and the
+# configuration and records an image and its snapshot in SRC_FIXTURE_STATE, where the aws
+# stand-in finds them.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+state="${SRC_FIXTURE_STATE:?the ops stand-in needs SRC_FIXTURE_STATE}"
+# shellcheck source=fixture-lib.sh
+. "${here}/fixture-lib.sh"
+echo "ops $*" >>"${state}/calls"
+fail_once "ops $*"
+
+if [ "${1:-} ${2:-}" != "image create" ] || [ ! -f "${3:-}" ] || [ -z "${AWS_PROFILE:-}" ]; then
+  echo "the ops stand-in takes: ops image create <program> -c <config> with AWS_PROFILE" >&2
+  exit 1
+fi
+if [ "$(head -c 4 "$3" | od -An -c | tr -d ' ')" != '177ELF' ]; then
+  echo "$3 is not a program" >&2
+  exit 1
+fi
+config=""
+previous=""
+for option in "$@"; do
+  if [ "${previous}" = -c ]; then config="${option}"; fi
+  previous="${option}"
+done
+name="$(sed -n 's/.*"ImageName": "\([^"]*\)".*/\1/p' "${config}")"
+number="$(count image)"
+image="$(printf 'ami-0f1c7e%08d' "${number}")"
+snapshot="$(printf 'snap-0f1c7e%08d' "${number}")"
+echo "${image} ${snapshot} ${name} untagged" >>"${state}/images"
+echo "${snapshot} ${name} untagged" >>"${state}/snapshots"
+echo "Image ${name} created as ${image}"

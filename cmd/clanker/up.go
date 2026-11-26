@@ -435,7 +435,7 @@ func build(ctx context.Context, o options) (*components, error) {
 		c.orch.JobVariables = map[string]string{"TF_VAR_admin_token": demoAdminToken}
 		scrub.Add(demoAdminToken)
 	}
-	if err := addCollectorVariables(c.orch, o.cloud, o.addr, o.env); err != nil {
+	if err := addCollectorVariables(c.orch, o.cloud, o.addr, o.env, os.Getenv); err != nil {
 		return nil, err
 	}
 	c.monitor = monitor.New(c.db, c.clock)

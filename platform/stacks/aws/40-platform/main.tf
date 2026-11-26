@@ -124,11 +124,26 @@ module "platform" {
   shared_fs_capacity_gb   = local.data.shared_fs_capacity_gb
 
   # Envoy Gateway makes a Service of type LoadBalancer, and AWS gives that Service a load
-  # balancer. Its DNS name does not exist before the apply, so the shared module finds it.
+  # balancer. Its DNS name does not exist before the apply: module.load_balancer waits for it.
   public_address = ""
 
   collector_endpoint = var.collector_endpoint
   collector_token    = var.collector_token
 
   service_annotations = local.service_annotations
+}
+
+# Envoy Gateway makes the Envoy Service some seconds after the release of the Gateway, and
+# the AWS service controller writes the DNS name of the NLB into its status later still. The
+# first apply waits here for that name, so that public_address is never empty.
+module "load_balancer" {
+  source = "../../../modules/aws/service-address"
+
+  cluster_name     = local.cluster.cluster_name
+  cluster_endpoint = local.cluster.cluster_endpoint
+  cluster_ca_data  = local.cluster.cluster_certificate_authority_data
+  region           = var.region
+  service          = module.platform.envoy_service
+
+  depends_on = [module.platform]
 }

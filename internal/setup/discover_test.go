@@ -144,7 +144,8 @@ func accountCLI() *fakeCLI {
 		"ecs list-clusters":      `["arn:aws:ecs:r:111122223333:cluster/routers"]`,
 		"ecs list-services":      `["arn:router","arn:web"]`,
 		"ecs describe-services": `[
-			{"name":"router","task":"task-router","running":1,"subnets":["subnet-a"]},
+			{"name":"router","task":"task-router","running":1,"subnets":["subnet-a"],
+			 "groups":["sg-router","sg-other"]},
 			{"name":"stopped","task":"task-x","running":0,"subnets":["subnet-a"]}]`,
 		"ecs describe-task-definition": `[{"image":"tailscale/tailscale:stable",
 			"routes":"10.2.0.0/16, fd00::/56"}]`,
@@ -194,7 +195,8 @@ func TestNetworksJoinsTagsSubnetsRoutesAndInstances(t *testing.T) {
 
 func TestNetworksFindsTheTailscaleRouterOfARunningService(t *testing.T) {
 	apps, calls := surveyed(t)
-	want := Router{Service: "router", Routes: []string{"10.2.0.0/16", "fd00::/56"}, Covers: true}
+	want := Router{Service: "router", Routes: []string{"10.2.0.0/16", "fd00::/56"}, Covers: true,
+		SecurityGroup: "sg-router"}
 	if apps.Router == nil || !reflect.DeepEqual(*apps.Router, want) {
 		t.Fatalf("router = %+v, want %+v", apps.Router, want)
 	}
@@ -372,7 +374,8 @@ func TestPlaceRecordsANetworkOfTheSurvey(t *testing.T) {
 		t.Fatalf("status = %d, body = %v", code, body)
 	}
 	want := State{Region: "eu-west-1", PlaceMode: PlaceExisting, Network: "vpc-1",
-		Subnets: []string{"subnet-a", "subnet-b"}, Access: AccessTailscale}
+		Subnets: []string{"subnet-a", "subnet-b"}, Access: AccessTailscale,
+		RouterGroup: "sg-router"}
 	if !reflect.DeepEqual(server.state, want) {
 		t.Fatalf("state = %+v, want %+v", server.state, want)
 	}

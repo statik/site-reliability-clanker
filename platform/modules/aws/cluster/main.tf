@@ -131,10 +131,14 @@ resource "aws_eks_access_entry" "this" {
   cluster_name  = aws_eks_cluster.this.name
   principal_arn = each.value.principal_arn
   type          = "STANDARD"
+  kubernetes_groups = (
+    length(each.value.kubernetes_groups) == 0 ? null : each.value.kubernetes_groups
+  )
 }
 
+# An entry with only Kubernetes groups gets its rights from role bindings in the cluster.
 resource "aws_eks_access_policy_association" "this" {
-  for_each = var.access_entries
+  for_each = { for key, entry in var.access_entries : key => entry if entry.policy != "" }
 
   cluster_name  = aws_eks_cluster.this.name
   principal_arn = aws_eks_access_entry.this[each.key].principal_arn

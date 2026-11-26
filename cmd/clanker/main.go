@@ -39,6 +39,16 @@ Usage:
                                     and print the setting CLANKER_AWS_BOOTSTRAP. With
                                     --kms-key it also writes the setting below PATH in
                                     Parameter Store
+  clanker install --cloud aws --env NAME --profile NAME
+                                    create the control plane on AWS and start it, as the
+                                    wizard does: preflight, inputs, home stack phase 1,
+                                    runner image, application images, image of the core,
+                                    00-bootstrap, phase 2 and the health check. A run after
+                                    a failure goes on from the step that failed. The inputs
+                                    that are not given come from ~/.clanker/aws/NAME/home.tfvars
+  clanker uninstall --cloud aws --env NAME --profile NAME
+                                    remove all that install created, in the order of the
+                                    teardown, and check that nothing is left
   clanker up                        start the control plane and the dashboard
   clanker destroy --env local       destroy every layer of an environment
   clanker destroy --cloud aws --env NAME --profile NAME --region NAME --broker-principal ARN
@@ -76,6 +86,19 @@ Flags of bootstrap and destroy on AWS:
                           /src, for example /src/prod. No agent role can read below /src
   --kms-key KEY           KMS key of those settings: bootstrap writes CLANKER_AWS_BOOTSTRAP
                           with it
+
+Flags of install on AWS (each one replaces the value of home.tfvars):
+  --source DIR            checkout of this repository: the runner, the core and the
+                          application images are built from it. A released binary needs it
+  --region NAME           region of the environment
+  --vpc ID, --subnets ID,ID, --router-sg ID
+                          the VPC, two private subnets or more in two zones, and the security
+                          group of its Tailscale subnet router (clanker discover proposes them)
+  --zone-id ID            a public Route 53 zone that its parent zone delegates
+  --tag KEY=VALUE         a tag that the organization requires; repeat it. The values are
+                          never printed
+  --nanos VERSION         Nanos release of the kernel of the core (default 0.1.56)
+  --model-key-file PATH   file with the OpenRouter API key of the core
 `
 
 // options are the settings shared by the commands.
@@ -114,6 +137,10 @@ type options struct {
 	brokerPrincipal string
 	parameterPath   string
 	kmsKey          string
+	// layerVariables are inputs of the layers on AWS that the installer gives a destroy,
+	// as TF_VAR_<name>: the values of CLANKER_AWS_LAYER_VARIABLES.
+	layerVariables map[string]string
+	install        installFlags
 	// fakeAWS is for the checks only: the core on AWS calls the stand-in at
 	// CLANKER_TEST_AWS_ENDPOINT. aws makes the clients of AWS for `up`.
 	fakeAWS bool
@@ -143,6 +170,16 @@ func parse(command string, args []string) (options, error) {
 	flags.StringVar(&o.parameterPath, "parameter-path", "", "Parameter Store path of the "+
 		"settings of the control plane")
 	flags.StringVar(&o.kmsKey, "kms-key", "", "KMS key of the settings of the control plane")
+	flags.StringVar(&o.install.network, "vpc", "", "install: ID of the VPC")
+	flags.StringVar(&o.install.subnets, "subnets", "", "install: private subnets, with commas")
+	flags.StringVar(&o.install.routerGroup, "router-sg", "", "install: security group of the "+
+		"Tailscale subnet router")
+	flags.StringVar(&o.install.zoneID, "zone-id", "", "install: ID of a public Route 53 zone")
+	flags.Var(&o.install.tags, "tag", "install: a required tag, KEY=VALUE; repeat it")
+	flags.StringVar(&o.install.nanos, "nanos", "", "install: release of the Nanos kernel "+
+		"(default "+setup.DefaultNanos+")")
+	flags.StringVar(&o.install.modelKeyFile, "model-key-file", "", "install: file that "+
+		"holds the OpenRouter API key")
 	flags.BoolVar(&o.fakeAWS, "fake-aws", false, "for the checks only: send the AWS calls of "+
 		"the core to the stand-in at "+testEndpointEnv)
 	if err := flags.Parse(args); err != nil {
@@ -417,6 +454,10 @@ func run() error {
 			return err
 		}
 		return up(ctx, o)
+	case "install":
+		return runInstall(ctx, o)
+	case "uninstall":
+		return runUninstall(ctx, o)
 	case "destroy":
 		if o.cloud == setup.TargetAWS {
 			if err := preflight(o.cloud); err != nil {

@@ -195,12 +195,12 @@ func (c *Client) execute(ctx context.Context, spec jobspec.Spec, log io.Writer) 
 		return jobspec.Result{Outputs: outputs}, err
 	case jobspec.KindRunbook:
 		outputs, err := c.Runner.Runbook(ctx, RunbookJob{Env: spec.Env, Checkout: checkout,
-			Name: spec.Runbook, Params: spec.Params, KubeConfig: spec.KubeConfig,
+			Name: spec.Runbook, Params: spec.Params, KubeConfig: spec.KubeConfig, AWS: spec.AWS,
 			Namespace: spec.Namespace, DataNamespace: spec.DataNamespace, Log: log})
 		return jobspec.Result{Outputs: outputs}, err
 	case jobspec.KindDiagnose:
 		kubectl := func(args ...string) ([]byte, error) {
-			return c.Runner.Kubectl(ctx, spec.KubeConfig, args...)
+			return c.Runner.Kubectl(ctx, spec.KubeConfig, spec.AWS, args...)
 		}
 		return jobspec.Result{Commands: diagnose(spec, kubectl)}, nil
 	default:

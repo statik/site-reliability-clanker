@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -29,9 +30,16 @@ func runSetup(ctx context.Context, o options) error {
 	if o.inApp {
 		ctx = stopWithParent(ctx)
 	}
+	// A released binary unpacks only the platform files: the installer on AWS then needs
+	// a checkout, which the person gives in the wizard.
+	checkout := ""
+	if _, err := os.Stat(filepath.Join(o.sourceDir, "build", "runner", "Dockerfile")); err == nil {
+		checkout = o.sourceDir
+	}
 	wizard, err := setup.New(ctx, setup.Config{
 		DataDir: o.dataDir, Version: version, DashboardURL: "http://" + o.addr,
 		InApp: o.inApp, Application: o.app.Title,
+		Layers: awsLayers{o: o, run: runAWS}, Checkout: checkout,
 		StartLocal: func(ctx context.Context, env, operator string) error {
 			local := o
 			local.env, local.cloud, local.demo = env, "local", true

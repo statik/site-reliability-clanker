@@ -67,9 +67,9 @@ lint: lint-core
 	opa check runbooks/policy
 	shellcheck apps/paperboat/runbooks/*.sh apps/paperboat/build.sh ops/run-local.sh scripts/*.sh \
 		scripts/verify/*.sh scripts/macos/*.sh build/runner/*.sh internal/setup/stack/*/*.sh \
-		$(PACK_SCRIPTS)
+		platform/modules/*/*/*.sh $(PACK_SCRIPTS)
 	shfmt -i 2 -d apps/paperboat/runbooks apps/paperboat/build.sh ops/run-local.sh scripts \
-		build/runner internal/setup/stack $(PACK_SCRIPTS)
+		build/runner internal/setup/stack platform/modules $(PACK_SCRIPTS)
 
 destroy: build
 	./bin/clanker destroy --env local
