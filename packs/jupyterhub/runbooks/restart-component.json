@@ -1,0 +1,13 @@
+{
+  "title": "Restart a component",
+  "description": "Restart the hub or the proxy of JupyterHub and wait for the rollout. A hub restart stops login and spawn for the restart; the new hub keeps each user server that it can reach and adds its route again. A proxy restart drops open connections until the hub adds the routes again. It changes no data.",
+  "tier": "T1",
+  "incident_mitigation": true,
+  "inputs": {
+    "component": {
+      "type": "string",
+      "description": "The component to restart. Its deployment is in the namespace of the application.",
+      "values": ["hub", "proxy"]
+    }
+  }
+}
