@@ -81,6 +81,39 @@ func TestParseEmptyPlanHasNoChanges(t *testing.T) {
 	}
 }
 
+// outputPlan returns the JSON of a plan of `tofu show -json` for a stack with no resource
+// and one output, with the given action of the output. OpenTofu 1.12 leaves
+// resource_changes out of such a plan.
+func outputPlan(action string) []byte {
+	return []byte(`{"output_changes":{"network_id":{"actions":["` + action + `"],` +
+		`"before":"vpc-0a1b2c3d","after":"vpc-0e0f0a0b","after_unknown":false,` +
+		`"before_sensitive":false,"after_sensitive":false}}}`)
+}
+
+func TestAPlanThatChangesOnlyOutputsHasChanges(t *testing.T) {
+	for _, action := range []string{"create", "update", "delete"} {
+		facts, err := planfacts.Parse(outputPlan(action))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !facts.HasChanges() || len(facts.Resources) != 0 ||
+			!slices.Equal(facts.Outputs, []string{"network_id"}) {
+			t.Errorf("%s of an output: changes %v, facts %+v; want changes in the output only",
+				action, facts.HasChanges(), facts)
+		}
+	}
+}
+
+func TestAPlanWithUnchangedOutputsHasNoChanges(t *testing.T) {
+	facts, err := planfacts.Parse(outputPlan("no-op"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if facts.HasChanges() || len(facts.Outputs) != 0 {
+		t.Fatalf("an unchanged output must not report changes: %+v", facts)
+	}
+}
+
 func TestParseRejectsBadInput(t *testing.T) {
 	if _, err := planfacts.Parse([]byte(`not json`)); err == nil {
 		t.Error("want an error for a plan file that is not JSON")

@@ -32,8 +32,12 @@ type Facts struct {
 	Outputs   []string         `json:"outputs"`
 }
 
-// HasChanges reports whether the plan changes any resource.
-func (f Facts) HasChanges() bool { return f.Add+f.Change+f.Destroy+f.Replace > 0 }
+// HasChanges reports whether the plan changes a resource or an output. A plan that changes
+// only outputs must be applied too: the apply writes the outputs into the state, where the
+// layers above read them, and the control plane stores them for the plan of the next layer.
+func (f Facts) HasChanges() bool {
+	return f.Add+f.Change+f.Destroy+f.Replace > 0 || len(f.Outputs) > 0
+}
 
 type planJSON struct {
 	ResourceChanges []struct {

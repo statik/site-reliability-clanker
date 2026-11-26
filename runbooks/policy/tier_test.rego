@@ -93,3 +93,34 @@ test_create_only_envelope if {
 	replace := {"resource_changes": [change("a", ["delete", "create"])]}
 	not tier.create_only with input as {"kind": "blank-slate", "layer": "30-data", "plan": replace}
 }
+
+# A plan of a stack with no resource, as `tofu show -json` prints it: OpenTofu leaves
+# resource_changes out.
+output_only(action) := {"output_changes": {"network_id": {
+	"actions": [action],
+	"before": "vpc-0a1b2c3d",
+	"after": "vpc-0e0f0a0b",
+}}}
+
+test_output_only_plan_of_network_layer_is_t3 if {
+	d := tier.decision with input as {"kind": "change", "layer": "10-network", "plan": output_only("update")}
+	d.tier == "T3"
+	d.rule == "high-risk-layer"
+}
+
+test_output_only_plan_of_other_layer_is_t2 if {
+	d := tier.decision with input as {"kind": "change", "layer": "30-data", "plan": output_only("create")}
+	d.tier == "T2"
+	d.rule == "output-change"
+	d.reasons == ["outputs changed: network_id. The layers above read them"]
+}
+
+test_unchanged_outputs_are_t0 if {
+	d := tier.decision with input as {"kind": "drift", "layer": "10-network", "plan": output_only("no-op")}
+	d.tier == "T0"
+	d.rule == "no-changes"
+}
+
+test_output_only_plan_is_inside_the_create_only_envelope if {
+	tier.create_only with input as {"kind": "blank-slate", "layer": "20-cluster", "plan": output_only("create")}
+}

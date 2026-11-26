@@ -240,6 +240,89 @@ func TestTheFirstDeploymentOnACloudStartsAboveTheBootstrapLayer(t *testing.T) {
 	}
 }
 
+// outputRunners run the jobs of stacks that have no resource and one output each, as the
+// layer 10-network of AWS in its existing-network mode: each plan only creates the output
+// of its layer, and each apply reports it.
+type outputRunners struct {
+	mu   sync.Mutex
+	jobs []jobspec.Job
+}
+
+func (r *outputRunners) Run(_ context.Context, job jobspec.Job) (jobspec.Result, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.jobs = append(r.jobs, job)
+	layer := job.Spec.Layer
+	if job.Spec.Kind == jobspec.KindApply {
+		return jobspec.Result{Status: jobspec.StatusOK,
+			Outputs: map[string]any{"network_id": "vpc-" + layer}}, nil
+	}
+	plan := []byte("a plan that creates the output of " + layer)
+	return jobspec.Result{Status: jobspec.StatusOK, Plan: plan, PlanSHA256: jobspec.SHA256(plan),
+		PlanJSON: []byte(`{"output_changes":{"network_id":{"actions":["create"],` +
+			`"before":null,"after":"vpc-` + layer + `"}}}`)}, nil
+}
+
+func (r *outputRunners) done() []jobspec.Job {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]jobspec.Job{}, r.jobs...)
+}
+
+func TestAPlanThatChangesOnlyOutputsIsAppliedAndTheLayerAboveIsPlanned(t *testing.T) {
+	o, _ := cloudOrchestrator(t, sandbox, &sessionIssuer{}, "00-bootstrap")
+	runners := &outputRunners{}
+	o.Runners = runners
+	t.Cleanup(o.WaitForApplies)
+	if _, err := o.DB.Exec(`INSERT INTO users (name, display, role, email) VALUES
+		('alice', 'Alice Ng', 'approver', 'alice@example.com'),
+		('bob', 'Bob Okafor', 'approver', 'bob@example.com')`); err != nil {
+		t.Fatal(err)
+	}
+	wi, err := planNew(t, o, sandbox.Name, sandbox.BlankSlateLayers())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wi.State != StateAwaitingApproval || wi.Tier != "T3" {
+		t.Fatalf("state %s, tier %s; want AwaitingApproval and T3", wi.State, wi.Tier)
+	}
+	plans, err := o.Plans(wi.ID, false)
+	if err != nil || len(plans) != 1 || !plans[0].Facts.HasChanges() {
+		t.Fatalf("plans = %+v, %v; want one plan of 10-network that changes an output", plans,
+			err)
+	}
+	for _, user := range []string{"alice", "bob"} {
+		if _, err := approve(t, o, wi.ID, user); err != nil {
+			t.Fatal(err)
+		}
+	}
+	o.WaitForApplies()
+	if state := storedState(t, o, wi.ID); state != StateDone {
+		t.Fatalf("state %s, want Done", state)
+	}
+	outputs, err := store.LayerOutputs(o.DB, sandbox.Name, "10-network")
+	if err != nil || outputs["network_id"] != "vpc-10-network" {
+		t.Errorf("outputs of 10-network = %v, %v; want the output of its apply", outputs, err)
+	}
+	jobs := runners.done()
+	if len(jobs) != 2*len(Layers[1:]) {
+		t.Fatalf("%d jobs, want a plan and an apply for each of %v", len(jobs), Layers[1:])
+	}
+	first := jobs[1]
+	if first.Spec.PlanSHA256 != plans[0].SHA256 || jobspec.SHA256(first.Plan) != plans[0].SHA256 {
+		t.Errorf("the apply of 10-network got the plan hash %s, want the approved plan %s",
+			first.Spec.PlanSHA256, plans[0].SHA256)
+	}
+	for i, layer := range Layers[1:] {
+		plan, apply := jobs[2*i].Spec, jobs[2*i+1].Spec
+		if plan.Kind != jobspec.KindPlan || apply.Kind != jobspec.KindApply ||
+			plan.Layer != layer || apply.Layer != layer {
+			t.Errorf("jobs %d and %d: %s %s and %s %s; want the plan and the apply of %s", 2*i,
+				2*i+1, plan.Kind, plan.Layer, apply.Kind, apply.Layer, layer)
+		}
+	}
+}
+
 func TestTheApplyWindowIsOneHourOnAWSAndTheReserveElsewhere(t *testing.T) {
 	cases := []struct {
 		cloud string

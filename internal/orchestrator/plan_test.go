@@ -67,6 +67,17 @@ func TestTemplateExplanationUsesOnlyPlanFacts(t *testing.T) {
 	}
 }
 
+func TestTemplateExplanationCountsTheChangedOutputs(t *testing.T) {
+	wi := orchestrator.WorkItem{Title: "Deploy", Layers: []string{"10-network"}}
+	plan := orchestrator.Plan{Layer: "10-network"}
+	plan.Facts.Outputs = []string{"network_id", "private_subnet_ids"}
+	want := "Deploy: 0 resources to add, 0 to change, 0 to destroy or replace in " +
+		"10-network. 2 outputs change."
+	if got := orchestrator.TemplateExplanation(wi, []orchestrator.Plan{plan}).Sentence; got != want {
+		t.Errorf("want %q, got %q", want, got)
+	}
+}
+
 func TestEveryDeployFileOfAPackTouchesItsLayer(t *testing.T) {
 	second := packtest.Second(t)
 	for _, file := range []string{"chart/values.yaml", "values/values-aws.yaml",
