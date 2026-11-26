@@ -1,6 +1,7 @@
 # Layer 20-cluster of the stand-in stacks of scripts/verify/aws-core-check.sh. It reads the
 # outputs of 10-network from its state in the bucket, as the real layer does, and takes a
-# map and a string of the inputs of the account.
+# map and a string of the inputs of the account. Its cluster is the stand-in API server of
+# fakeaws: the check gives its address and its certificate.
 terraform {
   backend "s3" {
     endpoints                   = { s3 = "http://minio:9000" }
@@ -32,6 +33,14 @@ variable "operator_principal_arn" {
   type = string
 }
 
+variable "fake_cluster_endpoint" {
+  type = string
+}
+
+variable "fake_cluster_ca_data" {
+  type = string
+}
+
 data "terraform_remote_state" "network" {
   backend = "s3"
   config = {
@@ -57,6 +66,14 @@ resource "terraform_data" "cluster" {
 
 output "cluster_name" {
   value = "${var.env_name}-cluster"
+}
+
+output "cluster_endpoint" {
+  value = var.fake_cluster_endpoint
+}
+
+output "cluster_certificate_authority_data" {
+  value = var.fake_cluster_ca_data
 }
 
 output "network_id" {
