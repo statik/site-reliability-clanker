@@ -268,7 +268,8 @@ def push_version(pack: Pack, version: str, purpose: str) -> tuple[str, str]:
         path = clone / pack.tfvars
         text, previous = set_version(path.read_text(encoding="utf-8"), pack.variable, version)
         path.write_text(text, encoding="utf-8")
-        # S7: a bad version of a pack with release records also needs its test record here.
+        # A pack with release records needs apps/<name>/releases/<version>.json for a bad
+        # version too: write here a record that names the artifacts of `previous`.
         git("commit", "-q", "-am", title, cwd=clone)
         git("push", "-q", "origin", branch, cwd=clone)
     body = {"branch": branch, "title": title, "body": "Pack check", "env": ENV}
