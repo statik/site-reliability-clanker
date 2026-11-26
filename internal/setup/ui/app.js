@@ -122,7 +122,7 @@ function jobBlock() {
     job.status === "running" && job.total > 0 ? el("p", { class: "progress" },
       el("progress", { value: job.completed, max: job.total, "aria-label": "Download" }),
       `${gigabytes(job.completed)} of ${gigabytes(job.total)} GB`) : null,
-    job.lines.length > 0 ? el("div", { class: "log", tabindex: "0" }, job.lines.join("\n")) : null,
+    job.lines.length > 0 ? el("div", { class: "log", tabindex: "0" }, job.lines.slice(-400).join("\n")) : null,
     job.status === "failed" ? el("div", { class: "notice notice-error", role: "alert" },
       el("strong", {}, "This step failed."), job.error) : null);
 }
@@ -764,6 +764,7 @@ function drawCreate() {
       notice(),
       failed ? buttons(button("Back to the review", "secondary", () => go("review")),
         button("Create again", "primary", startDeploy, jobRunning())) : null,
+      failed ? removeBlock("Or remove what Create made so far") : null,
     ];
   }
   return [
@@ -783,7 +784,6 @@ function drawDone() {
     return [el("h1", {}, "S.R.C. is not installed in your AWS account."),
       buttons(button("Back to the review", "secondary", () => go("review")))];
   }
-  const env = view.state.env;
   return [
     el("h1", {}, "S.R.C. runs in your AWS account."),
     el("p", { class: "lead" }, "The control plane plans the first deployment and waits for your approval. You reach it " +
@@ -798,14 +798,27 @@ function drawDone() {
     el("p", { class: "help" }, "The state of the home stack holds them. This wizard does not show them. Run this in a " +
       "terminal:"),
     el("pre", { class: "log" }, result.passwords),
-    el("h2", {}, "Remove"),
+    notice(),
+    removeBlock("Remove"),
+  ];
+}
+
+// removeBlock asks for the name of the environment before Remove. Typing changes only the
+// button, so that the field keeps the focus.
+function removeBlock(title) {
+  const env = view.state.env;
+  const remove = button(`Remove ${env}`, "danger", startRemove, form.confirm !== env || jobRunning());
+  return [
+    el("h2", {}, title),
     el("p", { class: "help" }, "Remove deletes everything that Create made, in the order of the teardown, and checks at " +
       `the end that nothing is left. Type ${env} to confirm.`),
     el("label", { class: "field" }, "Name of the environment",
       el("input", { type: "text", value: form.confirm, autocomplete: "off", spellcheck: "false",
-        oninput: (event) => { form.confirm = event.target.value; draw(); } })),
-    notice(),
-    buttons(button(`Remove ${env}`, "danger", startRemove, form.confirm !== env || jobRunning())),
+        oninput: (event) => {
+          form.confirm = event.target.value;
+          remove.disabled = form.confirm !== env || jobRunning();
+        } })),
+    buttons(remove),
   ];
 }
 
@@ -890,6 +903,8 @@ const DRAW = { target: drawTarget, checks: drawChecks, key: drawKey, signin: dra
 function draw() {
   drawSteps();
   main.replaceChildren(...DRAW[step]().flat().filter(Boolean));
+  // A log shows its last lines.
+  for (const log of main.querySelectorAll("div.log")) log.scrollTop = log.scrollHeight;
 }
 
 async function start() {
@@ -920,9 +935,9 @@ async function start() {
     }
   }
   if (view.state.target === "aws" && view.state.installed) step = "done";
-  if (view.job?.name === "install" || view.job?.name === "remove") {
-    step = { install: "create", remove: "remove" }[view.job.name];
-  }
+  // A Create that failed shows its log; one that ended goes to Done.
+  if (view.job?.name === "install" && view.job.status === "failed") step = "create";
+  if (view.job?.name === "remove") step = "remove";
   if (jobRunning()) {
     step = { deploy: "create", model: "key", install: "create", remove: "remove" }[view.job.name] ?? step;
     watchJob(view.job.name === "install" ? async () => go("done") : undefined);

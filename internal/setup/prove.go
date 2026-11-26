@@ -114,10 +114,19 @@ func (r *installRun) taggedLeft(ctx context.Context) ([]string, error) {
 }
 
 // goingAway reports whether a tagged resource waits for its deletion: a KMS key in its
-// waiting period, or a task definition that ECS deletes.
+// waiting period, a task definition that ECS deletes, or an instance that is terminated,
+// which EC2 shows for about an hour.
 func (r *installRun) goingAway(ctx context.Context, arn string) (bool, error) {
 	var state string
 	switch {
+	case strings.Contains(arn, ":ec2:") && strings.Contains(arn, ":instance/"):
+		var states []string
+		if err := r.aws.query(ctx, r.aws.Region, &states, "ec2", "describe-instances",
+			"--instance-ids", arn[strings.LastIndex(arn, "/")+1:], "--query",
+			"Reservations[].Instances[].State.Name"); err != nil {
+			return false, fmt.Errorf("read the state of the instance %s: %w", arn, err)
+		}
+		return len(states) == 1 && states[0] == "terminated", nil
 	case strings.Contains(arn, ":kms:") && strings.Contains(arn, ":key/"):
 		if err := r.aws.query(ctx, r.aws.Region, &state, "kms", "describe-key", "--key-id",
 			arn, "--query", "KeyMetadata.KeyState"); err != nil {

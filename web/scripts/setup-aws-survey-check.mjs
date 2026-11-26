@@ -1,13 +1,14 @@
 // Walk through the setup wizard for AWS in a real browser: the survey, the names and tags,
-// the review, Create, and Remove. The walk runs against the stand-ins of
-// scripts/fixtures/aws-account for aws, tofu, docker, ops, make and pnpm, never against an
-// account. It serves /healthz for the stand-in of the load balancer.
+// the review, a Create that fails at the image of the core, Create again, a reload, and
+// Remove. The walk runs against the stand-ins of scripts/fixtures/aws-account for aws, tofu,
+// docker, ops, make and pnpm, never against an account. It serves /healthz for the stand-in
+// of the load balancer.
 // Usage: node scripts/setup-aws-survey-check.mjs <wizard address with token> <fixture log> [screenshot directory]
 // Start the wizard first, from the root of the repository, with an empty home and data
 // directory and no AWS variables:
 //   env -i HOME=<empty directory> PATH="$PWD/web/scripts/fixtures/aws-account:/usr/bin:/bin" \
 //     SRC_FIXTURE_LOG=<fixture log> SRC_FIXTURE_STATE=<empty directory> \
-//     SRC_FIXTURE_CORE_URL=http://127.0.0.1:7182 \
+//     SRC_FIXTURE_CORE_URL=http://127.0.0.1:7182 SRC_FIXTURE_FAIL="ops image create" \
 //     clanker setup --no-browser --data <empty directory> --source "$PWD"
 import { mkdir, readFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -143,9 +144,26 @@ for (const call of beforeCreate) {
   if (!reads.test(`${call} `)) problems.push(`the wizard made a call that is not a read before Create: aws ${call}`);
 }
 
+// The stand-in of ops fails once, so the first Create stops at the image of the core.
 await press("Create");
+const stopped = page.getByRole("heading", { level: 1, name: "The installation stopped." });
+const finished = page.getByRole("heading", { level: 1, name: "S.R.C. runs in your AWS account." });
+await stopped.or(finished).waitFor({ timeout: 300000 });
+if (await finished.isVisible()) {
+  problems.push('the first Create did not stop: start the wizard with SRC_FIXTURE_FAIL="ops image create"');
+} else {
+  await shoot("create-stopped");
+  const failedStep = await page.locator(".job-steps li.is-failed").textContent();
+  if (failedStep !== "Build the machine image of the core") problems.push(`the failed step is "${failedStep}"`);
+  if (!(await page.getByRole("button", { name: "Remove clanker" }).isDisabled())) {
+    problems.push("Remove after a failed Create is possible without the name of the environment");
+  }
+  await press("Create again");
+}
 await heading("S.R.C. runs in your AWS account.", 300000);
 await shoot("done");
+await page.reload();
+await heading("S.R.C. runs in your AWS account.");
 const done = await page.locator("main").textContent();
 for (const want of ["http://127.0.0.1:7182", "admin@src-clanker-idp.example.com", "tofu output -raw admin_password",
   `${weekly} USD`]) {
@@ -153,6 +171,10 @@ for (const want of ["http://127.0.0.1:7182", "admin@src-clanker-idp.example.com"
 }
 checkPrivate("the page after Create", done);
 const installed = await api("/api/state");
+if (!installed.job.lines.includes("The image of the core is ami-0f1c7e00000001, with the snapshot snap-0f1c7e00000001.") ||
+  installed.job.lines.some((line) => line.startsWith("$ make bundle"))) {
+  problems.push("Create again did not go on from the image of the core");
+}
 if (installed.job.steps.length !== 9 || installed.job.status !== "done") {
   problems.push(`the installation ended ${installed.job.status} with ${installed.job.steps.length} steps`);
 }
@@ -164,7 +186,11 @@ if (!installed.job.lines.some((line) => line.includes('"example:owner" = "(hidde
 
 const remove = page.getByRole("button", { name: "Remove clanker" });
 if (!(await remove.isDisabled())) problems.push("Remove is possible without the name of the environment");
-await page.getByLabel("Name of the environment").fill("clanker");
+// Typing keeps the focus in the field, and the button follows the text.
+const confirm = page.getByLabel("Name of the environment");
+await confirm.pressSequentially("clanker");
+if (!(await confirm.evaluate((input) => input === document.activeElement))) problems.push("the field lost the focus while typing");
+if (await remove.isDisabled()) problems.push("Remove stays disabled with the name of the environment");
 await remove.click();
 await heading("S.R.C. is removed from your AWS account.", 300000);
 await shoot("removed");
@@ -189,5 +215,6 @@ if (problems.length > 0) {
   console.error(`FAILED:\n${problems.join("\n")}`);
   process.exit(1);
 }
-console.log(`RESULT: the wizard surveyed the fixture account with ${beforeCreate.length} calls that read, created ` +
-  `the control plane with the stand-ins in 9 steps and removed it in 7, and showed no private value`);
+console.log(`RESULT: the wizard surveyed the fixture account with ${beforeCreate.length} calls that read, stopped ` +
+  "Create at the image of the core, went on from there, created the control plane with the stand-ins in 9 steps, " +
+  "kept Done after a reload, removed it in 7 steps, and showed no private value");
