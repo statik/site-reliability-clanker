@@ -68,7 +68,8 @@ uid="$(in_image id -u)"
 entrypoint="$(docker image inspect --format '{{json .Config.Entrypoint}}' "${image}")"
 want_entrypoint='["clanker","runner","--data","'"${data}"'"]'
 [ "${entrypoint}" = "${want_entrypoint}" ] || fail "the entrypoint is ${entrypoint}"
-pin="$(sed -n 's/^ *tofu_version: *//p' "${repo}/.github/workflows/ci.yaml")"
+# CI pins OpenTofu in more than one job. Two different pins give two lines, which fail.
+pin="$(sed -n 's/^ *tofu_version: *//p' "${repo}/.github/workflows/ci.yaml" | sort -u)"
 tofu_version="$(in_image tofu version | head -1)"
 [ "${tofu_version}" = "OpenTofu v${pin}" ] ||
   fail "the image has ${tofu_version}, CI pins OpenTofu ${pin}"
