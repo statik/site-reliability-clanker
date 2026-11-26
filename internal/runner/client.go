@@ -25,6 +25,10 @@ type Client struct {
 	Token  string
 	Runner *Runner
 	HTTP   *http.Client
+
+	// key is the runner key from the answer to the first fetch of the job. Each later
+	// request sends it.
+	key string
 }
 
 const (
@@ -33,26 +37,36 @@ const (
 )
 
 func (c *Client) call(ctx context.Context, method, path string, body []byte) ([]byte, error) {
+	answer, _, err := c.exchange(ctx, method, path, body)
+	return answer, err
+}
+
+// exchange sends one request to the core and returns the body and the header of the answer.
+func (c *Client) exchange(ctx context.Context, method, path string, body []byte) ([]byte,
+	http.Header, error) {
 	request, err := http.NewRequestWithContext(ctx, method, strings.TrimSuffix(c.CoreURL, "/")+
 		"/runner/v1/"+path, bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("build the request for %s: %w", path, err)
+		return nil, nil, fmt.Errorf("build the request for %s: %w", path, err)
 	}
 	request.Header.Set("Authorization", "Bearer "+c.Token)
+	if c.key != "" {
+		request.Header.Set(jobspec.RunnerKeyHeader, c.key)
+	}
 	response, err := c.HTTP.Do(request)
 	if err != nil {
-		return nil, fmt.Errorf("%s %s: %w", method, path, err)
+		return nil, nil, fmt.Errorf("%s %s: %w", method, path, err)
 	}
 	defer response.Body.Close()
 	answer, err := io.ReadAll(response.Body)
 	if err != nil {
-		return nil, fmt.Errorf("read the answer of %s %s: %w", method, path, err)
+		return nil, nil, fmt.Errorf("read the answer of %s %s: %w", method, path, err)
 	}
 	if response.StatusCode >= 300 {
-		return nil, fmt.Errorf("%s %s: the core answered %d: %s", method, path, response.StatusCode,
-			strings.TrimSpace(string(answer)))
+		return nil, nil, fmt.Errorf("%s %s: the core answered %d: %s", method, path,
+			response.StatusCode, strings.TrimSpace(string(answer)))
 	}
-	return answer, nil
+	return answer, response.Header, nil
 }
 
 // logSender sends what a job prints to the core, in pieces.
@@ -89,9 +103,15 @@ func (c *Client) Serve(ctx context.Context) error {
 	if c.HTTP == nil {
 		c.HTTP = &http.Client{Timeout: 2 * time.Minute}
 	}
-	raw, err := c.call(ctx, http.MethodGet, "job", nil)
+	raw, header, err := c.exchange(ctx, http.MethodGet, "job", nil)
 	if err != nil {
 		return err
+	}
+	c.key = header.Get(jobspec.RunnerKeyHeader)
+	if c.key == "" {
+		return errors.New("the core gave the job without a runner key, so the runner cannot " +
+			"send its log or its result: the core and the runner are of different versions. " +
+			"Build the runner image from the commit of the core")
 	}
 	var spec jobspec.Spec
 	if err := json.Unmarshal(raw, &spec); err != nil {
