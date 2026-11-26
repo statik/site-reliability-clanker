@@ -13,3 +13,5 @@ internal/bundle/bundle.tar*
 web/test-results/
 .claude/worktrees/
 /build/macos/
+# The inputs of the home stack describe one AWS account.
+internal/setup/stack/**/*.tfvars

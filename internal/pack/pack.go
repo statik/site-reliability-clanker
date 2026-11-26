@@ -73,6 +73,8 @@ type Pack struct {
 	// mitigations are the names of the runbooks of the pack that are mitigations for an
 	// incident, in the order of the names. Load fills it when it checks the runbooks.
 	mitigations []string
+	// records are the releases that have a record, by version. Load fills it.
+	records map[string]release
 }
 
 // Releases says where the releases of the application are published.
@@ -80,28 +82,11 @@ type Releases struct {
 	// Repository is the repository of the forge with one note for each release.
 	Repository string `json:"repository"`
 	// Directory holds the notes, one file `<version>.md` for each release. It has the
-	// same name in the pack and in the repository.
+	// same name in the pack and in the repository. In the pack it can also hold one
+	// release record `<version>.json` beside each note (see Record).
 	Directory string `json:"directory"`
 	// First is the release that a new environment starts with.
 	First string `json:"first"`
-}
-
-// Deploy kinds.
-const DeployHelm = "helm"
-
-// Deploy says how the layer of the application deploys it.
-type Deploy struct {
-	// Kind is DeployHelm: the layer installs a chart of the pack.
-	Kind string `json:"kind"`
-	// Chart is the directory of the deployment chart, inside the pack.
-	Chart string `json:"chart"`
-	// Mount is the path of the pack in the platform repository. The stacks of the
-	// platform read the chart from there.
-	Mount string `json:"mount"`
-	// Build is the program of the pack that builds the images of every release and
-	// pushes them to a registry. The local target runs it with the registry as argument.
-	// A pack whose images are in a registry already has none.
-	Build string `json:"build,omitempty"`
 }
 
 // Runtimes of a component.
@@ -154,14 +139,24 @@ func (c HealthCheck) PassStatus() int {
 }
 
 // Version sources.
-const VersionHTTPJSON = "http-json"
+const (
+	// VersionHTTPJSON is the field `version` of the JSON answer of a path of the
+	// application.
+	VersionHTTPJSON = "http-json"
+	// VersionImage is the image tag of each instance of one component, as the collector
+	// of the cluster reports it.
+	VersionImage = "image"
+)
 
 // AppVersion says where the monitor reads the version of the application that runs.
 type AppVersion struct {
-	// Source is VersionHTTPJSON: Path answers with a JSON object that has the field
-	// `version`.
+	// Source is VersionHTTPJSON or VersionImage.
 	Source string `json:"source"`
-	Path   string `json:"path"`
+	// Path is the path that answers with the version. Only VersionHTTPJSON has one.
+	Path string `json:"path,omitempty"`
+	// Component is the component whose image tag is the version. Only VersionImage has
+	// one.
+	Component string `json:"component,omitempty"`
 }
 
 // Topology is the part of the topology view that belongs to the application. Each
@@ -178,6 +173,26 @@ type Topology struct {
 // pack can end at one of them.
 var PlatformNodes = []string{"network", "registry", "cluster", "nodes", "postgres", "sharedfs",
 	"backups", "lb", "secrets"}
+
+// reservedNames are the names that a pack cannot have, because the platform names the
+// namespaces of a pack after it: namespaces of Kubernetes, of the control plane, and of
+// the parts that the platform installs.
+var reservedNames = []string{"default", "kube", "clanker", "envoy-gateway-system",
+	"local-path-storage"}
+
+// reservedPrefixes are the prefixes of names that belong to Kubernetes and to the control
+// plane.
+var reservedPrefixes = []string{"kube-", "clanker-"}
+
+// reservedName reports whether a pack cannot have the name.
+func reservedName(name string) bool {
+	for _, prefix := range reservedPrefixes {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return slices.Contains(reservedNames, name)
+}
 
 // reservedRepositories are the repositories of the core. A pack cannot publish there.
 var reservedRepositories = []string{"platform-live", "runbooks"}
@@ -208,23 +223,46 @@ func Load(fsys fs.FS, dir string) (Pack, error) {
 	if p.files, err = fs.Sub(fsys, dir); err != nil {
 		return Pack{}, fmt.Errorf("open the application pack in %s: %w", dir, err)
 	}
-	needed := []string{p.Deploy.Chart, p.ReleaseNote(p.Releases.First)}
-	if p.Deploy.Build != "" {
-		needed = append(needed, p.Deploy.Build)
+	if err := p.checkFiles(); err != nil {
+		return Pack{}, fmt.Errorf("%s: %w", file, err)
 	}
-	for _, name := range needed {
-		if _, err := fs.Stat(p.files, name); err != nil {
-			return Pack{}, fmt.Errorf("%s names %s, which the pack does not have", file, name)
-		}
+	return p, nil
+}
+
+// checkFiles checks the files that the manifest names, and fills in the records and the
+// mitigations of the pack.
+func (p *Pack) checkFiles() error {
+	if err := p.checkNamedFiles(); err != nil {
+		return err
 	}
+	if err := p.checkDeployFiles(); err != nil {
+		return err
+	}
+	records, err := p.loadReleases()
+	if err != nil {
+		return err
+	}
+	p.records = records
 	parts, mitigations := p.checkParts()
 	for _, part := range parts {
 		if part.Problem != "" {
-			return Pack{}, fmt.Errorf("%s: %s: %s", file, part.Name, part.Problem)
+			return fmt.Errorf("%s: %s", part.Name, part.Problem)
 		}
 	}
 	p.mitigations = mitigations
-	return p, nil
+	return nil
+}
+
+// checkNamedFiles checks that the pack has the note of the first release and each file or
+// directory of the deployment that the manifest names.
+func (p Pack) checkNamedFiles() error {
+	for _, name := range []string{p.ReleaseNote(p.Releases.First), p.Deploy.Chart,
+		p.Deploy.Values, p.Deploy.Extras, p.Deploy.Build} {
+		if _, err := fs.Stat(p.files, name); name != "" && err != nil {
+			return fmt.Errorf("the manifest names %s, which the pack does not have", name)
+		}
+	}
+	return nil
 }
 
 // Discover returns the directory of the one pack below root in fsys. It is an error when
@@ -254,17 +292,11 @@ func Discover(fsys fs.FS, root string) (string, error) {
 // Dir returns the directory of the pack in the file system that Load read it from.
 func (p Pack) Dir() string { return p.dir }
 
-// ChartMount returns the path of the chart in the platform repository.
-func (p Pack) ChartMount() string { return path.Join(p.Deploy.Mount, p.Deploy.Chart) }
-
 // ReleaseNote returns the path of the note of a release, in the pack and in the releases
 // repository.
 func (p Pack) ReleaseNote(version string) string {
 	return path.Join(p.Releases.Directory, version+".md")
 }
-
-// ReleaseOf returns the version of a file in the directory of the release notes.
-func (p Pack) ReleaseOf(file string) string { return strings.TrimSuffix(file, ".md") }
 
 // Component returns the component with the name.
 func (p Pack) Component(name string) (Component, bool) {
@@ -325,8 +357,9 @@ func (p Pack) Validate() error {
 	if ReservedRepository(p.Releases.Repository) {
 		return fmt.Errorf("releases.repository %q is a repository of the core", p.Releases.Repository)
 	}
-	for _, validate := range []func() error{p.checkValues, p.checkPaths, p.checkComponents,
-		p.checkIncident, p.checkDiagnostics, p.checkChecks, p.checkTopology} {
+	for _, validate := range []func() error{p.checkValues, p.checkDeploy, p.checkPaths,
+		p.checkComponents, p.checkAppVersion, p.checkIncident, p.checkDiagnostics,
+		p.checkChecks, p.checkTopology} {
 		if err := validate(); err != nil {
 			return err
 		}
@@ -342,37 +375,35 @@ func (p Pack) checkValues() error {
 		{"url_output", p.URLOutput, variablePattern},
 		{"releases.repository", p.Releases.Repository, namePattern},
 		{"releases.first", p.Releases.First, versionPattern},
-		{"app_version.path", p.AppVersion.Path, urlPathPattern},
-	}
-	if p.Deploy.Kind != DeployHelm {
-		return fmt.Errorf("deploy.kind is %q; this version reads %q", p.Deploy.Kind, DeployHelm)
-	}
-	if p.AppVersion.Source != VersionHTTPJSON {
-		return fmt.Errorf("app_version.source is %q; this version reads %q",
-			p.AppVersion.Source, VersionHTTPJSON)
 	}
 	for _, c := range checks {
 		if !c.pattern.MatchString(c.value) {
 			return fmt.Errorf("%s is %q; it must match %s", c.field, c.value, c.pattern)
 		}
 	}
+	if reservedName(p.Name) {
+		return fmt.Errorf("name %q belongs to Kubernetes, to the control plane or to the "+
+			"platform; the namespaces of a pack have its name", p.Name)
+	}
 	return nil
 }
 
 // checkPaths refuses a path that can leave the pack.
 func (p Pack) checkPaths() error {
-	paths := map[string]string{"releases.directory": p.Releases.Directory,
-		"deploy.chart": p.Deploy.Chart, "deploy.mount": p.Deploy.Mount}
-	fields := []string{"deploy.chart", "deploy.mount", "releases.directory"}
-	if p.Deploy.Build != "" {
-		paths["deploy.build"], fields = p.Deploy.Build, append(fields, "deploy.build")
+	paths := map[string]string{"releases.directory": p.Releases.Directory}
+	optional := map[string]string{"deploy.chart": p.Deploy.Chart,
+		"deploy.values": p.Deploy.Values, "deploy.extras": p.Deploy.Extras,
+		"deploy.build": p.Deploy.Build, "runbooks": p.Runbooks, "evals": p.Evals}
+	for field, value := range optional {
+		if value != "" {
+			paths[field] = value
+		}
 	}
-	if p.Runbooks != "" {
-		paths["runbooks"], fields = p.Runbooks, append(fields, "runbooks")
+	fields := make([]string, 0, len(paths))
+	for field := range paths {
+		fields = append(fields, field)
 	}
-	if p.Evals != "" {
-		paths["evals"], fields = p.Evals, append(fields, "evals")
-	}
+	slices.Sort(fields)
 	for _, field := range fields {
 		value := paths[field]
 		if !pathPattern.MatchString(value) || path.Clean(value) != value ||
@@ -419,6 +450,36 @@ func checkComponent(component Component, names, workloads []string) error {
 	}
 	if slices.Contains(workloads, component.Workload) {
 		return fmt.Errorf("the workload %q is in the list two times", component.Workload)
+	}
+	return nil
+}
+
+// checkAppVersion checks the fields of the version source: a path for VersionHTTPJSON, a
+// component of the pack for VersionImage, and no field of the other source.
+func (p Pack) checkAppVersion() error {
+	version := p.AppVersion
+	switch version.Source {
+	case VersionHTTPJSON:
+		if version.Component != "" {
+			return fmt.Errorf("app_version.component is %q; the source %s has no component",
+				version.Component, VersionHTTPJSON)
+		}
+		if !urlPathPattern.MatchString(version.Path) {
+			return fmt.Errorf("app_version.path is %q; it must match %s", version.Path,
+				urlPathPattern)
+		}
+	case VersionImage:
+		if version.Path != "" {
+			return fmt.Errorf("app_version.path is %q; the source %s has no path",
+				version.Path, VersionImage)
+		}
+		if _, ok := p.Component(version.Component); !ok {
+			return fmt.Errorf("app_version.component %q is not one of the components",
+				version.Component)
+		}
+	default:
+		return fmt.Errorf("app_version.source is %q; this version reads %q or %q",
+			version.Source, VersionHTTPJSON, VersionImage)
 	}
 	return nil
 }

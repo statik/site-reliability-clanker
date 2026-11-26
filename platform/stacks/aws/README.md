@@ -20,10 +20,10 @@ the contract. The next table lists them.
 
 | Layer | Resources |
 |---|---|
-| `00-bootstrap` | S3 state bucket and S3 evidence bucket (versioned, encrypted, no public access, TLS only). One permission boundary policy. IAM roles `observer`, `planner`, `debugger` and `applier-<layer>` for layers 10 to 50 |
+| `00-bootstrap` | S3 state bucket and S3 evidence bucket (versioned, encrypted, no public access, TLS only; with `ttl_hours` above 0 a destroy removes them with their objects). One permission boundary policy. IAM roles `observer`, `planner`, `debugger` and `applier-<layer>` for layers 10 to 50 |
 | `10-network` | VPC, one public and one private subnet in each of `zone_count` zones, internet gateway, one NAT gateway, route tables. With `existing_network_id`: nothing. The layer reads each subnet and stops the plan if a subnet is not in the VPC |
 | `20-cluster` | EKS control plane, one managed node group (Amazon Linux 2023, arm64 on `t4g.medium` by default) with a launch template that requires IMDSv2 and tags each instance and volume, the EKS Pod Identity agent add-on, the EFS CSI driver add-on with its pod identity role, IAM roles for the cluster and the nodes, EKS access entries for the agent roles and the operator |
-| `30-data` | RDS for PostgreSQL (`db.t4g.micro`, one zone, gp3, encrypted, private, admin password in Secrets Manager), EFS file system with one mount target in each private subnet, `StorageClass` `efs-rwx`, S3 backup bucket |
+| `30-data` | RDS for PostgreSQL (`db.t4g.micro`, one zone, gp3, encrypted, private, admin password in Secrets Manager), EFS file system with one mount target in each private subnet, `StorageClass` `efs-rwx`, S3 backup bucket (removed with its objects when `00-bootstrap` has a TTL) |
 | `40-platform` | Calls `modules/shared/platform`. That module installs Envoy Gateway and the Gateway of the platform. The annotations from this root make the service controller of EKS create an internal Network Load Balancer for the Envoy `Service` (`clanker-envoy`), in the private subnets of `10-network`. The module reads the DNS name of the load balancer from that `Service` after the apply |
 | `50-app` | Calls `modules/shared/app`, which installs the Paperboat chart |
 

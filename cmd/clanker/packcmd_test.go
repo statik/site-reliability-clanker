@@ -51,6 +51,36 @@ func TestPackValidatePrintsOneLineForEachCheck(t *testing.T) {
 	}
 }
 
+func TestPackValidatePrintsTheVersionSource(t *testing.T) {
+	out, err := packCommand(t, "validate", filepath.Join(packtest.Root(t), "apps", "paperboat"))
+	if err != nil || !strings.Contains(out, "ok    version: http-json /api/version\n") {
+		t.Errorf("the example pack: %v\n%s", err, out)
+	}
+	dir := t.TempDir()
+	if err := os.CopyFS(dir, os.DirFS(filepath.Join(packtest.SecondSource(t), "harbor"))); err != nil {
+		t.Fatal(err)
+	}
+	manifest := filepath.Join(dir, "pack.json")
+	raw, err := os.ReadFile(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	httpSource := `"app_version": {"source": "http-json", "path": "/api/version"}`
+	if !bytes.Contains(raw, []byte(httpSource)) {
+		t.Fatalf("the second pack has no line %s", httpSource)
+	}
+	raw = bytes.Replace(raw, []byte(httpSource),
+		[]byte(`"app_version": {"source": "image", "component": "api"}`), 1)
+	if err := os.WriteFile(manifest, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err = packCommand(t, "validate", dir)
+	want := "ok    version: image, the tag of each instance of api, from the collector\n"
+	if err != nil || !strings.Contains(out, want) {
+		t.Errorf("a pack with the source image: %v\n%s", err, out)
+	}
+}
+
 func TestPackValidateFailsForAPackThatIsNotCorrect(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.CopyFS(dir, os.DirFS(filepath.Join(packtest.SecondSource(t), "harbor"))); err != nil {

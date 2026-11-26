@@ -671,8 +671,29 @@ Schema 2 replaces schema 1. The loader reads one schema.
 | `debug_commands` | `diagnostics` |
 | `health.*` | `checks`, `app_version` |
 | — | `volumes` |
-| `chart`, `mount`, `build` (required) | `deploy: {"kind": "helm", "chart": …, "mount": …}` or `deploy: {"kind": "layer"}`, where the layer of the pack does all of the deployment. `build` is optional with both |
+| `chart`, `mount`, `build` (required) | `deploy: {"kind": "helm", "chart": …, …}`: the core installs the chart with one application layer for every pack, and puts every deploy file of the pack at `apps/<name>/` of the platform repository, so there is no `mount`. `deploy: {"kind": "layer"}`, where the layer of the pack does all of the deployment, is the path for the host runtime (B.11, B.12) and is not built. `build` is optional |
 | `topology.services` | `components`, plus `topology.extra` for nodes that are not components (the load generator, a load balancer) |
+
+The deploy fields of the kind `helm` (issue #148, sections 1.2 to 1.7; the loader checks
+them, and the generic application layer of step S8 uses them). `apps/paperboat/PACK.md`
+has the bounds of each field.
+
+| Field | Content |
+|---|---|
+| `chart` | The main chart. Optional when every release has a record that names a chart |
+| `values` | A directory with `values.yaml` and optional `values-<cloud>.yaml` |
+| `extras` | A second chart, installed after the main chart |
+| `settings` | Typed variables of the layer, each with bounds, a default and the Helm value that it sets |
+| `secrets` | Key names of a secret with a random value for each key |
+| `route` | The service, the port, path prefixes, a timeout and a host name on the gateway of the platform |
+| `timeout_seconds` | The Helm timeout of an apply, 60 to 1200 seconds, default 300 |
+| `workloads_namespace` | A second namespace for the pods that the application starts |
+
+Beside each release note `<version>.md`, a pack can have a release record
+`<version>.json`: the chart of the release (an archive of the pack with its SHA-256, or a
+chart in an `https://` or `oci://` repository with an exact version and a digest), Helm
+values for the release, and `schema_change`. When a pack has records, every release has
+one. A pack goes to `packs/<name>/`; `apps/` holds Paperboat only.
 
 The part that changes, for the two applications of section B.11:
 
@@ -856,8 +877,12 @@ Each step is one pull request or a few, and each leaves Paperboat working.
    containers to the record, keeps the newest record of each environment and shows the
    state of each component in the topology view. A record with no new data for 60 seconds
    has each state `unknown`. The record has no checks and no volumes yet, and the version
-   of an instance is the tag of its image. No collector ran against this endpoint yet.
+   of an instance is the tag of its image. On 2026-11-25 the collector in the kind cluster
+   of the local target sent to this endpoint at `host.docker.internal` while the core
+   listened on `127.0.0.1:7070`, and the record of the environment was fresh. An image
+   `<repository>:<tag>@sha256:<digest>` gave the tag as the version of the instance.
 3. **The rules of B.8**, the `tcp` check, the `image` version, the state `unknown`.
+   Built so far: the `image` version for `kubernetes`.
 4. **The site runner.** Enrolment and the jobs of a site.
 5. **Access to a host.** The certificate in the broker, the host kit with the collector
    and the helper, and a test machine that runs systemd.

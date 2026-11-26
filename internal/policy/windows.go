@@ -18,8 +18,9 @@ import (
 const WindowsPath = "policy/maintenance-windows.json"
 
 // WindowReserve is the time that must be left in a maintenance window when an apply
-// starts. It is the lifetime of the apply grant of one layer. An apply of several layers
-// can end after the window.
+// starts. On the local target it is also the lifetime of the apply grant of one layer. On
+// AWS that grant lasts one hour, so the apply of one layer can end up to 30 minutes after
+// the window. An apply of several layers can end after the window.
 const WindowReserve = 30 * time.Minute
 
 // A window is longer than the reserve: the scheduler starts a change some seconds after

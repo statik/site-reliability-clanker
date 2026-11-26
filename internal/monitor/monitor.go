@@ -30,11 +30,15 @@ type Monitor struct {
 	// Wall gives the wall-clock time for the age of an observation. Nil is time.Now.
 	Wall   func() time.Time
 	client *http.Client
+	// verifyWait is how long Verify waits for the application to be healthy at the wanted
+	// version, and verifyPause is the pause between two tries.
+	verifyWait, verifyPause time.Duration
 }
 
 // New returns a monitor.
 func New(db *sql.DB, clock Clock) *Monitor {
-	return &Monitor{DB: db, Clock: clock, client: &http.Client{Timeout: 4 * time.Second}}
+	return &Monitor{DB: db, Clock: clock, client: &http.Client{Timeout: 4 * time.Second},
+		verifyWait: 90 * time.Second, verifyPause: 3 * time.Second}
 }
 
 // AppURL returns the URL of the application in env, or "" when it is not deployed.
@@ -85,13 +89,12 @@ func (m *Monitor) Probe(ctx context.Context, env string, count int) (Sample, err
 	if base == "" {
 		return Sample{}, fmt.Errorf("probe %s: the application is not deployed", env)
 	}
-	sample := Sample{TS: store.FormatTime(m.Clock.Now()), Env: env, Total: count}
-	var version struct {
-		Version string `json:"version"`
+	version, err := m.probeVersion(ctx, env, base)
+	if err != nil {
+		return Sample{}, err
 	}
-	if _, err := m.getJSON(ctx, base+m.App.AppVersion.Path, &version); err == nil {
-		sample.Version = observation.NormalizeVersion(version.Version)
-	}
+	sample := Sample{TS: store.FormatTime(m.Clock.Now()), Env: env, Total: count,
+		Version: version}
 	durations := []float64{}
 	primary := m.App.PrimaryCheck()
 	for range count {
@@ -164,10 +167,62 @@ func (m *Monitor) History(env, from, to string, limit int) ([]Sample, error) {
 	return samples, rows.Err()
 }
 
+// probeVersion returns the version that runs in env as the source of the pack gives it, or
+// "" when it is not known. With the source image it reads the newest observation, and an
+// observation that is stale gives "".
+func (m *Monitor) probeVersion(ctx context.Context, env, base string) (string, error) {
+	if m.App.AppVersion.Source != pack.VersionImage {
+		return m.reportedVersion(ctx, base), nil
+	}
+	current, err := m.Observation(env)
+	if err != nil || current.Stale {
+		return "", err
+	}
+	return componentVersion(current.Observation, m.App.AppVersion.Component), nil
+}
+
+// reportedVersion returns the version in the answer of the version path of the
+// application, or "" when it has none.
+func (m *Monitor) reportedVersion(ctx context.Context, base string) string {
+	var version struct {
+		Version string `json:"version"`
+	}
+	if _, err := m.getJSON(ctx, base+m.App.AppVersion.Path, &version); err != nil {
+		return ""
+	}
+	return observation.NormalizeVersion(version.Version)
+}
+
+// componentVersion returns the version of the instances of a component in the record when
+// each one reports the same version, or "".
+func componentVersion(record observation.Observation, component string) string {
+	version := ""
+	for _, instance := range instancesOf(record, component) {
+		if instance.Version == "" || (version != "" && instance.Version != version) {
+			return ""
+		}
+		version = instance.Version
+	}
+	return version
+}
+
+// instancesOf returns the instances of a component in the record.
+func instancesOf(record observation.Observation, component string) []observation.Instance {
+	for _, found := range record.Components {
+		if found.Name == component {
+			return found.Instances
+		}
+	}
+	return nil
+}
+
 // Verify is the check after an apply. When the application is deployed it must answer the
 // health check, report the version that the application layer declares, and answer the
-// probe with an error rate under ten percent.
+// probe with an error rate under ten percent. With the version source image, only an
+// observation that arrived after the start of Verify, which is the end of the apply,
+// counts: each instance of the component must be ok there and run the wanted version.
 func (m *Monitor) Verify(ctx context.Context, wi orchestrator.WorkItem) (orchestrator.VerifyResult, error) {
+	applied := m.wallNow()
 	outputs, err := store.LayerOutputs(m.DB, wi.Env, m.App.Layer)
 	if err != nil {
 		return orchestrator.VerifyResult{}, err
@@ -183,26 +238,25 @@ func (m *Monitor) Verify(ctx context.Context, wi orchestrator.WorkItem) (orchest
 			"with the address of the application", m.App.Layer, m.App.URLOutput)}, nil
 	}
 	result := orchestrator.VerifyResult{}
-	deadline := time.Now().Add(90 * time.Second)
+	deadline := time.Now().Add(m.verifyWait)
 	for {
 		failed := m.failedCheck(ctx, base)
-		var version struct {
-			Version string `json:"version"`
+		running, wanted, err := m.versionCheck(ctx, wi.Env, base, want, applied)
+		if err != nil {
+			return orchestrator.VerifyResult{}, err
 		}
-		_, versionErr := m.getJSON(ctx, base+m.App.AppVersion.Path, &version)
-		running := observation.NormalizeVersion(version.Version)
-		if failed == "" && versionErr == nil && running == want {
+		if failed == "" && wanted {
 			result.Checks = append(result.Checks, m.passedChecks()...)
 			result.Checks = append(result.Checks, "running version is "+want)
 			break
 		}
 		if time.Now().After(deadline) {
-			result.Reason = fmt.Sprintf("after 90 s the application does not report healthy "+
-				"version %s (%s, version %s)", want, orText(failed, "each check passes"),
-				orText(running, "unknown"))
+			result.Reason = fmt.Sprintf("after %.0f s the application does not report healthy "+
+				"version %s (%s, %s)", m.verifyWait.Seconds(), want,
+				orText(failed, "each check passes"), running)
 			return result, nil
 		}
-		time.Sleep(3 * time.Second)
+		time.Sleep(m.verifyPause)
 	}
 	sample, err := m.Probe(ctx, wi.Env, 40)
 	if err != nil {
@@ -222,6 +276,54 @@ func (m *Monitor) Verify(ctx context.Context, wi orchestrator.WorkItem) (orchest
 	}
 	result.OK = true
 	return result, nil
+}
+
+// versionCheck reports whether the application runs the version want, with a text that
+// says what runs. With the source image it reads only an observation that arrived after
+// applied.
+func (m *Monitor) versionCheck(ctx context.Context, env, base, want string,
+	applied time.Time) (string, bool, error) {
+	if m.App.AppVersion.Source != pack.VersionImage {
+		running := m.reportedVersion(ctx, base)
+		return "version " + orText(running, "unknown"), running != "" && running == want, nil
+	}
+	stored, found, err := m.storedObservation(env)
+	if err != nil {
+		return "", false, err
+	}
+	if problem := imageProblem(stored, found, applied, m.App.AppVersion.Component,
+		want); problem != "" {
+		return problem, false, nil
+	}
+	return "version " + want, true, nil
+}
+
+// imageProblem returns "" when the stored observation arrived after applied and each
+// instance of the component in it is ok and runs the version want. Otherwise it returns
+// what the observation shows instead. No observation never passes.
+func imageProblem(stored storedObservation, found bool, applied time.Time, component,
+	want string) string {
+	if !found {
+		return "no data from the collector"
+	}
+	if !stored.Received.After(applied) {
+		return "no data from the collector since the apply"
+	}
+	instances := instancesOf(stored.Observation, component)
+	if len(instances) == 0 {
+		return "the collector reports no instance of " + component
+	}
+	for _, instance := range instances {
+		if instance.State != observation.StateOK {
+			return fmt.Sprintf("instance %s of %s is %s", instance.ID, component,
+				instance.State)
+		}
+		if instance.Version == "" || instance.Version != want {
+			return fmt.Sprintf("instance %s of %s runs version %s", instance.ID, component,
+				orText(instance.Version, "unknown"))
+		}
+	}
+	return ""
 }
 
 // failedCheck sends one request for each check that is not the primary check. It returns

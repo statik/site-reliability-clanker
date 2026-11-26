@@ -145,7 +145,7 @@ def _seed() -> Repos:
     _read_tree(ROOT / "platform", "platform", platform)
     deploy = PACK["deploy"]
     chart = PACK_DIR / deploy["chart"]
-    _read_tree(chart, f"{deploy['mount']}/{deploy['chart']}", platform)
+    _read_tree(chart, f"apps/{PACK['name']}/chart", platform)
     runbooks: dict[str, str] = {}
     _read_tree(ROOT / "runbooks", "", runbooks)
     # The runbooks of the application come from the pack, into the directory of the jobs.
@@ -166,7 +166,7 @@ def load_repos(overlay: dict[str, str | None] | None = None) -> Repos:
     """Build the in-memory copy of the three forge repositories on branch main.
 
     The layout follows seedForge in cmd/clanker/up.go: platform-live holds platform/ and
-    the chart of the application pack at its mount path, runbooks holds the content of
+    the chart of the application pack at apps/<name>/chart, runbooks holds the content of
     runbooks/, and the releases repository of the pack holds the release notes and the
     chart.
 
