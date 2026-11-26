@@ -1,0 +1,83 @@
+{
+  "schema": 2,
+  "task": "investigator_diagnosis",
+  "samples": [
+    {
+      "id": "database-unreachable",
+      "alert": {
+        "failed": 20,
+        "version": "26.8.2"
+      },
+      "cause": "The PostgreSQL database of Keycloak is unreachable: Keycloak cannot open a connection, its readiness check on the database connections reports DOWN, so the pod is not ready and the gateway has no backend. The process is alive. A restart of Keycloak does not help; the database must come back.",
+      "expect": "none",
+      "evidence": [
+        "Failed to create connection",
+        "database connectivity issue",
+        "Readiness probe failed",
+        "database connections async health check"
+      ],
+      "transcript": "$ kubectl get pods -n keycloak -o wide\nNAME                        READY   STATUS             RESTARTS       AGE   IP            NODE                          NOMINATED NODE   READINESS GATES\nkeycloak-6f5d8b7c9d-x7k2p   0/1     Running            0              2d    10.244.0.21   clanker-local-control-plane   <none>           <none>\n$ kubectl get deployments -n keycloak\nNAME       READY   UP-TO-DATE   AVAILABLE   AGE\nkeycloak   0/1     1            0           12d\n$ kubectl get events -n keycloak --sort-by=.lastTimestamp\nLAST SEEN   TYPE      REASON              OBJECT                               MESSAGE\n3m          Warning   Unhealthy           pod/keycloak-6f5d8b7c9d-x7k2p       Readiness probe failed: HTTP probe failed with statuscode: 503\n$ kubectl logs -n keycloak deployment/keycloak --tail=80\n2026-02-28 06:10:12,008 INFO  [io.quarkus] (main) Keycloak 26.8.2 on JVM (powered by Quarkus 3.40.1.1) started in 1.971s. Listening on: http://0.0.0.0:8080. Management interface listening on http://0.0.0.0:9000.\n2026-02-28 06:10:12,008 INFO  [io.quarkus] (main) Profile prod activated.\n2026-02-28 06:10:13,290 INFO  [org.keycloak.connections.infinispan.DefaultInfinispanConnectionProviderFactory] (executor-thread-1) Node name: keycloak-6f5d8b7c9d-x7k2p, Site name: null, Cluster name: ISPN\n2026-02-28 06:10:13,688 INFO  [org.keycloak.exportimport.util.ImportUtils] (executor-thread-1) Realm 'apps' already exists. Import skipped\n2026-02-28 06:10:13,707 INFO  [org.keycloak.services.resources.KeycloakApplication] (executor-thread-1) Bootstrap completed in 1.741000 seconds\n2026-03-02 08:52:39,075 WARN  [io.agroal.pool] (jgroups-14,keycloak-6f5d8b7c9d-x7k2p(v=16.0.15)) Datasource '<default>': This connection has been closed.\n2026-03-02 08:52:39,076 WARN  [org.keycloak.jgroups.protocol.KEYCLOAK_JDBC_PING2] (jgroups-14,keycloak-6f5d8b7c9d-x7k2p(v=16.0.15)) Failed to determine cluster health for cluster 'ISPN' from the database. This may indicate a database connectivity issue.\n2026-03-02 08:52:57,253 ERROR [org.keycloak.jgroups.protocol.KEYCLOAK_JDBC_PING2] (Timer runner-2,keycloak-6f5d8b7c9d-x7k2p(v=16.0.15)) keycloak-6f5d8b7c9d-x7k2p(v=16.0.15): failed reading from the DB: org.postgresql.util.PSQLException: FATAL: terminating connection due to administrator command\n2026-03-02 08:53:01,520 ERROR [org.keycloak.jgroups.protocol.KEYCLOAK_JDBC_PING2] (jgroups-39,keycloak-6f5d8b7c9d-x7k2p(v=16.0.15)) keycloak-6f5d8b7c9d-x7k2p(v=16.0.15): failed writing to DB: java.sql.SQLException: Failed to create connection after -1 retries\n2026-03-02 08:53:22,015 INFO  [io.smallrye.health] (vert.x-eventloop-thread-0) SRHCK01001: Reporting health down status: {\"status\":\"DOWN\",\"checks\":[{\"name\":\"Graceful Shutdown\",\"status\":\"UP\"},{\"name\":\"Keycloak Initialized\",\"status\":\"UP\"},{\"name\":\"Keycloak cluster health check\",\"status\":\"UP\"},{\"name\":\"Keycloak database connections async health check\",\"status\":\"DOWN\",\"data\":{\"Failing since\":\"2026-03-02 08:53:22,013\"}}]}\n2026-03-02 08:55:01,520 ERROR [org.keycloak.jgroups.protocol.KEYCLOAK_JDBC_PING2] (jgroups-51,keycloak-6f5d8b7c9d-x7k2p(v=16.0.15)) keycloak-6f5d8b7c9d-x7k2p(v=16.0.15): failed writing to DB: java.sql.SQLException: Failed to create connection after -1 retries\n",
+      "history": [
+        "WI-0003 Set keycloak_version to 26.8.2: Done, 50h0m0s ago",
+        "WI-0001 Blank-slate deployment of local: Done, 288h0m0s ago"
+      ]
+    },
+    {
+      "id": "crash-loop-after-config-change",
+      "alert": {
+        "failed": 20,
+        "version": "26.8.2"
+      },
+      "cause": "A configuration change set the option KC_PROXY_HEADERS to the invalid value xforward. Keycloak refuses to start, so the new pod is in CrashLoopBackOff, and with the strategy Recreate the old pod is already gone. A restart starts the same configuration; the change must be reverted or fixed.",
+      "expect": "none",
+      "evidence": [
+        "Invalid value for option",
+        "KC_PROXY_HEADERS",
+        "CrashLoopBackOff"
+      ],
+      "transcript": "$ kubectl get pods -n keycloak -o wide\nNAME                        READY   STATUS             RESTARTS       AGE   IP            NODE                          NOMINATED NODE   READINESS GATES\nkeycloak-58c9d6f7b4-m2q8t   0/1     CrashLoopBackOff   6 (40s ago)    7m    10.244.0.34   clanker-local-control-plane   <none>           <none>\n$ kubectl get deployments -n keycloak\nNAME       READY   UP-TO-DATE   AVAILABLE   AGE\nkeycloak   0/1     1            0           12d\n$ kubectl get events -n keycloak --sort-by=.lastTimestamp\nLAST SEEN   TYPE      REASON              OBJECT                               MESSAGE\n7m          Normal    ScalingReplicaSet   deployment/keycloak                  Scaled down replica set keycloak-6f5d8b7c9d from 1 to 0\n7m          Normal    ScalingReplicaSet   deployment/keycloak                  Scaled up replica set keycloak-58c9d6f7b4 from 0 to 1\n40s         Warning   BackOff             pod/keycloak-58c9d6f7b4-m2q8t       Back-off restarting failed container keycloak in pod keycloak-58c9d6f7b4-m2q8t_keycloak\n$ kubectl logs -n keycloak deployment/keycloak --tail=80\nChanges detected in configuration. Updating the server image.\nInvalid value for option 'KC_PROXY_HEADERS': xforward. Expected values are: forwarded, xforwarded\n",
+      "history": [
+        "WI-0004 Change the proxy settings of Keycloak: Applying, 7m0s ago",
+        "WI-0003 Set keycloak_version to 26.8.2: Done, 50h0m0s ago",
+        "WI-0001 Blank-slate deployment of local: Done, 288h0m0s ago"
+      ]
+    },
+    {
+      "id": "oom-kills",
+      "alert": {
+        "failed": 14,
+        "version": "26.8.2"
+      },
+      "cause": "The Keycloak container uses more memory than its limit and the kernel kills it (OOMKilled) again and again under load; the logs stop without an error because the JVM is killed. A restart does not raise the limit. The fix is a larger memory limit in the values of the pack, a change that a person approves (T2).",
+      "expect": "none",
+      "evidence": [
+        "OOMKilled",
+        "Back-off restarting failed container"
+      ],
+      "transcript": "$ kubectl get pods -n keycloak -o wide\nNAME                        READY   STATUS             RESTARTS       AGE   IP            NODE                          NOMINATED NODE   READINESS GATES\nkeycloak-6f5d8b7c9d-x7k2p   0/1     OOMKilled          7 (55s ago)    2d    10.244.0.21   clanker-local-control-plane   <none>           <none>\n$ kubectl get deployments -n keycloak\nNAME       READY   UP-TO-DATE   AVAILABLE   AGE\nkeycloak   0/1     1            0           12d\n$ kubectl get events -n keycloak --sort-by=.lastTimestamp\nLAST SEEN   TYPE      REASON              OBJECT                               MESSAGE\n9m          Normal    Pulled              pod/keycloak-6f5d8b7c9d-x7k2p       Container image \"quay.io/keycloak/keycloak:26.8.2@sha256:7e66a96e4739239070aeaf72e4c5decf0f7f682cfc725b9f7ea2b336eaba38b3\" already present on machine\n55s         Warning   BackOff             pod/keycloak-6f5d8b7c9d-x7k2p       Back-off restarting failed container keycloak in pod keycloak-6f5d8b7c9d-x7k2p_keycloak\n$ kubectl logs -n keycloak deployment/keycloak --tail=80\n2026-03-02 08:55:12,008 INFO  [io.quarkus] (main) Keycloak 26.8.2 on JVM (powered by Quarkus 3.40.1.1) started in 1.971s. Listening on: http://0.0.0.0:8080. Management interface listening on http://0.0.0.0:9000.\n2026-03-02 08:55:12,008 INFO  [io.quarkus] (main) Profile prod activated.\n2026-03-02 08:55:13,290 INFO  [org.keycloak.connections.infinispan.DefaultInfinispanConnectionProviderFactory] (executor-thread-1) Node name: keycloak-6f5d8b7c9d-x7k2p, Site name: null, Cluster name: ISPN\n2026-03-02 08:55:13,688 INFO  [org.keycloak.exportimport.util.ImportUtils] (executor-thread-1) Realm 'apps' already exists. Import skipped\n2026-03-02 08:55:13,707 INFO  [org.keycloak.services.resources.KeycloakApplication] (executor-thread-1) Bootstrap completed in 1.741000 seconds\n",
+      "history": [
+        "WI-0003 Set keycloak_version to 26.8.2: Done, 50h0m0s ago",
+        "WI-0001 Blank-slate deployment of local: Done, 288h0m0s ago"
+      ]
+    },
+    {
+      "id": "migration-in-progress",
+      "alert": {
+        "failed": 20,
+        "version": "26.8.2"
+      },
+      "cause": "The upgrade to Keycloak 26.8.2 is migrating the database: the new pod started and logged 'Migrating older model to 26.8.2', and it reports ready only when the migration ends. The database is up. A restart would stop the migration; the right action is to wait, and a person looks when it runs past the Helm timeout.",
+      "expect": "none",
+      "evidence": [
+        "Migrating older model",
+        "Keycloak Initialized",
+        "Readiness probe failed"
+      ],
+      "transcript": "$ kubectl get pods -n keycloak -o wide\nNAME                        READY   STATUS             RESTARTS       AGE   IP            NODE                          NOMINATED NODE   READINESS GATES\nkeycloak-58c9d6f7b4-m2q8t   0/1     Running            0              4m    10.244.0.34   clanker-local-control-plane   <none>           <none>\n$ kubectl get deployments -n keycloak\nNAME       READY   UP-TO-DATE   AVAILABLE   AGE\nkeycloak   0/1     1            0           12d\n$ kubectl get events -n keycloak --sort-by=.lastTimestamp\nLAST SEEN   TYPE      REASON              OBJECT                               MESSAGE\n4m          Normal    ScalingReplicaSet   deployment/keycloak                  Scaled down replica set keycloak-6f5d8b7c9d from 1 to 0\n4m          Normal    ScalingReplicaSet   deployment/keycloak                  Scaled up replica set keycloak-58c9d6f7b4 from 0 to 1\n4m          Normal    Pulled              pod/keycloak-58c9d6f7b4-m2q8t       Successfully pulled image \"quay.io/keycloak/keycloak:26.8.2@sha256:7e66a96e4739239070aeaf72e4c5decf0f7f682cfc725b9f7ea2b336eaba38b3\"\n30s         Warning   Unhealthy           pod/keycloak-58c9d6f7b4-m2q8t       Readiness probe failed: HTTP probe failed with statuscode: 503\n$ kubectl logs -n keycloak deployment/keycloak --tail=80\nChanges detected in configuration. Updating the server image.\nUpdating the configuration and installing your custom providers, if any. Please wait.\n2026-03-02 08:51:25,968 INFO  [io.quarkus.deployment.QuarkusAugmentor] (main) Quarkus augmentation completed in 3662ms\n2026-03-02 08:51:28,008 INFO  [io.quarkus] (main) Keycloak 26.8.2 on JVM (powered by Quarkus 3.40.1.1) started in 1.971s. Listening on: http://0.0.0.0:8080. Management interface listening on http://0.0.0.0:9000.\n2026-03-02 08:51:28,576 INFO  [org.keycloak.storage.datastore.DefaultMigrationManager] (executor-thread-1) Migrating older model to 26.8.2\n2026-03-02 08:54:29,533 INFO  [io.smallrye.health] (vert.x-eventloop-thread-0) SRHCK01001: Reporting health down status: {\"status\":\"DOWN\",\"checks\":[{\"name\":\"Graceful Shutdown\",\"status\":\"UP\"},{\"name\":\"Keycloak Initialized\",\"status\":\"DOWN\"},{\"name\":\"Keycloak database connections async health check\",\"status\":\"UP\"}]}\n",
+      "history": [
+        "WI-0004 Set keycloak_version to 26.8.2: Applying, 4m0s ago",
+        "WI-0001 Blank-slate deployment of local: Done, 288h0m0s ago"
+      ]
+    }
+  ]
+}

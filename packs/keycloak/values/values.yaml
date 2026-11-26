@@ -1,0 +1,10 @@
+# Values of every target, after the values of the chart. The chart reads the values of the
+# platform itself (platform/CONTRACT.md section 4), so this file only sizes the pods.
+# Keycloak asks for at least 750 MB of memory and 2 GiB for a small production server; the
+# image gives the JVM 70 % of the limit.
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    memory: 2Gi

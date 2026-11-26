@@ -1,0 +1,7 @@
+# Values of the local target, after values.yaml: a smaller pod for kind on a laptop.
+resources:
+  requests:
+    cpu: 100m
+    memory: 768Mi
+  limits:
+    memory: 1Gi

@@ -1,0 +1,11 @@
+# The realm apps for the applications. Keycloak imports it at a start when the realm does
+# not exist yet, and skips it after that: a change of the file does not change the realm.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-realm
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+data:
+  apps.json: |
+    {{- .Files.Get "realm/apps.json" | nindent 4 }}

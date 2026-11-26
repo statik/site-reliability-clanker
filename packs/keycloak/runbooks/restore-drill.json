@@ -1,0 +1,10 @@
+{
+  "description": "Restore the newest Keycloak backup into a scratch database, compare the numbers of realms, users and clients with production, then drop the scratch database.",
+  "tier": "T1",
+  "outputs": {
+    "backup_file": {
+      "type": "string",
+      "description": "The path of the backup that the drill restored."
+    }
+  }
+}
