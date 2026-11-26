@@ -87,11 +87,12 @@ export CLANKER_DATABASE_URL="postgres://postgres:check@${address}/clanker?sslmod
 unset OPENROUTER_API_KEY CLANKER_SIGNING_KEY CLANKER_OIDC_ISSUER CLANKER_OIDC_CLIENT_ID \
   CLANKER_OIDC_CLIENT_SECRET CLANKER_PUBLIC_URL CLANKER_ADMIN_EMAIL
 
-echo "== the core refuses a start without its key, with a bad key, with --data, without a sign-in"
+echo "== the core refuses a start without its key, with bad keys, with --data, without a sign-in"
 refused "needs the signing key"
 CLANKER_SIGNING_KEY="$(printf short | base64)" refused "has 5 bytes"
 CLANKER_SIGNING_KEY="x" refused "remove --data" --data ./data
-CLANKER_SIGNING_KEY="$(head -c 64 /dev/urandom | base64 | tr -d '\n')"
+CLANKER_SIGNING_KEY="$(head -c 64 /dev/urandom | base64 | tr -d '\n')" refused "is not an Ed25519 private key"
+CLANKER_SIGNING_KEY="$("${repo}/scripts/verify/signing-key.sh")"
 export CLANKER_SIGNING_KEY
 refused "people must sign in"
 

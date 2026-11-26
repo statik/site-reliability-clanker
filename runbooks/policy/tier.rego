@@ -56,6 +56,14 @@ changes contains rc if {
 	action in {"create", "update", "delete"}
 }
 
+# The outputs that the plan creates, changes or removes. A plan that changes only outputs is
+# applied too: the layers above read the outputs from its state.
+output_changes contains name if {
+	some name, oc in input.plan.output_changes
+	some action in oc.actions
+	action in {"create", "update", "delete"}
+}
+
 removes(rc) if "delete" in rc.change.actions
 
 is_identity(rc) if {
@@ -76,7 +84,7 @@ t3_reasons contains reason if {
 }
 
 t3_reasons contains reason if {
-	count(changes) > 0
+	count(changes) + count(output_changes) > 0
 	input.layer in high_risk_layers
 	reason := {
 		"rule": "high-risk-layer",
@@ -131,6 +139,13 @@ decision := {"tier": "T2", "rule": "normal-change", "reasons": [text]} if {
 	count(t3_reasons) == 0
 	count(changes) > 0
 	text := sprintf("resources changed: %d. None is stateful or an identity", [count(changes)])
+}
+
+decision := {"tier": "T2", "rule": "output-change", "reasons": [text]} if {
+	count(t3_reasons) == 0
+	count(changes) == 0
+	count(output_changes) > 0
+	text := sprintf("outputs changed: %s. The layers above read them", [concat(", ", sort(output_changes))])
 }
 
 # A plan is inside the create-only envelope when it only creates resources. The layers of a

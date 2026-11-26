@@ -160,6 +160,34 @@ func TestTheFirstPlanOnACloudIsLayer10WithAPlannerSessionTheBackendAndTheInputs(
 	}
 }
 
+func TestAJobOfALayerOnACloudGetsTheVariablesOfTheAccount(t *testing.T) {
+	withVariables := sandbox
+	withVariables.Variables = map[string]string{
+		"TF_VAR_existing_network_id": "vpc-0a1b2c3d4e5f60718",
+		"TF_VAR_instance_tags":       `{"team":"check-team-value"}`,
+		// The inputs of the platform contract win over a variable of the account.
+		"TF_VAR_env_name": "another-environment"}
+	o, runners := cloudOrchestrator(t, withVariables, &sessionIssuer{}, "00-bootstrap")
+	if _, err := planNew(t, o, sandbox.Name, []string{"10-network"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(runners.jobs) != 1 {
+		t.Fatalf("jobs = %+v, want one", runners.jobs)
+	}
+	want := map[string]string{"TF_VAR_admin_token": "example-admin-token",
+		"TF_VAR_env_name": "aws-sandbox", "TF_VAR_region": "eu-west-1",
+		"TF_VAR_state_location":      "clanker-example-state-111122223333",
+		"TF_VAR_existing_network_id": "vpc-0a1b2c3d4e5f60718",
+		"TF_VAR_instance_tags":       `{"team":"check-team-value"}`}
+	if got := runners.jobs[0].Variables; !reflect.DeepEqual(got, want) {
+		t.Errorf("variables = %v, want %v", got, want)
+	}
+	if len(o.JobVariables) != len(sharedVariables) {
+		t.Errorf("the variables of the account went into the shared variables: %v",
+			o.JobVariables)
+	}
+}
+
 func TestEveryPlanOnACloudGetsAPlannerSessionAndTheKeyOfItsLayer(t *testing.T) {
 	issuer := &sessionIssuer{}
 	o, runners := cloudOrchestrator(t, sandbox, issuer, Layers[:5]...)
@@ -237,6 +265,89 @@ func TestTheFirstDeploymentOnACloudStartsAboveTheBootstrapLayer(t *testing.T) {
 	got[0] = "changed"
 	if Layers[1] != "10-network" {
 		t.Fatal("the layers of a work item share their array with Layers")
+	}
+}
+
+// outputRunners run the jobs of stacks that have no resource and one output each, as the
+// layer 10-network of AWS in its existing-network mode: each plan only creates the output
+// of its layer, and each apply reports it.
+type outputRunners struct {
+	mu   sync.Mutex
+	jobs []jobspec.Job
+}
+
+func (r *outputRunners) Run(_ context.Context, job jobspec.Job) (jobspec.Result, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.jobs = append(r.jobs, job)
+	layer := job.Spec.Layer
+	if job.Spec.Kind == jobspec.KindApply {
+		return jobspec.Result{Status: jobspec.StatusOK,
+			Outputs: map[string]any{"network_id": "vpc-" + layer}}, nil
+	}
+	plan := []byte("a plan that creates the output of " + layer)
+	return jobspec.Result{Status: jobspec.StatusOK, Plan: plan, PlanSHA256: jobspec.SHA256(plan),
+		PlanJSON: []byte(`{"output_changes":{"network_id":{"actions":["create"],` +
+			`"before":null,"after":"vpc-` + layer + `"}}}`)}, nil
+}
+
+func (r *outputRunners) done() []jobspec.Job {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]jobspec.Job{}, r.jobs...)
+}
+
+func TestAPlanThatChangesOnlyOutputsIsAppliedAndTheLayerAboveIsPlanned(t *testing.T) {
+	o, _ := cloudOrchestrator(t, sandbox, &sessionIssuer{}, "00-bootstrap")
+	runners := &outputRunners{}
+	o.Runners = runners
+	t.Cleanup(o.WaitForApplies)
+	if _, err := o.DB.Exec(`INSERT INTO users (name, display, role, email) VALUES
+		('alice', 'Alice Ng', 'approver', 'alice@example.com'),
+		('bob', 'Bob Okafor', 'approver', 'bob@example.com')`); err != nil {
+		t.Fatal(err)
+	}
+	wi, err := planNew(t, o, sandbox.Name, sandbox.BlankSlateLayers())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wi.State != StateAwaitingApproval || wi.Tier != "T3" {
+		t.Fatalf("state %s, tier %s; want AwaitingApproval and T3", wi.State, wi.Tier)
+	}
+	plans, err := o.Plans(wi.ID, false)
+	if err != nil || len(plans) != 1 || !plans[0].Facts.HasChanges() {
+		t.Fatalf("plans = %+v, %v; want one plan of 10-network that changes an output", plans,
+			err)
+	}
+	for _, user := range []string{"alice", "bob"} {
+		if _, err := approve(t, o, wi.ID, user); err != nil {
+			t.Fatal(err)
+		}
+	}
+	o.WaitForApplies()
+	if state := storedState(t, o, wi.ID); state != StateDone {
+		t.Fatalf("state %s, want Done", state)
+	}
+	outputs, err := store.LayerOutputs(o.DB, sandbox.Name, "10-network")
+	if err != nil || outputs["network_id"] != "vpc-10-network" {
+		t.Errorf("outputs of 10-network = %v, %v; want the output of its apply", outputs, err)
+	}
+	jobs := runners.done()
+	if len(jobs) != 2*len(Layers[1:]) {
+		t.Fatalf("%d jobs, want a plan and an apply for each of %v", len(jobs), Layers[1:])
+	}
+	first := jobs[1]
+	if first.Spec.PlanSHA256 != plans[0].SHA256 || jobspec.SHA256(first.Plan) != plans[0].SHA256 {
+		t.Errorf("the apply of 10-network got the plan hash %s, want the approved plan %s",
+			first.Spec.PlanSHA256, plans[0].SHA256)
+	}
+	for i, layer := range Layers[1:] {
+		plan, apply := jobs[2*i].Spec, jobs[2*i+1].Spec
+		if plan.Kind != jobspec.KindPlan || apply.Kind != jobspec.KindApply ||
+			plan.Layer != layer || apply.Layer != layer {
+			t.Errorf("jobs %d and %d: %s %s and %s %s; want the plan and the apply of %s", 2*i,
+				2*i+1, plan.Kind, plan.Layer, apply.Kind, apply.Layer, layer)
+		}
 	}
 }
 

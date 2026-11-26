@@ -73,6 +73,17 @@ and the region of the other layers from the output `state_backend`. At each star
 these outputs as the outputs of `00-bootstrap`. A setting with an output that the layer does
 not have, with a missing output or with a sensitive output stops the start.
 
+The setting `CLANKER_AWS_LAYER_VARIABLES` holds the inputs of layers `10-network` to
+`50-app` that belong to the account, as JSON, for example
+`{"existing_network_id": "vpc-...", "existing_private_subnet_ids": ["subnet-...", "subnet-..."], "image_registry": "...", "instance_tags": {"<key>": "<value>"}, "operator_principal_arn": "arn:aws:iam::...:role/..."}`.
+Each job of those layers gets each one as `TF_VAR_<name>`. The scrubber of the control plane
+learns each string value at the start, before any plan reaches a model. It ignores a value
+under 8 bytes, and the start log names the variables with such a value.
+
+The control plane plans the first deployment when it has `CLANKER_AWS_BOOTSTRAP` (the state
+backend and the roles of the broker) and `CLANKER_AWS_RUNNER` (the runner tasks). Without one
+of them it serves the dashboard, proposes no deployment and logs the missing setting.
+
 The permission boundary allows only the services that the platform uses. It denies IAM users
 and access keys, roles without the boundary, changes to the boundary and to the agent roles,
 changes to the configuration of the state and evidence buckets, and deletion of evidence.
@@ -100,6 +111,7 @@ request cannot get a secret of the control plane:
    `clanker bootstrap` applies the layer with local state and then moves the state to S3.
 3. Give `image_registry` to `10-network`, and the existing VPC and subnets if the
    environment uses them. Give `instance_tags` and `operator_principal_arn` to `20-cluster`.
+   The control plane gives them from `CLANKER_AWS_LAYER_VARIABLES`.
 4. Apply the layers in sequence from `10-network` to `50-app`. Each layer reads the layers
    below it from the state bucket.
 5. Push the Paperboat images to `<image_registry>/paperboat` before `50-app`.

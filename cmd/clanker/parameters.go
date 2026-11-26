@@ -39,6 +39,10 @@ func loadParameters(ctx context.Context, o options,
 	if err != nil {
 		return err
 	}
+	if _, found := settings[testEndpointEnv]; found {
+		return fmt.Errorf("the parameter %s/%s is for the checks only, and Parameter Store "+
+			"cannot give it: remove the parameter", path, testEndpointEnv)
+	}
 	names := make([]string, 0, len(settings))
 	for name, value := range settings {
 		if err := os.Setenv(name, value); err != nil {

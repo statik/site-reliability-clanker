@@ -122,7 +122,8 @@ func (o *Orchestrator) layerJob(wi WorkItem, kind, layer string) (jobspec.Job, e
 // cloudState returns the backend settings and the variables of a job for a layer of an
 // environment on a cloud. The state key and the inputs are those of the platform contract:
 // the layers above read layer 00-bootstrap at <env>/00-bootstrap.tfstate in the bucket
-// state_location of the region.
+// state_location of the region. The variables of the account of the environment come
+// between the shared variables and the inputs of the contract.
 func cloudState(env EnvConfig, layer string, shared map[string]string) (
 	map[string]string, map[string]string) {
 	backend := maps.Clone(env.Backend)
@@ -131,6 +132,7 @@ func cloudState(env EnvConfig, layer string, shared map[string]string) (
 	if variables == nil {
 		variables = map[string]string{}
 	}
+	maps.Copy(variables, env.Variables)
 	variables["TF_VAR_env_name"] = env.Name
 	variables["TF_VAR_state_location"] = env.Backend["bucket"]
 	variables["TF_VAR_region"] = env.Region
@@ -411,8 +413,8 @@ func (o *Orchestrator) runPlan(ctx context.Context, wi WorkItem, layer string,
 			layer, facts.Add, facts.Change, facts.Destroy, facts.Replace),
 		Data: map[string]any{"job": job.ID, "commit": wi.Commit, "plan_sha256": plan.SHA256,
 			"add": facts.Add, "change": facts.Change, "destroy": facts.Destroy,
-			"replace": facts.Replace, "tier": decision.Tier, "rule": decision.Rule,
-			"tool_digest": job.ToolDigest}})
+			"replace": facts.Replace, "outputs": facts.Outputs, "tier": decision.Tier,
+			"rule": decision.Rule, "tool_digest": job.ToolDigest}})
 	return plan, nil
 }
 
@@ -435,7 +437,7 @@ type planned struct {
 	tier, rule string
 	// deferred are the layers that cannot be planned before the layer below them exists.
 	deferred []string
-	// changes is set when a plan changes a resource.
+	// changes is set when a plan changes a resource or an output.
 	changes bool
 }
 
@@ -587,15 +589,20 @@ func (o *Orchestrator) explain(ctx context.Context, wi *WorkItem) {
 
 // TemplateExplanation builds the approval text from plan facts alone, without a model.
 func TemplateExplanation(wi WorkItem, plans []Plan) Explanation {
-	add, change, destroy := 0, 0, 0
+	add, change, destroy, outputs := 0, 0, 0, 0
 	for _, p := range plans {
 		add += p.Facts.Add
 		change += p.Facts.Change
 		destroy += p.Facts.Destroy + p.Facts.Replace
+		outputs += len(p.Facts.Outputs)
+	}
+	sentence := fmt.Sprintf("%s: %d resources to add, %d to change, %d to destroy or replace "+
+		"in %s.", wi.Title, add, change, destroy, strings.Join(wi.Layers, ", "))
+	if outputs > 0 {
+		sentence += fmt.Sprintf(" %d outputs change.", outputs)
 	}
 	return Explanation{
-		Sentence: fmt.Sprintf("%s: %d resources to add, %d to change, %d to destroy or replace "+
-			"in %s.", wi.Title, add, change, destroy, strings.Join(wi.Layers, ", ")),
+		Sentence:     sentence,
 		Why:          wi.Trigger,
 		Downtime:     "Not estimated",
 		UserEffect:   "Not estimated",

@@ -97,7 +97,7 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 
-key="$(head -c 64 /dev/urandom | base64 | tr -d '\n')"
+key="$("${repo}/scripts/verify/signing-key.sh")"
 cat >"${work}/config.json" <<EOF
 {
   "Args": ["up", "--cloud", "aws", "--env", "prod", "--demo=false", "--addr", "0.0.0.0:${port}"],

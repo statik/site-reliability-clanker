@@ -353,6 +353,9 @@ func (d *Detector) CheckDrift(ctx context.Context, env string) (orchestrator.Wor
 		for _, rc := range p.Facts.Resources {
 			drifted = append(drifted, rc.Address)
 		}
+		for _, name := range p.Facts.Outputs {
+			drifted = append(drifted, p.Layer+" output "+name)
+		}
 	}
 	err = d.open(ctx, Finding{Detector: "drift", Env: env,
 		Key:    fmt.Sprintf("drift:%s:%s", env, wi.ID),
