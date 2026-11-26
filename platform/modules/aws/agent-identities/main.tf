@@ -19,8 +19,9 @@ locals {
   applier_roles = { for layer in var.applier_layers : "applier-${layer}" => layer }
 
   # Roles with no standing use. The value is the layer that the session must name, or "" when
-  # the role is not tied to a layer.
-  gated_roles = merge(local.applier_roles, { debugger = "" })
+  # the role is not tied to a layer. The runbook role has no IAM policy: its sessions only
+  # sign the tokens of the cluster, and 20-cluster gives it its rights in Kubernetes.
+  gated_roles = merge(local.applier_roles, { debugger = "", runbook = "" })
 }
 
 data "aws_iam_policy_document" "trust_standing" {

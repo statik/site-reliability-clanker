@@ -64,11 +64,29 @@ variable "access_entries" {
   description = <<-EOT
     Kubernetes access for IAM principals. The key is a static label. `policy` is the name of an
     EKS access policy, for example AmazonEKSViewPolicy. An empty `namespaces` list gives the
-    policy cluster scope.
+    policy cluster scope. `kubernetes_groups` are the groups of the principal in Kubernetes:
+    an entry with groups and no policy has only the rights that role bindings give the groups.
   EOT
   type = map(object({
-    principal_arn = string
-    policy        = string
-    namespaces    = list(string)
+    principal_arn     = string
+    policy            = optional(string, "")
+    namespaces        = optional(list(string), [])
+    kubernetes_groups = optional(list(string), [])
   }))
+
+  validation {
+    condition = alltrue([
+      for entry in values(var.access_entries) :
+      entry.policy != "" || length(entry.kubernetes_groups) > 0
+    ])
+    error_message = "Each access entry needs a policy, Kubernetes groups or both."
+  }
+
+  validation {
+    condition = alltrue([
+      for entry in values(var.access_entries) :
+      entry.policy != "" || length(entry.namespaces) == 0
+    ])
+    error_message = "An access entry without a policy cannot name namespaces."
+  }
 }

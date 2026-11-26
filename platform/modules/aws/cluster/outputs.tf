@@ -14,6 +14,14 @@ output "ca_certificate_pem" {
   sensitive   = true
 }
 
+output "ca_certificate_data" {
+  description = <<-EOT
+    Cluster CA certificate, PEM in base64, as a kubeconfig takes it. It is not secret, so the
+    control plane can read it from the outputs of the layer.
+  EOT
+  value       = aws_eks_cluster.this.certificate_authority[0].data
+}
+
 output "kubernetes_version" {
   description = "Kubernetes version that the control plane runs."
   value       = aws_eks_cluster.this.version

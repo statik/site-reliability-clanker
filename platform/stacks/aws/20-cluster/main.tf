@@ -10,6 +10,11 @@ locals {
 
   cluster_admin = "AmazonEKSClusterAdminPolicy"
 
+  # The Kubernetes group of the runbook role. It has no access policy: 40-platform binds the
+  # group to the rights of the runbook identity in the application namespace, which this
+  # layer does not know.
+  runbook_group = "clanker-runbook"
+
   # The role that applies this layer creates the cluster, and EKS makes it a cluster admin.
   access_entries = {
     observer = {
@@ -26,6 +31,10 @@ locals {
       principal_arn = local.identities["debugger"]
       policy        = "AmazonEKSEditPolicy"
       namespaces    = local.debugger_namespaces
+    }
+    runbook = {
+      principal_arn     = local.identities["runbook"]
+      kubernetes_groups = [local.runbook_group]
     }
     applier-30-data = {
       principal_arn = local.identities["applier-30-data"]
@@ -100,4 +109,23 @@ module "cluster" {
   role_path                = local.bootstrap.workload_role_path
   permissions_boundary_arn = local.bootstrap.permission_guard
   access_entries           = merge(local.access_entries, local.operator_entry)
+}
+
+# The runners of the control plane run in the network of the environment. There the name of
+# the API server resolves to its private endpoint, and the security group of the cluster
+# admits only the nodes. This rule admits the address ranges of the network on port 443. The
+# endpoint is public as well, so the rule opens no path from outside the network.
+data "aws_vpc" "network" {
+  id = local.network.network_id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "api_from_network" {
+  for_each = toset(data.aws_vpc.network.cidr_block_associations[*].cidr_block)
+
+  security_group_id = module.cluster.node_security_group_id
+  description       = "Kubernetes API from the network, for the runners of the control plane"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv4         = each.value
 }

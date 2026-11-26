@@ -8,7 +8,8 @@
 # - MinIO holds the state of the layers, with server-side encryption.
 # - The stacks of layers 10 to 50 are the stand-in stacks of scripts/verify/fakeaws/fixture.
 #   They use no provider. 10-network has no resource, like the real layer in its
-#   existing-network mode.
+#   existing-network mode. The cluster of 20-cluster is a stand-in for the API server of EKS
+#   that fakeaws serves over TLS. It refuses every request and records its token.
 # - The core gets every setting from the stand-in for Parameter Store. Its environment
 #   holds only the path, the region and the address of the stand-in, and it starts with
 #   --fake-aws.
@@ -16,7 +17,9 @@
 # The check starts the core once without the runner setting, which must stand by, and then
 # with every setting. The first deployment must plan 10-network in a runner task and wait
 # for approval. The admin and a second approver approve it through the API, and every layer
-# must be applied in runner tasks with STS sessions and state in the bucket.
+# must be applied in runner tasks with STS sessions and state in the bucket. The variables of
+# the collector must reach 40-platform. Then a debug session must reach the stand-in cluster
+# with the kubeconfig of the broker and the keys of the session of the debugger role.
 #
 # Usage: scripts/verify/aws-core-check.sh
 #
@@ -34,6 +37,7 @@ idp_port=7271
 idp="http://127.0.0.1:${idp_port}"
 aws_port=7272
 aws="http://127.0.0.1:${aws_port}"
+kube_port=7273
 network="clanker-aws-check-$$"
 minio="clanker-aws-check-minio-$$"
 database="clanker-aws-check-db-$$"
@@ -143,6 +147,7 @@ fi
 go build -o "${work}/clanker" ./cmd/clanker
 go build -o "${work}/fakeidp" ./scripts/verify/fakeidp
 go build -o "${work}/fakeaws" ./scripts/verify/fakeaws
+"${work}/fakeaws" cert "${work}/kube"
 if [ -z "${image}" ]; then
   image="clanker-runner:aws-check-$$"
   own_image="${image}"
@@ -191,7 +196,8 @@ done
 
 echo "== the settings in the stand-in for Parameter Store"
 role="arn:aws:iam::111122223333:role/clanker-check"
-identities="$(jq -n --arg role "${role}" '{planner: ($role + "/planner")} +
+identities="$(jq -n --arg role "${role}" '{planner: ($role + "/planner"),
+  debugger: ($role + "/debugger"), runbook: ($role + "/runbook")} +
   (["10-network", "20-cluster", "30-data", "40-platform", "50-app"] |
     map({key: ("applier-" + .), value: ($role + "/applier-" + .)}) | from_entries)')"
 bootstrap="$(jq -n --argjson identities "${identities}" --arg bucket "${bucket}" \
@@ -208,12 +214,15 @@ bootstrap="$(jq -n --argjson identities "${identities}" --arg bucket "${bucket}"
 runner='{"cluster": "clanker-check", "task_definition": "clanker-runner:1",
   "container": "runner", "subnets": ["subnet-0a1b2c3d4e5f60718"],
   "security_groups": ["sg-0a1b2c3d4e5f60718"]}'
-variables="$(jq -n --arg network "${network_id}" --arg team "${team_tag}" '{
+variables="$(jq -n --arg network "${network_id}" --arg team "${team_tag}" \
+  --arg endpoint "https://host.docker.internal:${kube_port}" \
+  --arg ca "$(base64 <"${work}/kube/cert.pem" | tr -d '\n')" '{
   existing_network_id: $network,
   existing_private_subnet_ids: ["subnet-0a1b2c3d4e5f60718", "subnet-0f1e2d3c4b5a69788"],
   image_registry: "registry.example.com/check",
   instance_tags: {team: $team, purpose: "aws-core-check"},
-  operator_principal_arn: "arn:aws:iam::111122223333:role/check-operator"}')"
+  operator_principal_arn: "arn:aws:iam::111122223333:role/check-operator",
+  fake_cluster_endpoint: $endpoint, fake_cluster_ca_data: $ca}')"
 jq -n --arg db "postgres://postgres:check@${db_address}/clanker?sslmode=disable" \
   --arg key "$("${repo}/scripts/verify/signing-key.sh")" --arg idp "${idp}" \
   --arg base "${base}" --arg core "http://host.docker.internal:${port}" \
@@ -233,7 +242,8 @@ provider=$!
   --record "${work}/record.jsonl" --tokens "${work}/tokens.txt" --logs "${work}/tasks" \
   --image "${image}" --network "${network}" --minio "http://${minio_address}" \
   --minio-access-key "${minio_key}" --minio-secret-key "${minio_secret}" \
-  >"${work}/fakeaws.log" 2>&1 &
+  --kube-addr "127.0.0.1:${kube_port}" --kube-cert "${work}/kube/cert.pem" \
+  --kube-key "${work}/kube/key.pem" >"${work}/fakeaws.log" 2>&1 &
 standin=$!
 for _ in $(seq 1 30); do
   if curl -fs -o /dev/null "${idp}/.well-known/openid-configuration" &&
@@ -277,7 +287,8 @@ echo "== the calls to the stand-in for AWS"
 record="${work}/record.jsonl"
 [ "$(jq -s '[.[] | select(.service == "ssm")] | length' "${record}")" -ge 4 ] ||
   fail "the core did not read Parameter Store page by page at each start"
-[ "$(jq -s '[.[] | select(.service != "webhook" and .access_key != "fake-aws")] | length' "${record}")" = 0 ] ||
+[ "$(jq -s '[.[] | select(.service != "webhook" and .service != "kube" and
+  .access_key != "fake-aws")] | length' "${record}")" = 0 ] ||
   fail "a call to the stand-in was not signed with the keys of --fake-aws"
 plan_session="$(jq -cs '[.[] | select(.action == "AssumeRole")][0].detail' "${record}")"
 [ "$(jq -r '.role_arn + " " + .tags.clanker_layer + " " + .tags.clanker_env' <<<"${plan_session}")" = \
@@ -349,6 +360,41 @@ grep -q "${base}/work/${item}" <<<"${links}" ||
   fail "no Slack message has a link to ${base}/work/${item}"
 if grep -q "127.0.0.1:${port}" <<<"${links}"; then fail "a Slack message links to the listen address"; fi
 
+echo "== the variables of the collector in 40-platform"
+platform="$(sql "SELECT outputs FROM layer_outputs WHERE env = '${env_name}' AND layer = '40-platform'")"
+collector_token="$(sql "SELECT value FROM kv WHERE key = 'collector.token.${env_name}'")"
+[ "$(jq -r .collector_endpoint <<<"${platform}")" = "${base}/otlp" ] ||
+  fail "40-platform did not get the public URL of the core as the endpoint of the collector"
+token_sha256="$(printf '%s' "${collector_token}" | shasum -a 256 | cut -d ' ' -f 1)"
+if [ -z "${collector_token}" ] ||
+  [ "$(jq -r .collector_token_sha256 <<<"${platform}")" != "${token_sha256}" ]; then
+  fail "40-platform did not get the collector token of the environment"
+fi
+
+echo "== a debug session reads the stand-in cluster with the session of the debugger"
+answer="$(curl -fs -b "${work}/admin.jar" -H 'Content-Type: application/json' \
+  -d "{\"env\": \"${env_name}\", \"reason\": \"aws-core-check\"}" \
+  "${base}/api/v1/debug-sessions")" || fail "the debug session failed"
+# kubectl shows the refusal of the stand-in as "Forbidden" with no message.
+grep -q "Error from server (Forbidden)" <<<"$(jq -r .transcript <<<"${answer}")" ||
+  fail "the transcript does not show the answer of the stand-in cluster: ${answer}"
+debug_session="$(jq -cs '[.[] | select(.action == "AssumeRole" and
+  .detail.tags.clanker_layer == "debug")] | last | .detail' "${record}")"
+[ "$(jq -r .role_arn <<<"${debug_session}")" = "${role}/debugger" ] ||
+  fail "the debug session did not get a session of the debugger role: ${debug_session}"
+kube_tokens="$(jq -cs '[.[] | select(.service == "kube") | .detail.token]' "${record}")"
+echo "$(jq length <<<"${kube_tokens}") requests reached the stand-in cluster"
+[ "$(jq length <<<"${kube_tokens}")" -gt 0 ] || fail "kubectl did not reach the stand-in cluster"
+[ "$(jq -r --arg key "$(jq -r .access_key_id <<<"${debug_session}")" --arg region "${region}" \
+  '[.[] | select(.access_key_id != $key or .region != $region or .service != "sts" or
+    .action != "GetCallerIdentity" or (.has_session_token | not) or
+    (.signed_headers | split(";") | index("x-k8s-aws-id") == null))] | length' \
+  <<<"${kube_tokens}")" = 0 ] ||
+  fail "a token is not from aws eks get-token with the debugger session: ${kube_tokens}"
+[ "$(sql "SELECT data FROM events WHERE type = 'credential.issued' ORDER BY seq DESC LIMIT 1" |
+  jq -r .cluster)" = "${env_name}-cluster" ] ||
+  fail "the credential of the debug session does not name the cluster of 20-cluster"
+
 stop_core
 echo "== the log of the core"
 if grep -q "level=ERROR" "${work}/up.log" "${work}/standby.log"; then
@@ -357,6 +403,9 @@ fi
 while read -r token; do
   if grep -qF -- "${token}" "${work}/up.log"; then fail "a job token is in the log of the core"; fi
 done <"${work}/tokens.txt"
+if [ -n "${collector_token}" ] && grep -qF -- "${collector_token}" "${work}/up.log"; then
+  fail "the collector token is in the log of the core"
+fi
 for value in "${network_id}" "${team_tag}"; do
   if grep -qF -- "${value}" "${work}/up.log"; then fail "a value of the account is in the log"; fi
 done
@@ -369,5 +418,6 @@ if [ "${failures}" -ne 0 ]; then
   exit 1
 fi
 echo "RESULT: the core on AWS read its settings from Parameter Store, planned 10-network in" \
-  "a runner task with an STS session and S3 state, and applied layers 10 to 50 after two" \
-  "approvals"
+  "a runner task with an STS session and S3 state, applied layers 10 to 50 after two" \
+  "approvals with the variables of the collector, and ran a debug session against the" \
+  "stand-in cluster with the kubeconfig of the broker and the session of the debugger"
