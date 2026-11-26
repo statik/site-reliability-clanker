@@ -113,8 +113,8 @@ func (a *Agent) budgetReached(used usage) (summary string, err error) {
 	return "", nil
 }
 
-// complete sends one request for a role, enforces the budget, scrubs the input and the
-// answer, and records the call with its transcript.
+// complete sends one request for a role, enforces the budget, puts the name of the pack in
+// the replay key, scrubs the input and the answer, and records the call with its transcript.
 func (a *Agent) complete(ctx context.Context, role, workItem string, req Request) (Response, error) {
 	spent, err := a.spentToday()
 	if err != nil {
@@ -130,6 +130,9 @@ func (a *Agent) complete(ctx context.Context, role, workItem string, req Request
 		return Response{}, err
 	}
 	req.Model = a.Models[role]
+	if req.ReplayKey != "" {
+		req.ReplayKey = a.App.Name + "_" + req.ReplayKey
+	}
 	for i := range req.Messages {
 		req.Messages[i].Content = scrub.Text(req.Messages[i].Content)
 	}
