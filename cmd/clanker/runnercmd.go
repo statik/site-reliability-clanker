@@ -35,6 +35,10 @@ func runRunner(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	// A stop of the runner (SIGTERM from ECS or from the local launcher) ends ctx. The
+	// program of the job then gets an interrupt and the grace that fits in the time that the
+	// launcher gives the runner.
+	r.StopGrace = runner.TaskStopGrace
 	client := &runner.Client{CoreURL: coreURL, Token: token, Runner: r}
 	return client.Serve(ctx)
 }

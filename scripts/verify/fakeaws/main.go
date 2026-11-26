@@ -6,6 +6,8 @@
 //     MinIO with a session token;
 //   - ECS RunTask, DescribeTasks and StopTask: RunTask runs the runner image with Docker,
 //     with the environment of the container override, as Fargate runs a runner task.
+//     StopTask stops the container as Fargate stops a task: SIGTERM, and SIGKILL after the
+//     stop timeout of the runner task definition.
 //
 // It also takes the webhook of a chat platform at /hooks/<name>, and serves a stand-in for the
 // API server of an EKS cluster over TLS at --kube-addr (kube.go). `fakeaws cert DIR` writes

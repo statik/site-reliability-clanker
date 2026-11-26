@@ -34,6 +34,10 @@ resource "aws_ecs_task_definition" "runner" {
     name      = local.runner_container
     image     = "${aws_ecr_repository.runner.repository_url}@${var.runner_image_digest}"
     essential = true
+    # A stop of the task sends SIGTERM, and SIGKILL after this many seconds (at most 120 on
+    # Fargate). The runner interrupts OpenTofu and waits for it to save its state and
+    # release its lock. It is runner.TaskStopTime.
+    stopTimeout = 120
     logConfiguration = {
       logDriver = "awslogs"
       options = {

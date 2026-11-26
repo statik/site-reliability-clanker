@@ -10,7 +10,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"sync"
+
+	"github.com/statik/site-reliability-clanker/internal/runner"
 )
 
 // taskArnPrefix starts the ARN of each task. The account is the example account of the AWS
@@ -166,7 +169,9 @@ func (e *ecsTasks) runContainer(t *task, args, environ []string) {
 		return
 	}
 	t.status, t.exitCode = "STOPPED", &code
-	t.stopCode, t.reason = "EssentialContainerExited", "Essential container in task exited"
+	if t.stopCode == "" {
+		t.stopCode, t.reason = "EssentialContainerExited", "Essential container in task exited"
+	}
 }
 
 func (e *ecsTasks) setStatus(t *task, status string) {
@@ -236,9 +241,28 @@ func (e *ecsTasks) stopTask(w http.ResponseWriter, r *http.Request) error {
 	}
 	e.record.add("ecs", "StopTask", r, map[string]any{"cluster": in.Cluster,
 		"task": in.Task, "reason": in.Reason})
-	e.remove(t, "UserInitiated", in.Reason)
+	e.stop(t, in.Reason)
 	writeJSON(w, map[string]any{"task": e.describe(t)})
 	return nil
+}
+
+// stop stops the container of a task as ECS stops a task: SIGTERM, and SIGKILL after the
+// stop timeout of the runner task definition. The task is STOPPED when its container ended.
+// A task whose container cannot be stopped, because it does not run yet, is removed.
+func (e *ecsTasks) stop(t *task, reason string) {
+	e.mu.Lock()
+	if t.status != "STOPPED" {
+		t.stopCode, t.reason = "UserInitiated", reason
+	}
+	e.mu.Unlock()
+	seconds := strconv.Itoa(int(runner.TaskStopTime.Seconds()))
+	go func() {
+		out, err := exec.Command("docker", "stop", "--time", seconds, t.name).CombinedOutput()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "fakeaws: stop %s: %v: %s\n", t.name, err, out)
+			e.remove(t, "UserInitiated", reason)
+		}
+	}()
 }
 
 // remove removes the container of a task and marks the task stopped.

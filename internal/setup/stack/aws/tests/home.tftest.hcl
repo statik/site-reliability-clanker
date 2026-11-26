@@ -715,9 +715,11 @@ run "phase_two_starts_the_core_and_the_runners" {
       jsondecode(aws_ecs_task_definition.runner[0].container_definitions)[0].image == join("", [
         "123456789012.dkr.ecr.us-west-2.amazonaws.com/clanker-test-runner@",
         "sha256:0000000000000000000000000000000000000000000000000000000000000001",
-      ])
+      ]) &&
+      jsondecode(aws_ecs_task_definition.runner[0].container_definitions)[0].stopTimeout == 120
     )
-    error_message = "The runner must have no task role and run the image by its digest on ARM64."
+    error_message = join(" ", ["The runner must have no task role, run the image by its digest",
+    "on ARM64 and have the stop timeout of 120 seconds that Fargate allows at most."])
   }
 
   assert {
