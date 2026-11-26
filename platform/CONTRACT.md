@@ -179,6 +179,7 @@ application. `40-platform` makes that database.
 | Input | Type | Meaning |
 |---|---|---|
 | `app_name` | `string` | Name of the application pack, for example `paperboat`. Required. The namespace, the database role, the database, the secret `<name>-db` and the claim `<name>-shared` have this name |
+| `workloads_namespace` | `bool` | Make the namespace `<name>-workloads` for the pods that the application starts, such as the workspaces of Coder. Default `false`. The control plane writes the line from `deploy.workloads_namespace` of the pack |
 | `public_port` | `number` | Port of the public listener. Default `80` |
 | `collector_endpoint` | `string` | Address of the control plane for the data of the collector, for example `http://host:7070/otlp`. Default empty: no collector |
 | `collector_token` | `string`, sensitive | Token that the collector sends to the control plane. Default empty |
@@ -193,7 +194,7 @@ application. `40-platform` makes that database.
 | `app_domain` | `string` | Domain of the host names of the applications. A route with `hostname` gets `<name>.<app_domain>`. Empty: no application has a host name. The clouds have none yet: a private DNS zone and a certificate for each cloud come later, after the owner approves the cost | `127-0-0-1.sslip.io` |
 | `app_secret_name` | `string` | Kubernetes secret `<name>-db` in `app_namespace` with the credential of the database role of the application. See below | Same |
 | `shared_volume_claim` | `string` | `PersistentVolumeClaim` `<name>-shared` in `app_namespace`, `ReadWriteMany` | Same |
-| `targets` | `map(string)` | Where the application runs. The key `application` has the namespace of its components. The key `data` has the namespace of its data services, or it is empty when they are not in the cluster. The control plane reads the namespaces of a debug session and of the rights of its identities from this output, not from the application pack | `data` is the output `data_namespace` of `30-data` |
+| `targets` | `map(string)` | Where the application runs. The key `application` has the namespace of its components. The key `data` has the namespace of its data services, or it is empty when they are not in the cluster. The key `workloads` has the namespace `<name>-workloads`, or it is empty when `workloads_namespace` is `false`. The control plane reads the namespaces of a debug session and of the rights of its identities from this output, not from the application pack | `data` is the output `data_namespace` of `30-data` |
 | `collector_namespace` | `string` | Namespace of the OpenTelemetry Collector that sends the state of the workloads in `app_namespace` to the control plane. Empty when `collector_endpoint` is empty | `clanker-observe` when the control plane sets `collector_endpoint` |
 
 The control plane gives `collector_endpoint` and `collector_token` to the runner as
@@ -215,6 +216,12 @@ The entry point is the same on every target, the local target too:
   Service has none yet.
 - The ClusterRole `clanker-httproute-admin` adds the rights on `httproutes` to the
   ClusterRole `admin`, so the applier of `50-app` can manage the route in its namespace.
+- The namespace `<name>-workloads` has no label `clanker.dev/application`, so the Gateway
+  admits no route from it, and the collector does not read it. A pod there can have any
+  spec, so it is not in `app_namespace`, where it could mount the secret `<name>-db`. Only
+  the applier of `50-app` has rights there: the role `admin` on the local target, for the
+  Role that the chart of the application makes there. The runbook and debugger identities
+  have none, and no runbook or debug session gets this namespace.
 - On the local target the public DNS answers every name under `app_domain` with
   `127.0.0.1`. That is the host port of the gateway for the browser and the control plane,
   but not for a pod. So the layer writes the key `Corefile` of the ConfigMap
@@ -254,7 +261,7 @@ are in `apps/<name>/` of the platform repository.
 The static files of the root (`main.tf`, `variables.tf`, `outputs.tf`, `versions.tf`) have
 only the inputs of the environment. The control plane writes `app.tf` from the manifest of
 the pack (`internal/applayer`), because OpenTofu needs declared names. It also writes the
-lines of the pack in `terraform.tfvars` and the line `app_name` of the `terraform.tfvars` of
+lines of the pack in `terraform.tfvars` and the lines `app_name` and `workloads_namespace` of the `terraform.tfvars` of
 `40-platform`. A new control plane writes them when it seeds the platform repository. The
 files of the example pack are committed, and a Go test fails when they are not what the
 control plane writes.

@@ -98,10 +98,11 @@ func TestTheForgeIsSeededFromThePack(t *testing.T) {
 			wantOutside)
 	}
 	// The application layer has the names of the pack, not those of the source files.
+	platformVars := "app_name            = \"harbor\"\nworkloads_namespace = true\n"
 	for file, want := range map[string]string{
 		"platform/stacks/local/50-app/app.tf":                `variable "harbor_release" {`,
 		"platform/stacks/local/50-app/terraform.tfvars":      "harbor_release   = \"3.4.0\"\n",
-		"platform/stacks/local/40-platform/terraform.tfvars": "app_name = \"harbor\"\n",
+		"platform/stacks/local/40-platform/terraform.tfvars": platformVars,
 	} {
 		text, err := f.ReadFile(orchestrator.PlatformRepo, "main", file)
 		if err != nil || !strings.Contains(string(text), want) ||

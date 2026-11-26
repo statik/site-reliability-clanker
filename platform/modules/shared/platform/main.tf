@@ -36,6 +36,18 @@ resource "kubernetes_namespace_v1" "app" {
   }
 }
 
+# The pods that the application starts. They can have any spec, so they are not in the
+# namespace of the application, where a pod could mount the Secret <name>-db. The namespace
+# has no label of the application: the Gateway admits no route from it.
+resource "kubernetes_namespace_v1" "workloads" {
+  count = var.workloads_namespace ? 1 : 0
+
+  metadata {
+    name   = "${var.app_name}-workloads"
+    labels = local.labels
+  }
+}
+
 resource "kubernetes_persistent_volume_claim_v1" "shared" {
   metadata {
     name      = "${var.app_name}-shared"

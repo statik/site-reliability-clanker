@@ -1,0 +1,10 @@
+# The rights in the namespace of the pods that the application starts. The broker applies
+# this file when the target has such a namespace. The chart of the application makes its
+# own Role there, so the applier of the application layer gets admin. The runbook and the
+# debugger get nothing there: those pods can have any spec.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: clanker-applier-50-app, namespace: {{workloads_namespace}}}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: admin}
+subjects:
+  - {kind: ServiceAccount, name: clanker-applier-50-app, namespace: clanker-system}

@@ -22,9 +22,16 @@ func TestTheTargetsComeFromTheOutputOfThePlatformLayer(t *testing.T) {
 	if err != nil || got != (pack.Targets{Namespace: "paperboat", DataNamespace: "clanker-data"}) {
 		t.Errorf("the data namespace of the local target: ParseTargets = %+v, %v", got, err)
 	}
+	got, err = pack.ParseTargets(targets(map[string]any{"application": "coder",
+		"data": "clanker-data", "workloads": "coder-workloads"}))
+	if err != nil || got != (pack.Targets{Namespace: "coder", DataNamespace: "clanker-data",
+		WorkloadsNamespace: "coder-workloads"}) {
+		t.Errorf("the workloads namespace: ParseTargets = %+v, %v", got, err)
+	}
 	for name, values := range map[string]map[string]any{
-		"no key for the data":     {"application": "shop"},
-		"an empty data namespace": {"application": "shop", "data": ""},
+		"no key for the data":          {"application": "shop"},
+		"an empty data namespace":      {"application": "shop", "data": ""},
+		"an empty workloads namespace": {"application": "shop", "workloads": ""},
 	} {
 		got, err := pack.ParseTargets(targets(values))
 		if err != nil || got != (pack.Targets{Namespace: "shop"}) {
@@ -66,6 +73,19 @@ func TestTheTargetsAreChecked(t *testing.T) {
 			"data": "shop"}), "two times"},
 		"a key that does not exist": {targets(map[string]any{"application": "shop",
 			"cluster": "x"}), `the key "cluster"`},
+		"a workloads namespace of the platform": {targets(map[string]any{
+			"application": "shop", "workloads": "clanker-workloads"}),
+			`"clanker-workloads" of workloads`},
+		"the namespace of the control plane as workloads": {targets(map[string]any{
+			"application": "shop", "workloads": "clanker-system"}), `"clanker-system" of workloads`},
+		"a namespace of the cluster as workloads": {targets(map[string]any{
+			"application": "shop", "workloads": "kube-public"}), `"kube-public" of workloads`},
+		"a workloads namespace that is a flag": {targets(map[string]any{
+			"application": "shop", "workloads": "-A"}), `namespace "-A" of workloads`},
+		"the application namespace as workloads": {targets(map[string]any{
+			"application": "shop", "workloads": "shop"}), "two times"},
+		"the data namespace as workloads": {targets(map[string]any{"application": "shop",
+			"data": "shop-data", "workloads": "shop-data"}), "two times"},
 	}
 	for name, tc := range cases {
 		got, err := pack.ParseTargets(tc.outputs)

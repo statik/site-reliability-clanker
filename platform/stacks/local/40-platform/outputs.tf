@@ -42,6 +42,7 @@ output "targets" {
   value = {
     application = module.platform.app_namespace
     data        = local.data_outputs.data_namespace
+    workloads   = module.platform.workloads_namespace
   }
   description = "Where the application runs: the namespace of its components and the namespace of its data services."
 }

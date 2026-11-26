@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/statik/site-reliability-clanker/internal/jobspec"
+	"github.com/statik/site-reliability-clanker/internal/pack"
 	"github.com/statik/site-reliability-clanker/internal/pack/packtest"
 	"github.com/statik/site-reliability-clanker/internal/store"
 	"github.com/statik/site-reliability-clanker/internal/store/storetest"
@@ -97,6 +98,12 @@ func TestTheTargetsOfAnEnvironmentComeFromThePlatformLayer(t *testing.T) {
 	got, err := o.Targets("local")
 	if err != nil || got.Namespace != "harbor" || got.DataNamespace != "harbor-store" {
 		t.Errorf("Targets = %+v, %v", got, err)
+	}
+	set(map[string]any{"application": "coder", "data": "", "workloads": "coder-workloads"})
+	got, err = o.Targets("local")
+	if err != nil || got != (pack.Targets{Namespace: "coder",
+		WorkloadsNamespace: "coder-workloads"}) {
+		t.Errorf("Targets with a workloads namespace = %+v, %v", got, err)
 	}
 	set(map[string]any{"application": "kube-system"})
 	if _, err := o.Targets("local"); err == nil {

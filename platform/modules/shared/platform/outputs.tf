@@ -3,6 +3,11 @@ output "app_namespace" {
   description = "Namespace of the application. It has the name of the pack."
 }
 
+output "workloads_namespace" {
+  value       = try(kubernetes_namespace_v1.workloads[0].metadata[0].name, "")
+  description = "Namespace <name>-workloads for the pods that the application starts. Empty when workloads_namespace is false."
+}
+
 output "gateway_name" {
   value       = local.gateway_name
   description = "Name of the Gateway that the routes of the application attach to."

@@ -2,7 +2,8 @@
 // a pack. OpenTofu needs declared names, so for each target the stack of the layer has a
 // file app.tf with the version variable, the settings, the URL and version outputs and the
 // local value app that main.tf gives the shared module. The package also writes the lines
-// of the pack in terraform.tfvars of the layer and the line app_name of 40-platform.
+// of the pack in terraform.tfvars of the layer, and the line app_name of 40-platform with
+// the line workloads_namespace when the pack asks for that namespace.
 //
 // Every name and value that goes into a file comes from a pack that Load checked, so each
 // is a name, a number or a path of a fixed pattern. The package starts no program: the
@@ -42,8 +43,9 @@ var (
 	render = template.Must(template.New(AppFile).Funcs(template.FuncMap{
 		"quote": quote, "list": list}).Parse(appTemplate))
 	// assignment is a line of a tfvars file that sets one variable on one line.
-	assignment  = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_-]*)\s*=\s*(\S.*)$`)
-	appNameLine = regexp.MustCompile(`(?m)^(app_name\s*=\s*)"[^"\n]*"$`)
+	assignment    = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_-]*)\s*=\s*(\S.*)$`)
+	appNameLine   = regexp.MustCompile(`(?m)^(app_name\s*=\s*)"[^"\n]*"$`)
+	workloadsLine = regexp.MustCompile(`(?m)^workloads_namespace\s*=.*(\n|$)`)
 )
 
 // Files returns the generated files of the pack by their path in the platform tree (the
@@ -282,13 +284,20 @@ func settingDefault(s pack.Setting) (string, error) {
 }
 
 // PlatformVars returns terraform.tfvars of 40-platform with the name of the pack in the
-// line app_name. The file must have that line exactly once.
+// line app_name, and the line workloads_namespace = true after it when the pack asks for
+// that namespace. The file must have the line app_name exactly once. It keeps no other
+// line workloads_namespace.
 func PlatformVars(app pack.Pack, text []byte) ([]byte, error) {
 	if found := len(appNameLine.FindAll(text, -1)); found != 1 {
 		return nil, fmt.Errorf("the file must set app_name = \"...\" on one line; it does %d "+
 			"times", found)
 	}
-	return appNameLine.ReplaceAll(text, []byte("${1}"+quote(app.Name))), nil
+	line := "${1}" + quote(app.Name)
+	if app.Deploy.WorkloadsNamespace {
+		line += "\nworkloads_namespace = true"
+	}
+	text = workloadsLine.ReplaceAll(text, nil)
+	return []byte(Align(string(appNameLine.ReplaceAll(text, []byte(line))))), nil
 }
 
 // quote returns a string as an HCL string literal. The values of a checked pack have no

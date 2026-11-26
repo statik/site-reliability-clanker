@@ -52,7 +52,7 @@ built.
 | `deploy.secrets` | Optional. 1 to 8 key names. The layer makes a secret with a random value for each key |
 | `deploy.route` | The route of the application on the gateway of the platform: the `service` and the `port` that get the requests; optionally 1 to 8 path prefixes in `paths` (with none, every path), `timeout_seconds` from 0 (no timeout) to 3600 (with none, the default of the gateway), `hostname` (a host name of its own) and `wildcard` (every name below that host name; needs `hostname`) |
 | `deploy.timeout_seconds` | Optional. The Helm timeout of an apply, 60 to 1200 seconds. The default is 300 |
-| `deploy.workloads_namespace` | Optional. `true` asks the platform for a second namespace, for the pods that the application starts |
+| `deploy.workloads_namespace` | Optional. `true` asks the platform for a second namespace, `<name>-workloads`, for the pods that the application starts. The pack name then has at most 21 characters |
 | `components` | The parts of the application that run. Each has a `name`, the `runtime` `kubernetes`, the `workload` (the name of its deployment) and `required`. No code reads `required` yet |
 | `incident` | Optional. The `runbook` and the `component` that an incident proposes when no model gives a diagnosis. Without it, such an incident goes to a person |
 | `diagnostics` | The reads of a debug session, 1 to 8. A read is `{"read": "logs", "component": …, "lines": …}` with 1 to 200 lines, or `{"read": "events"}` |
@@ -102,16 +102,18 @@ and section 4). The control plane writes `app.tf` of each stack of the layer fro
 manifest: the version variable, a variable with bounds for each setting, the URL and
 version outputs, and the local value `app` with the deploy fields. It also writes the
 lines of the pack in `terraform.tfvars` (the first release and the default of each
-setting) and the line `app_name` of `40-platform`. The layer installs the objects of the
+setting) and the line `app_name` of `40-platform`, with the line `workloads_namespace`
+when the pack sets it. The layer installs the objects of the
 platform (the route, `<name>-platform`, `<name>-generated`), then the chart of the
 release record or of `deploy.chart` with the values files, the values of the record, the
 values of the platform and the settings, then the extras chart. A chart that a record
 names is a chart of another project, so it does not get the values of the platform
 (`platform.*`); its values files read the objects of the platform by name. With
 `deploy.route.hostname` the application gets the host name `<name>.<app_domain>` of the
-target, and its URL is on that name (`platform/CONTRACT.md` section 4). The layer does not
-read `deploy.workloads_namespace` yet: step S11 of #148 adds it. `packs/nginx` is the
-smallest pack that uses each of the other fields.
+target, and its URL is on that name (`platform/CONTRACT.md` section 4). With
+`deploy.workloads_namespace` the layer of the platform makes the namespace
+`<name>-workloads`, where only the applier of the application layer has rights.
+`packs/nginx` is the smallest pack that uses each of the other fields.
 
 **Release records.** A pack can have a record `<version>.json` beside the note of each
 release. When a pack has records, every release must have one, and each record must have

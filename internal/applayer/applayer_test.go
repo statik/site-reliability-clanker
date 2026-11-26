@@ -133,11 +133,34 @@ func TestTheLayerOfASecondPackHasItsNames(t *testing.T) {
 		t.Errorf("terraform.tfvars of local 50-app\n got %q\nwant %q", vars, want)
 	}
 	platform := string(files["stacks/local/40-platform/terraform.tfvars"])
-	if !strings.Contains(platform, "app_name    = \"harbor\"\n") ||
-		!strings.Contains(platform, "public_port = 8088\n") {
+	if !strings.Contains(platform, "app_name            = \"harbor\"\n"+
+		"workloads_namespace = true\npublic_port         = 8088\n") {
 		t.Errorf("terraform.tfvars of local 40-platform:\n%s", platform)
 	}
 	checkFormat(t, files)
+}
+
+// The line workloads_namespace is in the file of 40-platform once when the pack asks for
+// the namespace, and not at all when it does not, whatever the file had before.
+func TestTheWorkloadsLineOfThePlatformFollowsThePack(t *testing.T) {
+	before := "env_name = \"local\"\napp_name = \"x\"\nworkloads_namespace   = true\n" +
+		"public_port = 8088\nworkloads_namespace = false"
+	for name, tc := range map[string]struct {
+		app  pack.Pack
+		want string
+	}{
+		"a pack with the namespace": {packtest.Second(t), "env_name            = \"local\"\n" +
+			"app_name            = \"harbor\"\nworkloads_namespace = true\n" +
+			"public_port         = 8088\n"},
+		"a pack without it": {packtest.Example(t), "env_name    = \"local\"\n" +
+			"app_name    = \"paperboat\"\npublic_port = 8088\n"},
+	} {
+		got, err := applayer.PlatformVars(tc.app, []byte(before))
+		if err != nil || string(got) != tc.want {
+			t.Errorf("%s: %v\n got %q\nwant %q", name, err, got, tc.want)
+		}
+		checkFormat(t, map[string][]byte{"40-platform.tfvars": got})
+	}
 }
 
 func TestAPackWithRecordsSaysSo(t *testing.T) {

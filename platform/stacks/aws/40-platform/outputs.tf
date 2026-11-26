@@ -51,6 +51,7 @@ output "targets" {
   value = {
     application = module.platform.app_namespace
     data        = ""
+    workloads   = module.platform.workloads_namespace
   }
   description = "Where the application runs: the namespace of its components. The data services are not in the cluster."
 }
