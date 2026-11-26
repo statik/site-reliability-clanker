@@ -106,10 +106,11 @@ ignores.
 
 ## Order
 
-`clanker install --cloud aws` does all of this from a checkout, with the working copy in
-`~/.clanker/aws/<env>/stack`, the state in `home.tfstate` and the working data of OpenTofu in
-`tfdata` (`TF_DATA_DIR`) next to it. Its record `install.json` lets a run continue after a
-failed step and lets `clanker uninstall --cloud aws` find what is outside the state. By hand:
+`clanker install --cloud aws` and the wizard (`clanker setup`, its button Create) do all of
+this from a checkout, with the working copy in `~/.clanker/aws/<env>/stack`, the state in
+`home.tfstate` and the working data of OpenTofu in `tfdata` (`TF_DATA_DIR`) next to it. Their
+record `install.json` lets a run continue after a failed step and lets `clanker uninstall
+--cloud aws` (or Remove in the wizard) find what is outside the state. By hand:
 
 1. **Phase 1.** Apply without `runner_image_digest` and `core_image_id`. This creates
    everything except the runner task definition and the core. The apply waits until Keycloak

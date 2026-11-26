@@ -374,7 +374,8 @@ func TestPlaceRecordsANetworkOfTheSurvey(t *testing.T) {
 		t.Fatalf("status = %d, body = %v", code, body)
 	}
 	want := State{Region: "eu-west-1", PlaceMode: PlaceExisting, Network: "vpc-1",
-		Subnets: []string{"subnet-a", "subnet-b"}, Access: AccessTailscale}
+		Subnets: []string{"subnet-a", "subnet-b"}, Access: AccessTailscale,
+		RouterGroup: "sg-router"}
 	if !reflect.DeepEqual(server.state, want) {
 		t.Fatalf("state = %+v, want %+v", server.state, want)
 	}

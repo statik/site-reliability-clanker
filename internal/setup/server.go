@@ -44,6 +44,13 @@ type Config struct {
 	CLI CLI
 	// OllamaURL is where Ollama answers on this machine. Empty means its usual address.
 	OllamaURL string
+	// Layers applies 00-bootstrap and destroys the layers for the installer on AWS.
+	Layers Layers
+	// Checkout is the checkout of this repository that the wizard runs from, or "" for a
+	// released binary. The installer on AWS builds the runner and the core from a checkout.
+	Checkout string
+	// AWSRoot holds the directory of each environment on AWS. Empty means ~/.clanker/aws.
+	AWSRoot string
 }
 
 // State is what the wizard remembers between starts. It holds no secret.
@@ -67,6 +74,20 @@ type State struct {
 	Subnets     []string `json:"subnets"`
 	NetworkCIDR string   `json:"network_cidr"`
 	Access      string   `json:"access"`
+	// RouterGroup is the security group of the Tailscale subnet router of the network.
+	RouterGroup string `json:"router_group"`
+	// ZoneID and ZoneName name the public zone of the names on AWS. TagKeys are the keys
+	// of the required tags: their values stay in memory and in home.tfvars. Source is the
+	// checkout that the installer builds from, and Nanos the release of the kernel.
+	ZoneID   string   `json:"zone_id"`
+	ZoneName string   `json:"zone_name"`
+	TagKeys  []string `json:"tag_keys"`
+	Source   string   `json:"source"`
+	Nanos    string   `json:"nanos"`
+	// Installed says that the installer on AWS ended with every step, and Result is what
+	// it printed at the end.
+	Installed bool           `json:"installed"`
+	Result    *InstallResult `json:"result,omitempty"`
 }
 
 // Server is the wizard. One person uses it, on the loopback address.
@@ -85,6 +106,9 @@ type Server struct {
 	found   *Discovery
 	job     *job
 	baseCtx context.Context
+	// tags are the values of the required tags that the person gave in this start.
+	tags      map[string]string
+	installer *Installer
 }
 
 // New loads the saved state and makes the token of this start.
@@ -99,7 +123,9 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 	if _, err := rand.Read(raw); err != nil {
 		return nil, fmt.Errorf("make the access token: %w", err)
 	}
-	s := &Server{cfg: cfg, token: hex.EncodeToString(raw), baseCtx: ctx}
+	s := &Server{cfg: cfg, token: hex.EncodeToString(raw), baseCtx: ctx,
+		installer: &Installer{CLI: cfg.CLI, Layers: cfg.Layers, Version: cfg.Version,
+			Root: cfg.AWSRoot}}
 	data, err := os.ReadFile(s.statePath())
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
@@ -176,6 +202,9 @@ func (s *Server) Handler(listenHost string) (http.Handler, error) {
 	api("POST /api/aws/discover", s.postDiscover)
 	api("POST /api/aws/place", s.postPlace)
 	api("POST /api/aws/login", s.postLogin)
+	api("GET /api/aws/details", s.getDetails)
+	api("POST /api/aws/details", s.postDetails)
+	api("POST /api/aws/remove", s.postRemove)
 	api("POST /api/review", s.postReview)
 	api("POST /api/deploy", s.postDeploy)
 	_, port, err := net.SplitHostPort(listenHost)
