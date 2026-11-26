@@ -25,7 +25,10 @@ func checkoutWith(t *testing.T, packs ...string) string {
 		}
 	}
 	for file, text := range map[string]string{"platform/CONTRACT.md": "# Contract\n",
-		"runbooks/README.md": "# Runbooks\n"} {
+		"runbooks/README.md": "# Runbooks\n",
+		"platform/stacks/local/50-app/terraform.tfvars": "env_name = \"local\"\n" +
+			"paperboat_version = \"1.0.0\"\n",
+		"platform/stacks/local/40-platform/terraform.tfvars": "app_name = \"paperboat\"\n"} {
 		path := filepath.Join(dir, file)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			t.Fatal(err)
@@ -87,8 +90,25 @@ func TestTheForgeIsSeededFromThePack(t *testing.T) {
 			outside = append(outside, file)
 		}
 	}
-	if !slices.Equal(outside, []string{"platform/CONTRACT.md"}) {
-		t.Errorf("the platform repository has %v outside the pack", outside)
+	wantOutside := []string{"platform/CONTRACT.md",
+		"platform/stacks/local/40-platform/terraform.tfvars",
+		"platform/stacks/local/50-app/app.tf", "platform/stacks/local/50-app/terraform.tfvars"}
+	if !slices.Equal(outside, wantOutside) {
+		t.Errorf("the platform repository has %v outside the pack, want %v", outside,
+			wantOutside)
+	}
+	// The application layer has the names of the pack, not those of the source files.
+	for file, want := range map[string]string{
+		"platform/stacks/local/50-app/app.tf":                `variable "harbor_release" {`,
+		"platform/stacks/local/50-app/terraform.tfvars":      "harbor_release   = \"3.4.0\"\n",
+		"platform/stacks/local/40-platform/terraform.tfvars": "app_name = \"harbor\"\n",
+	} {
+		text, err := f.ReadFile(orchestrator.PlatformRepo, "main", file)
+		if err != nil || !strings.Contains(string(text), want) ||
+			strings.Contains(string(text), "paperboat") {
+			t.Errorf("%s of the platform repository has no %q, or names the source pack: "+
+				"%v\n%s", file, want, err, text)
+		}
 	}
 	wantPack := []string{"chart/Chart.yaml", "charts/harbor-3.5.0.tgz", "extras/Chart.yaml",
 		"extras/templates/job.yaml", "releases/3.4.0.json", "releases/3.5.0.json",

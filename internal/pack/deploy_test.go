@@ -117,6 +117,8 @@ func TestLoadRefusesASettingThatIsNotSafe(t *testing.T) {
 			"the setting env_name has the name"},
 		"the admin token": {setting(named("admin_token", "adminToken")),
 			"the setting admin_token has the name"},
+		"a name that OpenTofu reserves": {setting(named("count", "a")),
+			"the setting count has the name"},
 		"a variable two times": {in("deploy", "settings", []any{named("a_count", "a"),
 			named("a_count", "b")}), "the setting a_count has the name"},
 		"a Helm path with an index": {setting(named("a_count", "pods[0].replicas")),

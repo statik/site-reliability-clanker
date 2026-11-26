@@ -1,5 +1,0 @@
-apiVersion: v2
-name: clanker-route
-description: The HTTPRoute that attaches the web Service of the application to the platform Gateway.
-type: application
-version: 0.1.0

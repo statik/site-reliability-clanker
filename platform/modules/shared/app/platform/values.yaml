@@ -1,0 +1,31 @@
+# Layer 50-app sets every value. These defaults only make the chart render alone.
+
+# Name of the pack. The objects are <name>, <name>-platform and <name>-generated.
+name: example
+
+# The Gateway of 40-platform.
+gateway:
+  name: clanker
+  namespace: clanker-gateway
+
+# The route of the application: deploy.route of the manifest.
+route:
+  # The Service in the release namespace that gets the requests, and its port.
+  service: example-web
+  port: 8080
+  # Path prefixes. Empty: every path.
+  paths: []
+  # Request timeout, for example "30s". "0s" is no timeout. Empty: the default of the
+  # gateway.
+  timeout: ""
+
+# The data of the ConfigMap <name>-platform.
+platform:
+  APP_URL: http://localhost:8088
+  APP_HOSTNAME: ""
+  APP_WILDCARD_HOST: ""
+  APP_VERSION: 1.0.0
+
+# The keys and values of the Secret <name>-generated. Empty: no Secret. The layer gives
+# the values with set_sensitive.
+generated: {}

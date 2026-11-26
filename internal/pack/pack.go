@@ -358,7 +358,8 @@ func (p Pack) Validate() error {
 	if ReservedRepository(p.Releases.Repository) {
 		return fmt.Errorf("releases.repository %q is a repository of the core", p.Releases.Repository)
 	}
-	for _, validate := range []func() error{p.checkValues, p.checkDeploy, p.checkPaths,
+	for _, validate := range []func() error{p.checkValues, p.checkLayerNames, p.checkDeploy,
+		p.checkPaths,
 		p.checkComponents, p.checkAppVersion, p.checkIncident, p.checkDiagnostics,
 		p.checkChecks, p.checkTopology} {
 		if err := validate(); err != nil {

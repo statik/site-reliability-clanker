@@ -1,0 +1,7 @@
+apiVersion: v2
+name: clanker-app-platform
+description: >-
+  The objects that the platform makes for the application of a pack: its route on the
+  platform Gateway, the ConfigMap <name>-platform and the Secret <name>-generated.
+type: application
+version: 0.2.0
