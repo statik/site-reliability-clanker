@@ -34,8 +34,10 @@ log and the snapshots as of that time.
 | `GET /forge/pulls`, `GET /forge/pulls/{id}`, `POST /forge/pulls` | Pull requests. `POST` body `{"branch", "title", "body", "env"}` opens one for a branch and starts the pipeline |
 | `GET /chat`, `POST /chat` | Ask. Body `{"work_item": "", "question": ""}` |
 | `GET /agent/calls` | Model calls with model, tokens, cost and transcript |
-| `GET /runbooks` | The runbooks of the `runbooks` repository: description, tier, inputs, outputs and who signed the standing approval |
-| `POST /runbooks/{name}` | Run a tier T1 runbook. Body `{"env", "params"}`. The parameters must be exactly the inputs of the definition; a request that does not fit answers 400 with the reason. Approver or admin |
+| `GET /runbooks` | The runbooks of the `runbooks` repository: description, tier, inputs, outputs, who signed the standing approval (`standing_approver`, empty when nobody did) and when (`standing_signed_at`, empty for a signature from before this field) |
+| `POST /runbooks/{name}` | Run a tier T1 runbook. Body `{"env", "params"}`. The parameters must be exactly the inputs of the definition; a request that does not fit answers 400 with the reason. A runbook with no standing approval answers 409. Approver or admin |
+| `POST /runbooks/{name}/standing-approval` | Sign the standing approval of a runbook as the person behind the request. It covers every later run until somebody revokes it, and a new signature replaces the one before. No body. The answer is `{"runbook", "signer", "signed_at"}`. A runbook with no definition, or whose tier is not T1, answers 400 with the reason. Approver or admin; another role gets 403 |
+| `DELETE /runbooks/{name}/standing-approval` | Revoke the standing approval of a runbook, also one that another person signed. A run that started goes on. The answer is the approval with an empty `signer` and `signed_at`. A runbook with no standing approval answers 409. Approver or admin |
 | `POST /debug-sessions` | Open a recorded, read-only debug session. Approver or admin |
 | `POST /environments/{env}/blank-slate` | Open the blank-slate work item. Admin |
 | `GET /sim`, `POST /sim/advance`, `POST /sim/scenes/{name}` | Simulator: virtual clock and scenes of the scripted month |
@@ -80,7 +82,7 @@ the targets of the environment are not known, which is before the first apply of
 | Work items | `workitem.created`, `workitem.state_changed` |
 | Pull requests | `pr.opened`, `pr.updated`, `pr.merged` |
 | Plans and policy | `plan.created`, `plan.failed`, `plan.within_envelope`, `policy.evaluated` |
-| Approvals | `approval.requested`, `approval.recorded`, `standing_approval.signed` |
+| Approvals | `approval.requested`, `approval.recorded`, `standing_approval.signed`, `standing_approval.revoked` |
 | Access | `grant.issued`, `grant.debug_issued`, `grant.revoked`, `grant.expired`, `grant.revoke_failed` |
 | Applies | `apply.started`, `apply.succeeded`, `apply.failed`, `apply.refused`, `apply.error` |
 | Verification | `verify.passed`, `verify.failed`, `rollback.authorized`, `rollback.failed`, `rollback.refused` |

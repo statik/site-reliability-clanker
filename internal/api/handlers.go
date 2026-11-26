@@ -536,20 +536,50 @@ func (s *Server) getRunbooks(*http.Request) (any, error) {
 	type row struct {
 		runbook.Definition
 		StandingApprover string `json:"standing_approver"`
+		StandingSignedAt string `json:"standing_signed_at"`
 	}
 	rows := make([]row, 0, len(definitions))
 	for _, definition := range definitions {
-		approver, err := s.Orch.StandingApprover(definition.Name)
+		standing, err := s.Orch.StandingApproval(definition.Name)
 		if err != nil {
 			return nil, err
 		}
-		rows = append(rows, row{Definition: definition, StandingApprover: approver})
+		rows = append(rows, row{Definition: definition, StandingApprover: standing.Signer,
+			StandingSignedAt: standing.SignedAt})
 	}
 	return rows, nil
 }
 
+// postStandingApproval signs the standing approval of a runbook as the person behind the
+// request, and answers with the approval.
+func (s *Server) postStandingApproval(r *http.Request) (any, error) {
+	user, err := s.requireRole(r, "approver", "admin")
+	if err != nil {
+		return nil, err
+	}
+	name := r.PathValue("name")
+	if err := s.Orch.SignStandingApproval(name, user.Name); err != nil {
+		return nil, err
+	}
+	return s.Orch.StandingApproval(name)
+}
+
+// deleteStandingApproval revokes the standing approval of a runbook, and answers with the
+// approval, which has no signer now.
+func (s *Server) deleteStandingApproval(r *http.Request) (any, error) {
+	user, err := s.requireRole(r, "approver", "admin")
+	if err != nil {
+		return nil, err
+	}
+	name := r.PathValue("name")
+	if err := s.Orch.RevokeStandingApproval(name, user.Name); err != nil {
+		return nil, err
+	}
+	return s.Orch.StandingApproval(name)
+}
+
 // postRunbook starts a runbook. It answers with the reason when the request does not fit
-// the definition of the runbook.
+// the definition of the runbook, or when nobody signed its standing approval.
 func (s *Server) postRunbook(r *http.Request) (any, error) {
 	user, err := s.requireRole(r, "approver", "admin")
 	if err != nil {
@@ -565,6 +595,14 @@ func (s *Server) postRunbook(r *http.Request) (any, error) {
 	name := r.PathValue("name")
 	if _, err := s.Orch.CheckRunbook(name, body.Params); err != nil {
 		return nil, err
+	}
+	approver, err := s.Orch.StandingApprover(name)
+	if err != nil {
+		return nil, err
+	}
+	if approver == "" {
+		return nil, fmt.Errorf("%w: runbook %s has no standing approval: an approver must "+
+			"sign one first", orchestrator.ErrConflict, name)
 	}
 	go s.background("runbook "+name, func(ctx context.Context) error {
 		_, err := s.Orch.RunRunbook(ctx, orchestrator.RunbookRequest{Env: body.Env, Name: name,

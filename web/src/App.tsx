@@ -8,6 +8,7 @@ import { CodePage, PullPage, RepoPage } from "@/pages/CodePages";
 import { ActivityPage, ApprovalsPage } from "@/pages/ListPages";
 import { NotificationsPage } from "@/pages/NotificationsPage";
 import { OverviewPage } from "@/pages/OverviewPage";
+import { RunbooksPage } from "@/pages/RunbooksPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { TimelinePage } from "@/pages/TimelinePage";
 import { TopologyPage } from "@/pages/TopologyPage";
@@ -33,6 +34,7 @@ export function App() {
         <Route path="/upcoming" element={<UpcomingPage />} />
         <Route path="/approvals" element={<ApprovalsPage />} />
         <Route path="/work/:id" element={<WorkItemPage />} />
+        <Route path="/runbooks" element={<RunbooksPage />} />
         <Route path="/activity" element={<ActivityPage />} />
         <Route path="/code" element={<CodePage />} />
         <Route path="/code/pulls/:id" element={<PullPage />} />

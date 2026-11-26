@@ -26,7 +26,7 @@ async function pages(page) {
   const pulls = await api(page, "/forge/pulls");
   const routes = {
     overview: "/", timeline: "/timeline", topology: "/topology", upcoming: "/upcoming",
-    approvals: "/approvals", activity: "/activity", code: "/code",
+    approvals: "/approvals", runbooks: "/runbooks", activity: "/activity", code: "/code",
     "code-repo": "/code/runbooks?ref=main&path=notifications/routes.json&file=1",
     access: "/access", audit: "/audit", notifications: "/notifications", ask: "/ask",
     demo: "/demo", settings: "/settings",

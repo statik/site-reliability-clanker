@@ -213,6 +213,9 @@ func (s *Server) Handler() (http.Handler, error) {
 		"GET /api/v1/settings/model":                  s.getModelSettings,
 		"POST /api/v1/settings/model/local/start":     s.postLocalModelStart,
 		"POST /api/v1/settings/model/local/stop":      s.postLocalModelStop,
+
+		"POST /api/v1/runbooks/{name}/standing-approval":   s.postStandingApproval,
+		"DELETE /api/v1/runbooks/{name}/standing-approval": s.deleteStandingApproval,
 	}
 	for pattern, h := range routes {
 		mux.HandleFunc(pattern, wrap(h))

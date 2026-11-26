@@ -2,6 +2,8 @@ package orchestrator
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -17,22 +19,57 @@ import (
 	"github.com/statik/site-reliability-clanker/internal/store"
 )
 
-func standingKey(name string) string { return "standing_approval." + name }
+// standingKey holds the user who signed the standing approval of a runbook, and
+// standingTimeKey the time of the signature.
+func standingKey(name string) string     { return "standing_approval." + name }
+func standingTimeKey(name string) string { return "standing_approval_at." + name }
 
-// SignStandingApproval records that a human approves every future run of a tier T1 runbook.
-func (o *Orchestrator) SignStandingApproval(name, user string) error {
+// StandingApproval is the signature of a person that covers every future run of a runbook.
+// Signer and SignedAt are empty when nobody signed.
+type StandingApproval struct {
+	Runbook  string `json:"runbook"`
+	Signer   string `json:"signer"`
+	SignedAt string `json:"signed_at"`
+}
+
+// standingSigner returns the user behind a signature or a revocation of a standing
+// approval, who must be an approver or an admin.
+func (o *Orchestrator) standingSigner(user, action string) (User, error) {
 	u, err := o.GetUser(user)
 	if err != nil {
-		return err
+		return User{}, fmt.Errorf("%w: %v", ErrForbidden, err)
 	}
 	if u.Role != "approver" && u.Role != "admin" {
-		return fmt.Errorf("%s has role %s and cannot sign a standing approval", u.Name, u.Role)
+		return User{}, fmt.Errorf("%w: %s has role %s and cannot %s a standing approval; only "+
+			"an approver or admin can", ErrForbidden, u.Name, u.Role, action)
+	}
+	return u, nil
+}
+
+// SignStandingApproval records that a human approves every future run of a tier T1 runbook.
+// A new signature replaces the one before it.
+func (o *Orchestrator) SignStandingApproval(name, user string) error {
+	u, err := o.standingSigner(user, "sign")
+	if err != nil {
+		return err
 	}
 	if _, _, err := o.standingRunbook(name); err != nil {
 		return err
 	}
-	if err := store.SetKV(o.DB, standingKey(name), u.Name); err != nil {
-		return err
+	tx, err := o.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("sign the standing approval of %s: %w", name, err)
+	}
+	defer tx.Rollback() //nolint:errcheck // a rollback after the commit does nothing
+	for key, value := range map[string]string{standingKey(name): u.Name,
+		standingTimeKey(name): o.now()} {
+		if _, err := tx.Exec(`INSERT INTO kv(key, value) VALUES($1, $2)
+			ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value); err != nil {
+			return fmt.Errorf("sign the standing approval of %s: %w", name, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("sign the standing approval of %s: %w", name, err)
 	}
 	o.emit(audit.Event{Type: "standing_approval.signed", Actor: u.Name,
 		Summary: fmt.Sprintf("%s signed a standing approval for runbook %s", u.Display, name),
@@ -40,9 +77,59 @@ func (o *Orchestrator) SignStandingApproval(name, user string) error {
 	return nil
 }
 
+// RevokeStandingApproval removes the standing approval of a runbook. A run that started
+// before goes on; no run starts after it until somebody signs again. Any approver or admin
+// can revoke a signature, also the signature of another person. The runbook needs no
+// definition, so the approval of a runbook that was removed from the repository can go too.
+func (o *Orchestrator) RevokeStandingApproval(name, user string) error {
+	u, err := o.standingSigner(user, "revoke")
+	if err != nil {
+		return err
+	}
+	if !runbook.ValidName(name) {
+		return fmt.Errorf("%w: runbook name %q is not valid", ErrInvalid, name)
+	}
+	tx, err := o.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("revoke the standing approval of %s: %w", name, err)
+	}
+	defer tx.Rollback() //nolint:errcheck // a rollback after the commit does nothing
+	var signer string
+	err = tx.QueryRow(`DELETE FROM kv WHERE key = $1 RETURNING value`, standingKey(name)).Scan(
+		&signer)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("%w: runbook %s has no standing approval to revoke", ErrConflict, name)
+	}
+	if err != nil {
+		return fmt.Errorf("revoke the standing approval of %s: %w", name, err)
+	}
+	if _, err := tx.Exec(`DELETE FROM kv WHERE key = $1`, standingTimeKey(name)); err != nil {
+		return fmt.Errorf("revoke the standing approval of %s: %w", name, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("revoke the standing approval of %s: %w", name, err)
+	}
+	o.emit(audit.Event{Type: "standing_approval.revoked", Actor: u.Name,
+		Summary: fmt.Sprintf("%s revoked the standing approval that %s signed for runbook %s",
+			u.Display, signer, name),
+		Data: map[string]any{"runbook": name, "signer": signer}})
+	return nil
+}
+
 // StandingApprover returns who signed the standing approval for a runbook, or "".
 func (o *Orchestrator) StandingApprover(name string) (string, error) {
 	return store.GetKV(o.DB, standingKey(name))
+}
+
+// StandingApproval returns the standing approval of a runbook. SignedAt is empty for a
+// signature from before the time was recorded.
+func (o *Orchestrator) StandingApproval(name string) (StandingApproval, error) {
+	signer, err := o.StandingApprover(name)
+	if err != nil || signer == "" {
+		return StandingApproval{Runbook: name}, err
+	}
+	at, err := store.GetKV(o.DB, standingTimeKey(name))
+	return StandingApproval{Runbook: name, Signer: signer, SignedAt: at}, err
 }
 
 // runbookDefinition reads the definition of a runbook at a commit of the runbooks
