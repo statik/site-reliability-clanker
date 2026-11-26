@@ -55,25 +55,39 @@ locals {
   approver_email = "approver@${local.idp_host}"
 
   core_settings = {
-    CLANKER_DATABASE_URL       = local.database_url
-    CLANKER_SIGNING_KEY        = local.signing_key
-    CLANKER_PUBLIC_URL         = local.core_url
-    CLANKER_OIDC_ISSUER        = local.oidc_issuer
-    CLANKER_OIDC_CLIENT_ID     = local.client_id
-    CLANKER_OIDC_CLIENT_SECRET = random_password.client_secret.result
-    CLANKER_ADMIN_EMAIL        = local.admin_email
-    CLANKER_APPROVER_EMAILS    = local.approver_email
-    CLANKER_AWS_RUNNER         = local.runner_setting
+    CLANKER_DATABASE_URL        = local.database_url
+    CLANKER_SIGNING_KEY         = local.signing_key
+    CLANKER_PUBLIC_URL          = local.core_url
+    CLANKER_OIDC_ISSUER         = local.oidc_issuer
+    CLANKER_OIDC_CLIENT_ID      = local.client_id
+    CLANKER_OIDC_CLIENT_SECRET  = random_password.client_secret.result
+    CLANKER_ADMIN_EMAIL         = local.admin_email
+    CLANKER_APPROVER_EMAILS     = local.approver_email
+    CLANKER_AWS_RUNNER          = local.runner_setting
+    CLANKER_AWS_LAYER_VARIABLES = local.layer_variables
+    OPENROUTER_API_KEY          = var.model_api_key
   }
   # A for_each key cannot come from a map with secret values, so the names are a list.
   core_setting_names = toset(concat(
     [
       "CLANKER_DATABASE_URL", "CLANKER_SIGNING_KEY", "CLANKER_PUBLIC_URL", "CLANKER_OIDC_ISSUER",
       "CLANKER_OIDC_CLIENT_ID", "CLANKER_OIDC_CLIENT_SECRET", "CLANKER_ADMIN_EMAIL",
-      "CLANKER_APPROVER_EMAILS",
+      "CLANKER_APPROVER_EMAILS", "CLANKER_AWS_LAYER_VARIABLES",
     ],
     var.runner_image_digest == null ? [] : ["CLANKER_AWS_RUNNER"],
+    nonsensitive(var.model_api_key == null) ? [] : ["OPENROUTER_API_KEY"],
   ))
+
+  # CLANKER_AWS_LAYER_VARIABLES: the inputs of layers 10 to 50 that belong to this account.
+  # The core gives each one to the jobs of the layers as TF_VAR_<name>. The operator is the
+  # role of the person who applies this stack, without the session.
+  layer_variables = jsonencode({
+    existing_network_id         = var.vpc_id
+    existing_private_subnet_ids = var.private_subnet_ids
+    image_registry              = local.image_registry
+    instance_tags               = var.required_tags
+    operator_principal_arn      = data.aws_iam_session_context.operator.issuer_arn
+  })
 
   idp_settings = {
     CLANKER_OIDC_CLIENT_SECRET = random_password.client_secret.result

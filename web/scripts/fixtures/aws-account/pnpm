@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# A stand-in for pnpm. The make stand-in builds no dashboard, so nothing calls it.
+echo "the pnpm stand-in builds nothing: pnpm $*" >&2
+exit 1

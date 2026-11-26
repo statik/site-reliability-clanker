@@ -102,7 +102,7 @@ func bootstrap(ctx context.Context, o options) error {
 	case "local":
 		return bootstrapLocal(ctx, o)
 	case "aws":
-		return bootstrapAWS(ctx, o, runAWS)
+		return bootstrapAWS(ctx, o, runAWS, os.Stdout)
 	default:
 		return fmt.Errorf("bootstrap for cloud %q is not enabled: the %s modules are validated "+
 			"but not applied. Approve the expected cost first; see docs/HANDOFF.md", o.cloud,

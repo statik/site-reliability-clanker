@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Sign in to the core through a real Keycloak over plain HTTP, in the shape of a core in a VPC
 # that people reach through Tailscale. Keycloak runs in production mode (kc.sh start) with the
-# realm of scripts/verify/keycloak/realm.json. The core runs as it runs on a cloud, with its
-# own PostgreSQL container. The core makes the second person of the realm an approver from
+# realm of internal/setup/stack/keycloak-realm.json. The core runs as it runs on a cloud, with
+# its own PostgreSQL container. The core makes the second person of the realm an approver from
 # CLANKER_APPROVER_EMAILS. The check adds a third person, who has no role in the core.
 #
 # The core and Keycloak listen on the private address of this machine and not on 127.0.0.1:
@@ -92,7 +92,7 @@ start_keycloak() {
     -e CLANKER_PUBLIC_URL -e CLANKER_OIDC_CLIENT_SECRET -e CLANKER_ADMIN_EMAIL \
     -e REALM_APPROVER_EMAIL -e REALM_ADMIN_PASSWORD -e REALM_APPROVER_PASSWORD \
     -e KC_BOOTSTRAP_ADMIN_USERNAME=bootstrap -e KC_BOOTSTRAP_ADMIN_PASSWORD \
-    -v "${repo}/scripts/verify/keycloak/realm.json:/opt/keycloak/data/import/realm.json:ro" \
+    -v "${repo}/internal/setup/stack/keycloak-realm.json:/opt/keycloak/data/import/realm.json:ro" \
     "${image}" start --http-enabled=true --hostname="http://${address}:${listen}" \
     --db=dev-file --import-realm "$@" >/dev/null
 }

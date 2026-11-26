@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -63,10 +64,13 @@ type awsTarget struct {
 	run    setup.CLI
 	r      *runner.Runner
 	bucket string
+	// out gets what the command prints and the output of OpenTofu.
+	out io.Writer
 }
 
 // openAWSTarget checks the session of the profile and finds the bucket of the environment.
-func openAWSTarget(ctx context.Context, o options, run setup.CLI) (awsTarget, error) {
+func openAWSTarget(ctx context.Context, o options, run setup.CLI, out io.Writer) (awsTarget,
+	error) {
 	if o.profile == "" || o.region == "" {
 		return awsTarget{}, errors.New("name the AWS CLI profile and the region of the " +
 			"environment: --profile NAME --region NAME")
@@ -97,7 +101,13 @@ func openAWSTarget(ctx context.Context, o options, run setup.CLI) (awsTarget, er
 	// the jobs get empty ones.
 	r.ExtraEnv = []string{"AWS_PROFILE=" + o.profile, "AWS_REGION=" + o.region,
 		"AWS_ACCESS_KEY_ID=", "AWS_SECRET_ACCESS_KEY=", "AWS_SESSION_TOKEN="}
-	return awsTarget{o: o, run: run, r: r, bucket: stateBucket(o.env, identity.Account)}, nil
+	// The inputs of the account, which the core gives the layers from
+	// CLANKER_AWS_LAYER_VARIABLES. A destroy of 10-network needs image_registry.
+	for _, name := range slices.Sorted(maps.Keys(o.layerVariables)) {
+		r.ExtraEnv = append(r.ExtraEnv, "TF_VAR_"+name+"="+o.layerVariables[name])
+	}
+	return awsTarget{o: o, run: run, r: r, bucket: stateBucket(o.env, identity.Account),
+		out: out}, nil
 }
 
 // stateBucket is the bucket that layer 00-bootstrap creates for the state of the other
@@ -218,11 +228,11 @@ func checkBootstrapFlags(o options) error {
 // bootstrapAWS applies layer 00-bootstrap with the session of the profile, moves its state
 // into the bucket that it creates, and prints the setting CLANKER_AWS_BOOTSTRAP. With a
 // KMS key it also writes the setting to Parameter Store.
-func bootstrapAWS(ctx context.Context, o options, run setup.CLI) error {
+func bootstrapAWS(ctx context.Context, o options, run setup.CLI, out io.Writer) error {
 	if err := checkBootstrapFlags(o); err != nil {
 		return err
 	}
-	t, err := openAWSTarget(ctx, o, run)
+	t, err := openAWSTarget(ctx, o, run, out)
 	if err != nil {
 		return err
 	}
@@ -230,7 +240,7 @@ func bootstrapAWS(ctx context.Context, o options, run setup.CLI) error {
 	if err != nil {
 		return err
 	}
-	inBucket, local := t.bootstrapJobs(w, os.Stdout)
+	inBucket, local := t.bootstrapJobs(w, t.out)
 	moved, err := t.applyBootstrap(ctx, w, inBucket, local)
 	if err != nil {
 		return err
@@ -268,7 +278,7 @@ func (t awsTarget) settingFromBucket(ctx context.Context, inBucket runner.Job) (
 		return nil, fmt.Errorf("the outputs of %s are not a valid %s: %w", bootstrapLayer,
 			bootstrapEnv, err)
 	}
-	fmt.Printf("\nBootstrap of %s is complete. The bucket %s holds the state of %s: %d "+
+	fmt.Fprintf(t.out, "\nBootstrap of %s is complete. The bucket %s holds the state of %s: %d "+
 		"resources.\n", t.o.env, t.bucket, bootstrapLayer, len(resources))
 	return setting, nil
 }
@@ -289,13 +299,13 @@ func (t awsTarget) applyBootstrap(ctx context.Context, w workCopy, inBucket,
 			return false, err
 		}
 		if held {
-			fmt.Printf("The bucket %s holds the state of %s/%s. Applying the layer with it.\n",
+			fmt.Fprintf(t.out, "The bucket %s holds the state of %s/%s. Applying the layer with it.\n",
 				t.bucket, t.o.env, bootstrapLayer)
 			_, err := t.r.ApplyDirect(ctx, inBucket)
 			return false, err
 		}
 	}
-	fmt.Printf("Applying layer %s of %s with the session of the profile %s. Its state stays "+
+	fmt.Fprintf(t.out, "Applying layer %s of %s with the session of the profile %s. Its state stays "+
 		"in %s until the bucket %s holds it.\n", bootstrapLayer, t.o.env, t.o.profile,
 		t.r.StatePath(t.o.env, bootstrapLayer), t.bucket)
 	if err := w.setLocalBackend("aws", true); err != nil {
@@ -307,7 +317,7 @@ func (t awsTarget) applyBootstrap(ctx context.Context, w workCopy, inBucket,
 	if err := w.setLocalBackend("aws", false); err != nil {
 		return false, err
 	}
-	fmt.Printf("\nMoving the state of %s into the bucket %s.\n", bootstrapLayer, t.bucket)
+	fmt.Fprintf(t.out, "\nMoving the state of %s into the bucket %s.\n", bootstrapLayer, t.bucket)
 	return true, t.r.MoveState(ctx, inBucket)
 }
 
@@ -315,10 +325,10 @@ func (t awsTarget) applyBootstrap(ctx context.Context, w workCopy, inBucket,
 // below the parameter path of the control plane as a SecureString.
 func (t awsTarget) writeSetting(ctx context.Context, w workCopy, setting []byte) error {
 	name := t.o.parameterPath + "/" + bootstrapEnv
-	fmt.Printf("\nThe setting %s of the control plane. It holds no secret:\n%s\n",
+	fmt.Fprintf(t.out, "\nThe setting %s of the control plane. It holds no secret:\n%s\n",
 		bootstrapEnv, setting)
 	if t.o.kmsKey == "" {
-		fmt.Printf("\nIt was not written to Parameter Store. With --kms-key KEY the command "+
+		fmt.Fprintf(t.out, "\nIt was not written to Parameter Store. With --kms-key KEY the command "+
 			"writes it as %s.\n", name)
 		return nil
 	}
@@ -337,7 +347,7 @@ func (t awsTarget) writeSetting(ctx context.Context, w workCopy, setting []byte)
 		return fmt.Errorf("write the setting %s to Parameter Store as %s: %w", bootstrapEnv,
 			name, err)
 	}
-	fmt.Printf("\nWritten to Parameter Store as %s, a SecureString with the KMS key %s.\n",
+	fmt.Fprintf(t.out, "\nWritten to Parameter Store as %s, a SecureString with the KMS key %s.\n",
 		name, t.o.kmsKey)
 	return nil
 }
@@ -363,11 +373,11 @@ type survey struct {
 // destroyAWS destroys each layer of an AWS environment that has resources, from 50-app down
 // to 10-network, then moves the state of 00-bootstrap out of its bucket and destroys it.
 // It reads the state of every layer first, and destroys nothing when one cannot be read.
-func destroyAWS(ctx context.Context, o options, run setup.CLI) error {
+func destroyAWS(ctx context.Context, o options, run setup.CLI, out io.Writer) error {
 	if err := checkBrokerPrincipal(o.brokerPrincipal); err != nil {
 		return err
 	}
-	t, err := openAWSTarget(ctx, o, run)
+	t, err := openAWSTarget(ctx, o, run, out)
 	if err != nil {
 		return err
 	}
@@ -385,7 +395,7 @@ func destroyAWS(ctx context.Context, o options, run setup.CLI) error {
 	if err := t.destroyBootstrap(ctx, w, found); err != nil {
 		return err
 	}
-	fmt.Printf("\n%s\n", found.result(o.env))
+	fmt.Fprintf(t.out, "\n%s\n", found.result(o.env))
 	return nil
 }
 
@@ -424,9 +434,9 @@ func (t awsTarget) check(ctx context.Context, w workCopy) (survey, error) {
 			bootstrapLayer, t.o.env, where, err)
 	}
 	found.resources[bootstrapLayer] = len(addresses)
-	fmt.Printf("Resources in the state of each layer of %s:\n", t.o.env)
+	fmt.Fprintf(t.out, "Resources in the state of each layer of %s:\n", t.o.env)
 	if local && !slices.ContainsFunc(addresses, isStateBucket) {
-		fmt.Printf("  10-network to 50-app: no state, because the state of %s has no state "+
+		fmt.Fprintf(t.out, "  10-network to 50-app: no state, because the state of %s has no state "+
 			"bucket\n", bootstrapLayer)
 	} else {
 		if err := t.checkUpperLayers(ctx, found); err != nil {
@@ -434,7 +444,7 @@ func (t awsTarget) check(ctx context.Context, w workCopy) (survey, error) {
 		}
 		found.upperChecked = true
 	}
-	fmt.Printf("  %-13s %d (state %s)\n", bootstrapLayer, len(addresses), where)
+	fmt.Fprintf(t.out, "  %-13s %d (state %s)\n", bootstrapLayer, len(addresses), where)
 	return found, nil
 }
 
@@ -449,7 +459,7 @@ func (t awsTarget) checkUpperLayers(ctx context.Context, found survey) error {
 				layer, t.o.env, t.bucket, err)
 		}
 		found.resources[layer] = len(addresses)
-		fmt.Printf("  %-13s %d\n", layer, len(addresses))
+		fmt.Fprintf(t.out, "  %-13s %d\n", layer, len(addresses))
 	}
 	return nil
 }
@@ -461,8 +471,8 @@ func (t awsTarget) destroyUpperLayers(ctx context.Context, found survey) error {
 		if found.resources[layer] == 0 {
 			continue
 		}
-		fmt.Printf("\nDestroying %s/%s\n", t.o.env, layer)
-		if err := t.r.Destroy(ctx, t.layerJob(layer, os.Stdout)); err != nil {
+		fmt.Fprintf(t.out, "\nDestroying %s/%s\n", t.o.env, layer)
+		if err := t.r.Destroy(ctx, t.layerJob(layer, t.out)); err != nil {
 			return err
 		}
 	}
@@ -473,21 +483,21 @@ func (t awsTarget) destroyUpperLayers(ctx context.Context, found survey) error {
 // moves out first: the destroy removes the bucket.
 func (t awsTarget) destroyBootstrap(ctx context.Context, w workCopy, found survey) error {
 	if found.resources[bootstrapLayer] == 0 {
-		fmt.Printf("\nLayer %s of %s has no resources.\n", bootstrapLayer, t.o.env)
+		fmt.Fprintf(t.out, "\nLayer %s of %s has no resources.\n", bootstrapLayer, t.o.env)
 		return t.removeLocalState()
 	}
-	_, local := t.bootstrapJobs(w, os.Stdout)
+	_, local := t.bootstrapJobs(w, t.out)
 	if !found.localBootstrap {
 		if err := w.setLocalBackend("aws", true); err != nil {
 			return err
 		}
-		fmt.Printf("\nMoving the state of %s from the bucket %s to %s.\n", bootstrapLayer,
+		fmt.Fprintf(t.out, "\nMoving the state of %s from the bucket %s to %s.\n", bootstrapLayer,
 			t.bucket, t.r.StatePath(t.o.env, bootstrapLayer))
 		if err := t.r.MoveState(ctx, local); err != nil {
 			return err
 		}
 	}
-	fmt.Printf("\nDestroying %s/%s\n", t.o.env, bootstrapLayer)
+	fmt.Fprintf(t.out, "\nDestroying %s/%s\n", t.o.env, bootstrapLayer)
 	if err := t.r.Destroy(ctx, local); err != nil {
 		return err
 	}

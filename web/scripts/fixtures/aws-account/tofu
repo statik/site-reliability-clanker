@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
+# A stand-in for OpenTofu, for the installer on AWS. It keeps state in SRC_FIXTURE_STATE and
+# calls nothing.
+#
+# In the copy of the home stack (a directory named stack) it checks the inputs that the
+# installer gives, prints the lines of the tfvars file as a plan prints the tags (so that a
+# test sees whether the installer hides them), and writes markers that the aws stand-in
+# reads. In a layer it keeps the state of the backend as the real program does: init records
+# the backend in the directory of the working data, a state in s3 is a file in
+# SRC_FIXTURE_STATE/s3, and a local state is the file of its path.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+state="${SRC_FIXTURE_STATE:?the tofu stand-in needs SRC_FIXTURE_STATE}"
+# shellcheck source=fixture-lib.sh
+. "${here}/fixture-lib.sh"
+echo "tofu $(basename "${PWD}") $*" >>"${state}/calls"
+fail_once "tofu $(basename "${PWD}") $*"
+
+data="${TF_DATA_DIR:-.terraform}"
+recorded="${data}/fake-backend"
+mkdir -p "${data}"
+current="$(cat "${recorded}" 2>/dev/null || true)"
+
+state_file() {
+  case "$1" in
+  local:*) echo "${1#local:}" ;;
+  s3:*) echo "${state}/s3/$(echo "${1#s3:}" | tr / _)" ;;
+  esac
+}
+
+init() {
+  local target="" migrate=no option
+  for option in "$@"; do
+    case "${option}" in
+    -backend-config=key=*) target="s3:${option#-backend-config=key=}" ;;
+    -backend-config=path=*) target="local:${option#-backend-config=path=}" ;;
+    -migrate-state) migrate=yes ;;
+    esac
+  done
+  if [ "${migrate}" = yes ]; then
+    local from to
+    from="$(state_file "${current}")"
+    to="$(state_file "${target}")"
+    mkdir -p "$(dirname "${to}")"
+    if [ -f "${from}" ]; then cp "${from}" "${to}"; fi
+  elif [ -n "${current}" ] && [ "${current}" != "${target}" ]; then
+    echo "Error: Backend configuration changed" >&2
+    exit 1
+  fi
+  echo "${target}" >"${recorded}"
+}
+
+option_value() {
+  local name="$1" option
+  shift
+  for option in "$@"; do
+    case "${option}" in "${name}"*) echo "${option#"${name}"}" ;; esac
+  done
+}
+
+home_outputs() {
+  local env core
+  env="$(sed -n 's/^env_name = "\(.*\)"$/\1/p' "${state}/home.tfvars")"
+  core="${SRC_FIXTURE_CORE_URL:-https://src-${env}.example.com}"
+  cat <<EOF
+{
+  "admin_email": {"sensitive": false, "type": "string", "value": "admin@src-${env}-idp.example.com"},
+  "admin_password": {"sensitive": true, "type": "string", "value": "fixture-admin-password"},
+  "approver_email": {"sensitive": false, "type": "string", "value": "approver@src-${env}-idp.example.com"},
+  "cluster_arn": {"sensitive": false, "type": "string", "value": "arn:aws:ecs:us-west-2:111122223333:cluster/clanker-${env}"},
+  "core_autoscaling_group": {"sensitive": false, "type": "string", "value": $(if [ -f "${state}/phase2" ]; then echo "\"clanker-${env}-core\""; else echo null; fi)},
+  "core_image_env": {"sensitive": false, "type": ["object", {}], "value": {"AWS_REGION": "us-west-2", "CLANKER_PARAMETER_PATH": "/src/${env}"}},
+  "core_role_arn": {"sensitive": false, "type": "string", "value": "arn:aws:iam::111122223333:role/clanker-${env}-core"},
+  "core_target_group_arn": {"sensitive": false, "type": "string", "value": "arn:aws:elasticloadbalancing:us-west-2:111122223333:targetgroup/core-1/1"},
+  "core_url": {"sensitive": false, "type": "string", "value": "${core}"},
+  "idp_url": {"sensitive": false, "type": "string", "value": "https://src-${env}-idp.example.com"},
+  "image_registry": {"sensitive": false, "type": "string", "value": "111122223333.dkr.ecr.us-west-2.amazonaws.com/clanker-${env}"},
+  "parameter_key_arn": {"sensitive": false, "type": "string", "value": "arn:aws:kms:us-west-2:111122223333:key/0f1c7e"},
+  "parameter_path": {"sensitive": false, "type": "string", "value": "/src/${env}"},
+  "runner_repository_url": {"sensitive": false, "type": "string", "value": "111122223333.dkr.ecr.us-west-2.amazonaws.com/clanker-${env}/runner"}
+}
+EOF
+}
+
+# home runs a command in the copy of the home stack.
+home() {
+  local file
+  file="$(state_file "${current}")"
+  case "$1" in
+  init) init "$@" ;;
+  apply | destroy)
+    local vars
+    vars="$(option_value -var-file= "$@")"
+    if [ ! -f "${vars}" ] || [ -z "${TF_VAR_keycloak_realm:-}" ] || [ -z "${AWS_PROFILE:-}" ] ||
+      [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
+      echo "Error: the stand-in needs -var-file, the realm and the profile, and no keys" >&2
+      exit 1
+    fi
+    cp "${vars}" "${state}/home.tfvars"
+    sed 's/^/  ~ /' "${vars}"
+    if [ "$1" = apply ]; then
+      echo '{"version":4,"resources":["aws_lb.this","aws_db_instance.this"]}' >"${file}"
+      touch "${state}/home-applied"
+      if [ -n "$(option_value -var=core_image_id= "$@")" ]; then touch "${state}/phase2"; fi
+    else
+      echo '{"version":4,"resources":[]}' >"${file}"
+      rm -f "${state}/home-applied" "${state}/phase2" "${state}/core-stopped"
+      local env
+      env="$(sed -n 's/^env_name = "\(.*\)"$/\1/p' "${vars}")"
+      printf '%s INACTIVE\n' \
+        "arn:aws:ecs:us-west-2:111122223333:task-definition/clanker-${env}-runner:1" \
+        "arn:aws:ecs:us-west-2:111122223333:task-definition/clanker-${env}-keycloak:1" \
+        >>"${state}/taskdefs"
+    fi
+    ;;
+  output)
+    if applied; then home_outputs; else echo '{}'; fi
+    ;;
+  state)
+    if applied; then printf '%s\n' aws_lb.this aws_db_instance.this; fi
+    ;;
+  *)
+    echo "the tofu stand-in has no answer for: tofu $*" >&2
+    exit 1
+    ;;
+  esac
+}
+
+# The state of 00-bootstrap after an apply: a resource of the state bucket and one more.
+applied_layer='{"version":4,"resources":[
+  {"module":"module.state_bucket","mode":"managed","type":"aws_s3_bucket","name":"this","instances":[{}]},
+  {"mode":"managed","type":"aws_iam_role","name":"planner","instances":[{}]}]}'
+
+bootstrap_outputs() {
+  cat <<'EOF'
+{
+  "clanker_ttl": {"sensitive": false, "type": "string", "value": "168"},
+  "evidence_bucket": {"sensitive": false, "type": "string", "value": "evidence"},
+  "identities": {"sensitive": false, "type": ["map", "string"],
+    "value": {"planner": "arn:aws:iam::111122223333:role/clanker/planner"}},
+  "permission_guard": {"sensitive": false, "type": "string", "value": "guard"},
+  "state_backend": {"sensitive": false, "type": ["map", "string"], "value": {
+    "bucket": "state", "encrypt": "true", "region": "us-west-2", "use_lockfile": "true"}},
+  "workload_role_path": {"sensitive": false, "type": "string", "value": "/clanker/"}
+}
+EOF
+}
+
+# layer runs a command in the copy of a layer.
+layer() {
+  local file
+  file="$(state_file "${current}")"
+  case "$1" in
+  init) init "$@" ;;
+  apply)
+    mkdir -p "$(dirname "${file}")"
+    echo "${applied_layer}" >"${file}"
+    if [ "$(basename "${PWD}")" = 00-bootstrap ]; then touch "${state}/buckets"; fi
+    ;;
+  destroy)
+    echo '{"version":4,"resources":[]}' >"${file}"
+    if [ "$(basename "${PWD}")" = 00-bootstrap ]; then rm -f "${state}/buckets"; fi
+    ;;
+  state)
+    if [ -f "${file}" ]; then cat "${file}"; else echo '{"version":4,"serial":0,"resources":[]}'; fi
+    ;;
+  output)
+    if [ "$(basename "${PWD}")" = 00-bootstrap ]; then bootstrap_outputs; else echo '{}'; fi
+    ;;
+  *)
+    echo "the tofu stand-in has no answer for: tofu $*" >&2
+    exit 1
+    ;;
+  esac
+}
+
+if [ "$(basename "${PWD}")" = stack ]; then
+  home "$@"
+else
+  layer "$@"
+fi

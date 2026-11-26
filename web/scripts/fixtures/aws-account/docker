@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
+# A stand-in for Docker, for the installer on AWS. It builds nothing and pushes nothing: it
+# records the images in SRC_FIXTURE_STATE, writes the header of an arm64 program for
+# `buildx build --target core --output type=local,dest=DIR`, and gives each push a digest
+# that the aws stand-in answers for `ecr describe-images`.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+state="${SRC_FIXTURE_STATE:?the docker stand-in needs SRC_FIXTURE_STATE}"
+# shellcheck source=fixture-lib.sh
+. "${here}/fixture-lib.sh"
+echo "docker $*" >>"${state}/calls"
+fail_once "docker $*"
+touch "${state}/docker-images" "${state}/docker-logins"
+
+# arm64_header writes the 64 bytes of the header of a 64-bit ELF program for arm64.
+arm64_header() {
+  printf '\177ELF\002\001\001\000\000\000\000\000\000\000\000\000'
+  printf '\002\000\267\000\001\000\000\000'
+  printf '\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000'
+  printf '\000\000\000\000\000\000\000\000\000\000\000\000'
+  printf '\100\000\070\000\000\000\100\000\000\000\000\000'
+}
+
+build() {
+  local platform="" target="" output="" tag="" option previous=""
+  for option in "$@"; do
+    case "${previous}" in
+    --platform) platform="${option}" ;;
+    --target) target="${option}" ;;
+    --output) output="${option}" ;;
+    --tag) tag="${option}" ;;
+    esac
+    previous="${option}"
+  done
+  if [ "${platform}" != linux/arm64 ]; then
+    echo "the stand-in builds for linux/arm64 only, not for '${platform}'" >&2
+    exit 1
+  fi
+  if [ "${target}" = core ]; then
+    local dest="${output#type=local,dest=}"
+    mkdir -p "${dest}"
+    arm64_header >"${dest}/clanker"
+    return
+  fi
+  echo "${tag}" >>"${state}/docker-images"
+}
+
+push() {
+  local image="$1" host name tag dir
+  host="${image%%/*}"
+  name="${image#*/}"
+  tag="${name##*:}"
+  name="${name%:*}"
+  grep -qx "${image}" "${state}/docker-images" || {
+    echo "An image does not exist locally with the tag: ${image}" >&2
+    exit 1
+  }
+  grep -qx "${host}" "${state}/docker-logins" || {
+    echo "no basic auth credentials" >&2
+    exit 1
+  }
+  dir="${state}/ecr/$(echo "${name}" | tr / _)"
+  mkdir -p "${dir}"
+  printf 'sha256:%064d\n' "$(count digest)" >"${dir}/${tag}"
+  echo "${tag}: digest: $(cat "${dir}/${tag}") size: 1"
+}
+
+case "${1:-}" in
+info) echo "Server: fixture" ;;
+buildx)
+  case "${2:-}" in
+  version) echo "github.com/docker/buildx v0.0.0-fixture" ;;
+  build)
+    shift 2
+    build "$@"
+    ;;
+  *) exit 1 ;;
+  esac
+  ;;
+build)
+  shift
+  build "$@"
+  ;;
+login)
+  token="$(cat)"
+  if [ -z "${token}" ]; then
+    echo "the stand-in needs a token on standard input" >&2
+    exit 1
+  fi
+  echo "${@: -1}" >>"${state}/docker-logins"
+  echo "Login Succeeded"
+  ;;
+push) push "$2" ;;
+*)
+  echo "the docker stand-in has no answer for: docker $*" >&2
+  exit 1
+  ;;
+esac

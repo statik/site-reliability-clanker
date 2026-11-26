@@ -166,10 +166,11 @@ func findOps() (string, error) {
 	return "", errors.New("ops is not in PATH or in ~/.ops/bin: install it from https://ops.city")
 }
 
-// opsEnvironment returns the environment of ops: this one, with the profile and the
-// region of the survey. Keys in the environment would win over the profile in ops, which
-// would then build the image in another account than the one that the survey read.
-func opsEnvironment(base []string, profile, region string) []string {
+// profileEnvironment returns the environment of a program that calls AWS, such as ops or
+// tofu: this one, with the profile and the region of the survey. Keys in the environment
+// would win over the profile, so the program would work in another account than the one
+// that the survey read.
+func profileEnvironment(base []string, profile, region string) []string {
 	env := make([]string, 0, len(base)+2)
 	for _, entry := range base {
 		name, _, _ := strings.Cut(entry, "=")
@@ -236,7 +237,7 @@ func (a AWS) runOps(ctx context.Context, program string, build ImageBuild) (stri
 	args := []string{"image", "create", build.Binary, "-t", "aws", "-c", configPath,
 		"--arch", "arm64", "--nanos-version", build.Nanos}
 	cmd := exec.CommandContext(ctx, program, args...)
-	cmd.Env = opsEnvironment(os.Environ(), a.Profile, a.Region)
+	cmd.Env = profileEnvironment(os.Environ(), a.Profile, a.Region)
 	var output bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &output, &output
 	if err := cmd.Run(); err != nil {

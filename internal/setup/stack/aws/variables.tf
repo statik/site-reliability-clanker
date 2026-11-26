@@ -67,8 +67,8 @@ variable "required_tags" {
 variable "keycloak_realm" {
   description = <<-EOT
     The realm that Keycloak imports, as JSON text: the content of
-    scripts/verify/keycloak/realm.json. Keycloak replaces each $${NAME} in it with a variable
-    of the container.
+    internal/setup/stack/keycloak-realm.json, which the installer gives. Keycloak replaces
+    each $${NAME} in it with a variable of the container.
   EOT
   type        = string
 
@@ -116,4 +116,28 @@ variable "core_image_id" {
     condition     = var.core_image_id == null || can(regex("^ami-[0-9a-f]+$", var.core_image_id))
     error_message = "core_image_id must be the ID of an image."
   }
+}
+
+variable "application_name" {
+  description = <<-EOT
+    Name of the application pack. Its images are <image_registry>/<application_name>, in a
+    repository of this stack. The installer gives the name of the pack of its checkout.
+  EOT
+  type        = string
+  default     = "paperboat"
+
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]{0,39}$", var.application_name))
+    error_message = "application_name must be lowercase letters, digits and hyphens."
+  }
+}
+
+variable "model_api_key" {
+  description = <<-EOT
+    OpenRouter API key of the core: the parameter OPENROUTER_API_KEY. null: no parameter, and
+    the core answers with recorded responses instead of a hosted model.
+  EOT
+  type        = string
+  default     = null
+  sensitive   = true
 }
