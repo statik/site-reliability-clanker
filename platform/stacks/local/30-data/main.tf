@@ -2,7 +2,7 @@
 provider "kubernetes" {}
 
 locals {
-  namespace   = "paperboat-data"
+  namespace   = "clanker-data"
   shared_path = "/var/clanker/shared"
   backup_path = "/var/clanker/backups"
   labels = {
@@ -97,11 +97,6 @@ resource "kubernetes_stateful_set_v1" "postgres" {
           }
 
           env {
-            name  = "POSTGRES_DB"
-            value = "paperboat"
-          }
-
-          env {
             name  = "PGDATA"
             value = "/var/lib/postgresql/data/pgdata"
           }
@@ -128,7 +123,7 @@ resource "kubernetes_stateful_set_v1" "postgres" {
 
           readiness_probe {
             exec {
-              command = ["pg_isready", "-U", "postgres", "-d", "paperboat"]
+              command = ["pg_isready", "-U", "postgres"]
             }
             period_seconds = 5
           }
@@ -173,7 +168,7 @@ resource "kubernetes_storage_class_v1" "shared_rwx" {
 
 resource "kubernetes_persistent_volume_v1" "shared" {
   metadata {
-    name   = "paperboat-shared"
+    name   = "clanker-shared"
     labels = local.labels
   }
 

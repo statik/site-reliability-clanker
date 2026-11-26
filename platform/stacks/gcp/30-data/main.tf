@@ -58,7 +58,6 @@ module "postgres" {
   postgres_version      = var.postgres_version
   storage_gb            = var.postgres_storage_gb
   backup_retention_days = var.backup_retention_days
-  database_name         = "paperboat"
 
   labels              = local.labels
   deletion_protection = var.deletion_protection

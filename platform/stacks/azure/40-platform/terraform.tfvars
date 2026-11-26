@@ -1,2 +1,2 @@
-app_namespace = "paperboat"
-public_port   = 80
+app_name    = "paperboat"
+public_port = 80

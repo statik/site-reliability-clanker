@@ -32,7 +32,7 @@ override_data {
     outputs = {
       postgres_host             = "db.example.com"
       postgres_port             = 5432
-      postgres_database         = "paperboat"
+      postgres_sslmode          = "require"
       postgres_admin_secret_ref = "test-secret"
       rwx_storage_class         = "efs-rwx"
       shared_fs_capacity_gb     = 5
@@ -49,6 +49,7 @@ variables {
   env_name       = "test-env"
   state_location = "test-state"
   region         = "us-east-1"
+  app_name       = "paperboat"
 }
 
 run "the_runbook_group_has_the_rights_of_the_local_runbook_identity" {
@@ -78,5 +79,38 @@ run "the_runbook_group_has_the_rights_of_the_local_runbook_identity" {
       && kubernetes_role_binding_v1.runbook.subject[0].name == "clanker-runbook"
     )
     error_message = "Only the group clanker-runbook of 20-cluster may get the runbook role."
+  }
+}
+
+run "the_debugger_group_can_only_view_the_application_namespace" {
+  command = plan
+
+  assert {
+    condition = (
+      kubernetes_role_binding_v1.debugger.metadata[0].namespace == "paperboat"
+      && kubernetes_role_binding_v1.debugger.role_ref[0].kind == "ClusterRole"
+      && kubernetes_role_binding_v1.debugger.role_ref[0].name == "view"
+      && length(kubernetes_role_binding_v1.debugger.subject) == 1
+      && kubernetes_role_binding_v1.debugger.subject[0].kind == "Group"
+      && kubernetes_role_binding_v1.debugger.subject[0].name == "clanker-debugger"
+    )
+    error_message = "The group clanker-debugger of 20-cluster must get view in the application namespace, as the local debugger does."
+  }
+}
+
+run "the_application_namespace_follows_the_pack" {
+  command = plan
+
+  variables {
+    app_name = "harbor"
+  }
+
+  assert {
+    condition = (
+      kubernetes_role_binding_v1.debugger.metadata[0].namespace == "harbor"
+      && kubernetes_role_binding_v1.runbook.metadata[0].namespace == "harbor"
+      && output.targets.application == "harbor"
+    )
+    error_message = "The rights of the identities and the targets must follow app_name."
   }
 }

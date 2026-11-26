@@ -43,11 +43,6 @@ variable "backup_retention_days" {
   }
 }
 
-variable "database_name" {
-  description = "Name of the application database."
-  type        = string
-}
-
 variable "labels" {
   description = "Labels for the instance. The provider default labels do not reach it."
   type        = map(string)

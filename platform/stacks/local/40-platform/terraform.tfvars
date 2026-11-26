@@ -1,3 +1,3 @@
-env_name      = "local"
-app_namespace = "paperboat"
-public_port   = 8088
+env_name    = "local"
+app_name    = "paperboat"
+public_port = 8088

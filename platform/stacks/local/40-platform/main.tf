@@ -23,11 +23,11 @@ module "platform" {
   source = "../../../modules/shared/platform"
 
   env_name                = var.env_name
-  app_namespace           = var.app_namespace
+  app_name                = var.app_name
   public_port             = var.public_port
   postgres_host           = local.data_outputs.postgres_host
   postgres_port           = local.data_outputs.postgres_port
-  postgres_database       = local.data_outputs.postgres_database
+  postgres_sslmode        = local.data_outputs.postgres_sslmode
   postgres_admin_password = data.kubernetes_secret_v1.postgres_admin.data["password"]
   rwx_storage_class       = local.data_outputs.rwx_storage_class
   shared_fs_capacity_gb   = var.shared_fs_claim_gb

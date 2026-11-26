@@ -28,11 +28,6 @@ variable "backup_retention_days" {
   }
 }
 
-variable "database_name" {
-  description = "Name of the database that the instance creates."
-  type        = string
-}
-
 variable "admin_username" {
   description = "Name of the master user."
   type        = string

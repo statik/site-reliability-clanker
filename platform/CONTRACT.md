@@ -162,30 +162,33 @@ Types use OpenTofu syntax. "Local" shows how the local target satisfies the row.
 |---|---|---|---|
 | `postgres_host` | `string` | Private host name | In-cluster service DNS name |
 | `postgres_port` | `number` | Port | `5432` |
-| `postgres_database` | `string` | Database name for Paperboat | `paperboat` |
+| `postgres_sslmode` | `string` | libpq `sslmode` for connections to Postgres: `require` on aws, gcp and azure | `disable`: the local Postgres has no TLS |
 | `postgres_admin_secret_ref` | `string` | Secret store reference for the admin credential | `<namespace>/<secret name>` |
 | `postgres_version` | `string` | Version that runs now | Image tag |
 | `rwx_storage_class` | `string` | Name of a `StorageClass` that supports `ReadWriteMany` | Static volume class |
 | `backup_bucket` | `string` | Bucket or path for database backups | Directory on the node |
-| `data_namespace` | `string` | Local target only: the namespace of the data services in the cluster | `paperboat-data` |
+| `data_namespace` | `string` | Local target only: the namespace of the data services in the cluster | `clanker-data` |
+
+This layer makes the server and its admin user `postgres`, and no database for the
+application. `40-platform` makes that database.
 
 ### 40-platform
 
 | Input | Type | Meaning |
 |---|---|---|
-| `app_namespace` | `string` | Namespace for Paperboat. Default `paperboat` |
+| `app_name` | `string` | Name of the application pack, for example `paperboat`. Required. The namespace, the database role, the database, the secret `<name>-db` and the claim `<name>-shared` have this name |
 | `public_port` | `number` | Port of the public listener. Default `80` |
 | `collector_endpoint` | `string` | Address of the control plane for the data of the collector, for example `http://host:7070/otlp`. Default empty: no collector |
 | `collector_token` | `string`, sensitive | Token that the collector sends to the control plane. Default empty |
 
 | Output | Type | Meaning | Local |
 |---|---|---|---|
-| `app_namespace` | `string` | Namespace for Paperboat. It has the label `clanker.dev/application=true` | Same |
+| `app_namespace` | `string` | Namespace of the application: `app_name`. It has the label `clanker.dev/application=true` | Same |
 | `gateway_name` | `string` | Name of the Gateway that the routes of the application attach to | `clanker` |
 | `gateway_namespace` | `string` | Namespace of the Gateway | `clanker-gateway` |
 | `public_address` | `string` | Host name or IP address that serves the application | `localhost:8088` |
-| `app_secret_name` | `string` | Kubernetes secret in `app_namespace` with keys `DATABASE_URL` | Same |
-| `shared_volume_claim` | `string` | `PersistentVolumeClaim` in `app_namespace`, `ReadWriteMany` | Same |
+| `app_secret_name` | `string` | Kubernetes secret `<name>-db` in `app_namespace` with the credential of the database role of the application. See below | Same |
+| `shared_volume_claim` | `string` | `PersistentVolumeClaim` `<name>-shared` in `app_namespace`, `ReadWriteMany` | Same |
 | `targets` | `map(string)` | Where the application runs. The key `application` has the namespace of its components. The key `data` has the namespace of its data services, or it is empty when they are not in the cluster. The control plane reads the namespaces of a debug session and of the rights of its identities from this output, not from the application pack | `data` is the output `data_namespace` of `30-data` |
 | `collector_namespace` | `string` | Namespace of the OpenTelemetry Collector that sends the state of the workloads in `app_namespace` to the control plane. Empty when `collector_endpoint` is empty | `clanker-observe` when the control plane sets `collector_endpoint` |
 
@@ -208,6 +211,26 @@ The entry point is the same on every target, the local target too:
   Service has none yet.
 - The ClusterRole `clanker-httproute-admin` adds the rights on `httproutes` to the
   ClusterRole `admin`, so the applier of `50-app` can manage the route in its namespace.
+
+The database of the application is the same on every target:
+
+- Only the cluster reaches Postgres on every target, so a Kubernetes Job in the namespace
+  `clanker-platform` makes the role and the database with `psql`, as the admin user. The
+  admin credential is in a secret in that namespace, never in `app_namespace`.
+- The role `<name>` can log in and is not a superuser. It owns the database `<name>`, and
+  `PUBLIC` cannot connect to that database. The password is a `random_password` in the
+  state of the layer.
+- The SQL can run again. It stops when `<name>` is the admin user, a superuser, or the name
+  of a database of another role. It grants the role to the admin user before
+  `CREATE DATABASE ... OWNER`: from PostgreSQL 16, an admin user that is not a superuser
+  (RDS, Cloud SQL, Azure) must be able to `SET ROLE` to the owner.
+- The name of the Job ends with a hash of the SQL, the client image, the host, the port, the
+  `sslmode`, the name and the password of the role. A change of one of them replaces the Job,
+  so it runs again. A rotation of the admin password does not run it again.
+- The secret `<name>-db` has `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`,
+  `PGSSLMODE` and `DATABASE_URL` =
+  `postgresql://<name>:<password>@<host>:<port>/<name>?sslmode=<postgres_sslmode>`. The
+  layer writes it after the Job.
 
 ### 50-app
 

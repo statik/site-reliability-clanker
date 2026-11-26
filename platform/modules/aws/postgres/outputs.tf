@@ -8,11 +8,6 @@ output "port" {
   value       = aws_db_instance.this.port
 }
 
-output "database_name" {
-  description = "Database name."
-  value       = aws_db_instance.this.db_name
-}
-
 output "admin_secret_arn" {
   description = "ARN of the Secrets Manager secret. Its JSON has the keys username and password."
   value       = aws_db_instance.this.master_user_secret[0].secret_arn

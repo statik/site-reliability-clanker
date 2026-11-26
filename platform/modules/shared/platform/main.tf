@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/helm"
       version = "3.3.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "3.9.1"
+    }
   }
 }
 
@@ -23,34 +27,18 @@ locals {
   gateway_namespace  = "clanker-gateway"
   envoy_namespace    = "envoy-gateway-system"
   envoy_service_name = "clanker-envoy"
-  database_url = format(
-    "postgres://postgres:%s@%s:%d/%s?sslmode=prefer",
-    var.postgres_admin_password, var.postgres_host, var.postgres_port, var.postgres_database,
-  )
 }
 
 resource "kubernetes_namespace_v1" "app" {
   metadata {
-    name   = var.app_namespace
+    name   = var.app_name
     labels = merge(local.labels, local.application_label)
-  }
-}
-
-resource "kubernetes_secret_v1" "database" {
-  metadata {
-    name      = "paperboat-db"
-    namespace = kubernetes_namespace_v1.app.metadata[0].name
-    labels    = local.labels
-  }
-
-  data = {
-    DATABASE_URL = local.database_url
   }
 }
 
 resource "kubernetes_persistent_volume_claim_v1" "shared" {
   metadata {
-    name      = "paperboat-shared"
+    name      = "${var.app_name}-shared"
     namespace = kubernetes_namespace_v1.app.metadata[0].name
     labels    = local.labels
   }

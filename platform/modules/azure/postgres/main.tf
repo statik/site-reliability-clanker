@@ -59,11 +59,6 @@ variable "key_vault_id" {
   description = "Key Vault that stores the administrator password."
 }
 
-variable "database_name" {
-  type        = string
-  description = "Database for the application."
-}
-
 variable "tags" {
   type        = map(string)
   description = "Tags for each resource."
@@ -113,19 +108,8 @@ resource "azurerm_postgresql_flexible_server" "main" {
   }
 }
 
-resource "azurerm_postgresql_flexible_server_database" "app" {
-  name      = var.database_name
-  server_id = azurerm_postgresql_flexible_server.main.id
-  charset   = "UTF8"
-  collation = "en_US.utf8"
-}
-
 output "host" {
   value = azurerm_postgresql_flexible_server.main.fqdn
-}
-
-output "database" {
-  value = azurerm_postgresql_flexible_server_database.app.name
 }
 
 output "major_version" {

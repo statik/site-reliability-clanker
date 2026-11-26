@@ -3,10 +3,14 @@ variable "env_name" {
   description = "Environment name."
 }
 
-variable "app_namespace" {
+variable "app_name" {
   type        = string
-  description = "Namespace for Paperboat."
-  default     = "paperboat"
+  description = "Name of the application pack. Its namespace, its database role, its database, the Secret <name>-db and the claim <name>-shared have this name."
+
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]{0,30}$", var.app_name))
+    error_message = "Set app_name to the name of the pack: a lowercase letter, then up to 30 lowercase letters, digits or hyphens."
+  }
 }
 
 variable "public_port" {
@@ -25,15 +29,20 @@ variable "postgres_port" {
   description = "Postgres port."
 }
 
-variable "postgres_database" {
+variable "postgres_sslmode" {
   type        = string
-  description = "Database name for Paperboat."
+  description = "libpq sslmode for connections to Postgres: disable, require, verify-ca or verify-full."
+
+  validation {
+    condition     = contains(["disable", "require", "verify-ca", "verify-full"], var.postgres_sslmode)
+    error_message = "Set postgres_sslmode to disable, require, verify-ca or verify-full. Some drivers of applications refuse other modes."
+  }
 }
 
 variable "postgres_admin_password" {
   type        = string
   sensitive   = true
-  description = "Password of the postgres user."
+  description = "Password of the postgres user, the administrator of the server."
 }
 
 variable "rwx_storage_class" {

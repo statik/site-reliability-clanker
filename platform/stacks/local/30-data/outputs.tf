@@ -8,9 +8,9 @@ output "postgres_port" {
   description = "Postgres port."
 }
 
-output "postgres_database" {
-  value       = "paperboat"
-  description = "Database name for Paperboat."
+output "postgres_sslmode" {
+  value       = "disable"
+  description = "libpq sslmode for connections to Postgres. The local Postgres has no TLS."
 }
 
 output "postgres_admin_secret_ref" {

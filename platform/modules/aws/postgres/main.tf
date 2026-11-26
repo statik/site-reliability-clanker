@@ -35,7 +35,6 @@ resource "aws_db_instance" "this" {
   allocated_storage = var.storage_gb
   storage_encrypted = true
 
-  db_name                     = var.database_name
   port                        = local.port
   username                    = var.admin_username
   manage_master_user_password = true

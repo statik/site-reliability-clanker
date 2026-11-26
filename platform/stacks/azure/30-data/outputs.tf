@@ -8,9 +8,9 @@ output "postgres_port" {
   description = "PostgreSQL port."
 }
 
-output "postgres_database" {
-  value       = module.postgres.database
-  description = "Database name for Paperboat."
+output "postgres_sslmode" {
+  value       = "require"
+  description = "libpq sslmode for connections to PostgreSQL. The server takes TLS connections."
 }
 
 output "postgres_admin_secret_ref" {

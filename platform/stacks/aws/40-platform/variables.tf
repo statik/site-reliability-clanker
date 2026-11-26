@@ -13,10 +13,9 @@ variable "region" {
   type        = string
 }
 
-variable "app_namespace" {
-  description = "Namespace for Paperboat."
+variable "app_name" {
+  description = "Name of the application pack. The namespace, the database role, the database, the Secret <name>-db and the claim <name>-shared have this name."
   type        = string
-  default     = "paperboat"
 }
 
 variable "public_port" {

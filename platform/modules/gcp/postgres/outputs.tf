@@ -8,11 +8,6 @@ output "port" {
   value       = 5432
 }
 
-output "database" {
-  description = "Name of the application database."
-  value       = google_sql_database.app.name
-}
-
 output "admin_secret_ref" {
   description = "Secret Manager secret that holds the password of the postgres user."
   value       = google_secret_manager_secret.admin_password.id

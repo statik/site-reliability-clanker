@@ -4,16 +4,13 @@ locals {
   network    = data.terraform_remote_state.network.outputs
   identities = local.bootstrap.identities
 
-  # The debugger works in the application namespace only. `paperboat` is the contract default
-  # of `app_namespace` in 40-platform.
-  debugger_namespaces = ["paperboat"]
-
   cluster_admin = "AmazonEKSClusterAdminPolicy"
 
-  # The Kubernetes group of the runbook role. It has no access policy: 40-platform binds the
-  # group to the rights of the runbook identity in the application namespace, which this
-  # layer does not know.
-  runbook_group = "clanker-runbook"
+  # The Kubernetes groups of the debugger and runbook roles. They have no access policy:
+  # 40-platform binds each group to the rights of the identity in the application namespace,
+  # which this layer does not know.
+  debugger_group = "clanker-debugger"
+  runbook_group  = "clanker-runbook"
 
   # The role that applies this layer creates the cluster, and EKS makes it a cluster admin.
   access_entries = {
@@ -28,9 +25,8 @@ locals {
       namespaces    = []
     }
     debugger = {
-      principal_arn = local.identities["debugger"]
-      policy        = "AmazonEKSEditPolicy"
-      namespaces    = local.debugger_namespaces
+      principal_arn     = local.identities["debugger"]
+      kubernetes_groups = [local.debugger_group]
     }
     runbook = {
       principal_arn     = local.identities["runbook"]
