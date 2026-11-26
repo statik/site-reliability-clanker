@@ -20,6 +20,7 @@ import (
 
 	"github.com/statik/site-reliability-clanker/internal/agent"
 	"github.com/statik/site-reliability-clanker/internal/api"
+	"github.com/statik/site-reliability-clanker/internal/applayer"
 	"github.com/statik/site-reliability-clanker/internal/audit"
 	"github.com/statik/site-reliability-clanker/internal/broker"
 	"github.com/statik/site-reliability-clanker/internal/detect"
@@ -164,7 +165,9 @@ func subtrees(source fs.FS, paths ...string) ([]fs.FS, error) {
 
 // seedForge makes the three repositories of the forge from the source files, when they do
 // not exist yet. The deploy files of the application pack go into the platform repository
-// below the directory of the pack, apps/<name>/, where the stacks read them.
+// below the directory of the pack, apps/<name>/, where the stacks read them. The files of
+// the application layer that come from the manifest of the pack (app.tf, the lines of the
+// pack in the tfvars files) replace those of the source files.
 func seedForge(f *forge.Forge, source fs.FS, app pack.Pack) error {
 	trees, err := subtrees(source, "platform", "runbooks")
 	if err != nil {
@@ -175,7 +178,9 @@ func seedForge(f *forge.Forge, source fs.FS, app pack.Pack) error {
 	if err != nil {
 		return fmt.Errorf("open the deploy files of the application pack: %w", err)
 	}
-	platform["platform"] = trees[0]
+	if platform["platform"], err = applayer.Platform(app, trees[0]); err != nil {
+		return fmt.Errorf("write the application layer of the pack: %w", err)
+	}
 	// The runbooks of the application come from the pack. They can go only into the
 	// directory of the jobs, so a pack cannot bring a policy or a notification route.
 	jobs, err := app.RunbookFiles()
@@ -423,6 +428,7 @@ func build(ctx context.Context, o options) (*components, error) {
 	if c.dispatcher, err = newDispatcher(ctx, o); err != nil {
 		return nil, err
 	}
+	c.dispatcher.Refused = recordRefusal(c.log)
 	c.broker, err = broker.New(c.db, c.clock, secret.signingKey, on.issuer,
 		func() (policy.Approvals, error) { return orchestrator.ApprovalSettings(c.forge) })
 	if err != nil {

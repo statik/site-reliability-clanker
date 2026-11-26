@@ -1,0 +1,8 @@
+apiVersion: v2
+name: nginx
+description: >-
+  One nginx web server. The chart is written like a chart of another project: it knows
+  nothing of the platform, and the values of the pack connect it to the objects that the
+  platform makes.
+type: application
+version: 0.1.0

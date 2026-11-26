@@ -18,12 +18,9 @@ locals {
 module "app" {
   source = "../../../modules/shared/app"
 
-  paperboat_version   = var.paperboat_version
-  api_replicas        = var.api_replicas
-  worker_replicas     = var.worker_replicas
-  web_replicas        = var.web_replicas
-  loadgen_enabled     = var.loadgen_enabled
-  workload_runtime    = var.workload_runtime
+  app                 = local.app
+  cloud               = "local"
+  pack_dir            = "${path.root}/../../../../apps/${local.app.name}"
   image_registry      = data.terraform_remote_state.network.outputs.image_registry
   app_namespace       = local.platform.app_namespace
   app_secret_name     = local.platform.app_secret_name
@@ -32,5 +29,4 @@ module "app" {
   gateway_namespace   = local.platform.gateway_namespace
   public_address      = local.platform.public_address
   admin_token         = var.admin_token
-  chart_path          = "${path.root}/../../../../apps/paperboat/chart"
 }

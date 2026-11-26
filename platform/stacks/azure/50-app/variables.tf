@@ -23,38 +23,3 @@ variable "kubelogin_login" {
   description = "kubelogin login mode for the Kubernetes and Helm providers, for example azurecli or workloadidentity."
   default     = "azurecli"
 }
-
-variable "paperboat_version" {
-  type        = string
-  description = "Release to run, for example 1.1.0."
-}
-
-variable "api_replicas" {
-  type        = number
-  description = "Replicas of api."
-}
-
-variable "worker_replicas" {
-  type        = number
-  description = "Replicas of worker."
-}
-
-variable "web_replicas" {
-  type        = number
-  description = "Replicas of web."
-}
-
-variable "loadgen_enabled" {
-  type        = bool
-  description = "Run synthetic traffic."
-}
-
-variable "workload_runtime" {
-  type        = string
-  description = "kubernetes or unikernel. Only kubernetes is implemented."
-
-  validation {
-    condition     = var.workload_runtime == "kubernetes"
-    error_message = "Only workload_runtime = \"kubernetes\" is implemented."
-  }
-}

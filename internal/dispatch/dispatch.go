@@ -1,12 +1,14 @@
 // Package dispatch gives jobs to runners and takes their results. It is the side of the
 // core: it starts no program itself. A Launcher starts a runner, and the runner then talks
-// to this package over HTTP with the token of its one job.
+// to this package over HTTP with the token of its one job. The first fetch of the job gives
+// the runner a runner key, and each later request must carry it as well.
 package dispatch
 
 import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -41,7 +43,22 @@ const (
 	maxPlan = 256 << 20
 	// maxLog bounds one piece of a log.
 	maxLog = 4 << 20
+	// maxRefusals bounds the refused requests of one job that Dispatcher.Refused learns of,
+	// so that a holder of a token cannot fill the audit log.
+	maxRefusals = 10
 )
+
+// Refusal is a request with the token of a running job that the dispatcher refused. It
+// holds no secret: no token, no runner key and no credential of the job.
+type Refusal struct {
+	// Kind, Env, Layer and CheckoutID name the job.
+	Kind, Env, Layer, CheckoutID string
+	// Request is the method and the path of the request.
+	Request string
+	// Remote is the address that the request came from.
+	Remote string
+	Reason string
+}
 
 // Dispatcher runs jobs on runners.
 type Dispatcher struct {
@@ -53,6 +70,11 @@ type Dispatcher struct {
 	// the cloud must first get a machine and pull its image. When it is 0, Silence counts
 	// from the launch.
 	StartGrace time.Duration
+	// Refused, when it is set, learns of the first refused requests of each job that had
+	// the job token: a second fetch of the job, or a request without the runner key of the
+	// first fetch. Someone other than the runner has the token. The core records them in
+	// the audit log.
+	Refused func(Refusal)
 
 	mu      sync.Mutex
 	pending map[string]*pending
@@ -72,11 +94,13 @@ type pending struct {
 	// seen is the launch, and after the first request of the runner its last request.
 	seen    time.Time
 	started bool
-	// bound is true when the runner has the job. A token gives its job once.
-	bound    bool
-	plan     []byte
-	planJSON []byte
-	result   *jobspec.Result
+	// runnerKey is the hash of the runner key that the first fetch gave. It is empty
+	// before that fetch. A token gives its job once.
+	runnerKey string
+	refusals  int
+	plan      []byte
+	planJSON  []byte
+	result    *jobspec.Result
 }
 
 func (p *pending) touch(now time.Time) {
@@ -85,15 +109,32 @@ func (p *pending) touch(now time.Time) {
 	p.mu.Unlock()
 }
 
-// bind gives the job to the runner that asks first. It is false when the job was given.
-func (p *pending) bind() bool {
+// bind gives the job to the runner that asks first and returns a new runner key. It is
+// false when the job was given.
+func (p *pending) bind() (string, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.bound {
-		return false
+	if p.runnerKey != "" {
+		return "", false
 	}
-	p.bound = true
-	return true
+	runnerKey := rand.Text()
+	p.runnerKey = key(runnerKey)
+	return runnerKey, true
+}
+
+// refusal returns why a request with runnerKey cannot act for the job, or "" when it can.
+func (p *pending) refusal(runnerKey string) string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	switch {
+	case p.runnerKey == "":
+		return "the job was not fetched yet"
+	case runnerKey == "":
+		return "the request has no runner key"
+	case subtle.ConstantTimeCompare([]byte(key(runnerKey)), []byte(p.runnerKey)) != 1:
+		return "the runner key is not the one that the first fetch of the job gave"
+	}
+	return ""
 }
 
 func (p *pending) finish(result jobspec.Result) bool {
@@ -108,9 +149,9 @@ func (p *pending) finish(result jobspec.Result) bool {
 	return true
 }
 
-// key is what the dispatcher keeps of a token: its hash.
-func key(token string) string {
-	sum := sha256.Sum256([]byte(token))
+// key is what the dispatcher keeps of a token or a runner key: its hash.
+func key(secret string) string {
+	sum := sha256.Sum256([]byte(secret))
 	return hex.EncodeToString(sum[:])
 }
 
@@ -197,33 +238,76 @@ func outcome(job jobspec.Job, result jobspec.Result) (jobspec.Result, error) {
 	}
 }
 
+// open returns the job of the token of a request. For a request without the token of a
+// running job it answers 401 Unauthorized and returns nil.
+func (d *Dispatcher) open(w http.ResponseWriter, r *http.Request) *pending {
+	token, found := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	d.mu.Lock()
+	p := d.pending[key(token)]
+	d.mu.Unlock()
+	if !found || p == nil {
+		http.Error(w, "the token opens no running job", http.StatusUnauthorized)
+		return nil
+	}
+	return p
+}
+
+// refuse answers a request that had the token of the job of p with status and reason, and
+// tells Refused of it. The reason holds no secret.
+func (d *Dispatcher) refuse(p *pending, w http.ResponseWriter, r *http.Request, status int,
+	reason string) {
+	http.Error(w, reason, status)
+	if d.Refused == nil {
+		return
+	}
+	p.mu.Lock()
+	p.refusals++
+	tell := p.refusals <= maxRefusals
+	p.mu.Unlock()
+	if tell {
+		d.Refused(Refusal{Kind: p.job.Kind, Env: p.job.Env, Layer: p.job.Layer,
+			CheckoutID: p.job.CheckoutID, Request: r.Method + " " + r.URL.Path,
+			Remote: r.RemoteAddr, Reason: reason})
+	}
+}
+
 // Handler serves the runners. Mount it at "/runner/v1/". A request carries the token of its
 // job as a bearer token, and reaches only that job. The first GET of the job specification
-// binds the job to its runner: a later GET gets 409 Conflict.
+// binds the job to its runner: the answer has a new runner key in the header
+// jobspec.RunnerKeyHeader, and a later GET gets 409 Conflict. Every other request must
+// carry that key in the same header, or it gets 403 Forbidden. A refused request does not
+// count as a sign of life of the runner.
 func (d *Dispatcher) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /runner/v1/job", func(w http.ResponseWriter, r *http.Request) {
+		p := d.open(w, r)
+		if p == nil {
+			return
+		}
+		runnerKey, given := p.bind()
+		if !given {
+			d.refuse(p, w, r, http.StatusConflict, "the job was given to a runner already")
+			return
+		}
+		p.touch(time.Now())
+		w.Header().Set(jobspec.RunnerKeyHeader, runnerKey)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(p.job.Spec)
+	})
 	route := func(pattern string, handle func(p *pending, w http.ResponseWriter, r *http.Request)) {
 		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
-			token, found := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-			d.mu.Lock()
-			p := d.pending[key(token)]
-			d.mu.Unlock()
-			if !found || p == nil {
-				http.Error(w, "the token opens no running job", http.StatusUnauthorized)
+			p := d.open(w, r)
+			if p == nil {
+				return
+			}
+			if reason := p.refusal(r.Header.Get(jobspec.RunnerKeyHeader)); reason != "" {
+				d.refuse(p, w, r, http.StatusForbidden, reason)
 				return
 			}
 			p.touch(time.Now())
 			handle(p, w, r)
 		})
 	}
-	route("GET /runner/v1/job", func(p *pending, w http.ResponseWriter, _ *http.Request) {
-		if !p.bind() {
-			http.Error(w, "the job was given to a runner already", http.StatusConflict)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(p.job.Spec)
-	})
 	route("GET /runner/v1/job/checkout", func(p *pending, w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write(p.job.Checkout)
 	})

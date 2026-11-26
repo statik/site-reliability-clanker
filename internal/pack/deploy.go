@@ -41,9 +41,38 @@ const (
 var Clouds = []string{"local", "aws", "gcp", "azure"}
 
 // coreVariables are the variables of the application layer that the core owns on some
-// target. A setting of a pack cannot have one of these names.
+// target. The version variable and a setting of a pack cannot have one of these names.
 var coreVariables = []string{"env_name", "state_location", "region", "location", "project_id",
-	"subscription_id", "admin_token", "workload_runtime", "kubelogin_login"}
+	"subscription_id", "admin_token", "kubelogin_login"}
+
+// tofuReservedVariables are the names that OpenTofu does not allow for a variable.
+var tofuReservedVariables = []string{"source", "version", "providers", "count", "for_each",
+	"lifecycle", "depends_on", "locals"}
+
+// coreOutputs are the outputs of the application layer that the core owns. The URL output
+// and the version output (the version variable) of a pack cannot have one of these names.
+var coreOutputs = []string{"release_revision"}
+
+// CoreVariables returns the variables of the application layer that the core owns on some
+// target.
+func CoreVariables() []string { return slices.Clone(coreVariables) }
+
+// checkLayerNames checks the names that the pack gives the variables and outputs of the
+// application layer: the version variable, which is also the version output, and the URL
+// output. The settings are checked with checkSettings.
+func (p Pack) checkLayerNames() error {
+	version := p.VersionVariable
+	if slices.Contains(coreVariables, version) || slices.Contains(tofuReservedVariables,
+		version) || slices.Contains(coreOutputs, version) {
+		return fmt.Errorf("version_variable %q is a variable or an output of the core, or a "+
+			"name that OpenTofu reserves", version)
+	}
+	if p.URLOutput == version || slices.Contains(coreOutputs, p.URLOutput) {
+		return fmt.Errorf("url_output %q is the version output (version_variable) or an "+
+			"output of the core", p.URLOutput)
+	}
+	return nil
+}
 
 // platformHelmRoot is the root of the Helm values that the platform gives a chart. A
 // setting cannot set one.
@@ -219,7 +248,7 @@ func (p Pack) checkSettings() error {
 	if badLength(settings, maxSettings) {
 		return fmt.Errorf("deploy.settings must have 1 to %d entries", maxSettings)
 	}
-	taken := append([]string{p.VersionVariable}, coreVariables...)
+	taken := slices.Concat([]string{p.VersionVariable}, coreVariables, tofuReservedVariables)
 	paths := []string{}
 	for _, setting := range settings {
 		if err := checkSetting(setting, taken, paths); err != nil {
@@ -238,7 +267,7 @@ func checkSetting(setting Setting, taken, paths []string) error {
 	}
 	if slices.Contains(taken, name) {
 		return fmt.Errorf("the setting %s has the name of the version variable, of a variable "+
-			"of the core, or of another setting", name)
+			"of the core, of another setting, or a name that OpenTofu reserves", name)
 	}
 	if err := checkSettingPath(setting, paths); err != nil {
 		return err

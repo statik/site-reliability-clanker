@@ -122,6 +122,10 @@ func (p Pack) Record(version string) (Record, bool) {
 // record have that name.
 func IsRelease(version string) bool { return releasePattern.MatchString(version) }
 
+// ReleasePattern returns the regular expression of IsRelease, for the validation of the
+// version variable of the application layer.
+func ReleasePattern() string { return releasePattern.String() }
+
 // Newer reports whether version a is newer than version b. A suffix such as "-bad" does not
 // change the order.
 func Newer(a, b string) bool {

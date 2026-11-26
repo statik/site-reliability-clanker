@@ -4,7 +4,8 @@
 // share no file. They share only the state in the bucket and what the dispatcher holds.
 //
 // It runs a plan, an apply with a changed plan file, which the runner must refuse, and an
-// apply of the plan. It prints one line for each check and fails when a check fails.
+// apply of the plan. Then it stops a runner container in the middle of an apply, as ECS
+// stops a task. It prints one line for each check and fails when a check fails.
 package main
 
 import (
@@ -22,22 +23,30 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/dispatch"
 	"github.com/statik/site-reliability-clanker/internal/jobspec"
+	"github.com/statik/site-reliability-clanker/internal/runner"
 )
 
 //go:embed fixture/main.tf
 var fixture []byte
 
-// The place of the fixture in the checkout, as the runner finds a stack.
+// stopFixture is the stack of the stop case. Its create runs until the runner is stopped.
+//
+//go:embed fixture/stop/main.tf
+var stopFixture []byte
+
+// The place of the fixtures in the checkout, as the runner finds a stack.
 const (
-	env   = "check"
-	cloud = "fixture"
-	layer = "10-state"
+	env       = "check"
+	cloud     = "fixture"
+	layer     = "10-state"
+	stopLayer = "20-stop"
 )
 
 type options struct {
@@ -70,18 +79,20 @@ func parseOptions() (options, error) {
 	return o, nil
 }
 
-// checkoutArchive returns the checkout of the jobs: the fixture as the only stack.
+// checkoutArchive returns the checkout of the jobs: the two fixtures as the only stacks.
 func checkoutArchive() ([]byte, error) {
 	var archive bytes.Buffer
 	zipped := gzip.NewWriter(&archive)
 	writer := tar.NewWriter(zipped)
-	header := &tar.Header{Name: "platform/stacks/" + cloud + "/" + layer + "/main.tf",
-		Mode: 0o644, Size: int64(len(fixture)), Typeflag: tar.TypeReg}
-	if err := writer.WriteHeader(header); err != nil {
-		return nil, fmt.Errorf("write the header of the fixture: %w", err)
-	}
-	if _, err := writer.Write(fixture); err != nil {
-		return nil, fmt.Errorf("write the fixture: %w", err)
+	for stack, content := range map[string][]byte{layer: fixture, stopLayer: stopFixture} {
+		header := &tar.Header{Name: "platform/stacks/" + cloud + "/" + stack + "/main.tf",
+			Mode: 0o644, Size: int64(len(content)), Typeflag: tar.TypeReg}
+		if err := writer.WriteHeader(header); err != nil {
+			return nil, fmt.Errorf("write the header of the fixture %s: %w", stack, err)
+		}
+		if _, err := writer.Write(content); err != nil {
+			return nil, fmt.Errorf("write the fixture %s: %w", stack, err)
+		}
 	}
 	if err := writer.Close(); err != nil {
 		return nil, fmt.Errorf("close the tar archive: %w", err)
@@ -99,16 +110,44 @@ type containerLauncher struct {
 	image   string
 	network string
 	coreURL string
+	// stops gets the end of each container that was stopped.
+	stops chan stoppedContainer
+
+	mu   sync.Mutex
+	next int
 }
 
-func (l containerLauncher) Launch(ctx context.Context, token string) error {
-	cmd := exec.CommandContext(ctx, "docker", "run", "--rm", "--platform", "linux/arm64",
-		"--network", l.network, "--env", dispatch.CoreURLEnv+"="+l.coreURL,
+// stoppedContainer is how a stopped runner container ended: when, and with which exit code.
+type stoppedContainer struct {
+	ended    time.Time
+	exitCode int
+	output   string
+}
+
+func (l *containerLauncher) Launch(ctx context.Context, token string) error {
+	l.mu.Lock()
+	l.next++
+	name := fmt.Sprintf("clanker-runner-check-%d-%d", os.Getpid(), l.next)
+	l.mu.Unlock()
+	cmd := exec.CommandContext(ctx, "docker", "run", "--rm", "--name", name, "--platform",
+		"linux/arm64", "--network", l.network, "--env", dispatch.CoreURLEnv+"="+l.coreURL,
 		"--env", dispatch.TokenEnv, l.image)
+	// A stop of the job stops the container as ECS stops a task: SIGTERM, and SIGKILL after
+	// the stop timeout of the runner task definition.
+	cmd.Cancel = func() error {
+		return exec.Command("docker", "stop", "--time",
+			strconv.Itoa(int(runner.TaskStopTime.Seconds())), name).Run()
+	}
+	cmd.WaitDelay = 10 * time.Second
 	cmd.Env = append(os.Environ(), dispatch.TokenEnv+"="+token)
 	var output bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &output, &output
-	if err := cmd.Run(); err != nil {
+	err := cmd.Run()
+	if ctx.Err() != nil {
+		l.stops <- stoppedContainer{ended: time.Now(), exitCode: cmd.ProcessState.ExitCode(),
+			output: strings.TrimSpace(output.String())}
+	}
+	if err != nil {
 		return fmt.Errorf("the runner container ended with an error: %w: %s", err,
 			strings.TrimSpace(output.String()))
 	}
@@ -135,6 +174,7 @@ func (l *jobLog) String() string {
 
 type harness struct {
 	opts       options
+	launcher   *containerLauncher
 	dispatcher *dispatch.Dispatcher
 	archive    []byte
 	failures   int
@@ -151,12 +191,12 @@ func (h *harness) check(ok bool, format string, args ...any) {
 
 // spec returns a job on the fixture with the S3 backend and the MinIO keys as its AWS
 // credential, as the core sends a job with an S3 backend and a broker credential.
-func (h *harness) spec(kind string) jobspec.Spec {
-	return jobspec.Spec{Kind: kind, Env: env, Cloud: cloud, Layer: layer,
+func (h *harness) spec(kind, stack string) jobspec.Spec {
+	return jobspec.Spec{Kind: kind, Env: env, Cloud: cloud, Layer: stack,
 		CheckoutID: "runner-image-check",
 		AWS: &jobspec.AWSSession{AccessKeyID: h.opts.accessKey,
 			SecretAccessKey: h.opts.secretKey, Expires: time.Now().Add(time.Hour)},
-		Backend: map[string]string{"bucket": h.opts.bucket, "key": env + "/" + layer + ".tfstate",
+		Backend: map[string]string{"bucket": h.opts.bucket, "key": env + "/" + stack + ".tfstate",
 			"region": "us-east-1", "use_lockfile": "true"},
 		Variables: map[string]string{"TF_VAR_message": h.opts.message}}
 }
@@ -198,7 +238,7 @@ func plannedActions(planJSON []byte, address string) ([]string, error) {
 }
 
 func (h *harness) planJob(ctx context.Context) (jobspec.Result, error) {
-	result, err := h.run(ctx, h.spec(jobspec.KindPlan), nil)
+	result, err := h.run(ctx, h.spec(jobspec.KindPlan, layer), nil)
 	if err != nil {
 		return result, fmt.Errorf("the plan job failed: %w", err)
 	}
@@ -221,7 +261,7 @@ func (h *harness) planJob(ctx context.Context) (jobspec.Result, error) {
 func (h *harness) changedApply(ctx context.Context, plan jobspec.Result) {
 	changed := bytes.Clone(plan.Plan)
 	changed[len(changed)-1] ^= 0xff
-	spec := h.spec(jobspec.KindApply)
+	spec := h.spec(jobspec.KindApply, layer)
 	spec.PlanSHA256 = plan.PlanSHA256
 	result, err := h.run(ctx, spec, changed)
 	h.check(err != nil && result.Status == jobspec.StatusFailed &&
@@ -233,7 +273,7 @@ func (h *harness) changedApply(ctx context.Context, plan jobspec.Result) {
 }
 
 func (h *harness) applyJob(ctx context.Context, plan jobspec.Result) {
-	spec := h.spec(jobspec.KindApply)
+	spec := h.spec(jobspec.KindApply, layer)
 	spec.PlanSHA256 = plan.PlanSHA256
 	result, err := h.run(ctx, spec, plan.Plan)
 	h.check(err == nil && result.Status == jobspec.StatusOK,
@@ -247,6 +287,72 @@ func (h *harness) applyJob(ctx context.Context, plan jobspec.Result) {
 	h.check(result.Outputs["state_location"] == h.opts.bucket,
 		"the apply job reports the output state_location %v, the bucket of the backend",
 		result.Outputs["state_location"])
+}
+
+// stoppedApply stops the runner container in the middle of an apply, as ECS stops a task.
+// The runner must interrupt OpenTofu, which ends the create, saves the state and releases
+// the lock, and the runner must end before ECS would kill it. A plan after the stop then
+// gets the lock and sees the resource of the interrupted create in the state.
+func (h *harness) stoppedApply(ctx context.Context) {
+	plan, err := h.run(ctx, h.spec(jobspec.KindPlan, stopLayer), nil)
+	if err != nil {
+		h.check(false, "the plan of the stack %s: %v", stopLayer, err)
+		return
+	}
+	spec := h.spec(jobspec.KindApply, stopLayer)
+	spec.PlanSHA256 = plan.PlanSHA256
+	log := &jobLog{}
+	applyCtx, stop := context.WithCancel(ctx)
+	defer stop()
+	done := make(chan error, 1)
+	go func() {
+		_, err := h.dispatcher.Run(applyCtx, jobspec.Job{Spec: spec, Checkout: h.archive,
+			Plan: plan.Plan, Log: log})
+		done <- err
+	}()
+	if err := waitForLog(log, done, "the slow create started", 3*time.Minute); err != nil {
+		h.check(false, "the apply of %s reaches the slow create: %v\n%s", stopLayer, err, log)
+		return
+	}
+	stopped := time.Now()
+	stop()
+	<-done
+	var end stoppedContainer
+	select {
+	case end = <-h.launcher.stops:
+	case <-time.After(runner.TaskStopTime + time.Minute):
+		h.check(false, "the stopped runner container of the apply of %s ended", stopLayer)
+		return
+	}
+	took := end.ended.Sub(stopped)
+	h.check(end.exitCode != 137 && took < runner.TaskStopGrace,
+		"the stopped runner container ended on its own %s after the stop, with exit code %d, "+
+			"before ECS would kill it: %s", took.Round(100*time.Millisecond), end.exitCode,
+		end.output)
+	after, err := h.run(ctx, h.spec(jobspec.KindPlan, stopLayer), nil)
+	h.check(err == nil, "a plan after the stop gets the lock of the state: error %v", err)
+	if err == nil {
+		actions, err := plannedActions(after.PlanJSON, "terraform_data.slow")
+		h.check(err == nil && reflect.DeepEqual(actions, []string{"delete", "create"}),
+			"the state has the interrupted create as tainted, so the plan replaces it: "+
+				"actions %v, error %v", actions, err)
+	}
+}
+
+// waitForLog waits until the log of a job has text. It fails when the job ended first.
+func waitForLog(log *jobLog, done <-chan error, text string, limit time.Duration) error {
+	deadline := time.Now().Add(limit)
+	for !strings.Contains(log.String(), text) {
+		select {
+		case err := <-done:
+			return fmt.Errorf("the job ended first: %v", err)
+		case <-time.After(500 * time.Millisecond):
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("the log has no %q after %s", text, limit)
+		}
+	}
+	return nil
 }
 
 func run() error {
@@ -264,9 +370,11 @@ func run() error {
 		return fmt.Errorf("listen for the runners: %w", err)
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
-	launcher := containerLauncher{image: opts.image, network: opts.network,
-		coreURL: fmt.Sprintf("http://host.docker.internal:%d", port)}
-	h := &harness{opts: opts, dispatcher: dispatch.New(launcher), archive: archive}
+	launcher := &containerLauncher{image: opts.image, network: opts.network,
+		coreURL: fmt.Sprintf("http://host.docker.internal:%d", port),
+		stops:   make(chan stoppedContainer, 4)}
+	h := &harness{opts: opts, launcher: launcher, dispatcher: dispatch.New(launcher),
+		archive: archive}
 	mux := http.NewServeMux()
 	mux.Handle("/runner/v1/", h.dispatcher.Handler())
 	server := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
@@ -285,6 +393,7 @@ func run() error {
 	}
 	h.changedApply(ctx, plan)
 	h.applyJob(ctx, plan)
+	h.stoppedApply(ctx)
 	if h.failures > 0 {
 		return fmt.Errorf("%d checks failed", h.failures)
 	}

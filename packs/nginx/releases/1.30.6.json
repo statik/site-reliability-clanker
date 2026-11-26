@@ -1,0 +1,9 @@
+{
+  "values": {
+    "image": {
+      "tag": "1.30.6",
+      "digest": "sha256:ec0f7ecb1fbd84959ac114e65fb36074ffc97d4d51db0f18ee925162d889dcef"
+    }
+  },
+  "schema_change": false
+}

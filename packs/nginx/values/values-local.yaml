@@ -1,0 +1,7 @@
+# Values of the local target, after values.yaml.
+resources:
+  requests:
+    cpu: 5m
+    memory: 8Mi
+  limits:
+    memory: 32Mi

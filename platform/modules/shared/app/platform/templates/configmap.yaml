@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.name }}-platform
+  namespace: {{ .Release.Namespace }}
+data:
+  {{- range $key, $value := .Values.platform }}
+  {{ $key }}: {{ $value | toString | quote }}
+  {{- end }}

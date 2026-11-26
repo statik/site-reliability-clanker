@@ -5,10 +5,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/statik/site-reliability-clanker/internal/audit"
 	"github.com/statik/site-reliability-clanker/internal/dispatch"
 	"github.com/statik/site-reliability-clanker/internal/launch"
 	"github.com/statik/site-reliability-clanker/internal/runner"
@@ -35,8 +37,31 @@ func runRunner(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	// A stop of the runner (SIGTERM from ECS or from the local launcher) ends ctx. The
+	// program of the job then gets an interrupt and the grace that fits in the time that the
+	// launcher gives the runner.
+	r.StopGrace = runner.TaskStopGrace
 	client := &runner.Client{CoreURL: coreURL, Token: token, Runner: r}
 	return client.Serve(ctx)
+}
+
+// recordRefusal returns the function that records in the audit log a request of a runner
+// that the dispatcher refused. The request had the token of a running job, so someone other
+// than the runner of the job can have the token.
+func recordRefusal(log *audit.Log) func(dispatch.Refusal) {
+	return func(refusal dispatch.Refusal) {
+		_, err := log.Append(audit.Event{Type: "runner.refused", Actor: "dispatcher",
+			Env: refusal.Env, Layer: refusal.Layer,
+			Summary: fmt.Sprintf("A request %s for the %s job from %s was refused: %s",
+				refusal.Request, refusal.Kind, refusal.Remote, refusal.Reason),
+			Data: map[string]any{"request": refusal.Request, "kind": refusal.Kind,
+				"checkout": refusal.CheckoutID, "remote": refusal.Remote,
+				"reason": refusal.Reason}})
+		if err != nil {
+			slog.Error("record a refused request of a runner", "request", refusal.Request,
+				"error", err)
+		}
+	}
 }
 
 // fargateStartGrace is how long a runner task on Fargate has from its launch to its first

@@ -16,7 +16,7 @@ spec:
       labels:
         {{- include "paperboat.labels" $ctx | nindent 8 }}
       annotations:
-        checksum/admin-token: {{ .Values.adminToken | sha256sum }}
+        checksum/admin-token: {{ .Values.platform.adminToken | sha256sum }}
     spec:
       terminationGracePeriodSeconds: 15
       {{- include "paperboat.podSecurity" . | nindent 6 }}
@@ -31,7 +31,7 @@ spec:
             {{- include "paperboat.databaseEnv" . | nindent 12 }}
             - name: DATA_DIR
               value: /data
-            {{- if .Values.adminToken }}
+            {{- if .Values.platform.adminToken }}
             - name: ADMIN_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -61,7 +61,7 @@ spec:
     - name: http
       port: 8081
       targetPort: http
-{{- if .Values.adminToken }}
+{{- if .Values.platform.adminToken }}
 ---
 apiVersion: v1
 kind: Secret
@@ -71,5 +71,5 @@ metadata:
     {{- include "paperboat.labels" $ctx | nindent 4 }}
 type: Opaque
 stringData:
-  ADMIN_TOKEN: {{ .Values.adminToken | quote }}
+  ADMIN_TOKEN: {{ .Values.platform.adminToken | quote }}
 {{- end }}

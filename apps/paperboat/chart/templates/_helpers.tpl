@@ -1,14 +1,14 @@
-{{/* Image reference. The tag comes from image.tag only. */}}
+{{/* Image reference. The tag is the release that the platform runs, platform.version. */}}
 {{- define "paperboat.image" -}}
-{{- $registry := required "image.registry is required" .Values.image.registry -}}
-{{- $tag := required "image.tag is required" .Values.image.tag -}}
+{{- $registry := required "platform.imageRegistry is required" .Values.platform.imageRegistry -}}
+{{- $tag := required "platform.version is required" .Values.platform.version -}}
 {{- printf "%s/paperboat:%s" (trimSuffix "/" $registry) $tag -}}
 {{- end -}}
 
 {{/* Labels for every object. Call with (dict "root" . "component" "api"). */}}
 {{- define "paperboat.labels" -}}
 {{ include "paperboat.selector" . }}
-app.kubernetes.io/version: {{ .root.Values.image.tag | quote }}
+app.kubernetes.io/version: {{ .root.Values.platform.version | quote }}
 app.kubernetes.io/managed-by: {{ .root.Release.Service }}
 helm.sh/chart: {{ printf "%s-%s" .root.Chart.Name .root.Chart.Version }}
 {{- end -}}
@@ -61,7 +61,7 @@ resources:
 - name: DATABASE_URL
   valueFrom:
     secretKeyRef:
-      name: {{ required "database.secretName is required" .Values.database.secretName }}
+      name: {{ required "platform.databaseSecret is required" .Values.platform.databaseSecret }}
       key: DATABASE_URL
 {{- end -}}
 
@@ -87,5 +87,5 @@ livenessProbe:
 {{- define "paperboat.sharedVolume" -}}
 - name: data
   persistentVolumeClaim:
-    claimName: {{ required "sharedVolume.claimName is required" .Values.sharedVolume.claimName }}
+    claimName: {{ required "platform.sharedVolumeClaim is required" .Values.platform.sharedVolumeClaim }}
 {{- end -}}

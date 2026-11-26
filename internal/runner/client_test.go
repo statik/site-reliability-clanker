@@ -1,8 +1,13 @@
 package runner
 
 import (
+	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/statik/site-reliability-clanker/internal/jobspec"
@@ -50,5 +55,29 @@ func TestADiagnoseJobWithANamespaceThatIsAFlagStartsNoProgram(t *testing.T) {
 	})
 	if len(got) != 1 || got[0].Failure == "" {
 		t.Errorf("results %+v", got)
+	}
+}
+
+// A core of another version gives the job without a runner key. The runner then stops
+// before it runs anything, because each later request would be refused.
+func TestARunnerStopsWhenTheCoreGivesNoRunnerKey(t *testing.T) {
+	var mu sync.Mutex
+	requests := []string{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		requests = append(requests, r.Method+" "+r.URL.Path)
+		mu.Unlock()
+		_, _ = w.Write([]byte(`{"kind":"runbook","env":"local","runbook":"hello"}`))
+	}))
+	defer server.Close()
+	client := &Client{CoreURL: server.URL, Token: "token", Runner: newRunner(t)}
+	err := client.Serve(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "without a runner key") {
+		t.Fatalf("error = %v, want the missing runner key", err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if !reflect.DeepEqual(requests, []string{"GET /runner/v1/job"}) {
+		t.Fatalf("requests = %v, want only the fetch of the job", requests)
 	}
 }

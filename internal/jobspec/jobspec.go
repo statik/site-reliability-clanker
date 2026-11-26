@@ -35,6 +35,12 @@ const (
 // ErrStalePlan means that the state changed after the plan was saved.
 var ErrStalePlan = errors.New("the saved plan is stale")
 
+// RunnerKeyHeader is the HTTP header of the runner key. The core gives a new key in its
+// answer to the first fetch of a job, and the runner sends the key with each later request
+// of the job. Whoever reads the job token after that fetch, for example in the environment
+// of a runner task, thus cannot act as the runner.
+const RunnerKeyHeader = "Clanker-Runner-Key"
+
 // AWSSession holds the keys of one STS session: the AWS credential of one job, from the
 // access broker. The JSON form carries the keys, because that is how a runner gets them.
 // The text and log forms carry only the key ID and the expiry, so that a log line or an

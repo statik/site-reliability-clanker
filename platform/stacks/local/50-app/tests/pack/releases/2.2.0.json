@@ -1,0 +1,1 @@
+{"chart_repository": "oci://ghcr.io/example/charts", "chart_name": "demo", "chart_version": "2.2.0", "chart_digest": "sha256:455d6a04fe43df4a93b40e1f92d65b2a9befaa0348e5a461295d961161ebf475", "schema_change": false}

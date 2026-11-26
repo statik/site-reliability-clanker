@@ -2,8 +2,10 @@
 # Build the runner image and run jobs in it as a launcher on a cloud does: each job in a new
 # container, with its state in an S3 bucket. The bucket is in a MinIO container. A Go
 # harness (scripts/verify/runnerharness) serves the runner routes of the dispatcher and
-# runs a plan, an apply with a changed plan file and the apply of the plan. Then the check
-# reads the state from the bucket with the AWS CLI of the image.
+# runs a plan, an apply with a changed plan file and the apply of the plan. Then it stops a
+# runner container with `docker stop` in the middle of an apply, as ECS stops a task, and
+# the runner must interrupt OpenTofu so that it saves its state and releases its lock.
+# Then the check reads the state from the bucket with the AWS CLI of the image.
 #
 # Usage: scripts/verify/runner-image-check.sh
 #
@@ -66,7 +68,8 @@ uid="$(in_image id -u)"
 entrypoint="$(docker image inspect --format '{{json .Config.Entrypoint}}' "${image}")"
 want_entrypoint='["clanker","runner","--data","'"${data}"'"]'
 [ "${entrypoint}" = "${want_entrypoint}" ] || fail "the entrypoint is ${entrypoint}"
-pin="$(sed -n 's/^ *tofu_version: *//p' "${repo}/.github/workflows/ci.yaml")"
+# CI pins OpenTofu in more than one job. Two different pins give two lines, which fail.
+pin="$(sed -n 's/^ *tofu_version: *//p' "${repo}/.github/workflows/ci.yaml" | sort -u)"
 tofu_version="$(in_image tofu version | head -1)"
 [ "${tofu_version}" = "OpenTofu v${pin}" ] ||
   fail "the image has ${tofu_version}, CI pins OpenTofu ${pin}"
@@ -132,8 +135,8 @@ echo "== the state in the bucket"
 keys="$(aws_cli s3api list-objects-v2 --bucket "${bucket}" --query 'Contents[].Key' \
   --output text)"
 echo "objects: ${keys}"
-[ "${keys}" = "check/10-state.tfstate" ] ||
-  fail "the bucket must hold only the state, and no lock: ${keys}"
+[ "$(echo "${keys}" | tr -s '[:space:]' ' ')" = "check/10-state.tfstate check/20-stop.tfstate " ] ||
+  fail "the bucket must hold only the two states, and no lock: ${keys}"
 output="$(aws_cli s3 cp "s3://${bucket}/check/10-state.tfstate" - | jq -r '.outputs.message.value')"
 [ "${output}" = "${message}" ] ||
   fail "the state has the output message \"${output}\", want \"${message}\""
@@ -143,4 +146,4 @@ if [ "${failures}" -gt 0 ]; then
   exit 1
 fi
 echo "RESULT: the runner image planned and applied in separate containers with S3 state," \
-  "refused a changed plan and left no lock"
+  "refused a changed plan, and left no lock also when it was stopped in an apply"

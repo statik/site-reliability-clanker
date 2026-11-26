@@ -25,7 +25,7 @@ the contract. The next table lists them.
 | `20-cluster` | EKS control plane, one managed node group (Amazon Linux 2023, arm64 on `t4g.medium` by default) with a launch template that requires IMDSv2 and tags each instance and volume, the EKS Pod Identity agent add-on, the EFS CSI driver add-on with its pod identity role, IAM roles for the cluster and the nodes, EKS access entries for the agent roles and the operator, a rule that lets the address ranges of the VPC reach the private endpoint of the API server on port 443 (the runners of the control plane run in the VPC) |
 | `30-data` | RDS for PostgreSQL (`db.t4g.micro`, one zone, gp3, encrypted, private, admin password in Secrets Manager), EFS file system with one mount target in each private subnet, `StorageClass` `efs-rwx`, S3 backup bucket (removed with its objects when `00-bootstrap` has a TTL) |
 | `40-platform` | Calls `modules/shared/platform`. That module installs Envoy Gateway and the Gateway of the platform. The annotations from this root make the service controller of EKS create an internal Network Load Balancer for the Envoy `Service` (`clanker-envoy`), in the private subnets of `10-network`. `modules/aws/service-address` waits in the first apply until that `Service` has the DNS name of the load balancer, and reads it. A Job in the cluster makes the database and the role of the application in RDS. A `Role` gives the group `clanker-runbook` its rights in the application namespace, and a `RoleBinding` gives the group `clanker-debugger` the `ClusterRole` `view` there |
-| `50-app` | Calls `modules/shared/app`, which installs the Paperboat chart |
+| `50-app` | Calls `modules/shared/app`, which installs the chart of the application pack |
 
 ### The load balancer
 

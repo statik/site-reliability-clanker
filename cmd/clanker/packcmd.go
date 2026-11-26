@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/statik/site-reliability-clanker/internal/applayer"
 	"github.com/statik/site-reliability-clanker/internal/audit"
 	"github.com/statik/site-reliability-clanker/internal/bundle"
 	"github.com/statik/site-reliability-clanker/internal/pack"
@@ -52,6 +53,9 @@ func packValidate(args []string, out io.Writer) error {
 		return fmt.Errorf("clanker pack validate needs one directory\n\n%s", packUsage)
 	}
 	app, err := packstore.LoadDir(args[0])
+	if err == nil {
+		_, err = applayer.AppTF(app)
+	}
 	if err != nil {
 		fmt.Fprintf(out, "FAIL  %v\n", err)
 		return errors.New("the pack is not correct")
@@ -72,6 +76,9 @@ func packFacts(app pack.Pack) []string {
 	lines := []string{
 		fmt.Sprintf("manifest: %s %s (%s), schema %d", app.Name, app.Version, app.Title, app.Schema),
 		"deployment: " + deploymentFact(app),
+		fmt.Sprintf("application layer: %s/%s with the variable %s, %d settings and the "+
+			"outputs %s and %s", app.Layer, applayer.AppFile, app.VersionVariable,
+			len(app.Deploy.Settings), app.URLOutput, app.VersionVariable),
 		"settings: " + settingsFact(app.Deploy.Settings),
 		"route: " + routeFact(*app.Deploy.Route),
 		"secrets: " + listOrNone(app.Deploy.Secrets),
