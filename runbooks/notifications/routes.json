@@ -9,7 +9,8 @@
     },
     {
       "name": "Change failed or rolled back",
-      "types": ["apply.failed", "apply.refused", "verify.failed", "rollback.failed"],
+      "types": ["apply.failed", "apply.refused", "verify.failed", "rollback.failed",
+                "rollback.refused"],
       "channels": ["email", "slack", "teams", "discord"],
       "audience": "operators",
       "urgency": "immediate"

@@ -1,6 +1,7 @@
 package planfacts_test
 
 import (
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -120,5 +121,45 @@ func TestParseRejectsBadInput(t *testing.T) {
 	}
 	if _, err := planfacts.Parse(nil); err == nil {
 		t.Error("want an error for an empty plan")
+	}
+}
+
+func TestOutputChangeGivesTheValuesOfAnUpdatedStringOutput(t *testing.T) {
+	plan := func(change string) []byte {
+		return []byte(`{"output_changes":{"harbor_release":` + change + `}}`)
+	}
+	cases := map[string]struct {
+		plan          []byte
+		before, after string
+	}{
+		"an update": {plan(`{"actions":["update"],"before":"3.6.0","after":"3.4.0"}`),
+			"3.6.0", "3.4.0"},
+		"a new output":      {plan(`{"actions":["create"],"before":null,"after":"3.4.0"}`), "", ""},
+		"no change":         {plan(`{"actions":["no-op"],"before":"3.4.0","after":"3.4.0"}`), "", ""},
+		"a value not known": {plan(`{"actions":["update"],"before":"3.4.0","after":null}`), "", ""},
+		"a number":          {plan(`{"actions":["update"],"before":1,"after":2}`), "", ""},
+		"another output":    {[]byte(`{"output_changes":{"x":{"actions":["update"]}}}`), "", ""},
+		"no output changes": {[]byte(`{"resource_changes":[]}`), "", ""},
+	}
+	for name, tc := range cases {
+		before, after, err := planfacts.OutputChange(tc.plan, "harbor_release")
+		if err != nil || before != tc.before || after != tc.after {
+			t.Errorf("%s: %q, %q, %v; want %q, %q", name, before, after, err, tc.before,
+				tc.after)
+		}
+	}
+	if _, _, err := planfacts.OutputChange([]byte("not json"), "x"); err == nil {
+		t.Error("want an error for a plan that is not JSON")
+	}
+}
+
+func TestFactsWithNoWarningHaveNoWarningsField(t *testing.T) {
+	facts, err := planfacts.Parse([]byte(upgradePlan))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(facts)
+	if err != nil || strings.Contains(string(raw), "warnings") {
+		t.Errorf("facts %s, %v; want no warnings field, so stored facts do not change", raw, err)
 	}
 }

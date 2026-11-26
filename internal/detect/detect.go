@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -141,27 +140,6 @@ func (d *Detector) Findings() ([]Finding, error) {
 	return findings, rows.Err()
 }
 
-// versionOrder turns "1.2.0-bad" into comparable numbers. A suffix does not change the order.
-func versionOrder(v string) [3]int {
-	var out [3]int
-	core, _, _ := strings.Cut(v, "-")
-	for i, part := range strings.SplitN(core, ".", 3) {
-		out[i], _ = strconv.Atoi(part)
-	}
-	return out
-}
-
-// Newer reports whether version a is newer than version b.
-func Newer(a, b string) bool {
-	va, vb := versionOrder(a), versionOrder(b)
-	for i := range va {
-		if va[i] != vb[i] {
-			return va[i] > vb[i]
-		}
-	}
-	return false
-}
-
 func (d *Detector) runningVersion(env, layer, output string) string {
 	outputs, err := store.LayerOutputs(d.DB, env, layer)
 	if err != nil {
@@ -238,8 +216,8 @@ func (d *Detector) newestRelease(running string) (string, error) {
 	}
 	newest := ""
 	for _, e := range entries {
-		if v, ok := app.ReleaseOf(e.Name); ok && Newer(v, running) &&
-			(newest == "" || Newer(v, newest)) {
+		if v, ok := app.ReleaseOf(e.Name); ok && pack.Newer(v, running) &&
+			(newest == "" || pack.Newer(v, newest)) {
 			newest = v
 		}
 	}
@@ -300,7 +278,7 @@ func (d *Detector) CheckAdvisories(ctx context.Context, env string) error {
 			continue
 		}
 		running := d.runningVersion(env, adv.Layer, adv.Variable)
-		if running == "" || running == adv.Value || Newer(running, adv.Value) {
+		if running == "" || running == adv.Value || pack.Newer(running, adv.Value) {
 			continue
 		}
 		kind := map[string]string{"base-image-cve": "app-upgrade",

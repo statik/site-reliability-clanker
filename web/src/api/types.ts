@@ -63,6 +63,9 @@ export interface PlanFacts {
   replace: number;
   resources: ResourceChange[] | null;
   outputs: string[] | null;
+  /** Set only when the core warns the approver, for example of a version that goes down
+   *  across a release that changed the database schema. */
+  warnings?: string[];
 }
 
 export interface PolicyDecision {

@@ -9,7 +9,7 @@ import (
 )
 
 // verify checks the environment after the apply. A failed check of a change that came from a
-// pull request starts the rollback.
+// pull request starts the rollback, unless rollbackRefusal gives a reason not to.
 func (o *Orchestrator) verify(ctx context.Context, wi WorkItem, approvers []string) (WorkItem, error) {
 	if err := o.setState(&wi, StateVerifying, "orchestrator", "apply finished"); err != nil {
 		return WorkItem{}, err
@@ -39,6 +39,12 @@ func (o *Orchestrator) verify(ctx context.Context, wi WorkItem, approvers []stri
 	}
 	if wi.PRID == 0 || wi.RollbackOf != "" {
 		return wi, o.setState(&wi, StateFailed, "verifier", result.Reason)
+	}
+	if refusal := o.rollbackRefusal(wi); refusal != "" {
+		o.emit(audit.Event{Type: "rollback.refused", Actor: "orchestrator", Env: wi.Env,
+			WorkItem: wi.ID, Summary: "Rollback refused: " + refusal,
+			Data: map[string]any{"reason": refusal, "verify_reason": result.Reason}})
+		return wi, o.setState(&wi, StateFailed, "orchestrator", refusal)
 	}
 	if err := o.rollback(ctx, wi, approvers, result.Reason); err != nil {
 		o.emit(audit.Event{Type: "rollback.failed", Actor: "orchestrator", Env: wi.Env,

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/audit"
-	"github.com/statik/site-reliability-clanker/internal/detect"
 	"github.com/statik/site-reliability-clanker/internal/monitor"
 	"github.com/statik/site-reliability-clanker/internal/orchestrator"
 	"github.com/statik/site-reliability-clanker/internal/pack"
@@ -485,7 +484,7 @@ func (s *Server) latestVersions() (map[string]string, error) {
 			if !ok || withdrawn[v] {
 				continue
 			}
-			if latest[app.Name] == "" || detect.Newer(v, latest[app.Name]) {
+			if latest[app.Name] == "" || pack.Newer(v, latest[app.Name]) {
 				latest[app.Name] = v
 			}
 		}
