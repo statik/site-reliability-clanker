@@ -19,16 +19,19 @@ provider "aws" {
 
 data "aws_caller_identity" "current" {}
 
+# An environment with a TTL is a test: its versioned buckets go with it when it is destroyed.
 module "state_bucket" {
   source = "../../../modules/aws/bucket"
 
-  name = var.state_location
+  name          = var.state_location
+  force_destroy = var.ttl_hours > 0
 }
 
 module "evidence_bucket" {
   source = "../../../modules/aws/bucket"
 
-  name = "clanker-${var.env_name}-evidence-${data.aws_caller_identity.current.account_id}"
+  name          = "clanker-${var.env_name}-evidence-${data.aws_caller_identity.current.account_id}"
+  force_destroy = var.ttl_hours > 0
 }
 
 module "agent_identities" {

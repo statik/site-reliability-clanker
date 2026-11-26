@@ -57,7 +57,9 @@ func TestTheCommandFindsTheOnePackOfTheSourceFiles(t *testing.T) {
 }
 
 func TestTheForgeIsSeededFromThePack(t *testing.T) {
-	source := os.DirFS(checkoutWith(t, "harbor"))
+	dir := checkoutWith(t, "harbor")
+	packtest.AddRecords(t, filepath.Join(dir, "apps", "harbor"))
+	source := os.DirFS(dir)
 	app, err := loadPack(source, "")
 	if err != nil {
 		t.Fatal(err)
@@ -76,19 +78,48 @@ func TestTheForgeIsSeededFromThePack(t *testing.T) {
 	if !slices.Equal(repos, want) {
 		t.Fatalf("repositories = %v, want %v", repos, want)
 	}
-	for repo, path := range map[string]string{
-		orchestrator.PlatformRepo: "apps/harbor/chart/Chart.yaml",
-		"harbor":                  "notes/3.4.0.md",
-	} {
-		if _, err := f.ReadFile(repo, "main", path); err != nil {
-			t.Errorf("%s has no %s: %v", repo, path, err)
+	// Nothing of the pack is outside apps/harbor/: the rest is platform/ of the source.
+	inPack, outside := []string{}, []string{}
+	for _, file := range repositoryFiles(t, f, orchestrator.PlatformRepo, "") {
+		if rest, ok := strings.CutPrefix(file, "apps/harbor/"); ok {
+			inPack = append(inPack, rest)
+		} else {
+			outside = append(outside, file)
 		}
 	}
-	// The simulator publishes the later releases; the seed has only the first one.
-	if _, err := f.ReadFile("harbor", "main", "notes/3.5.0.md"); err == nil {
-		t.Error("the seed has a release after the first one")
+	if !slices.Equal(outside, []string{"platform/CONTRACT.md"}) {
+		t.Errorf("the platform repository has %v outside the pack", outside)
 	}
-	if _, err := f.ReadFile("harbor", "main", "chart/Chart.yaml"); err != nil {
-		t.Errorf("the releases repository has no chart: %v", err)
+	wantPack := []string{"chart/Chart.yaml", "charts/harbor-3.5.0.tgz", "extras/Chart.yaml",
+		"extras/templates/job.yaml", "releases/3.4.0.json", "releases/3.5.0.json",
+		"values/values-aws.yaml", "values/values.yaml"}
+	if !slices.Equal(inPack, wantPack) {
+		t.Errorf("apps/harbor/ of the platform repository\n got %v\nwant %v", inPack, wantPack)
 	}
+	// The simulator publishes the later releases; the seed has only the first note, and
+	// the chart.
+	got := repositoryFiles(t, f, "harbor", "")
+	if want := []string{"chart/Chart.yaml", "notes/3.4.0.md"}; !slices.Equal(got, want) {
+		t.Errorf("the releases repository has %v, want %v", got, want)
+	}
+}
+
+// repositoryFiles returns the paths of the files below dir on main of a repository, in
+// the order of the paths.
+func repositoryFiles(t *testing.T, f *forge.Forge, repo, dir string) []string {
+	t.Helper()
+	entries, err := f.Tree(repo, "main", dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := []string{}
+	for _, entry := range entries {
+		if entry.Type == "tree" {
+			files = append(files, repositoryFiles(t, f, repo, entry.Path)...)
+		} else {
+			files = append(files, entry.Path)
+		}
+	}
+	slices.Sort(files)
+	return files
 }

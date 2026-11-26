@@ -13,8 +13,10 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -183,8 +185,16 @@ func moveBranch(s *sqlStorage, branch string, updated, old plumbing.Hash) error 
 
 var skipNames = map[string]bool{".terraform": true, ".git": true, "node_modules": true}
 
-// readTree stores the files of source as blobs and adds them to files below prefix.
-func readTree(s *sqlStorage, source fs.FS, prefix string, files map[string]file) error {
+// seedTree is the content of a repository that Seed makes, with the source of each path.
+type seedTree struct {
+	files map[string]file
+	// owners holds the source of each file, and dirs the source of each directory that
+	// has a file.
+	owners, dirs map[string]string
+}
+
+// readTree stores the files of source as blobs and adds them to the tree below prefix.
+func readTree(s *sqlStorage, source fs.FS, prefix string, tree seedTree) error {
 	return fs.WalkDir(source, ".", func(relative string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -195,30 +205,68 @@ func readTree(s *sqlStorage, source fs.FS, prefix string, files map[string]file)
 		if d.IsDir() || strings.Contains(d.Name(), ".tfstate") || strings.HasSuffix(d.Name(), ".tfplan") {
 			return nil
 		}
-		content, err := fs.ReadFile(source, relative)
+		target := path.Join(prefix, relative)
+		if err := tree.claim(target, prefix); err != nil {
+			return err
+		}
+		stored, err := storeFile(s, source, relative, d)
 		if err != nil {
 			return err
 		}
-		info, err := d.Info()
-		if err != nil {
-			return err
-		}
-		hash, err := s.writeBlob(content)
-		if err != nil {
-			return err
-		}
-		mode := filemode.Regular
-		if info.Mode().Perm()&0o111 != 0 {
-			mode = filemode.Executable
-		}
-		files[path.Join(prefix, relative)] = file{Mode: mode, Hash: hash}
+		tree.files[target] = stored
 		return nil
 	})
 }
 
+// storeFile stores one file of source as a blob and returns its entry in a tree.
+func storeFile(s *sqlStorage, source fs.FS, relative string, d fs.DirEntry) (file, error) {
+	content, err := fs.ReadFile(source, relative)
+	if err != nil {
+		return file{}, err
+	}
+	info, err := d.Info()
+	if err != nil {
+		return file{}, err
+	}
+	hash, err := s.writeBlob(content)
+	if err != nil {
+		return file{}, err
+	}
+	mode := filemode.Regular
+	if info.Mode().Perm()&0o111 != 0 {
+		mode = filemode.Executable
+	}
+	return file{Mode: mode, Hash: hash}, nil
+}
+
+// claim records that the source prefix writes the file target. One source must never
+// replace a file of another, so claim refuses a file that the tree has already, a file at
+// a directory of the tree, and a file at a directory above target.
+func (t seedTree) claim(target, prefix string) error {
+	if owner, taken := t.owners[target]; taken {
+		return fmt.Errorf("the sources %q and %q both write %s", owner, prefix, target)
+	}
+	if owner, taken := t.dirs[target]; taken {
+		return fmt.Errorf("the source %q writes files inside %s, and %q writes the file %s",
+			owner, target, prefix, target)
+	}
+	for dir := path.Dir(target); dir != "."; dir = path.Dir(dir) {
+		if owner, taken := t.owners[dir]; taken {
+			return fmt.Errorf("the source %q writes the file %s, and %q writes %s inside it",
+				owner, dir, prefix, target)
+		}
+	}
+	t.owners[target] = prefix
+	for dir := path.Dir(target); dir != "."; dir = path.Dir(dir) {
+		t.dirs[dir] = prefix
+	}
+	return nil
+}
+
 // Seed creates the repository and commits the given source trees into it. Each key of
 // sources is a path inside the repository. Each value is the tree of files to copy there.
-// Seed does nothing when the repository exists.
+// Two sources can share a directory, but never a file: Seed refuses a path that two
+// sources write. Seed does nothing when the repository exists.
 func (f *Forge) Seed(repo string, sources map[string]fs.FS, message string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -228,13 +276,14 @@ func (f *Forge) Seed(repo string, sources map[string]fs.FS, message string) erro
 	// The repository becomes visible only with its first commit: the row in git_repos is
 	// the last write.
 	s := newStorage(f.db, repo)
-	files := map[string]file{}
-	for dest, src := range sources {
-		if err := readTree(s, src, dest, files); err != nil {
+	tree := seedTree{files: map[string]file{}, owners: map[string]string{},
+		dirs: map[string]string{}}
+	for _, dest := range slices.Sorted(maps.Keys(sources)) {
+		if err := readTree(s, sources[dest], dest, tree); err != nil {
 			return fmt.Errorf("copy the files for %q into repository %s: %w", dest, repo, err)
 		}
 	}
-	commit, err := f.writeCommit(s, files, "clanker-bootstrap", message)
+	commit, err := f.writeCommit(s, tree.files, "clanker-bootstrap", message)
 	if err != nil {
 		return fmt.Errorf("seed repository %s: %w", repo, err)
 	}
