@@ -37,14 +37,19 @@ func (s *Server) getState(r *http.Request) (any, error) {
 		"dashboard_url": s.cfg.DashboardURL,
 		"dashboard_up":  s.dashboardUp(r.Context()),
 		"aws_plan":      awsPlan(state),
+		"install_steps": InstallSteps,
 		"in_app":        s.cfg.InApp,
 	}, nil
 }
 
 func (s *Server) getChecks(r *http.Request) (any, error) {
-	checks, err := Checks(r.URL.Query().Get("target"))
+	target := r.URL.Query().Get("target")
+	checks, err := Checks(target)
 	if err != nil {
 		return nil, invalid("%v", err)
+	}
+	if target == TargetAWS {
+		checks = InstallChecks()
 	}
 	return map[string]any{"checks": checks, "ready": len(Missing(checks)) == 0}, nil
 }
@@ -205,20 +210,25 @@ func (s *Server) postReview(r *http.Request) (any, error) {
 		if s.state.PlaceMode == "" {
 			return nil, invalid("choose the network of the control plane before the review")
 		}
+		s.review = []Change{}
+		for _, item := range awsPlan(s.state).Creates {
+			s.review = append(s.review, Change{"Add", item.What, TargetAWS})
+		}
 	default:
 		return nil, invalid("choose where to run before the review")
 	}
 	return map[string]bool{"started": false}, nil
 }
 
-// postDeploy starts the control plane on this machine. The wizard creates nothing on AWS.
+// postDeploy starts the control plane on this machine, or the installer on AWS. The person
+// pressed the button of the review.
 func (s *Server) postDeploy(r *http.Request) (any, error) {
 	s.mu.Lock()
 	state, reviewed := s.state, len(s.review) > 0
 	s.mu.Unlock()
-	if state.Target != TargetLocal {
-		return nil, invalid("the wizard creates nothing on AWS: the review is its last step " +
-			"there")
+	if state.Target == TargetAWS {
+		err := s.deployAWS(state, reviewed)
+		return map[string]bool{"started": err == nil}, err
 	}
 	// A control plane that was set up before is only started again: nothing new is
 	// created, so there is nothing to review.

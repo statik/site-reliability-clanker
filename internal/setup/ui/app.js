@@ -17,9 +17,11 @@ const STEPS = [
   { id: "key", title: "Language model" },
   { id: "signin", title: "Sign in", only: "aws" },
   { id: "where", title: "Network", only: "aws" },
+  { id: "details", title: "Names and tags", only: "aws" },
   { id: "review", title: "Review" },
-  { id: "create", title: "Create", only: "local" },
+  { id: "create", title: "Create" },
   { id: "handover", title: "Hand over", only: "local" },
+  { id: "done", title: "Done", only: "aws" },
 ];
 
 let view = null;
@@ -27,7 +29,8 @@ let step = "target";
 let message = null;
 let timer = null;
 const form = { target: "", env: "clanker", operator: "", key: "", model: "", local: null, profile: "", profiles: null,
-  checks: null, found: null, surveying: false, place: "" };
+  checks: null, found: null, surveying: false, place: "", details: null, zone: "", tags: [], newTag: "",
+  checkout: "", nanos: "", confirm: "" };
 
 async function call(method, path, body) {
   const response = await fetch(path, {
@@ -156,7 +159,8 @@ function drawTarget() {
         "Free. Good for a first look."),
       choice("aws", "Your AWS account", "A unikernel on one small virtual machine, in a private " +
         "network of your account, with a small PostgreSQL database. The wizard signs in with your " +
-        "AWS command line, reads your account, and shows what S.R.C. creates there and its price."),
+        "AWS command line, reads your account, shows what S.R.C. creates there and its price, and " +
+        "creates it when you press Create."),
       choice("gcp", "Google Cloud", "The stacks exist and are validated. The wizard does not set " +
         "up this cloud yet.", "not yet"),
       choice("azure", "Azure", "The stacks exist and are validated. The wizard does not set up " +
@@ -268,8 +272,9 @@ function localModelBlock() {
 
 function hostedKeyBlock() {
   const where = targetOf() === "aws"
-    ? "The wizard holds it in memory while it runs. It is not written to a file here, and " +
-      "nothing is stored in your AWS account."
+    ? "The wizard holds it in memory. Create writes it to home.tfvars on this machine, readable " +
+      "only by you, and to an encrypted parameter in your AWS account that only the control plane " +
+      "can read."
     : "The wizard saves it in the data directory on this machine, readable only by you.";
   return el("label", { class: "field" }, "OpenRouter API key",
     el("input", { type: "password", autocomplete: "off", spellcheck: "false", placeholder: "sk-or-…",
@@ -412,7 +417,8 @@ async function savePlace() {
   try {
     await call("POST", "/api/aws/place", body);
     await refresh();
-    go("review");
+    form.details = null;
+    go("details");
   } catch (error) { fail(error); }
 }
 
@@ -519,7 +525,120 @@ function drawWhere() {
   ];
 }
 
-// ---------------------------------------------------------------- 6. review
+// ---------------------------------------------------------------- 6. names and tags
+
+async function loadDetails() {
+  try {
+    const details = await call("GET", "/api/aws/details");
+    const state = view.state;
+    const delegated = details.zones.filter((zone) => zone.delegated);
+    form.zone = [state.zone_id, details.saved_zone].find((id) => delegated.some((zone) => zone.id === id)) ??
+      delegated[0]?.id ?? "";
+    const keys = new Set([...(details.launch.required_tags ?? []), ...details.saved_tag_keys, ...(state.tag_keys ?? [])]);
+    form.tags = [...keys].sort().map((key) => ({ key, value: "" }));
+    form.checkout = details.checkout;
+    form.nanos = details.nanos;
+    form.details = details;
+  } catch (error) { form.details = { failed: true }; fail(error); return; }
+  draw();
+}
+
+function zoneChoice(zone) {
+  const selected = form.zone === zone.id;
+  return el("label", { class: `choice${selected ? " is-selected" : ""}${zone.delegated ? "" : " is-disabled"}` },
+    el("input", { type: "radio", name: "zone", value: zone.id, checked: selected, disabled: !zone.delegated,
+      onchange: () => { form.zone = zone.id; draw(); } }),
+    el("span", { class: "choice-title" }, zone.name, zone.delegated ? null : el("span", { class: "tag" }, "not delegated")),
+    el("span", { class: "choice-text" }, `${zone.id}. `, zone.delegated
+      ? `The control plane gets src-${view.state.env}.${zone.name} and Keycloak src-${view.state.env}-idp.${zone.name}.`
+      : `It cannot hold the names: ${zone.reason}.`));
+}
+
+function launchText(details) {
+  if (details.launch_error) return `The dry run of a launch did not answer: ${details.launch_error}. Add the tags that your organization requires.`;
+  const launch = details.launch;
+  if (launch.allowed) return "A dry run of a launch passed without tags: your organization requires none on a launch.";
+  if (launch.required_tags.length > 0) {
+    return `A dry run of a launch was refused. The rule names the tags ${launch.required_tags.join(", ")}. Give their values.`;
+  }
+  return `A dry run of a launch was refused: ${launch.reason}. Add the tags that your organization requires.`;
+}
+
+function tagRow(tag, index, saved) {
+  return el("div", { class: "tag-row" },
+    el("label", { class: "field" }, tag.key,
+      el("input", { type: "text", value: tag.value, autocomplete: "off", spellcheck: "false",
+        placeholder: saved.includes(tag.key) ? "keep the value of home.tfvars" : "value",
+        oninput: (event) => { form.tags[index].value = event.target.value; } })),
+    button("Remove the tag", "secondary", () => { form.tags.splice(index, 1); draw(); }));
+}
+
+function drawDetails() {
+  if (form.details === null) {
+    loadDetails();
+    return [el("h1", {}, "Looking at your zones and tags"),
+      el("p", {}, el("span", { class: "spinner" }), "Reading the public zones and making a dry run of a launch. " +
+        "This changes nothing.")];
+  }
+  const details = form.details;
+  if (details.failed) {
+    return [el("h1", {}, "The wizard could not read your zones."), notice(),
+      buttons(button("Back", "secondary", () => go("where")),
+        button("Try again", "primary", () => { form.details = null; draw(); }))];
+  }
+  return [
+    el("h1", {}, "Choose the names and the tags."),
+    el("p", { class: "lead" }, "S.R.C. puts two names in a public zone of your account, with a certificate, and puts " +
+      "the tags that your organization requires on each resource and on each launch. The wizard read your account " +
+      "and changed nothing."),
+    el("h2", {}, "Zone of the names"),
+    details.zones_error ? el("div", { class: "notice notice-error" }, details.zones_error) : null,
+    details.zones.length === 0 && !details.zones_error
+      ? el("div", { class: "notice notice-warning" }, "The account has no public zone. Create one in Route 53 first.") : null,
+    el("div", { class: "choices choices-list", role: "radiogroup", "aria-label": "Zone" }, details.zones.map(zoneChoice)),
+    el("h2", {}, "Tags that your organization requires"),
+    el("p", { class: "help" }, launchText(details), " The values stay on this machine and in your account: no log shows them."),
+    form.tags.map((tag, index) => tagRow(tag, index, details.saved_tag_keys)),
+    el("div", { class: "tag-row" },
+      el("label", { class: "field" }, "Another tag",
+        el("input", { type: "text", value: form.newTag, autocomplete: "off", spellcheck: "false", placeholder: "key",
+          oninput: (event) => { form.newTag = event.target.value; } })),
+      button("Add the tag", "secondary", () => {
+        const key = form.newTag.trim();
+        if (key !== "" && !form.tags.some((tag) => tag.key === key)) form.tags.push({ key, value: "" });
+        form.newTag = "";
+        draw();
+      })),
+    el("h2", {}, "What the installer builds"),
+    el("label", { class: "field" }, "Checkout of S.R.C.",
+      el("input", { type: "text", value: form.checkout, autocomplete: "off", spellcheck: "false",
+        oninput: (event) => { form.checkout = event.target.value; } }),
+      el("span", { class: "help" }, "The installer builds the runner image, the control plane and the images of the " +
+        "application from this directory, for linux/arm64. A released program does not carry their source.")),
+    el("label", { class: "field" }, "Release of the Nanos kernel",
+      el("input", { type: "text", value: form.nanos, autocomplete: "off", spellcheck: "false",
+        oninput: (event) => { form.nanos = event.target.value; } }),
+      el("span", { class: "help" }, "The machine image of the control plane boots this kernel. 0.1.55 is the fallback " +
+        "when an image does not boot.")),
+    el("p", { class: "help" }, `The inputs go to ${details.directory}/home.tfvars, readable only by you.`),
+    notice(),
+    buttons(
+      button("Back", "secondary", () => go("where")),
+      button("Continue", "primary", saveDetails, form.zone === "")),
+  ];
+}
+
+async function saveDetails() {
+  const tags = Object.fromEntries(form.tags.map((tag) => [tag.key, tag.value]));
+  try {
+    await call("POST", "/api/aws/details", { zone_id: form.zone, tags, checkout: form.checkout, nanos: form.nanos });
+    form.tags = form.tags.map((tag) => ({ key: tag.key, value: "" }));
+    await refresh();
+    go("review");
+  } catch (error) { fail(error); }
+}
+
+// ---------------------------------------------------------------- 7. review
 
 async function startReview() {
   try {
@@ -574,42 +693,79 @@ function drawAwsReview() {
       el("p", { class: "lead" }, "The review needs the sign-in and the network of the control plane."),
       buttons(button("Back", "secondary", () => go("where")))];
   }
+  const reviewed = (view.review ?? []).length > 0;
+  if (!reviewed && !message) startReview();
   const state = view.state;
+  const tags = (state.tag_keys ?? []).length > 0 ? `${state.tag_keys.join(", ")} (values not shown)` : "None";
   return [
     el("h1", {}, "This is what S.R.C. creates in your AWS account."),
     el("p", { class: "lead" }, `${plan.network} ${plan.access}`),
     el("dl", { class: "facts" },
       el("div", {}, el("dt", {}, "Account"), el("dd", {}, state.account)),
       el("div", {}, el("dt", {}, "Region"), el("dd", {}, state.region)),
-      el("div", {}, el("dt", {}, "Language model"), el("dd", {}, MODELS[state.key_choice] ?? "Not chosen"))),
+      el("div", {}, el("dt", {}, "Zone"), el("dd", {}, state.zone_name || "Not chosen")),
+      el("div", {}, el("dt", {}, "Required tags"), el("dd", {}, tags)),
+      el("div", {}, el("dt", {}, "Language model"), el("dd", {}, MODELS[state.key_choice] ?? "Not chosen")),
+      el("div", {}, el("dt", {}, "Nanos kernel"), el("dd", {}, state.nanos || "Not chosen"))),
     el("table", {},
       el("thead", {}, el("tr", {}, el("th", {}, "Resource"), el("th", {}, "What it is"))),
       el("tbody", {}, plan.creates.map((item) => el("tr", {},
         el("td", {}, item.what), el("td", {}, item.detail))))),
     el("p", { class: "block" }, "Every resource carries the tag ", el("code", {}, `${plan.tag_key}=${plan.tag_value}`),
-      ". One command removes everything that has this tag."),
+      ". Remove, on the last page, deletes everything that Create made and checks that nothing is left."),
     priceTable(plan),
-    el("div", { class: "notice" }, el("strong", {}, "The wizard stops here for AWS."),
-      "The review is the last step for AWS in this version. The wizard created nothing and stored " +
-      "nothing in your account. Your choices are saved on this machine."),
+    el("h2", {}, "What Create does"),
+    el("ol", { class: "steps job-steps" }, view.install_steps.map((title) => el("li", {}, title))),
+    el("p", { class: "help" }, "Each step can run again. When one fails, fix the cause and press Create again: it " +
+      "goes on from that step. Nothing starts before you press Create."),
+    plan.blocked.length > 0 ? el("div", { class: "notice notice-warning" },
+      el("strong", {}, "Create cannot start yet."), plan.blocked.join("; "), ".") : null,
     notice(),
-    buttons(button("Back", "secondary", () => go("where"))),
+    buttons(
+      button("Back", "secondary", () => go("details")),
+      button("Create", "primary", startDeploy, !reviewed || plan.blocked.length > 0 || jobRunning())),
   ];
 }
 
-// ---------------------------------------------------------------- 7. create
+// ---------------------------------------------------------------- 8. create
 
 async function startDeploy() {
   try {
     await call("POST", "/api/deploy");
     await refresh();
     go("create");
-    watchJob(async () => go("handover"));
+    watchJob(async () => go(targetOf() === "aws" ? "done" : "handover"));
   } catch (error) { fail(error); }
+}
+
+// jobSteps shows the steps of the installer or of the removal and how far the job is.
+function jobSteps(job) {
+  if (!job || job.steps.length === 0) return null;
+  const done = job.status === "done";
+  return el("ol", { class: "steps job-steps", "aria-label": "Progress" }, job.steps.map((title, index) => {
+    let state = "";
+    if (done || index < job.current) state = "is-done";
+    else if (index === job.current) state = job.status === "failed" ? "is-failed" : "is-current";
+    return el("li", { class: state }, title);
+  }));
 }
 
 function drawCreate() {
   const failed = view.job?.status === "failed";
+  if (targetOf() === "aws") {
+    return [
+      el("h1", {}, failed ? "The installation stopped." : "Creating S.R.C. in your AWS account"),
+      el("p", { class: "lead" }, failed
+        ? "Fix the cause that the log names, then press Create again. It goes on from the step that failed."
+        : "This takes a while: the database, the images and the first start of the control plane take the " +
+          "longest. The wizard goes on when you close this page."),
+      jobSteps(view.job),
+      jobBlock(),
+      notice(),
+      failed ? buttons(button("Back to the review", "secondary", () => go("review")),
+        button("Create again", "primary", startDeploy, jobRunning())) : null,
+    ];
+  }
   return [
     el("h1", {}, failed ? "The start stopped." : "Starting the control plane"),
     el("p", { class: "lead" }, "This takes less than a minute."),
@@ -619,7 +775,71 @@ function drawCreate() {
   ];
 }
 
-// ---------------------------------------------------------------- 8. hand over
+// ---------------------------------------------------------------- 9. done and remove
+
+function drawDone() {
+  const result = view.state.result;
+  if (!view.state.installed || !result) {
+    return [el("h1", {}, "S.R.C. is not installed in your AWS account."),
+      buttons(button("Back to the review", "secondary", () => go("review")))];
+  }
+  const env = view.state.env;
+  return [
+    el("h1", {}, "S.R.C. runs in your AWS account."),
+    el("p", { class: "lead" }, "The control plane plans the first deployment and waits for your approval. You reach it " +
+      "through the Tailscale subnet router of the network."),
+    el("dl", { class: "facts" },
+      el("div", {}, el("dt", {}, "Dashboard"), el("dd", {}, el("a", { href: result.dashboard_url, target: "_blank",
+        rel: "noopener" }, result.dashboard_url))),
+      el("div", {}, el("dt", {}, "Sign in as"), el("dd", {}, result.admin_email)),
+      el("div", {}, el("dt", {}, "Second approver"), el("dd", {}, result.approver_email)),
+      el("div", {}, el("dt", {}, "Price of one week, about"), el("dd", {}, `${money(result.weekly_usd)} USD`))),
+    el("h2", {}, "Passwords of Keycloak"),
+    el("p", { class: "help" }, "The state of the home stack holds them. This wizard does not show them. Run this in a " +
+      "terminal:"),
+    el("pre", { class: "log" }, result.passwords),
+    el("h2", {}, "Remove"),
+    el("p", { class: "help" }, "Remove deletes everything that Create made, in the order of the teardown, and checks at " +
+      `the end that nothing is left. Type ${env} to confirm.`),
+    el("label", { class: "field" }, "Name of the environment",
+      el("input", { type: "text", value: form.confirm, autocomplete: "off", spellcheck: "false",
+        oninput: (event) => { form.confirm = event.target.value; draw(); } })),
+    notice(),
+    buttons(button(`Remove ${env}`, "danger", startRemove, form.confirm !== env || jobRunning())),
+  ];
+}
+
+async function startRemove() {
+  try {
+    await call("POST", "/api/aws/remove", { env: form.confirm });
+    form.confirm = "";
+    await refresh();
+    go("remove");
+    watchJob();
+  } catch (error) { fail(error); }
+}
+
+function drawRemove() {
+  const status = view.job?.status;
+  const title = { running: "Removing S.R.C. from your AWS account", failed: "The removal stopped.",
+    done: "S.R.C. is removed from your AWS account." }[status] ?? "Removal";
+  return [
+    el("h1", {}, title),
+    el("p", { class: "lead" }, status === "failed"
+      ? "Fix the cause that the log names, then remove again. Each step checks before it reports."
+      : "Each step checks that its part is gone before the next one starts."),
+    jobSteps(view.job),
+    jobBlock(),
+    notice(),
+    status === "failed" ? buttons(button("Remove again", "danger", async () => {
+      form.confirm = view.state.env;
+      await startRemove();
+    }, jobRunning())) : null,
+    status === "done" ? buttons(button("Back to the start", "secondary", () => go("target"))) : null,
+  ];
+}
+
+// ---------------------------------------------------------------- 10. hand over
 
 function drawHandover() {
   const up = view.dashboard_up;
@@ -664,7 +884,8 @@ async function resume() {
 }
 
 const DRAW = { target: drawTarget, checks: drawChecks, key: drawKey, signin: drawSignIn, where: drawWhere,
-  review: drawReview, create: drawCreate, handover: drawHandover };
+  details: drawDetails, review: drawReview, create: drawCreate, handover: drawHandover, done: drawDone,
+  remove: drawRemove };
 
 function draw() {
   drawSteps();
@@ -698,9 +919,13 @@ async function start() {
       return;
     }
   }
+  if (view.state.target === "aws" && view.state.installed) step = "done";
+  if (view.job?.name === "install" || view.job?.name === "remove") {
+    step = { install: "create", remove: "remove" }[view.job.name];
+  }
   if (jobRunning()) {
-    step = { deploy: "create", model: "key" }[view.job.name] ?? step;
-    watchJob();
+    step = { deploy: "create", model: "key", install: "create", remove: "remove" }[view.job.name] ?? step;
+    watchJob(view.job.name === "install" ? async () => go("done") : undefined);
   }
   draw();
 }

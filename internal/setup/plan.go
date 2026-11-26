@@ -42,8 +42,8 @@ type PlanItem struct {
 	Detail string `json:"detail"`
 }
 
-// AWSPlan is what the review shows for AWS: what S.R.C. creates, where, with which tag
-// and at which price. The wizard creates none of it.
+// AWSPlan is what the review shows for AWS: what the installer creates, where, with which
+// tag and at which price, and what stops it from starting.
 type AWSPlan struct {
 	Network  string     `json:"network"`
 	Access   string     `json:"access"`
@@ -54,6 +54,8 @@ type AWSPlan struct {
 	Weekly   float64    `json:"weekly_usd"`
 	// NotPriced names what the estimate leaves out.
 	NotPriced []string `json:"not_priced"`
+	// Blocked says why the installer cannot start with these choices. Empty means it can.
+	Blocked []string `json:"blocked"`
 }
 
 // awsPlan returns the plan for the choices of the state, or nil before the network is
@@ -67,7 +69,9 @@ func awsPlan(state State) *AWSPlan {
 		Prices: PriceList{Region: awsPrices.Region, Checked: awsPrices.Checked},
 		NotPriced: []string{"the storage of the database, of the machine image and of its snapshot",
 			"the capacity units of the load balancer", "the runner tasks on Fargate",
-			"the transfer of the container images into the network"}}
+			"the transfer of the container images into the network",
+			"the storage of the container images and of the two buckets"},
+		Blocked: blockers(state)}
 	router := "the router of your private network"
 	plan.Access = "A Tailscale subnet router serves this network. You reach the control " +
 		"plane through it."
@@ -82,7 +86,14 @@ func awsPlan(state State) *AWSPlan {
 			state.NetworkCIDR + ", with private subnets and one NAT gateway"})
 		plan.NotPriced = append(plan.NotPriced, "the NAT gateway of the new network")
 	}
+	zone := "the zone that you choose"
+	if state.ZoneName != "" {
+		zone = state.ZoneName
+	}
 	plan.Creates = append(plan.Creates,
+		PlanItem{"Two names in " + zone, "src-" + state.Env + "." + zone + " for the control " +
+			"plane and src-" + state.Env + "-idp." + zone + " for its identity provider, with " +
+			"a TLS certificate that DNS records in the zone validate"},
 		PlanItem{"One virtual machine", "t4g.small, in an auto scaling group of one, which " +
 			"replaces a machine that fails. It runs the control plane as a Nanos unikernel."},
 		PlanItem{"One PostgreSQL database", "db.t4g.micro. It holds all state of the control plane."},
@@ -93,11 +104,17 @@ func awsPlan(state State) *AWSPlan {
 			"sign-in. S.R.C. does not manage it."},
 		PlanItem{"Runners", "a container repository for the runner image and a Fargate " +
 			"cluster for the short-lived runners, which run the jobs"},
+		PlanItem{"Images", "the runner image and the images of the application, built on " +
+			"this machine for linux/arm64, in two container repositories"},
+		PlanItem{"Layer 00-bootstrap", "two buckets, for the state of the layers and for " +
+			"the evidence, and the roles of the agents, which the control plane assumes"},
+		PlanItem{"Log groups", "for the runners and for Keycloak, kept for 7 days"},
 		PlanItem{"Roles", "one for the virtual machine, one for the runners and one for " +
 			"Keycloak"},
 		PlanItem{"Parameters", "the settings of the control plane, in Parameter Store " +
 			"below " + parameterPath(state.Env) + ", with a key that only the control " +
-			"plane and Keycloak can use"},
+			"plane and Keycloak can use: the database URL, the signing key, the sign-in, " +
+			"the inputs of the layers with the required tags, and the model key"},
 		PlanItem{"Security groups", "the load balancer admits only " + router +
 			" and the addresses of the network; each other part admits only its callers"})
 	for _, line := range awsPrices.Lines {
@@ -106,4 +123,21 @@ func awsPlan(state State) *AWSPlan {
 		plan.Weekly += line.Weekly
 	}
 	return &plan
+}
+
+// blockers says why the installer cannot start with the choices of the state.
+func blockers(state State) []string {
+	blocked := []string{}
+	if state.PlaceMode == PlaceNew {
+		blocked = append(blocked, "the installer does not create a network: choose a "+
+			"network that exists, with a Tailscale subnet router")
+	} else if state.RouterGroup == "" {
+		blocked = append(blocked, "no Tailscale subnet router serves this network: the "+
+			"control plane has no public address, so the installer needs one")
+	}
+	if state.ZoneID == "" || state.Source == "" {
+		blocked = append(blocked, "choose the zone, the tags and the checkout in the step "+
+			"Names and tags")
+	}
+	return blocked
 }

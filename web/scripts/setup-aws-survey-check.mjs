@@ -1,11 +1,16 @@
-// Walk through the setup wizard for AWS in a real browser, to the review, which is the
-// last step for AWS. The walk runs against a stand-in for the AWS command line, never
-// against an account.
+// Walk through the setup wizard for AWS in a real browser: the survey, the names and tags,
+// the review, Create, and Remove. The walk runs against the stand-ins of
+// scripts/fixtures/aws-account for aws, tofu, docker, ops, make and pnpm, never against an
+// account. It serves /healthz for the stand-in of the load balancer.
 // Usage: node scripts/setup-aws-survey-check.mjs <wizard address with token> <fixture log> [screenshot directory]
-// Start the wizard first, from the root of the repository:
-//   PATH="$PWD/web/scripts/fixtures/aws-account:$PATH" SRC_FIXTURE_LOG=<fixture log> \
-//     clanker setup --no-browser --data <an empty directory>
+// Start the wizard first, from the root of the repository, with an empty home and data
+// directory and no AWS variables:
+//   env -i HOME=<empty directory> PATH="$PWD/web/scripts/fixtures/aws-account:/usr/bin:/bin" \
+//     SRC_FIXTURE_LOG=<fixture log> SRC_FIXTURE_STATE=<empty directory> \
+//     SRC_FIXTURE_CORE_URL=http://127.0.0.1:7182 \
+//     clanker setup --no-browser --data <empty directory> --source "$PWD"
 import { mkdir, readFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { join } from "node:path";
 import { chromium } from "playwright";
 
@@ -16,16 +21,28 @@ if (address === undefined || !address.includes("token=") || fixtureLog === undef
 }
 if (shots !== undefined) await mkdir(shots, { recursive: true });
 
-// The wizard must use the stand-in. With the real AWS command line, the walk stops here.
+// The private values of the walk. No page, log line or state may show them.
+const tagValue = "owner@example.com";
+const modelKey = "sk-or-v1-0000000000000000000000-walk";
+
+// The wizard must use the stand-ins. With a real program, the walk stops here.
 const token = new URL(address).searchParams.get("token");
-const checks = await (await fetch(new URL("/api/checks?target=aws", address), {
-  headers: { "X-Setup-Token": token },
-})).json();
-const program = checks.checks.find((check) => check.name === "aws")?.detail ?? "";
-if (!program.endsWith("fixtures/aws-account/aws")) {
-  console.error(`FAILED: the wizard would run "${program}", not the stand-in. Start it with the stand-in first in PATH.`);
-  process.exit(1);
+const api = async (path) => (await fetch(new URL(path, address), { headers: { "X-Setup-Token": token } })).json();
+const checks = await api("/api/checks?target=aws");
+for (const name of ["aws", "tofu", "docker", "ops", "make", "pnpm"]) {
+  const program = checks.checks.find((check) => check.name === name)?.detail ?? "";
+  if (!program.endsWith(`fixtures/aws-account/${name}`)) {
+    console.error(`FAILED: the wizard would run "${program}" for ${name}, not the stand-in. Start it with the ` +
+      "stand-ins first in PATH.");
+    process.exit(1);
+  }
 }
+
+// The stand-in of the load balancer: the dashboard of the stand-in core answers /healthz.
+const health = createServer((request, response) => {
+  response.writeHead(request.url === "/healthz" ? 200 : 404).end();
+});
+await new Promise((resolve) => health.listen(7182, "127.0.0.1", resolve));
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
@@ -46,6 +63,11 @@ const shoot = async (name) => {
 };
 const heading = (text, timeout = 15000) => page.getByRole("heading", { level: 1, name: text }).waitFor({ timeout });
 const press = (name) => page.getByRole("button", { name, exact: true }).click();
+const checkPrivate = (where, text) => {
+  for (const value of [tagValue, modelKey, "fixture-admin-password", "fixture-registry-token"]) {
+    if (text.includes(value)) problems.push(`${where} shows a private value`);
+  }
+};
 
 await page.goto(address);
 await heading("Where do you want S.R.C. to run?");
@@ -56,10 +78,10 @@ await press("Continue");
 await heading("This machine is ready.");
 await shoot("checks");
 const steps = await page.locator("#steps li").allTextContents();
-for (const absent of ["Create", "Hand over"]) {
-  if (steps.includes(absent)) problems.push(`the steps for AWS include "${absent}"`);
+if (steps.includes("Hand over")) problems.push('the steps for AWS include "Hand over"');
+for (const want of ["Names and tags", "Review", "Create", "Done"]) {
+  if (!steps.includes(want)) problems.push(`the steps for AWS lack "${want}"`);
 }
-if (steps.at(-1) !== "Review") problems.push(`the last step for AWS is "${steps.at(-1)}", want "Review"`);
 await press("Continue");
 
 await heading("Choose the language model of S.R.C.");
@@ -67,8 +89,7 @@ if (!(await page.getByRole("radio", { name: /^A model on this machine/ }).isDisa
   problems.push("the model on this machine is offered for AWS");
 }
 await page.getByRole("radio", { name: /^A hosted key/ }).check({ force: true });
-// The AWS path ends at the review and starts no control plane, so the key is never used.
-await page.getByLabel("OpenRouter API key").fill("sk-or-v1-0000000000000000000000-walk");
+await page.getByLabel("OpenRouter API key").fill(modelKey);
 await shoot("model");
 await press("Save the key and continue");
 
@@ -83,39 +104,90 @@ await heading("Choose the network of the control plane.", 120000);
 await shoot("network");
 const networks = await page.getByRole("radio").count();
 const proposed = await page.locator(".choice", { has: page.locator(".tag", { hasText: "proposed" }) }).count();
-const chosen = await page.getByRole("radio", { checked: true }).count();
 if (networks !== 2) problems.push(`the page lists ${networks} choices, want the network of the fixture and a new network`);
 if (proposed !== 1) problems.push(`${proposed} choices are marked as proposed, want 1`);
-if (chosen !== 1) problems.push(`${chosen} choices are selected, want the proposed one`);
 const regions = await page.getByLabel("Region").locator("option").count();
 if (regions !== 2) problems.push(`the page lists ${regions} regions, want the 2 of the fixture`);
 await press("Use this network");
 
+await heading("Choose the names and the tags.", 60000);
+await shoot("names-and-tags");
+const zones = page.getByRole("radiogroup", { name: "Zone" }).getByRole("radio");
+if ((await zones.count()) !== 2) problems.push(`the page lists ${await zones.count()} zones, want the 2 of the fixture`);
+if (!(await page.getByRole("radio", { name: /not delegated/ }).isDisabled())) {
+  problems.push("the zone that the parent does not delegate can be chosen");
+}
+if ((await page.getByRole("radio", { checked: true }).count()) !== 1) problems.push("no zone is chosen");
+const details = await page.locator("main").textContent();
+if (!details.includes("The rule names the tags example:owner")) problems.push("the page does not name the required tag");
+await page.getByLabel("example:owner").fill(tagValue);
+await press("Continue");
+
 await heading("This is what S.R.C. creates in your AWS account.");
-await shoot("review");
-const review = await page.locator("main").textContent();
-// The price of one week is the sum of the price list of the wizard.
-const state = await (await fetch(new URL("/api/state", address), { headers: { "X-Setup-Token": token } })).json();
+const state = await api("/api/state");
 const weekly = state.aws_plan.weekly_usd.toFixed(2);
+const review = await page.locator("main").textContent();
 for (const want of ["t4g.small", "auto scaling group of one", "db.t4g.micro", "machine image and its snapshot",
-  "Roles", "Parameters", "admits only the router of your private network", "clanker_env=clanker",
-  weekly, "US West (Oregon)", "2026-11-18", "The wizard stops here for AWS.", "111122223333"]) {
+  "Two names in example.com", "src-clanker.example.com", "Layer 00-bootstrap", "Images", "Log groups",
+  "example:owner (values not shown)", "admits only the router of your private network", "clanker_env=clanker",
+  weekly, "US West (Oregon)", "What Create does", "Build and push the images of the application", "111122223333"]) {
   if (!review.includes(want)) problems.push(`the review lacks "${want}"`);
 }
-const buttons = await page.getByRole("button").allTextContents();
-if (buttons.join(",") !== "Back") problems.push(`the review has the buttons "${buttons.join(", ")}", want only "Back"`);
+checkPrivate("the review", review);
+await shoot("review");
+
+// Until Create, every call reads, or makes a dry run.
+const beforeCreate = (await readFile(fixtureLog, "utf8")).trim().split("\n");
+const reads = /^(configure list-profiles|sts (get-caller-identity|decode-authorization-message)|(ec2|ecs) (describe|list)-[a-z-]+|iam (get-role|simulate-principal-policy)|route53 (list-hosted-zones|get-hosted-zone)|ssm get-parameter|ec2 run-instances .*--dry-run) /;
+for (const call of beforeCreate) {
+  if (!reads.test(`${call} `)) problems.push(`the wizard made a call that is not a read before Create: aws ${call}`);
+}
+
+await press("Create");
+await heading("S.R.C. runs in your AWS account.", 300000);
+await shoot("done");
+const done = await page.locator("main").textContent();
+for (const want of ["http://127.0.0.1:7182", "admin@src-clanker-idp.example.com", "tofu output -raw admin_password",
+  `${weekly} USD`]) {
+  if (!done.includes(want)) problems.push(`the page after Create lacks "${want}"`);
+}
+checkPrivate("the page after Create", done);
+const installed = await api("/api/state");
+if (installed.job.steps.length !== 9 || installed.job.status !== "done") {
+  problems.push(`the installation ended ${installed.job.status} with ${installed.job.steps.length} steps`);
+}
+checkPrivate("the log of Create", installed.job.lines.join("\n"));
+checkPrivate("the state of the wizard", JSON.stringify(installed));
+if (!installed.job.lines.some((line) => line.includes('"example:owner" = "(hidden)"'))) {
+  problems.push("the log of Create does not show the tag hidden");
+}
+
+const remove = page.getByRole("button", { name: "Remove clanker" });
+if (!(await remove.isDisabled())) problems.push("Remove is possible without the name of the environment");
+await page.getByLabel("Name of the environment").fill("clanker");
+await remove.click();
+await heading("S.R.C. is removed from your AWS account.", 300000);
+await shoot("removed");
+const removed = await api("/api/state");
+if (removed.job.steps.length !== 7 || removed.state.installed) {
+  problems.push(`the removal ended with ${removed.job.steps.length} steps and installed=${removed.state.installed}`);
+}
+if (!removed.job.lines.some((line) => line.startsWith("Nothing is left"))) problems.push("the removal did not check what is left");
+checkPrivate("the log of Remove", removed.job.lines.join("\n"));
 
 await browser.close();
+health.close();
 
-// The stand-in logged each call. Every one must be a read.
+// No launch: every call of ec2 run-instances is a dry run.
 const calls = (await readFile(fixtureLog, "utf8")).trim().split("\n");
-const reads = /^(configure list-profiles|sts get-caller-identity|(ec2|ecs) (describe|list)-[a-z-]+|iam (get-role|simulate-principal-policy)) /;
 for (const call of calls) {
-  if (!reads.test(`${call} `)) problems.push(`the wizard made a call that is not a read: aws ${call}`);
+  if (call.startsWith("ec2 run-instances") && !call.includes("--dry-run")) problems.push(`a launch: aws ${call}`);
+  checkPrivate("a call of the aws program", call.startsWith("ec2 run-instances") ? "" : call);
 }
 
 if (problems.length > 0) {
   console.error(`FAILED:\n${problems.join("\n")}`);
   process.exit(1);
 }
-console.log(`RESULT: the wizard surveyed the fixture account with ${calls.length} read calls and ended at the review`);
+console.log(`RESULT: the wizard surveyed the fixture account with ${beforeCreate.length} calls that read, created ` +
+  `the control plane with the stand-ins in 9 steps and removed it in 7, and showed no private value`);

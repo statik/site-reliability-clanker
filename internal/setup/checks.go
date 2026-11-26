@@ -1,7 +1,8 @@
 // Package setup is the first-run wizard: a small web application on the loopback address
 // that checks the machine and chooses the language model. On this machine it starts the
-// control plane and hands over to it. On AWS it signs in, surveys the account and shows
-// what the control plane needs there.
+// control plane and hands over to it. On AWS it signs in, surveys the account, shows what
+// the control plane needs there and its price, and creates it when the person presses
+// Create: with the Installer of this package, which `clanker install --cloud aws` runs too.
 package setup
 
 import (
