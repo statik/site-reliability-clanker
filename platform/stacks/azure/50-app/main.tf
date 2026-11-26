@@ -3,17 +3,6 @@
 
 # kubelogin gets an Entra token for the AKS server application, whose ID is the same in
 # each tenant. The cluster has no local accounts.
-provider "kubernetes" {
-  host                   = local.cluster.cluster_endpoint
-  cluster_ca_certificate = local.cluster.cluster_ca_certificate
-
-  exec {
-    api_version = "client.authentication.k8s.io/v1"
-    command     = "kubelogin"
-    args        = local.kubelogin_args
-  }
-}
-
 provider "helm" {
   kubernetes = {
     host                   = local.cluster.cluster_endpoint
@@ -77,12 +66,9 @@ data "terraform_remote_state" "platform" {
 module "app" {
   source = "../../../modules/shared/app"
 
-  paperboat_version   = var.paperboat_version
-  api_replicas        = var.api_replicas
-  worker_replicas     = var.worker_replicas
-  web_replicas        = var.web_replicas
-  loadgen_enabled     = var.loadgen_enabled
-  workload_runtime    = var.workload_runtime
+  app                 = local.app
+  cloud               = "azure"
+  pack_dir            = "${path.root}/../../../../apps/${local.app.name}"
   image_registry      = local.network.image_registry
   app_namespace       = local.platform.app_namespace
   app_secret_name     = local.platform.app_secret_name
@@ -90,5 +76,4 @@ module "app" {
   gateway_name        = local.platform.gateway_name
   gateway_namespace   = local.platform.gateway_namespace
   public_address      = local.platform.public_address
-  chart_path          = abspath("${path.root}/../../../../apps/paperboat/chart")
 }

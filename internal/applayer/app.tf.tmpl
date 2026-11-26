@@ -1,0 +1,66 @@
+# The control plane writes this file from the manifest of the application pack {{.Name}}.
+# Do not edit it: the seed of a new control plane writes it again.
+
+variable "{{.VersionVariable}}" {
+  type = string
+  description = {{quote (printf "Release of %s to run." .Title)}}
+
+  validation {
+    condition = can(regex({{quote .ReleasePattern}}, var.{{.VersionVariable}}))
+    error_message = {{quote (printf "%s must be a release such as 1.2.3 or 1.2.0-bad." .VersionVariable)}}
+  }
+}
+{{- range .Settings}}
+
+variable "{{.Variable}}" {
+{{- if .Number}}
+  type = number
+  description = {{quote (printf "Sets the Helm value %s: a whole number from %d to %d." .Path .Min .Max)}}
+
+  validation {
+    condition = var.{{.Variable}} >= {{.Min}} && var.{{.Variable}} <= {{.Max}} && floor(var.{{.Variable}}) == var.{{.Variable}}
+    error_message = {{quote (printf "%s must be a whole number from %d to %d." .Variable .Min .Max)}}
+  }
+{{- else}}
+  type = bool
+  description = {{quote (printf "Sets the Helm value %s." .Path)}}
+{{- end}}
+}
+{{- end}}
+
+locals {
+  app = {
+    name = {{quote .Name}}
+    version = var.{{.VersionVariable}}
+    values = {{.Values}}
+    extras = {{.Extras}}
+    records = {{.Records}}
+    timeout_seconds = {{.TimeoutSeconds}}
+    secrets = {{list .Secrets}}
+{{- if .Settings}}
+    settings = {
+{{- range .Settings}}
+      {{quote .Path}} = tostring(var.{{.Variable}})
+{{- end}}
+    }
+{{- else}}
+    settings = {}
+{{- end}}
+    route = {
+      service = {{quote .Route.Service}}
+      port = {{.Route.Port}}
+      paths = {{list .Route.Paths}}
+      timeout_seconds = {{.Route.Timeout}}
+    }
+  }
+}
+
+output "{{.URLOutput}}" {
+  value = module.app.url
+  description = {{quote (printf "URL that serves %s." .Title)}}
+}
+
+output "{{.VersionVariable}}" {
+  value = module.app.version
+  description = {{quote (printf "Release of %s that runs now." .Title)}}
+}

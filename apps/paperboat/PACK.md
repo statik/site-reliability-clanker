@@ -95,11 +95,20 @@ the cluster or of the control plane.
 at `chart/`, the values at `values/`, the extras chart at `extras/`, the release records
 at `releases/` and the chart archives that the records name at `charts/`. A pack cannot
 choose a path there, and the forge refuses a seed in which two sources write one file. A
-change below `apps/<name>/` touches the layer of the pack. The stacks read the chart of
-Paperboat from `apps/paperboat/chart`. The stacks do not read `deploy.values`,
-`deploy.extras`, `deploy.settings`, `deploy.secrets`, `deploy.route`,
-`deploy.timeout_seconds`, `deploy.workloads_namespace` or the release records yet: the
-generic application layer (#148, step S8) does.
+change below `apps/<name>/` touches the layer of the pack.
+
+**The application layer.** One layer deploys every pack (`platform/CONTRACT.md`, `50-app`
+and section 4). The control plane writes `app.tf` of each stack of the layer from the
+manifest: the version variable, a variable with bounds for each setting, the URL and
+version outputs, and the local value `app` with the deploy fields. It also writes the
+lines of the pack in `terraform.tfvars` (the first release and the default of each
+setting) and the line `app_name` of `40-platform`. The layer installs the objects of the
+platform (the route, `<name>-platform`, `<name>-generated`), then the chart of the
+release record or of `deploy.chart` with the values files, the values of the record, the
+values of the platform and the settings, then the extras chart. It does not read
+`deploy.route.hostname`, `deploy.route.wildcard` or `deploy.workloads_namespace` yet:
+steps S10 and S11 of #148 add them. `packs/nginx` is the smallest pack that uses each
+of the other fields.
 
 **Release records.** A pack can have a record `<version>.json` beside the note of each
 release. When a pack has records, every release must have one, and each record must have
@@ -126,8 +135,11 @@ layer installs the chart of `deploy.chart`. How tightly each form pins the chart
   The Helm provider 3.3.0 of the stacks contains Helm 3.20.2 and gives the chart
   reference to Helm as it is
   ([resource_helm_release.go](https://github.com/hashicorp/terraform-provider-helm/blob/v3.3.0/helm/resource_helm_release.go#L1307-L1335)),
-  so a reference with a digest is expected to work there. The provider does not document
-  it, and no test ran it yet. A digest in the `version` argument does not work. Coder
+  so the layer gives the chart as `oci://<repository>/<name>@<digest>` with
+  `version = <version>`. With the provider 3.3.0 a plan fetched a chart in that form, an
+  apply on kind installed it and a second plan had no changes; a digest of another version
+  stopped the plan with `chart reference digest mismatch`.
+  A digest in the `version` argument does not work. Coder
   publishes its chart at `oci://ghcr.io/coder/chart/coder` as well as at
   `https://helm.coder.com/v2`
   ([Coder docs](https://github.com/coder/coder/blob/19da85b5d353982565298e964f657b1ea6a25567/docs/install/server/kubernetes/index.md#L133-L143)).
@@ -244,6 +256,7 @@ fails. It asks no question, so a program can run it.
 $ clanker pack validate apps/paperboat
 ok    manifest: paperboat 0.1.0 (Paperboat), schema 2
 ok    deployment: layer 50-app, variable paperboat_version, chart chart, Helm timeout 300 s, into apps/paperboat/ of the platform repository
+ok    application layer: 50-app/app.tf with the variable paperboat_version, 4 settings and the outputs app_url and paperboat_version
 ok    settings: api_replicas 1 to 5 (api.replicas, default 1), worker_replicas 1 to 5 (worker.replicas, default 1), web_replicas 1 to 5 (web.replicas, default 1), loadgen_enabled bool (loadgen.enabled, default true)
 ok    route: service paperboat-web port 8080, every path, the request timeout of the gateway
 ok    secrets: none
@@ -299,10 +312,6 @@ The core on a cloud has no disk. It reads only the pack that it carries.
 
 ## Not in the pack
 
-- The stacks of the platform (`platform/stacks/*/50-app` and
-  `platform/modules/shared/app`) name Paperboat and its variable. A pack for another
-  application loads and passes the checks, but it cannot deploy until the generic
-  application layer reads its deploy fields (#148, step S8).
 - The released binary and the core on a cloud carry Paperboat only.
 - A pack cannot change after the first start of an environment. The forge is seeded one
   time, so the runbooks and the chart of a new version do not reach it.

@@ -17,6 +17,11 @@ variable "env_name" {
   type = string
 }
 
+# The name of the pack. The seed of the core writes its line in terraform.tfvars.
+variable "app_name" {
+  type = string
+}
+
 variable "collector_endpoint" {
   type = string
 }

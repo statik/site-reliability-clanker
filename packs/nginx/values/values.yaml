@@ -1,0 +1,18 @@
+# Values of every target. The chart knows nothing of the platform, so these values connect
+# it to the objects that the platform makes for the pack (platform/CONTRACT.md section 4).
+# nginx reads none of the variables: they show the wiring for the packs that copy this one,
+# and a pod does not start when one of the objects is missing.
+envFrom:
+  # APP_URL, APP_HOSTNAME, APP_WILDCARD_HOST and APP_VERSION.
+  - configMapRef:
+      name: nginx-platform
+  # The keys of deploy.secrets, each with a random value.
+  - secretRef:
+      name: nginx-generated
+env:
+  # The credential of the database role of the pack.
+  - name: DATABASE_URL
+    valueFrom:
+      secretKeyRef:
+        name: nginx-db
+        key: DATABASE_URL

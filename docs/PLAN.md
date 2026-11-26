@@ -396,7 +396,7 @@ A pack holds these parts:
 |---|---|---|
 | Manifest (`pack.json`) | Name, title, version of the pack, the layer and the variable that sets the version of the application, the components, the topology. The namespaces are an output of the layer of the platform | Every component |
 | Release source | The forge repository and the directory with one release note for each release | Detector, Author, Explainer |
-| Deployment code | The chart, and where the platform repository expects it | Runner |
+| Deployment | The chart, its values files, and a release record for each release that can name a chart archive or a chart in a repository and the values of the release. The core brings one application layer for every pack (`platform/CONTRACT.md`, `50-app`) | Runner |
 | Checks | The HTTP checks, one of them the primary check that the monitor samples, and the path for the version | Monitor, verification, canary |
 | Runbooks | Typed job definitions and scripts, as in section 5.6 | Orchestrator |
 | Diagnostics | The reads of the debug session: the logs of a component, the events. The core makes the commands | Investigator |
@@ -418,11 +418,14 @@ Rules:
 4. **A pack is measured before it is trusted.** A pack brings eval cases, and the eval suite
    runs them with the same checks as its own cases.
 
+The core brings one application layer; the pack brings its chart, its values and a record
+for each release (`platform/CONTRACT.md`, `50-app` and section 4). `packs/nginx` is the
+smallest pack other than Paperboat that deploys.
+
 Not built:
 
-- The application layer of the stacks (`platform/stacks/*/50-app` and
-  `platform/modules/shared/app`) still names Paperboat, so a pack for a second application
-  cannot deploy. The pack must bring its application layer for each target.
+- An application layer that the pack brings (`deploy.kind` `layer`), for an application
+  that does not run on Kubernetes (`docs/PACKS.md` B.12).
 - A new version of a pack cannot replace the pack of an environment that runs. This has the
   same cause as the note at the end of section 5.6: only the platform repository takes pull
   requests.

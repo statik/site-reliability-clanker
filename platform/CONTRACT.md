@@ -12,7 +12,7 @@ platform/
   modules/
     <cloud>/<capability>/     cloud-specific building blocks (aws, gcp, azure, local)
     shared/platform/          cloud-agnostic layer 40, Kubernetes and Helm providers only
-    shared/app/               cloud-agnostic layer 50, Kubernetes and Helm providers only
+    shared/app/               cloud-agnostic layer 50, Helm and random providers only
   stacks/
     <cloud>/<layer>/          one root module per cloud and layer
 ```
@@ -26,6 +26,7 @@ Each root module has one OpenTofu state. A root module contains:
 | `variables.tf` | The inputs in section 3 |
 | `main.tf` | Provider configuration and module calls |
 | `outputs.tf` | The outputs in section 3 |
+| `app.tf` | Layer `50-app` only. The variables, the outputs and the local value `app` that come from the manifest of the application pack. The control plane writes it; see `50-app` in section 3 |
 | `terraform.tfvars` | The values for this environment. The agent edits this file. On a cloud target it does not set the inputs that the job gives (see "State backends") |
 
 ## 2. Rules for every root module
@@ -39,8 +40,9 @@ Each root module has one OpenTofu state. A root module contains:
 5. Put a `clanker_env`, `clanker_layer` and `clanker_ttl` label or tag on each cloud resource
    that accepts labels.
 6. Layers `40-platform` and `50-app` call `modules/shared/platform` and `modules/shared/app`.
-   The root module configures the `kubernetes` and `helm` providers for its cloud and passes
-   nothing cloud-specific into the shared module except the inputs in section 3.
+   The root module configures the providers of the shared module for its cloud (`kubernetes`
+   and `helm` for `40-platform`, `helm` for `50-app`) and passes nothing cloud-specific
+   into the shared module except the inputs in section 3.
 7. Use the smallest instance sizes that pass the conformance suite.
 
 ### State backends
@@ -234,38 +236,93 @@ The database of the application is the same on every target:
 
 ### 50-app
 
+The layer is the same for every pack. The pack brings data, not OpenTofu: its chart, its
+values files and a release record for each release (`docs/PACKS.md` B.10). Its deploy files
+are in `apps/<name>/` of the platform repository.
+
+The static files of the root (`main.tf`, `variables.tf`, `outputs.tf`, `versions.tf`) have
+only the inputs of the environment. The control plane writes `app.tf` from the manifest of
+the pack (`internal/applayer`), because OpenTofu needs declared names. It also writes the
+lines of the pack in `terraform.tfvars` and the line `app_name` of the `terraform.tfvars` of
+`40-platform`. A new control plane writes them when it seeds the platform repository. The
+files of the example pack are committed, and a Go test fails when they are not what the
+control plane writes.
+
 | Input | Type | Meaning |
 |---|---|---|
-| `paperboat_version` | `string` | Release to run, for example `1.1.0` |
-| `api_replicas` | `number` | Replicas of `api` |
-| `worker_replicas` | `number` | Replicas of `worker` |
-| `web_replicas` | `number` | Replicas of `web` |
-| `loadgen_enabled` | `bool` | Run synthetic traffic |
-| `workload_runtime` | `string` | `kubernetes` or `unikernel`. Only `kubernetes` is implemented |
+| `<version_variable>` | `string` | Release to run, for example `1.1.0`. It must match `^[0-9]+.[0-9]+.[0-9]+(-[a-z][a-z0-9]*)?$`. Paperboat: `paperboat_version` |
+| A variable for each entry of `deploy.settings` | `number` or `bool` | A number has a validation for its bounds. Paperboat: `api_replicas`, `worker_replicas`, `web_replicas` (1 to 5) and `loadgen_enabled` |
+| `admin_token` | `string`, sensitive | Local only. The token for fault injection in demo mode. Default empty |
 
 | Output | Type | Meaning |
 |---|---|---|
-| `app_url` | `string` | URL that serves Paperboat |
-| `paperboat_version` | `string` | Release that runs now |
-| `release_revision` | `number` | Helm revision |
+| `<url_output>` | `string` | URL that serves the application. Paperboat: `app_url` |
+| `<version_variable>` | `string` | Release that runs now |
+| `release_revision` | `number` | Helm revision of the main release |
 
-## 4. Paperboat chart interface
+`modules/shared/app` installs three Helm releases in `app_namespace`, in this order:
 
-Layer `50-app` installs the chart in `apps/paperboat/chart` with these values:
+1. `<name>-platform`, the chart `modules/shared/app/platform` of the core: the HTTPRoute
+   `<name>`, the ConfigMap `<name>-platform` and the Secret `<name>-generated`. It comes
+   first, so a chart can read the ConfigMap and the Secret when its pods start.
+2. `<name>`, the main chart. The release record of the version selects it: an archive of
+   the pack in `apps/<name>/charts/`, whose SHA-256 the layer checks with `filesha256`
+   against `chart_sha256`; or a chart in a repository, which the runner fetches at apply;
+   or, with no chart in the record, `apps/<name>/chart`. An `oci://` chart is
+   `<repository>/<chart_name>@<chart_digest>` with `version = chart_version`, so Helm
+   checks that the digest is the digest of that version. Helm does not check the digest
+   of a chart in an `https://` repository. When the pack has records and the version has
+   none, a precondition stops the plan and names the record to add.
+3. `<name>-extras`, the chart `apps/<name>/extras`, when the pack has `deploy.extras`.
+
+Each release has `timeout = deploy.timeout_seconds` (default 300), `wait = true` and
+`atomic = false`: Helm never rolls back by itself, because a release can have migrated the
+database.
+
+## 4. Chart interface
+
+The main chart gets its values in this order, the last one wins:
+
+1. The defaults of the chart.
+2. `apps/<name>/values/values.yaml`, then `values-<cloud>.yaml`, when the pack has them.
+3. The `values` of the release record.
+4. The values of the platform, below.
+5. The settings, with Helm `set`, as `--set <path>=<value>` would set them.
+
+The values of the platform. The extras chart gets them too.
 
 | Value | From |
 |---|---|
-| `image.registry` | `10-network.image_registry` |
-| `image.tag` | `paperboat_version` |
-| `api.replicas`, `worker.replicas`, `web.replicas` | The matching inputs |
-| `loadgen.enabled` | `loadgen_enabled` |
-| `database.secretName` | `40-platform.app_secret_name` |
-| `sharedVolume.claimName` | `40-platform.shared_volume_claim` |
+| `platform.name` | The name of the pack |
+| `platform.namespace` | `40-platform.app_namespace` |
+| `platform.version` | The version variable |
+| `platform.url` | The URL output: `http://<public_address>` |
+| `platform.hostname` | Empty. Step S10 of issue #148 adds host names |
+| `platform.imageRegistry` | `10-network.image_registry` |
+| `platform.databaseSecret` | `40-platform.app_secret_name`: the Secret `<name>-db` |
+| `platform.sharedVolumeClaim` | `40-platform.shared_volume_claim`: the claim `<name>-shared` |
+| `platform.generatedSecret` | `<name>-generated`, or empty when the pack has no `deploy.secrets` |
+| `platform.adminToken` | `admin_token`, with `set_sensitive`. Empty off demo mode |
+
+A chart of another project cannot read `platform.*`. The values files of the pack connect
+it to these objects in `app_namespace`, by name, with `env` and `envFrom`:
+
+| Object | Content |
+|---|---|
+| Secret `<name>-db` | `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, `PGSSLMODE`, `DATABASE_URL` (see `40-platform`) |
+| ConfigMap `<name>-platform` | `APP_URL`, `APP_HOSTNAME`, `APP_WILDCARD_HOST` (empty until S10), `APP_VERSION` |
+| Secret `<name>-generated` | One key for each entry of `deploy.secrets`, each with a random value of 32 letters and digits that the state of the layer keeps |
+| PersistentVolumeClaim `<name>-shared` | `ReadWriteMany` |
 
 The chart makes no Gateway, no route and no Service of type `NodePort` or `LoadBalancer`.
-Its Service `paperboat-web` (port `8080`) is a `ClusterIP` Service. Layer `50-app`
-attaches it to the Gateway of `40-platform` with the HTTPRoute `paperboat`, which a second
-release (`paperboat-route`, chart `modules/shared/app/route`) installs.
+The HTTPRoute `<name>` of the core attaches the `ClusterIP` Service `deploy.route.service`
+on `deploy.route.port` to the Gateway of `40-platform`, with the path prefixes of
+`deploy.route.paths` (every path when it has none) and the request timeout
+`deploy.route.timeout_seconds` (`0` is no timeout; with none, the default of the gateway).
+
+Paperboat reads `platform.imageRegistry` and `platform.version` for its image,
+`platform.databaseSecret`, `platform.sharedVolumeClaim` and `platform.adminToken`. Its
+Service `paperboat-web` (port `8080`) is the route service.
 
 ## 5. Local target specifics
 
@@ -283,6 +340,6 @@ release (`paperboat-route`, chart `modules/shared/app/route`) installs.
 1. The cluster API answers.
 2. Two pods write and read the same file on the `ReadWriteMany` volume.
 3. Postgres accepts a connection from inside the cluster.
-4. `public_address` serves Paperboat and `/api/healthz` returns `200`.
+4. `public_address` serves the application of the pack, and its primary check passes.
 5. A database backup completes and restores into a scratch database.
 6. A pod reads the application secret.
