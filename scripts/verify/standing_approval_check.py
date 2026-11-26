@@ -156,8 +156,10 @@ def sign_and_run(alice):
     detail = alice.api("GET", f"/work-items/{item}")
     check(detail["work_item"]["state"] == "Done",
           f"{item} ended in {detail['work_item']['state']}")
+    # The grant of a runbook names the standing approval that covers it.
     approvers = [grant["approvers"] for grant in detail["grants"]]
-    check(approvers == [["alice"]], f"the grant of the run names alice: {approvers}")
+    check(approvers == [["standing:alice"]],
+          f"the grant of the run names the standing approval of alice: {approvers}")
     check("alice signed" in detail["work_item"]["summary"],
           f"the work item names the signature: {detail['work_item']['summary']}")
     return item
