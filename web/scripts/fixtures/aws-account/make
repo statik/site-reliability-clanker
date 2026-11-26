@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
+# A stand-in for make, for the installer on AWS: it records the target and builds nothing.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+state="${SRC_FIXTURE_STATE:?the make stand-in needs SRC_FIXTURE_STATE}"
+# shellcheck source=fixture-lib.sh
+. "${here}/fixture-lib.sh"
+echo "make $*" >>"${state}/calls"
+fail_once "make $*"

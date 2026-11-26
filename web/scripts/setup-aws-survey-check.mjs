@@ -94,9 +94,12 @@ await press("Use this network");
 await heading("This is what S.R.C. creates in your AWS account.");
 await shoot("review");
 const review = await page.locator("main").textContent();
+// The price of one week is the sum of the price list of the wizard.
+const state = await (await fetch(new URL("/api/state", address), { headers: { "X-Setup-Token": token } })).json();
+const weekly = state.aws_plan.weekly_usd.toFixed(2);
 for (const want of ["t4g.small", "auto scaling group of one", "db.t4g.micro", "machine image and its snapshot",
   "Roles", "Parameters", "admits only the router of your private network", "clanker_env=clanker",
-  "5.51", "US West (Oregon)", "2026-11-18", "The wizard stops here for AWS.", "111122223333"]) {
+  weekly, "US West (Oregon)", "2026-11-18", "The wizard stops here for AWS.", "111122223333"]) {
   if (!review.includes(want)) problems.push(`the review lacks "${want}"`);
 }
 const buttons = await page.getByRole("button").allTextContents();

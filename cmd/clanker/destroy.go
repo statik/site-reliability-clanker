@@ -17,7 +17,7 @@ func destroy(ctx context.Context, o options) error {
 	case "local":
 		return destroyLocal(ctx, o)
 	case "aws":
-		return destroyAWS(ctx, o, runAWS)
+		return destroyAWS(ctx, o, runAWS, os.Stdout)
 	default:
 		return fmt.Errorf("destroy for cloud %q is not enabled: only the local and the aws "+
 			"targets have it", o.cloud)

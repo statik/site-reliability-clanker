@@ -97,3 +97,13 @@ output "core_autoscaling_group" {
   description = "Auto scaling group of the core. Null before phase 2."
   value       = one(aws_autoscaling_group.core[*].name)
 }
+
+output "image_registry" {
+  description = "Registry host and path prefix of the application images: an input of 10-network."
+  value       = local.image_registry
+}
+
+output "core_target_group_arn" {
+  description = "Target group of the core. The installer reads the health of the core from it."
+  value       = aws_lb_target_group.core.arn
+}

@@ -10,6 +10,7 @@ import (
 type foundRouter struct {
 	Service string
 	Subnets []string
+	Groups  []string
 	Routes  []string
 }
 
@@ -18,6 +19,7 @@ type ecsService struct {
 	Task    string   `json:"task"`
 	Running int      `json:"running"`
 	Subnets []string `json:"subnets"`
+	Groups  []string `json:"groups"`
 }
 
 type ecsContainer struct {
@@ -41,7 +43,8 @@ func (a AWS) services(ctx context.Context, region, cluster string) ([]ecsService
 		args := append([]string{"ecs", "describe-services", "--cluster", cluster, "--services"},
 			chunk...)
 		args = append(args, "--query", "services[].{name:serviceName,task:taskDefinition,"+
-			"running:runningCount,subnets:networkConfiguration.awsvpcConfiguration.subnets}")
+			"running:runningCount,subnets:networkConfiguration.awsvpcConfiguration.subnets,"+
+			"groups:networkConfiguration.awsvpcConfiguration.securityGroups}")
 		if err := a.query(ctx, region, &described, args...); err != nil {
 			return nil, err
 		}
@@ -99,7 +102,7 @@ func (a AWS) routers(ctx context.Context, region string) ([]foundRouter, error) 
 			}
 			if len(routes) > 0 {
 				found = append(found, foundRouter{Service: service.Name, Subnets: service.Subnets,
-					Routes: routes})
+					Groups: service.Groups, Routes: routes})
 			}
 		}
 	}
@@ -116,8 +119,12 @@ func routerOf(n Network, routers []foundRouter) *Router {
 		if !slices.ContainsFunc(router.Subnets, func(id string) bool { return own[id] }) {
 			continue
 		}
-		return &Router{Service: router.Service, Routes: router.Routes,
+		found := &Router{Service: router.Service, Routes: router.Routes,
 			Covers: covers(router.Routes, n.CIDR)}
+		if len(router.Groups) > 0 {
+			found.SecurityGroup = router.Groups[0]
+		}
+		return found
 	}
 	return nil
 }

@@ -9,7 +9,10 @@
 ARG BASE_IMAGE
 ARG GO_DIGEST=sha256:fa3d596898d9f126af7c01d14ee7597bab3f39cccf392ef36b69fe77cd681f18
 
-FROM golang:1.27.3-alpine@${GO_DIGEST} AS build
+# The build runs on the machine that builds and compiles for the platform of the image.
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine@${GO_DIGEST} AS build
+ARG TARGETOS
+ARG TARGETARCH
 ARG VERSION
 ARG FEATURE_LEVEL
 ARG FAULT
@@ -22,7 +25,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY main.go ./
 COPY internal ./internal
-ENV CGO_ENABLED=0
+ENV CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 RUN pkg=github.com/statik/site-reliability-clanker/apps/paperboat/internal/buildinfo \
   && go build -trimpath -o /out/paperboat -ldflags "-s -w \
     -X ${pkg}.Version=${VERSION} \

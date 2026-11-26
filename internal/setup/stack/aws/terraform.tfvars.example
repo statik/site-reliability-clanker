@@ -1,8 +1,10 @@
 # Copy this file to terraform.tfvars in this directory and replace each value. Git ignores
 # *.tfvars here: the values describe one AWS account and must not go into the repository.
 #
-# The realm of Keycloak is not in this file, because a tfvars file cannot read a file:
-#   export TF_VAR_keycloak_realm="$(cat <checkout>/scripts/verify/keycloak/realm.json)"
+# `clanker install --cloud aws` writes ~/.clanker/aws/<env_name>/home.tfvars in this form,
+# and reads the values of that file as its defaults. The realm of Keycloak is not in this
+# file, because a tfvars file cannot read a file. The installer gives it; by hand:
+#   export TF_VAR_keycloak_realm="$(cat <checkout>/internal/setup/stack/keycloak-realm.json)"
 
 env_name = "prod"
 region   = "us-west-2"
@@ -23,6 +25,9 @@ required_tags = {
   "example:owner"   = "owner@example.com"
 }
 
-# Phase 2. Leave both unset for phase 1. See README.md.
+# Optional: the OpenRouter API key of the core. Without it the core uses recorded answers.
+# model_api_key = "sk-or-..."
+
+# Phase 2. Leave both unset for phase 1. The installer gives them. See README.md.
 # runner_image_digest = "sha256:<64 hexadecimal digits>"
 # core_image_id       = "ami-0123456789abcdef0"

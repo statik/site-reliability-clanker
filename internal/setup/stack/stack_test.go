@@ -74,3 +74,13 @@ func TestAWSFilesHaveTheContentOfTheDirectory(t *testing.T) {
 		}
 	}
 }
+
+func TestKeycloakRealmIsTheFileOfThePackage(t *testing.T) {
+	onDisk, err := os.ReadFile("keycloak-realm.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if KeycloakRealm() != string(onDisk) || !strings.Contains(KeycloakRealm(), `"realm"`) {
+		t.Error("the embedded realm differs from keycloak-realm.json or has no realm name")
+	}
+}
