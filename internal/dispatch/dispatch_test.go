@@ -243,14 +243,27 @@ func waitForLaunch(t *testing.T, l *launcher) string {
 	}
 }
 
-// call sends one request of a runner with token and returns the status and the body.
+// call sends one request of a runner with token and no runner key, and returns the status
+// and the body.
 func call(t *testing.T, server *httptest.Server, token, method, path, body string) (int, string) {
+	t.Helper()
+	status, answer, _ := callWithKey(t, server, token, "", method, path, body)
+	return status, answer
+}
+
+// callWithKey sends one request of a runner with token and the runner key runnerKey, when it
+// is not empty. It returns the status, the body and the runner key in the answer.
+func callWithKey(t *testing.T, server *httptest.Server, token, runnerKey, method, path,
+	body string) (int, string, string) {
 	t.Helper()
 	request, err := http.NewRequest(method, server.URL+"/runner/v1/"+path, strings.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
 	}
 	request.Header.Set("Authorization", "Bearer "+token)
+	if runnerKey != "" {
+		request.Header.Set(jobspec.RunnerKeyHeader, runnerKey)
+	}
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		t.Fatal(err)
@@ -260,7 +273,18 @@ func call(t *testing.T, server *httptest.Server, token, method, path, body strin
 	if err != nil {
 		t.Fatal(err)
 	}
-	return response.StatusCode, string(answer)
+	return response.StatusCode, string(answer), response.Header.Get(jobspec.RunnerKeyHeader)
+}
+
+// fetch makes the first fetch of the job of token and returns the runner key.
+func fetch(t *testing.T, server *httptest.Server, token string) string {
+	t.Helper()
+	status, body, runnerKey := callWithKey(t, server, token, "", http.MethodGet, "job", "")
+	if status != http.StatusOK || runnerKey == "" {
+		t.Fatalf("the first fetch got status %d and the runner key %q: %s", status, runnerKey,
+			body)
+	}
+	return runnerKey
 }
 
 // runInBackground runs the job and sends the error of Run on the channel.
@@ -278,15 +302,16 @@ func TestASecondResultIsRefused(t *testing.T) {
 	l.silent = true
 	done := runInBackground(d, runbook(t, "hello", &bytes.Buffer{}))
 	token := waitForLaunch(t, l)
+	runnerKey := fetch(t, server, token)
 	result := `{"status":"stale","error":"the state moved"}`
-	status, _ := call(t, server, token, http.MethodPost, "job/result", result)
+	status, _, _ := callWithKey(t, server, token, runnerKey, http.MethodPost, "job/result", result)
 	if status != http.StatusNoContent {
 		t.Fatalf("first result: status %d", status)
 	}
 	if err := <-done; !errors.Is(err, jobspec.ErrStalePlan) {
 		t.Fatalf("error = %v, want a stale plan", err)
 	}
-	status, _ = call(t, server, token, http.MethodPost, "job/result", result)
+	status, _, _ = callWithKey(t, server, token, runnerKey, http.MethodPost, "job/result", result)
 	if status != http.StatusUnauthorized && status != http.StatusConflict {
 		t.Fatalf("second result: status %d, want a refusal", status)
 	}
@@ -317,39 +342,38 @@ func TestTheJobIsGivenToOneRunnerOnly(t *testing.T) {
 	token := waitForLaunch(t, l)
 
 	const fetches = 8
-	statuses := make(chan int, fetches)
+	keys := make(chan string, fetches)
 	var wait sync.WaitGroup
 	for range fetches {
 		wait.Add(1)
 		go func() {
 			defer wait.Done()
-			status, body := call(t, server, token, http.MethodGet, "job", "")
-			if status == http.StatusOK && !strings.Contains(body, `"runbook":"hello"`) {
+			status, body, runnerKey := callWithKey(t, server, token, "", http.MethodGet, "job", "")
+			switch {
+			case status == http.StatusOK && !strings.Contains(body, `"runbook":"hello"`):
 				t.Errorf("the job = %s, want the hello runbook", body)
+			case status == http.StatusOK:
+				keys <- runnerKey
+			case status != http.StatusConflict || runnerKey != "":
+				t.Errorf("a fetch of the job got status %d and the runner key %q, want 200 "+
+					"or 409 without a key", status, runnerKey)
 			}
-			statuses <- status
 		}()
 	}
 	wait.Wait()
-	close(statuses)
-	given := 0
-	for status := range statuses {
-		switch status {
-		case http.StatusOK:
-			given++
-		case http.StatusConflict:
-		default:
-			t.Errorf("a fetch of the job got status %d, want 200 or 409", status)
-		}
+	close(keys)
+	given := []string{}
+	for runnerKey := range keys {
+		given = append(given, runnerKey)
 	}
-	if given != 1 {
-		t.Fatalf("the job was given %d times, want once", given)
+	if len(given) != 1 || given[0] == "" {
+		t.Fatalf("the job was given with the runner keys %q, want once with a key", given)
 	}
 	if status, _ := call(t, server, token, http.MethodGet, "job", ""); status != http.StatusConflict {
 		t.Fatalf("a later fetch got status %d, want 409", status)
 	}
 
-	// The runner that has the job works on with the same token.
+	// The runner that has the job works on with the same token and its runner key.
 	steps := []struct{ method, path, body string }{
 		{http.MethodGet, "job/checkout", ""},
 		{http.MethodPost, "job/heartbeat", ""},
@@ -357,7 +381,9 @@ func TestTheJobIsGivenToOneRunnerOnly(t *testing.T) {
 		{http.MethodPost, "job/result", `{"status":"ok"}`},
 	}
 	for _, step := range steps {
-		if status, body := call(t, server, token, step.method, step.path, step.body); status >= 300 {
+		status, body, _ := callWithKey(t, server, token, given[0], step.method, step.path,
+			step.body)
+		if status >= 300 {
 			t.Fatalf("%s %s: status %d: %s", step.method, step.path, status, body)
 		}
 	}

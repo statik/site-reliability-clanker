@@ -423,6 +423,7 @@ func build(ctx context.Context, o options) (*components, error) {
 	if c.dispatcher, err = newDispatcher(ctx, o); err != nil {
 		return nil, err
 	}
+	c.dispatcher.Refused = recordRefusal(c.log)
 	c.broker, err = broker.New(c.db, c.clock, secret.signingKey, on.issuer,
 		func() (policy.Approvals, error) { return orchestrator.ApprovalSettings(c.forge) })
 	if err != nil {
