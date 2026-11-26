@@ -22,17 +22,19 @@ import (
 )
 
 // sessionIssuer is a target that gives an AWS session for each grant. It records the
-// grants.
+// grants, and the time that each one had left when the broker exchanged it.
 type sessionIssuer struct {
-	mu     sync.Mutex
-	grants []broker.Grant
+	mu        sync.Mutex
+	grants    []broker.Grant
+	remaining []time.Duration
 }
 
-func (s *sessionIssuer) Issue(_ context.Context, g broker.Grant, _ time.Duration) (
+func (s *sessionIssuer) Issue(_ context.Context, g broker.Grant, remaining time.Duration) (
 	broker.Credential, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.grants = append(s.grants, g)
+	s.remaining = append(s.remaining, remaining)
 	return broker.Credential{AWS: &jobspec.AWSSession{AccessKeyID: "ASIAEXAMPLE" + g.Layer,
 		SecretAccessKey: "example-secret", SessionToken: "example-token",
 		Expires: fixedClock{}.Now().Add(15 * time.Minute)}, Mechanism: "example STS session"}, nil
@@ -44,6 +46,12 @@ func (s *sessionIssuer) issued() []broker.Grant {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return append([]broker.Grant{}, s.grants...)
+}
+
+func (s *sessionIssuer) remainders() []time.Duration {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]time.Duration{}, s.remaining...)
 }
 
 var (
@@ -339,6 +347,103 @@ func TestAPlanThatChangesOnlyOutputsIsAppliedAndTheLayerAboveIsPlanned(t *testin
 			plan.Layer != layer || apply.Layer != layer {
 			t.Errorf("jobs %d and %d: %s %s and %s %s; want the plan and the apply of %s", 2*i,
 				2*i+1, plan.Kind, plan.Layer, apply.Kind, apply.Layer, layer)
+		}
+	}
+}
+
+func TestTheApplyWindowIsOneHourOnAWSAndTheReserveElsewhere(t *testing.T) {
+	cases := []struct {
+		cloud string
+		want  time.Duration
+	}{{"aws", time.Hour}, {"local", policy.WindowReserve}, {"gcp", policy.WindowReserve},
+		{"", policy.WindowReserve}}
+	for _, c := range cases {
+		if got := (EnvConfig{Cloud: c.cloud}).ApplyWindow(); got != c.want {
+			t.Errorf("cloud %q: apply window %s, want %s", c.cloud, got, c.want)
+		}
+	}
+	if policy.WindowReserve != 30*time.Minute {
+		t.Errorf("the apply window of the local target changed to %s", policy.WindowReserve)
+	}
+}
+
+func TestAnApplyOnAWSCanUseTheWindowOfEachLayerAndLocally45Minutes(t *testing.T) {
+	o := &Orchestrator{Envs: map[string]EnvConfig{sandbox.Name: sandbox,
+		localEnv.Name: localEnv}}
+	cases := []struct {
+		wi   WorkItem
+		want time.Duration
+	}{
+		{WorkItem{Env: localEnv.Name, Layers: []string{"50-app"}}, 45 * time.Minute},
+		{WorkItem{Env: localEnv.Name, Layers: Layers}, 45 * time.Minute},
+		{WorkItem{Env: localEnv.Name}, 45 * time.Minute},
+		{WorkItem{Env: sandbox.Name, Layers: sandbox.BlankSlateLayers()},
+			5*time.Hour + 15*time.Minute},
+		{WorkItem{Env: sandbox.Name, Layers: []string{"20-cluster"}},
+			time.Hour + 15*time.Minute},
+	}
+	for _, c := range cases {
+		if got := o.applyTimeout(c.wi); got != c.want {
+			t.Errorf("%s %v: timeout %s, want %s", c.wi.Env, c.wi.Layers, got, c.want)
+		}
+	}
+}
+
+// approvedApply approves a work item of tier T2 with one saved plan for the layer that
+// adds a resource, and waits for its apply.
+func approvedApply(t *testing.T, o *Orchestrator, env, layer string) WorkItem {
+	t.Helper()
+	commit, err := o.Forge.Head(PlatformRepo, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := []byte("the approved plan of " + layer)
+	if _, err := o.DB.Exec(`INSERT INTO users (name, display, role, email) VALUES
+		('alice', 'Alice Ng', 'approver', 'alice@example.com')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := o.DB.Exec(`INSERT INTO work_items (id, title, kind, env, layers, state, tier,
+		commit_sha, created_at, updated_at) VALUES ('WI-0001', 'Change a layer', 'manual', $1,
+		$2, $3, 'T2', $4, 'then', 'then')`, env, `["`+layer+`"]`, StateAwaitingApproval,
+		commit); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := o.DB.Exec(`INSERT INTO plans (work_item, layer, commit_sha, plan_sha256, plan,
+		plan_json, facts, created_at) VALUES ('WI-0001', $1, $2, $3, $4, '{}', '{"add": 1}',
+		'then')`, layer, commit, jobspec.SHA256(plan), plan); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := approve(t, o, "WI-0001", "alice"); err != nil {
+		t.Fatal(err)
+	}
+	o.WaitForApplies()
+	wi, err := o.Get("WI-0001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return wi
+}
+
+func TestAnApplyGrantAndItsSessionLastTheApplyWindowOfTheTarget(t *testing.T) {
+	cases := []struct {
+		env   EnvConfig
+		layer string
+		want  time.Duration
+	}{{sandbox, "10-network", time.Hour}, {localEnv, "50-app", 30 * time.Minute}}
+	for _, c := range cases {
+		issuer := &sessionIssuer{}
+		o, _ := cloudOrchestrator(t, c.env, issuer, "00-bootstrap")
+		if wi := approvedApply(t, o, c.env.Name, c.layer); wi.State != StateDone {
+			t.Fatalf("%s: state %s, want %s", c.env.Cloud, wi.State, StateDone)
+		}
+		grants, remaining := issuer.issued(), issuer.remainders()
+		if len(grants) != 1 || grants[0].Kind != broker.KindApply {
+			t.Fatalf("%s: want one apply grant, got %+v", c.env.Cloud, grants)
+		}
+		lifetime := store.ParseTime(grants[0].Expires).Sub(store.ParseTime(grants[0].NotBefore))
+		if lifetime != c.want || remaining[0] != c.want {
+			t.Errorf("%s: grant of %s with %s left at the exchange, want %s", c.env.Cloud,
+				lifetime, remaining[0], c.want)
 		}
 	}
 }

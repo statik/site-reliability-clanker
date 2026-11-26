@@ -163,18 +163,19 @@ func subtrees(source fs.FS, paths ...string) ([]fs.FS, error) {
 }
 
 // seedForge makes the three repositories of the forge from the source files, when they do
-// not exist yet. The chart of the application pack goes into the platform repository at
-// the path that the stacks read it from.
+// not exist yet. The deploy files of the application pack go into the platform repository
+// below the directory of the pack, apps/<name>/, where the stacks read them.
 func seedForge(f *forge.Forge, source fs.FS, app pack.Pack) error {
 	trees, err := subtrees(source, "platform", "runbooks")
 	if err != nil {
 		return err
 	}
-	platform, runbooks := trees[0], map[string]fs.FS{".": trees[1]}
-	chart, err := app.ChartFiles()
+	runbooks := map[string]fs.FS{".": trees[1]}
+	platform, err := app.PlatformFiles()
 	if err != nil {
-		return fmt.Errorf("open the chart of the application pack: %w", err)
+		return fmt.Errorf("open the deploy files of the application pack: %w", err)
 	}
+	platform["platform"] = trees[0]
 	// The runbooks of the application come from the pack. They can go only into the
 	// directory of the jobs, so a pack cannot bring a policy or a notification route.
 	jobs, err := app.RunbookFiles()
@@ -184,25 +185,38 @@ func seedForge(f *forge.Forge, source fs.FS, app pack.Pack) error {
 	if jobs != nil {
 		runbooks[orchestrator.RunbookJobsDir] = jobs
 	}
-	if err := f.Seed(orchestrator.PlatformRepo, map[string]fs.FS{
-		"platform": platform, app.ChartMount(): chart,
-	}, "Seed platform code and the "+app.Title+" chart"); err != nil {
+	if err := f.Seed(orchestrator.PlatformRepo, platform,
+		"Seed platform code and the deploy files of "+app.Title); err != nil {
 		return err
 	}
 	if err := f.Seed(orchestrator.RunbooksRepo, runbooks,
 		"Seed runbooks, policies and notification routes"); err != nil {
 		return err
 	}
+	release, err := firstRelease(app)
+	if err != nil {
+		return err
+	}
+	return f.Seed(app.Releases.Repository, release, "Release "+app.Releases.First)
+}
+
+// firstRelease returns the content of the releases repository of the application at the
+// first start: the note of the first release only, and the main chart when the pack has
+// one. The simulator publishes the later releases.
+func firstRelease(app pack.Pack) (map[string]fs.FS, error) {
 	first := app.Releases.First
 	note, err := app.ReadReleaseNote(first)
 	if err != nil {
-		return fmt.Errorf("read the %s release note: %w", first, err)
+		return nil, fmt.Errorf("read the %s release note: %w", first, err)
 	}
-	// The repository of the application starts with the first release only. The simulator
-	// publishes the later ones.
-	firstRelease := fstest.MapFS{first + ".md": {Data: note, Mode: 0o644}}
-	return f.Seed(app.Releases.Repository, map[string]fs.FS{
-		app.Releases.Directory: firstRelease, app.Deploy.Chart: chart}, "Release "+first)
+	release := map[string]fs.FS{app.Releases.Directory: fstest.MapFS{
+		first + ".md": {Data: note, Mode: 0o644}}}
+	if app.Deploy.Chart != "" {
+		if release[app.Deploy.Chart], err = app.ChartFiles(); err != nil {
+			return nil, fmt.Errorf("open the chart of the application pack: %w", err)
+		}
+	}
+	return release, nil
 }
 
 // adapters returns the channels of the notifier. It also builds the chat apps, which are

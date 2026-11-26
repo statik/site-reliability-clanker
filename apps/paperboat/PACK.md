@@ -4,16 +4,22 @@ Paperboat is the example application of S.R.C. The control plane names no applic
 its code. It reads what it must know about the application from an application pack: this
 directory, with the manifest `pack.json`.
 
-To manage another application, write a pack for it. The package `internal/pack` reads and
-checks the manifest. `internal/pack/testdata/harbor` is a second pack, which the tests use
-to show that the core does not depend on a name of Paperboat.
+To manage another application, write a pack for it in `packs/<name>/`, and start the
+control plane with `clanker up --pack packs/<name>`. The directory `apps/` holds exactly
+one pack, Paperboat: a start with no `--pack`, the scripts in `scripts/verify/` and the
+released binary read that one. CI runs `clanker pack validate` on each pack in `apps/` and
+`packs/`, and `shellcheck` and `shfmt` on `packs/*/runbooks/*.sh`.
+
+The package `internal/pack` reads and checks the manifest. `internal/pack/testdata/harbor`
+is a second pack, which the tests use to show that the core does not depend on a name of
+Paperboat.
 
 ## What the pack holds
 
 | Path | Content |
 |---|---|
 | `pack.json` | The manifest |
-| `chart/` | The deployment chart. The platform repository gets it at `<mount>/<chart>` |
+| `chart/` | The deployment chart |
 | `releases/` | One note `<version>.md` for each release |
 | `build.sh` | Builds the images of every release and pushes them to a registry |
 | `runbooks/` | The runbooks of the application: `<name>.json` and `<name>.sh` for each |
@@ -27,7 +33,7 @@ built.
 | Field | Meaning |
 |---|---|
 | `schema` | The version of the manifest format. This version reads `2` |
-| `name` | The short name. The API uses it as the key of the application in its version lists |
+| `name` | The short name. The API uses it as the key of the application in its version lists. The platform names the namespaces of the pack after it, so it cannot be `default`, `kube`, `clanker`, `envoy-gateway-system`, `local-path-storage`, or start with `kube-` or `clanker-` |
 | `title` | The name that a person reads. One to three words |
 | `version` | The version of the pack, not of the application |
 | `description` | One line about the application |
@@ -35,12 +41,18 @@ built.
 | `version_variable` | The variable of the layer with the version to deploy. The layer has an output of the same name with the version that runs |
 | `url_output` | The output of the layer with the address of the application |
 | `releases.repository` | The repository of the forge with the release notes. Not a repository of the core |
-| `releases.directory` | The directory of the notes, in the pack and in that repository |
+| `releases.directory` | The directory of the notes, in the pack and in that repository. In the pack it can also hold a release record `<version>.json` beside each note (see "Release records") |
 | `releases.first` | The release that a new environment starts with |
 | `deploy.kind` | How the layer deploys the application. This version reads `helm` |
-| `deploy.chart` | The directory of the chart, inside the pack |
-| `deploy.mount` | The path of the pack in the platform repository, where the stacks read the chart |
+| `deploy.chart` | The directory of the main chart, inside the pack, with a `Chart.yaml`. Optional when every release has a record that names a chart |
+| `deploy.values` | Optional. A directory with `values.yaml` and, for each cloud that needs other values, `values-<cloud>.yaml` (`local`, `aws`, `gcp`, `azure`). Files only, each 256 KiB or less |
+| `deploy.extras` | Optional. The directory of a second chart, with a `Chart.yaml`, that the layer installs after the main chart: for objects that a chart of another project does not have |
 | `deploy.build` | Optional. The build program, inside the pack. A pack with none has its images in a registry already |
+| `deploy.settings` | Optional. 1 to 16 variables of the layer that a change can set. Each has a `variable` (not the version variable and not a variable of the core), a `type` (`number`, a whole number from `min` to `max` within 0 to 1000000, or `bool` with no bounds), a `default` for a new environment, and the `value`: the dotted Helm path that it sets (names only, not below `platform`, and not inside the path of another setting) |
+| `deploy.secrets` | Optional. 1 to 8 key names. The layer makes a secret with a random value for each key |
+| `deploy.route` | The route of the application on the gateway of the platform: the `service` and the `port` that get the requests; optionally 1 to 8 path prefixes in `paths` (with none, every path), `timeout_seconds` from 0 (no timeout) to 3600 (with none, the default of the gateway), `hostname` (a host name of its own) and `wildcard` (every name below that host name; needs `hostname`) |
+| `deploy.timeout_seconds` | Optional. The Helm timeout of an apply, 60 to 1200 seconds. The default is 300 |
+| `deploy.workloads_namespace` | Optional. `true` asks the platform for a second namespace, for the pods that the application starts |
 | `components` | The parts of the application that run. Each has a `name`, the `runtime` `kubernetes`, the `workload` (the name of its deployment) and `required`. No code reads `required` yet |
 | `incident` | Optional. The `runbook` and the `component` that an incident proposes when no model gives a diagnosis. Without it, such an incident goes to a person |
 | `diagnostics` | The reads of a debug session, 1 to 8. A read is `{"read": "logs", "component": …, "lines": …}` with 1 to 200 lines, or `{"read": "events"}` |
@@ -78,6 +90,61 @@ data services (`platform/CONTRACT.md`). The control plane reads the namespace of
 session and of the rights of its identities from that output. It refuses a namespace of
 the cluster or of the control plane.
 
+**Where the deploy files go.** The core puts every deploy file of a pack below
+`apps/<name>/` of the platform repository, at names that the core chooses: the main chart
+at `chart/`, the values at `values/`, the extras chart at `extras/`, the release records
+at `releases/` and the chart archives that the records name at `charts/`. A pack cannot
+choose a path there, and the forge refuses a seed in which two sources write one file. A
+change below `apps/<name>/` touches the layer of the pack. The stacks read the chart of
+Paperboat from `apps/paperboat/chart`. The stacks do not read `deploy.values`,
+`deploy.extras`, `deploy.settings`, `deploy.secrets`, `deploy.route`,
+`deploy.timeout_seconds`, `deploy.workloads_namespace` or the release records yet: the
+generic application layer (#148, step S8) does.
+
+**Release records.** A pack can have a record `<version>.json` beside the note of each
+release. When a pack has records, every release must have one, and each record must have
+a note. The directory of the releases can hold only notes and records. A record has the fields below and no other:
+
+| Field | Meaning |
+|---|---|
+| `chart`, `chart_sha256` | A chart archive of the pack, `charts/<file>.tgz`, 4 MiB or less, and its SHA-256 as 64 lowercase hexadecimal characters. The loader checks the SHA-256 |
+| `chart_repository`, `chart_name`, `chart_version`, `chart_digest` | A chart that the runner fetches at apply: an `https://` or `oci://` address with no user, query or `..` step, the name of the chart, one exact version, and `sha256:<64 hexadecimal characters>` |
+| `values` | Optional. An object of Helm values for this release, for example the image tag and digest |
+| `schema_change` | Required. `true` when the release changes the schema of the database |
+
+A record has a chart archive, a chart in a repository, or no chart; with no chart the
+layer installs the chart of `deploy.chart`. How tightly each form pins the chart:
+
+- **Archive in the pack.** The archive is in the reviewed pull request, and the loader
+  refuses an archive whose SHA-256 differs from the record.
+- **`oci://` repository.** `chart_digest` is the digest of the OCI manifest of the chart,
+  the value that `helm pull` prints. It is not the SHA-256 of the archive. Helm 3.17 and
+  later install a chart by that digest, `oci://<repository>/<name>:<version>@sha256:…`
+  ([helm#12690](https://github.com/helm/helm/pull/12690)), and refuse a tag that
+  resolves to another digest
+  ([client.go](https://github.com/helm/helm/blob/v3.20.2/pkg/registry/client.go#L925-L943)).
+  The Helm provider 3.3.0 of the stacks contains Helm 3.20.2 and gives the chart
+  reference to Helm as it is
+  ([resource_helm_release.go](https://github.com/hashicorp/terraform-provider-helm/blob/v3.3.0/helm/resource_helm_release.go#L1307-L1335)),
+  so a reference with a digest is expected to work there. The provider does not document
+  it, and no test ran it yet. A digest in the `version` argument does not work. Coder
+  publishes its chart at `oci://ghcr.io/coder/chart/coder` as well as at
+  `https://helm.coder.com/v2`
+  ([Coder docs](https://github.com/coder/coder/blob/19da85b5d353982565298e964f657b1ea6a25567/docs/install/server/kubernetes/index.md#L133-L143)).
+- **`https://` repository.** `chart_digest` is the `digest` of the version in the
+  `index.yaml` of the repository (the SHA-256 of the archive), with `sha256:` before it.
+  Helm does not compare a downloaded archive with that digest
+  ([chart_downloader.go](https://github.com/helm/helm/blob/v3.22.1/pkg/downloader/chart_downloader.go#L88-L101)),
+  and the Helm provider has no argument for it (its `verify` checks a GPG provenance
+  file, which Coder does not publish). So the version pins the chart, and the digest only
+  records the archive that a person reviewed.
+
+The release detector reads only the notes, `<version>.md`, in the releases repository. For
+a pack with records, a release whose record is not in the platform repository at
+`apps/<name>/releases/<version>.json` gets a finding for a person: "<title> <version> is
+published; add its record … in a pull request". The agent does not draft a change for
+it. When the record is on main, the next check opens the upgrade for the agent.
+
 
 ## A pack is not trusted
 
@@ -99,7 +166,21 @@ A pack comes from outside the core. `pack.Load` refuses a manifest when:
   mitigation for an incident in the pack, or a component that this runbook does not
   permit;
 - an edge of the topology joins nodes that do not exist, or two nodes of the platform;
-- the chart, the build program or the note of the first release is not in the pack;
+- the name is a reserved name (see `name` above);
+- a deploy field is outside its bounds (see the table above), a setting has the name of
+  the version variable, of a variable of the core or of another setting, or its Helm path
+  has an index, an escape, a second value, a value of the platform or the path of another
+  setting;
+- the chart, the values, the extras chart, the build program or the note of the first
+  release is not in the pack, a chart has no `Chart.yaml`, or the directory of the values
+  has a file that is not `values.yaml` or `values-<cloud>.yaml`. The loader does not parse
+  the YAML of a values file;
+- the directory of the releases has a file that is not a note or a record, a release has
+  no record when others have one, a record has no note, a record has a field that the
+  format does not have, has no `schema_change`, names an archive that is not in the pack
+  or has another SHA-256, or names a repository that is not `https://` or `oci://`, a
+  version that is not exact, or no digest;
+- `deploy.chart` is missing and a release has no record that names a chart;
 - the directory of the runbooks or of the eval cases has a directory in it, a file of
   more than 256 KiB, a script with no definition, a definition with no script or a
   definition that `internal/runbook` refuses;
@@ -162,8 +243,12 @@ fails. It asks no question, so a program can run it.
 ```text
 $ clanker pack validate apps/paperboat
 ok    manifest: paperboat 0.1.0 (Paperboat), schema 2
-ok    deployment: layer 50-app, variable paperboat_version, chart chart
+ok    deployment: layer 50-app, variable paperboat_version, chart chart, Helm timeout 300 s, into apps/paperboat/ of the platform repository
+ok    settings: api_replicas 1 to 5 (api.replicas, default 1), worker_replicas 1 to 5 (worker.replicas, default 1), web_replicas 1 to 5 (web.replicas, default 1), loadgen_enabled bool (loadgen.enabled, default true)
+ok    route: service paperboat-web port 8080, every path, the request timeout of the gateway
+ok    secrets: none
 ok    releases: repository paperboat, first release 1.0.0
+ok    release records: none
 ok    components: api (paperboat-api), web (paperboat-web), worker (paperboat-worker)
 ok    diagnostics: 2 reads, and the state of the pods and the deployments
 ok    checks: ready /api/healthz 200, inventory /api/inventory 200 (primary)
@@ -202,8 +287,8 @@ start    clanker up --pack <data directory>/packs/harbor/0.1.0
 
 `clanker up` and `clanker setup` read the one pack in the directory `apps` of the source
 files: the pack that comes with the control plane. `--pack DIR` names another one: a
-directory of the source files, or a directory of this machine, for example the directory
-that the import printed.
+directory of the source files such as `packs/<name>`, or a directory of this machine, for
+example the directory that the import printed.
 
 A pack with a lock file must still have the hash of the lock. A pack that changed on the
 disk does not start; import it again. Each start with a new pack, a new version or other
@@ -216,8 +301,9 @@ The core on a cloud has no disk. It reads only the pack that it carries.
 
 - The stacks of the platform (`platform/stacks/*/50-app` and
   `platform/modules/shared/app`) name Paperboat and its variable. A pack for another
-  application loads and passes the checks, but it cannot deploy until it brings its own
-  application layer.
+  application loads and passes the checks, but it cannot deploy until the generic
+  application layer reads its deploy fields (#148, step S8).
+- The released binary and the core on a cloud carry Paperboat only.
 - A pack cannot change after the first start of an environment. The forge is seeded one
   time, so the runbooks and the chart of a new version do not reach it.
 - The scenes of the simulator are the story of the Paperboat releases 1.1.0, 1.1.1 and

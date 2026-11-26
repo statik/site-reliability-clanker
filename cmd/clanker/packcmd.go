@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/statik/site-reliability-clanker/internal/audit"
@@ -70,10 +71,13 @@ func packValidate(args []string, out io.Writer) error {
 func packFacts(app pack.Pack) []string {
 	lines := []string{
 		fmt.Sprintf("manifest: %s %s (%s), schema %d", app.Name, app.Version, app.Title, app.Schema),
-		fmt.Sprintf("deployment: layer %s, variable %s, chart %s", app.Layer, app.VersionVariable,
-			app.Deploy.Chart),
+		"deployment: " + deploymentFact(app),
+		"settings: " + settingsFact(app.Deploy.Settings),
+		"route: " + routeFact(*app.Deploy.Route),
+		"secrets: " + listOrNone(app.Deploy.Secrets),
 		fmt.Sprintf("releases: repository %s, first release %s", app.Releases.Repository,
 			app.Releases.First),
+		"release records: " + recordsFact(app),
 		fmt.Sprintf("components: %s", strings.Join(componentFacts(app), ", ")),
 		fmt.Sprintf("diagnostics: %d reads, and the state of the pods and the deployments",
 			len(app.Diagnostics)),
@@ -90,6 +94,91 @@ func packFacts(app pack.Pack) []string {
 		}
 	}
 	return lines
+}
+
+// deploymentFact says what the layer installs and where the core puts the files of it.
+func deploymentFact(app pack.Pack) string {
+	deploy := app.Deploy
+	parts := []string{"layer " + app.Layer, "variable " + app.VersionVariable}
+	for name, dir := range map[string]string{"chart": deploy.Chart, "values": deploy.Values,
+		"extras": deploy.Extras} {
+		if dir != "" {
+			parts = append(parts, name+" "+dir)
+		}
+	}
+	slices.Sort(parts[2:])
+	parts = append(parts, fmt.Sprintf("Helm timeout %d s", deploy.HelmTimeout()))
+	if deploy.WorkloadsNamespace {
+		parts = append(parts, "a namespace for workloads")
+	}
+	return strings.Join(parts, ", ") + ", into " + app.PlatformDir() + "/ of the platform " +
+		"repository"
+}
+
+// settingsFact returns each setting with its bounds, its Helm value and its default.
+func settingsFact(settings []pack.Setting) string {
+	facts := []string{}
+	for _, setting := range settings {
+		bounds := setting.Type
+		if setting.Type == pack.SettingNumber {
+			bounds = fmt.Sprintf("%d to %d", *setting.Min, *setting.Max)
+		}
+		facts = append(facts, fmt.Sprintf("%s %s (%s, default %s)", setting.Variable, bounds,
+			setting.Value, setting.Default))
+	}
+	return listOrNone(facts)
+}
+
+// routeFact says which requests the route of the gateway sends to the application.
+func routeFact(route pack.Route) string {
+	parts := []string{fmt.Sprintf("service %s port %d", route.Service, route.Port), "every path"}
+	if route.Paths != nil {
+		parts[1] = "paths " + strings.Join(route.Paths, " ")
+	}
+	switch {
+	case route.TimeoutSeconds == nil:
+		parts = append(parts, "the request timeout of the gateway")
+	case *route.TimeoutSeconds == 0:
+		parts = append(parts, "no request timeout")
+	default:
+		parts = append(parts, fmt.Sprintf("request timeout %d s", *route.TimeoutSeconds))
+	}
+	if route.Hostname {
+		parts = append(parts, "a host name of its own")
+	}
+	if route.Wildcard {
+		parts = append(parts, "every name below it")
+	}
+	return strings.Join(parts, ", ")
+}
+
+// recordsFact returns each release record with the chart that it pins, so a person sees
+// the digests.
+func recordsFact(app pack.Pack) string {
+	facts := []string{}
+	for _, version := range app.RecordVersions() {
+		record, _ := app.Record(version)
+		chart := "the chart of deploy.chart"
+		switch {
+		case record.Chart != "":
+			chart = fmt.Sprintf("%s sha256 %s", record.Chart, record.ChartSHA256)
+		case record.ChartRepository != "":
+			chart = fmt.Sprintf("%s %s %s %s", record.ChartRepository, record.ChartName,
+				record.ChartVersion, record.ChartDigest)
+		}
+		if *record.SchemaChange {
+			chart += ", schema change"
+		}
+		facts = append(facts, fmt.Sprintf("%s (%s)", version, chart))
+	}
+	return listOrNone(facts)
+}
+
+func listOrNone(items []string) string {
+	if len(items) == 0 {
+		return "none"
+	}
+	return strings.Join(items, ", ")
 }
 
 // componentFacts returns each component with its deployment: "api (shop-api)".

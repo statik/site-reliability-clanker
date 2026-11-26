@@ -222,7 +222,7 @@ jq -n --arg db "postgres://postgres:check@${db_address}/clanker?sslmode=disable"
   CLANKER_DATABASE_URL: $db, CLANKER_SIGNING_KEY: $key, CLANKER_OIDC_ISSUER: $idp,
   CLANKER_OIDC_CLIENT_ID: "clanker", CLANKER_OIDC_CLIENT_SECRET: "check",
   CLANKER_PUBLIC_URL: $base, CLANKER_ADMIN_EMAIL: "admin@example.com",
-  CLANKER_CORE_URL: $core, CLANKER_AWS_BOOTSTRAP: $bootstrap, CLANKER_AWS_RUNNER: $runner,
+  CLANKER_APPROVER_EMAILS: "approver2@example.com", CLANKER_CORE_URL: $core, CLANKER_AWS_BOOTSTRAP: $bootstrap, CLANKER_AWS_RUNNER: $runner,
   CLANKER_AWS_LAYER_VARIABLES: $variables, CLANKER_SLACK_WEBHOOK: $slack} |
   {"/src/check": ., "/src/standby": del(.CLANKER_AWS_RUNNER)}' >"${work}/parameters.json"
 
@@ -294,8 +294,6 @@ grep -q -- "-backend-config=key=${env_name}/10-network.tfstate" <<<"${plan_log}"
   fail "the plan job did not use the state key of its layer"
 
 echo "== the admin and a second approver approve; every layer is applied"
-sql "INSERT INTO users (name, display, role, email) VALUES ('approver2', 'Second Approver',
-  'approver', 'approver2@example.com')" >/dev/null
 [ "$(sign_in approver2@example.com "${work}/approver.jar")" = approver ] ||
   fail "the second approver could not sign in"
 for jar in admin approver; do

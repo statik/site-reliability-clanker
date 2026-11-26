@@ -122,6 +122,51 @@ func TestSeedDoesNothingForARepositoryThatExists(t *testing.T) {
 	}
 }
 
+// A source of a seed can never replace a file of another source: a pack could otherwise
+// put a file into a module of the platform.
+func TestSeedRefusesTwoSourcesThatWriteOnePath(t *testing.T) {
+	module := fstest.MapFS{"main.tf": {Data: []byte("module {}\n")}}
+	platform := fstest.MapFS{"modules/shared/app/main.tf": {Data: []byte("core\n")}}
+	cases := map[string]struct {
+		sources map[string]fs.FS
+		want    string
+	}{
+		"one file from two sources": {map[string]fs.FS{"platform": platform,
+			"platform/modules/shared/app": module}, "both write platform/modules/shared/app/main.tf"},
+		"a file where a source has a directory": {map[string]fs.FS{"platform": platform,
+			"platform/modules/shared": fstest.MapFS{"app": {Data: []byte("x")}}},
+			"writes files inside platform/modules/shared/app"},
+		"a directory where a source has a file": {map[string]fs.FS{
+			"platform/modules/shared": fstest.MapFS{"app": {Data: []byte("x")}},
+			"platform":                platform}, "writes the file platform/modules/shared/app"},
+	}
+	for name, tc := range cases {
+		f := New(storetest.Open(t))
+		err := f.Seed(repo, tc.sources, "Seed")
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: error %v, want one with %q", name, err, tc.want)
+		}
+		if f.Exists(repo) {
+			t.Errorf("%s: the refused seed made the repository", name)
+		}
+	}
+}
+
+func TestSeedJoinsSourcesThatShareADirectory(t *testing.T) {
+	f := New(storetest.Open(t))
+	if err := f.Seed(repo, map[string]fs.FS{
+		"platform":         fstest.MapFS{"modules/a.tf": {Data: []byte("a\n")}},
+		"platform/modules": fstest.MapFS{"b.tf": {Data: []byte("b\n")}},
+	}, "Seed"); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"platform/modules/a.tf", "platform/modules/b.tf"} {
+		if _, err := f.ReadFile(repo, "main", path); err != nil {
+			t.Errorf("no %s: %v", path, err)
+		}
+	}
+}
+
 func TestSeedFromMemoryGivesTheSameCommitAsFromADirectory(t *testing.T) {
 	fromDirectory, _ := seeded(t)
 	want, err := fromDirectory.Head(repo, "main")

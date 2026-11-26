@@ -12,7 +12,23 @@
     "directory": "notes",
     "first": "3.4.0"
   },
-  "deploy": {"kind": "helm", "chart": "chart", "mount": "apps/harbor", "build": "build.sh"},
+  "deploy": {
+    "kind": "helm",
+    "chart": "chart",
+    "values": "values",
+    "extras": "extras",
+    "build": "build.sh",
+    "settings": [
+      {"variable": "gateway_replicas", "type": "number", "min": 1, "max": 4, "default": 2,
+       "value": "gateway.replicaCount"},
+      {"variable": "jobs_enabled", "type": "bool", "default": false, "value": "jobservice.enabled"}
+    ],
+    "secrets": ["admin-password"],
+    "route": {"service": "harbor-ui", "port": 8080, "paths": ["/api", "/v2"], "timeout_seconds": 0,
+              "hostname": true},
+    "timeout_seconds": 600,
+    "workloads_namespace": true
+  },
   "runbooks": "jobs",
   "components": [
     {"name": "api", "runtime": "kubernetes", "workload": "harbor-gateway", "required": true},

@@ -23,12 +23,13 @@ import (
 )
 
 // LayersForPaths returns the layers of cloud that the changed paths touch, in apply order.
-// A change to a shared module or to the chart of the application pack touches the layer
-// that uses it. On a cloud a change to layer 00-bootstrap is an error: an operator applies
-// that layer with `clanker bootstrap`, and no agent role can apply it.
+// A change to a shared module or to a deploy file of the application pack (its directory
+// apps/<name>/ of the platform repository) touches the layer that uses it. On a cloud a
+// change to layer 00-bootstrap is an error: an operator applies that layer with `clanker
+// bootstrap`, and no agent role can apply it.
 func LayersForPaths(cloud string, app pack.Pack, paths []string) ([]string, error) {
 	touched := map[string]bool{}
-	chart, appLayer := app.ChartMount(), app.Layer
+	appDir, appLayer := app.PlatformDir()+"/", app.Layer
 	stackPrefix := "platform/stacks/" + cloud + "/"
 	for _, path := range paths {
 		switch {
@@ -38,7 +39,7 @@ func LayersForPaths(cloud string, app pack.Pack, paths []string) ([]string, erro
 		case strings.HasPrefix(path, "platform/modules/shared/platform/"):
 			touched["40-platform"] = true
 		case strings.HasPrefix(path, "platform/modules/shared/app/"),
-			strings.HasPrefix(path, chart+"/"):
+			strings.HasPrefix(path, appDir):
 			touched[appLayer] = true
 		}
 	}

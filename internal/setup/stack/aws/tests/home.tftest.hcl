@@ -331,6 +331,7 @@ run "settings_are_secure_parameters_below_one_path" {
     condition = toset(keys(aws_ssm_parameter.core)) == toset([
       "CLANKER_DATABASE_URL", "CLANKER_SIGNING_KEY", "CLANKER_PUBLIC_URL", "CLANKER_OIDC_ISSUER",
       "CLANKER_OIDC_CLIENT_ID", "CLANKER_OIDC_CLIENT_SECRET", "CLANKER_ADMIN_EMAIL",
+      "CLANKER_APPROVER_EMAILS",
     ])
     error_message = "Phase 1 must write the database URL, the signing key and the sign-in."
   }
@@ -353,11 +354,13 @@ run "settings_are_secure_parameters_below_one_path" {
   assert {
     condition = (
       aws_ssm_parameter.core["CLANKER_ADMIN_EMAIL"].value == "admin@src-test-idp.example.com" &&
+      aws_ssm_parameter.core["CLANKER_APPROVER_EMAILS"].value ==
+      "approver@src-test-idp.example.com" &&
       aws_ssm_parameter.core["CLANKER_OIDC_CLIENT_ID"].value == "clanker" &&
       aws_ssm_parameter.core["CLANKER_OIDC_CLIENT_SECRET"].value ==
       aws_ssm_parameter.idp["CLANKER_OIDC_CLIENT_SECRET"].value
     )
-    error_message = "The core and Keycloak must share the client and its secret."
+    error_message = "The core and Keycloak must share the client, its secret and the two approvers."
   }
 
   assert {

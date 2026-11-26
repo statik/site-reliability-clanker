@@ -47,7 +47,8 @@ export function permissionRequests(workItem: WorkItem): PermissionRequest[] {
       identity: `applier-${layer}`,
       scope: `Apply the approved plan of layer ${layer} in ${env}. The grant is bound to ` +
         `commit ${commit} and to the hash of the plan, so any other plan is refused.${local}`,
-      duration: "30 minutes from the start of the apply, revoked when the job ends.",
+      duration: "30 minutes from the start of the apply (one hour on AWS), revoked when the " +
+        "job ends.",
     });
   }
   return requests;
