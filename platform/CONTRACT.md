@@ -286,10 +286,13 @@ The main chart gets its values in this order, the last one wins:
 1. The defaults of the chart.
 2. `apps/<name>/values/values.yaml`, then `values-<cloud>.yaml`, when the pack has them.
 3. The `values` of the release record.
-4. The values of the platform, below.
+4. The values of the platform, below, when the chart is the chart directory of the pack.
 5. The settings, with Helm `set`, as `--set <path>=<value>` would set them.
 
-The values of the platform. The extras chart gets them too.
+The values of the platform. The extras chart gets them too. A chart that a release record
+names, as an archive or in a repository, is a chart of another project and does not get
+them: its values schema can refuse a key that it does not know, as the schema of Zero to
+JupyterHub does.
 
 | Value | From |
 |---|---|

@@ -105,7 +105,9 @@ lines of the pack in `terraform.tfvars` (the first release and the default of ea
 setting) and the line `app_name` of `40-platform`. The layer installs the objects of the
 platform (the route, `<name>-platform`, `<name>-generated`), then the chart of the
 release record or of `deploy.chart` with the values files, the values of the record, the
-values of the platform and the settings, then the extras chart. It does not read
+values of the platform and the settings, then the extras chart. A chart that a record
+names is a chart of another project, so it does not get the values of the platform
+(`platform.*`); its values files read the objects of the platform by name. It does not read
 `deploy.route.hostname`, `deploy.route.wildcard` or `deploy.workloads_namespace` yet:
 steps S10 and S11 of #148 add them. `packs/nginx` is the smallest pack that uses each
 of the other fields.
