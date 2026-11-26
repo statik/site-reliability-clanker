@@ -136,8 +136,9 @@ layer installs the chart of `deploy.chart`. How tightly each form pins the chart
   reference to Helm as it is
   ([resource_helm_release.go](https://github.com/hashicorp/terraform-provider-helm/blob/v3.3.0/helm/resource_helm_release.go#L1307-L1335)),
   so the layer gives the chart as `oci://<repository>/<name>@<digest>` with
-  `version = <version>`. A plan with the provider 3.3.0 fetched a chart in that form, and
-  a digest of another version stopped the plan with `chart reference digest mismatch`.
+  `version = <version>`. With the provider 3.3.0 a plan fetched a chart in that form, an
+  apply on kind installed it and a second plan had no changes; a digest of another version
+  stopped the plan with `chart reference digest mismatch`.
   A digest in the `version` argument does not work. Coder
   publishes its chart at `oci://ghcr.io/coder/chart/coder` as well as at
   `https://helm.coder.com/v2`
