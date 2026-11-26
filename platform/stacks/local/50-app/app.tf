@@ -6,7 +6,7 @@ variable "paperboat_version" {
   description = "Release of Paperboat to run."
 
   validation {
-    condition     = can(regex("^[0-9]+[.][0-9]+[.][0-9]+(-[a-z][a-z0-9]*)?$", var.paperboat_version))
+    condition     = can(regex("^[0-9]+\\.[0-9]+\\.[0-9]+(-[a-z][a-z0-9]*)?$", var.paperboat_version))
     error_message = "paperboat_version must be a release such as 1.2.3 or 1.2.0-bad."
   }
 }

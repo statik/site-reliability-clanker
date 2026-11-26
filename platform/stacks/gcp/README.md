@@ -17,8 +17,8 @@ Each root takes `project_id` and `region` in addition to the contract inputs.
 | `40-platform` | Nothing on Google Cloud. It calls `modules/shared/platform` with the reserved IP address as `public_address`. That module installs Envoy Gateway and the Gateway of the platform, and a Job in the cluster makes the database and the role of the application in Cloud SQL |
 | `50-app` | Nothing on Google Cloud. It calls `modules/shared/app` |
 
-Layers `30-data`, `40-platform` and `50-app` configure the `kubernetes` provider with the
-cluster endpoint and CA certificate from the `20-cluster` state and the access token from
+Layers `30-data` and `40-platform` configure the `kubernetes` provider with the cluster
+endpoint and CA certificate from the `20-cluster` state and the access token from
 `data.google_client_config`. Layers `40-platform` and `50-app` configure the `helm` provider
 in the same way. Layer `20-cluster` makes no Kubernetes object and has no `kubernetes` provider.
 

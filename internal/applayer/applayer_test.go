@@ -101,7 +101,7 @@ func TestTheLayerOfASecondPackHasItsNames(t *testing.T) {
 	app := string(files["stacks/aws/50-app/app.tf"])
 	for _, want := range []string{
 		`variable "harbor_release" {`,
-		`condition     = can(regex("^[0-9]+[.][0-9]+[.][0-9]+(-[a-z][a-z0-9]*)?$", ` +
+		`condition     = can(regex("^[0-9]+\\.[0-9]+\\.[0-9]+(-[a-z][a-z0-9]*)?$", ` +
 			`var.harbor_release))`,
 		`variable "gateway_replicas" {`,
 		`condition     = var.gateway_replicas >= 1 && var.gateway_replicas <= 4 && ` +

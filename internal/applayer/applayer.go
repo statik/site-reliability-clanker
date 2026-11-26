@@ -33,9 +33,6 @@ const (
 	VarsFile = "terraform.tfvars"
 	// PlatformLayer is the layer whose app_name line names the pack.
 	PlatformLayer = "40-platform"
-	// releasePattern is the pattern of the version variable: a release as the names of the
-	// release notes have it (internal/pack).
-	releasePattern = `^[0-9]+[.][0-9]+[.][0-9]+(-[a-z][a-z0-9]*)?$`
 )
 
 //go:embed app.tf.tmpl
@@ -220,7 +217,7 @@ func AppTF(app pack.Pack) ([]byte, error) {
 		return nil, fmt.Errorf("the pack %s has no deploy.route", app.Name)
 	}
 	values := layer{Name: app.Name, Title: app.Title, VersionVariable: app.VersionVariable,
-		URLOutput: app.URLOutput, ReleasePattern: releasePattern, Values: deploy.Values != "",
+		URLOutput: app.URLOutput, ReleasePattern: pack.ReleasePattern(), Values: deploy.Values != "",
 		Extras: deploy.Extras != "", Records: app.HasRecords(),
 		TimeoutSeconds: deploy.HelmTimeout(), Secrets: deploy.Secrets,
 		Route: route{Service: deploy.Route.Service, Port: deploy.Route.Port,

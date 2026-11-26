@@ -674,9 +674,10 @@ Schema 2 replaces schema 1. The loader reads one schema.
 | `chart`, `mount`, `build` (required) | `deploy: {"kind": "helm", "chart": …, …}`: the core installs the chart with one application layer for every pack, and puts every deploy file of the pack at `apps/<name>/` of the platform repository, so there is no `mount`. `deploy: {"kind": "layer"}`, where the layer of the pack does all of the deployment, is the path for the host runtime (B.11, B.12) and is not built. `build` is optional |
 | `topology.services` | `components`, plus `topology.extra` for nodes that are not components (the load generator, a load balancer) |
 
-The deploy fields of the kind `helm` (issue #148, sections 1.2 to 1.7; the loader checks
-them, and the generic application layer of step S8 uses them). `apps/paperboat/PACK.md`
-has the bounds of each field.
+The deploy fields of the kind `helm` (issue #148, sections 1.2 to 1.7). The loader checks
+them, and the application layer of the core uses them (`platform/CONTRACT.md`, `50-app`
+and section 4), except the host name of the route and `workloads_namespace`, which come
+later. `apps/paperboat/PACK.md` has the bounds of each field.
 
 | Field | Content |
 |---|---|
@@ -801,7 +802,9 @@ not define them:
 - A fifth target in `platform/CONTRACT.md` for hosts that exist, with its own conformance
   suite. The contract of today assumes a cloud or a cluster in its state backends, its
   identities and each of its six conformance checks.
-- An application layer that the pack brings (`docs/PLAN.md` section 5.7, "Not built").
+- An application layer that the pack brings, `deploy: {"kind": "layer"}` (B.10). For
+  Kubernetes the core brings one application layer for every pack; the host runtime
+  needs the layer of the pack (`docs/PLAN.md` section 5.7, "Not built").
 - A source for packages inside a site whose hosts have no outbound path.
 
 ### B.13 Decisions for the owner
