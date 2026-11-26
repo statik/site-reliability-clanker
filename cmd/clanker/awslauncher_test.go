@@ -91,7 +91,7 @@ func TestTheDispatcherOnAWSUsesFargateWithTheRunnerSetting(t *testing.T) {
 	// With the core URL set, building the dispatcher makes no call to AWS or to IMDS.
 	setRunnerSettings(t, exampleRunner, "eu-west-1", "http://10.0.1.5:7070")
 	d, err := newDispatcher(context.Background(), options{cloud: "aws", env: "prod",
-		addr: ":7070"})
+		addr: ":7070", aws: realAWS})
 	if err != nil {
 		t.Fatal(err)
 	}

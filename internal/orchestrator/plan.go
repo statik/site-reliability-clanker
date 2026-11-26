@@ -122,7 +122,8 @@ func (o *Orchestrator) layerJob(wi WorkItem, kind, layer string) (jobspec.Job, e
 // cloudState returns the backend settings and the variables of a job for a layer of an
 // environment on a cloud. The state key and the inputs are those of the platform contract:
 // the layers above read layer 00-bootstrap at <env>/00-bootstrap.tfstate in the bucket
-// state_location of the region.
+// state_location of the region. The variables of the account of the environment come
+// between the shared variables and the inputs of the contract.
 func cloudState(env EnvConfig, layer string, shared map[string]string) (
 	map[string]string, map[string]string) {
 	backend := maps.Clone(env.Backend)
@@ -131,6 +132,7 @@ func cloudState(env EnvConfig, layer string, shared map[string]string) (
 	if variables == nil {
 		variables = map[string]string{}
 	}
+	maps.Copy(variables, env.Variables)
 	variables["TF_VAR_env_name"] = env.Name
 	variables["TF_VAR_state_location"] = env.Backend["bucket"]
 	variables["TF_VAR_region"] = env.Region

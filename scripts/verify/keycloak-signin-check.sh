@@ -175,7 +175,7 @@ echo "== start the core with the sign-in of Keycloak and a second approver"
 mkdir "${work}/cwd" "${work}/home" "${work}/client"
 before="$(core_requests "GET /realms/clanker/.well-known/openid-configuration")"
 address_of_database="$(docker port "${database}" 5432/tcp | head -n 1)"
-signing_key="$(head -c 64 /dev/urandom | base64 | tr -d '\n')"
+signing_key="$("${repo}/scripts/verify/signing-key.sh")"
 
 # start_core starts the core in the background with the approvers of $1 and its log in $2.
 start_core() {

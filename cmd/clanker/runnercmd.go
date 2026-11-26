@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/statik/site-reliability-clanker/internal/awsrunner"
 	"github.com/statik/site-reliability-clanker/internal/dispatch"
 	"github.com/statik/site-reliability-clanker/internal/launch"
 	"github.com/statik/site-reliability-clanker/internal/runner"
@@ -64,8 +63,7 @@ func newDispatcher(ctx context.Context, o options) (*dispatch.Dispatcher, error)
 		return dispatch.New(launch.Local{Binary: binary, Dir: o.dataDir,
 			CoreURL: "http://" + o.addr}), nil
 	case "aws":
-		fargate, err := awsLauncher(ctx, o, awsClients{ecs: awsrunner.NewECS,
-			metadata: awsrunner.NewMetadata})
+		fargate, err := awsLauncher(ctx, o, awsClients{ecs: o.aws.ecs, metadata: o.aws.metadata})
 		if err != nil {
 			return nil, err
 		}

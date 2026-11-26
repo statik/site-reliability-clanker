@@ -2,6 +2,10 @@ package broker_test
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/base64"
 	"errors"
 	"strings"
 	"testing"
@@ -391,6 +395,65 @@ func TestNewRefusesAKeyOfTheWrongSize(t *testing.T) {
 	_, err := broker.New(storetest.Open(t), &testClock{}, []byte("short"), nil, nil)
 	if err == nil || !strings.Contains(err.Error(), "has 5 bytes") {
 		t.Fatalf("want an error that gives the size of the key, got %v", err)
+	}
+}
+
+func TestNewRefusesSixtyFourBytesThatAreNotAKey(t *testing.T) {
+	key, err := broker.NewKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Random bytes in the place of the public key: no signature of this key verifies.
+	key[63] ^= 0xff
+	_, err = broker.New(storetest.Open(t), &testClock{}, key, nil, nil)
+	if err == nil || !strings.Contains(err.Error(), "is not an Ed25519 private key") {
+		t.Fatalf("want an error that the key is not a key, got %v", err)
+	}
+}
+
+// homeStackKey makes a signing key as internal/setup/stack/aws/settings.tf writes it: the
+// 32 bytes after the 16-byte header of the PKCS #8 form of a new Ed25519 key, then the 32
+// bytes after the 12-byte header of its SubjectPublicKeyInfo, in base64. It also checks the
+// two headers that the precondition of that file checks.
+func homeStackKey(t *testing.T) string {
+	t.Helper()
+	public, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkcs8, err := x509.MarshalPKCS8PrivateKey(private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	spki, err := x509.MarshalPKIXPublicKey(public)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pkcs8) != 48 || len(spki) != 44 ||
+		base64.StdEncoding.EncodeToString(pkcs8[:16]) != "MC4CAQAwBQYDK2VwBCIEIA==" ||
+		base64.StdEncoding.EncodeToString(spki[:12]) != "MCowBQYDK2VwAyEA" {
+		t.Fatalf("the DER forms are not the layout of settings.tf: %x, %x", pkcs8, spki)
+	}
+	return base64.StdEncoding.EncodeToString(append(pkcs8[16:48:48], spki[12:44]...))
+}
+
+func TestTheKeyOfTheHomeStackSignsGrantsThatVerify(t *testing.T) {
+	key, err := base64.StdEncoding.DecodeString(homeStackKey(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock := &testClock{time.Date(2026, 11, 21, 2, 0, 0, 0, time.UTC)}
+	b, err := broker.New(storetest.Open(t), clock, key, &fakeIssuer{}, nil)
+	if err != nil {
+		t.Fatalf("the broker refused the key of the home stack: %v", err)
+	}
+	g, err := b.Issue(applyRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock.t = clock.t.Add(20 * time.Minute)
+	if _, err := b.Exchange(context.Background(), g, held); err != nil {
+		t.Fatalf("a grant signed with the key of the home stack did not verify: %v", err)
 	}
 }
 
