@@ -372,12 +372,23 @@ if [ -z "${collector_token}" ] ||
 fi
 
 echo "== a debug session reads the stand-in cluster with the session of the debugger"
-answer="$(curl -fs -b "${work}/admin.jar" -H 'Content-Type: application/json' \
+# The core answers with the work item at once and runs the session in the background. The
+# transcript is the log of the debug job of the work item.
+debug_item="$(curl -fs -b "${work}/admin.jar" -H 'Content-Type: application/json' \
   -d "{\"env\": \"${env_name}\", \"reason\": \"aws-core-check\"}" \
-  "${base}/api/v1/debug-sessions")" || fail "the debug session failed"
+  "${base}/api/v1/debug-sessions" | jq -r .id)" || true
+if [ -z "${debug_item}" ] || [ "${debug_item}" = null ]; then
+  echo "FAILED: the core did not start the debug session"
+  exit 1
+fi
+wait_state "${debug_item}" Done 300
+debug_job="$(curl -fs -b "${work}/admin.jar" "${base}/api/v1/work-items/${debug_item}" |
+  jq -r '.jobs[] | select(.kind == "debug") | .id')"
+transcript="$(curl -fs -b "${work}/admin.jar" "${base}/api/v1/jobs/${debug_job}/log" |
+  jq -r .log)"
 # kubectl shows the refusal of the stand-in as "Forbidden" with no message.
-grep -q "Error from server (Forbidden)" <<<"$(jq -r .transcript <<<"${answer}")" ||
-  fail "the transcript does not show the answer of the stand-in cluster: ${answer}"
+grep -q "Error from server (Forbidden)" <<<"${transcript}" ||
+  fail "the transcript of ${debug_item} does not show the stand-in cluster: ${transcript}"
 debug_session="$(jq -cs '[.[] | select(.action == "AssumeRole" and
   .detail.tags.clanker_layer == "debug")] | last | .detail' "${record}")"
 [ "$(jq -r .role_arn <<<"${debug_session}")" = "${role}/debugger" ] ||

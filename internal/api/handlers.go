@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -612,6 +613,10 @@ func (s *Server) postRunbook(r *http.Request) (any, error) {
 	return map[string]string{"started": name}, nil
 }
 
+// postDebugSession opens a debug session and answers with its work item at once. The
+// session runs in the background and not on the context of the request, so a client that
+// goes away, or a load balancer that closes an idle connection, does not stop it. The work
+// item ends Done or Failed, and the transcript is the log of its debug job.
 func (s *Server) postDebugSession(r *http.Request) (any, error) {
 	user, err := s.requireRole(r, "approver", "admin")
 	if err != nil {
@@ -630,18 +635,18 @@ func (s *Server) postDebugSession(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, badRequest("%v", err)
 	}
-	transcript, err := s.Orch.DebugSession(r.Context(), wi, user.Name, body.Reason)
-	state := orchestrator.StateDone
-	if err != nil {
-		state = orchestrator.StateFailed
-	}
-	if _, stateErr := s.Orch.Transition(wi.ID, state, user.Name, "session ended"); stateErr != nil {
-		return nil, stateErr
-	}
-	if err != nil {
-		return nil, err
-	}
-	return map[string]string{"work_item": wi.ID, "transcript": transcript}, nil
+	go s.background("debug session "+wi.ID, func(ctx context.Context) error {
+		_, err := s.Orch.DebugSession(ctx, wi, user.Name, body.Reason)
+		state, reason := orchestrator.StateDone, "session ended"
+		if err != nil {
+			state, reason = orchestrator.StateFailed, err.Error()
+		}
+		if _, stateErr := s.Orch.Transition(wi.ID, state, user.Name, reason); stateErr != nil {
+			return errors.Join(err, stateErr)
+		}
+		return err
+	})
+	return wi, nil
 }
 
 // approvalProgress returns the approvers whose approval covers the current plans of the
