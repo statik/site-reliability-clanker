@@ -4,10 +4,41 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/statik/site-reliability-clanker/internal/runner"
 )
+
+// TestTheRunnerTaskGivesTheRunnerItsStopTime ties the stop timeout of the runner task, after
+// which ECS kills a stopped task, to the time that the runner needs to end after a stop.
+func TestTheRunnerTaskGivesTheRunnerItsStopTime(t *testing.T) {
+	files, err := AWS()
+	if err != nil {
+		t.Fatal(err)
+	}
+	text, err := fs.ReadFile(files, "runner.tf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	match := regexp.MustCompile(`(?m)^\s*stopTimeout\s*=\s*(\d+)\s*$`).FindSubmatch(text)
+	if match == nil {
+		t.Fatal("the runner task definition sets no stopTimeout, so ECS kills a stopped " +
+			"runner after 30 seconds")
+	}
+	seconds, err := strconv.Atoi(string(match[1]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := time.Duration(seconds) * time.Second; got != runner.TaskStopTime {
+		t.Fatalf("the stop timeout of the runner task is %s, want runner.TaskStopTime, %s",
+			got, runner.TaskStopTime)
+	}
+}
 
 // TestAWSCarriesEveryFileThatTofuNeeds compares the embedded files with the directory, so
 // that a new .tf file cannot be left out of the binary.

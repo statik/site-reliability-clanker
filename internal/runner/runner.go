@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/statik/site-reliability-clanker/internal/jobspec"
 )
@@ -42,6 +43,11 @@ type Runner struct {
 	WorkRoot string
 	// ExtraEnv is added to the environment of every job, for example TF_VAR_admin_token.
 	ExtraEnv []string
+	// StopGrace is how long the program of a job has to end after the context of the job
+	// ended and the runner interrupted the program. Then the runner kills it. Zero means 30
+	// minutes, for the commands of the operator. A runner that a launcher started has
+	// TaskStopGrace.
+	StopGrace time.Duration
 
 	digestOnce sync.Once
 	digest     string
@@ -311,6 +317,7 @@ func (r *Runner) tofu(ctx context.Context, p run, log, capture io.Writer, args .
 	cmd := exec.CommandContext(ctx, "tofu", args...)
 	cmd.Dir = p.stack
 	cmd.Env = p.environ
+	interruptOnStop(cmd, r.stopGrace())
 	var tail bytes.Buffer
 	writers := []io.Writer{&tail}
 	if log != nil {
@@ -323,7 +330,9 @@ func (r *Runner) tofu(ctx context.Context, p run, log, capture io.Writer, args .
 	} else {
 		cmd.Stdout = cmd.Stderr
 	}
-	if err := cmd.Run(); err != nil {
+	err := cmd.Run()
+	killLeftovers(cmd)
+	if err != nil {
 		text := tail.String()
 		if strings.Contains(text, "Saved plan is stale") {
 			return fmt.Errorf("%w: tofu %s for %s/%s", ErrStalePlan, args[0], p.job.Env, p.job.Layer)
@@ -565,7 +574,10 @@ func (r *Runner) Runbook(ctx context.Context, j RunbookJob) (map[string]any, err
 	cmd.Env = append(cmd.Env, paramEnv(j.Params)...)
 	cmd.Env = append(cmd.Env, awsEnv(j.AWS)...)
 	cmd.Stdout, cmd.Stderr = j.Log, j.Log
-	if err := cmd.Run(); err != nil {
+	interruptOnStop(cmd, r.stopGrace())
+	err = cmd.Run()
+	killLeftovers(cmd)
+	if err != nil {
 		return nil, fmt.Errorf("runbook %s: %w", j.Name, err)
 	}
 	raw, err := os.ReadFile(outputFile)
@@ -639,7 +651,10 @@ func (r *Runner) Kubectl(ctx context.Context, kubeConfig string, session *jobspe
 	defer remove()
 	cmd := exec.CommandContext(ctx, "kubectl", append([]string{"--kubeconfig", path}, args...)...)
 	cmd.Env = append(os.Environ(), awsEnv(session)...)
-	return cmd.CombinedOutput()
+	interruptOnStop(cmd, readStopGrace)
+	out, err := cmd.CombinedOutput()
+	killLeftovers(cmd)
+	return out, err
 }
 
 // ToolDigest identifies the exact tool versions that run jobs. It stands in for the digest of
