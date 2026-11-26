@@ -20,8 +20,8 @@ locals {
   version     = var.app.version
   record_path = "apps/${local.name}/releases/${local.version}.json"
   record_file = "${var.pack_dir}/releases/${local.version}.json"
-  record = (var.app.records && fileexists(local.record_file)
-  ? jsondecode(file(local.record_file)) : null)
+  has_record  = var.app.records && fileexists(local.record_file)
+  record      = local.has_record ? jsondecode(file(local.record_file)) : null
 
   # The chart of the release: an archive of the pack, a chart in a repository, or the chart
   # directory of the pack. Helm checks the digest of an OCI chart against its version; it
