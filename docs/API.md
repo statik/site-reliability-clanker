@@ -83,7 +83,7 @@ the targets of the environment are not known, which is before the first apply of
 | Approvals | `approval.requested`, `approval.recorded`, `standing_approval.signed` |
 | Access | `grant.issued`, `grant.debug_issued`, `grant.revoked`, `grant.expired`, `grant.revoke_failed` |
 | Applies | `apply.started`, `apply.succeeded`, `apply.failed`, `apply.refused`, `apply.error` |
-| Verification | `verify.passed`, `verify.failed`, `rollback.authorized`, `rollback.failed` |
+| Verification | `verify.passed`, `verify.failed`, `rollback.authorized`, `rollback.failed`, `rollback.refused` |
 | Runbooks | `runbook.succeeded`, `runbook.failed` |
 | Detectors | `finding.opened`, `detector.failed` |
 | Incidents | `incident.opened`, `incident.diagnosed`, `incident.escalated`, `incident.resolved` |

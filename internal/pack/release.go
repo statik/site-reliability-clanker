@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"testing/fstest"
 )
@@ -87,9 +88,12 @@ type release struct {
 // PlatformDir returns the directory of the pack in the platform repository.
 func (p Pack) PlatformDir() string { return path.Join(platformAppsDir, p.Name) }
 
+// RecordsDir returns the directory of the release records in the platform repository.
+func (p Pack) RecordsDir() string { return path.Join(p.PlatformDir(), recordsDir) }
+
 // RecordPath returns the path of the record of a release in the platform repository.
 func (p Pack) RecordPath(version string) string {
-	return path.Join(p.PlatformDir(), recordsDir, version+".json")
+	return path.Join(p.RecordsDir(), version+".json")
 }
 
 // HasRecords reports whether the releases of the pack have records.
@@ -112,6 +116,32 @@ func (p Pack) Record(version string) (Record, bool) {
 		return Record{}, false
 	}
 	return *entry.record, true
+}
+
+// IsRelease reports whether a version can be the name of a release: its note and its
+// record have that name.
+func IsRelease(version string) bool { return releasePattern.MatchString(version) }
+
+// Newer reports whether version a is newer than version b. A suffix such as "-bad" does not
+// change the order.
+func Newer(a, b string) bool {
+	va, vb := versionOrder(a), versionOrder(b)
+	for i := range va {
+		if va[i] != vb[i] {
+			return va[i] > vb[i]
+		}
+	}
+	return false
+}
+
+// versionOrder turns "1.2.0-bad" into comparable numbers.
+func versionOrder(v string) [3]int {
+	var out [3]int
+	core, _, _ := strings.Cut(v, "-")
+	for i, part := range strings.SplitN(core, ".", 3) {
+		out[i], _ = strconv.Atoi(part)
+	}
+	return out
 }
 
 // ReleaseOf returns the version of a file in the directory of the release notes, and
@@ -219,30 +249,37 @@ func (p Pack) readRecord(file string) (release, error) {
 	if err != nil {
 		return release{}, err
 	}
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	var record Record
-	if err := decoder.Decode(&record); err != nil {
-		return release{}, fmt.Errorf("%s is not a correct release record: %w", file, err)
+	record, err := ParseRecord(raw)
+	if err == nil {
+		err = p.checkChart(record)
 	}
-	if decoder.More() {
-		return release{}, fmt.Errorf("%s has text after the record object", file)
-	}
-	if err := p.checkRecord(record); err != nil {
+	if err != nil {
 		return release{}, fmt.Errorf("%s: %w", file, err)
 	}
 	return release{record: &record, raw: raw}, nil
 }
 
-func (p Pack) checkRecord(record Record) error {
+// ParseRecord reads one release record from the content of its file. Like the manifest, it
+// refuses a field that it does not know, and schema_change is required. It does not check
+// the chart of the record against the files of a pack; Load does that.
+func ParseRecord(raw []byte) (Record, error) {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	var record Record
+	if err := decoder.Decode(&record); err != nil {
+		return Record{}, fmt.Errorf("not a correct release record: %w", err)
+	}
+	if decoder.More() {
+		return Record{}, fmt.Errorf("text after the record object")
+	}
 	if record.SchemaChange == nil {
-		return fmt.Errorf("schema_change is required: true when the release changes the " +
-			"schema of the database, false when it does not")
+		return Record{}, fmt.Errorf("schema_change is required: true when the release " +
+			"changes the schema of the database, false when it does not")
 	}
 	if values := bytes.TrimSpace(record.Values); len(values) > 0 && values[0] != '{' {
-		return fmt.Errorf("values must be an object of Helm values")
+		return Record{}, fmt.Errorf("values must be an object of Helm values")
 	}
-	return p.checkChart(record)
+	return record, nil
 }
 
 // checkChart checks the chart of a record: an archive of the pack, a chart in a

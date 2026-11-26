@@ -106,6 +106,24 @@ function DestructiveCallout({ plans }: { plans: Plan[] }) {
   );
 }
 
+function WarningsCallout({ plans }: { plans: Plan[] }) {
+  const warnings = plans.flatMap((plan) =>
+    (plan.facts.warnings ?? []).map((warning) => ({ layer: plan.layer, warning })));
+  if (warnings.length === 0) {
+    return null;
+  }
+  return (
+    <InlineNotification kind="warning" lowContrast hideCloseButton className="app-note"
+      title="Read this before you decide.">
+      <UnorderedList>
+        {warnings.map(({ layer, warning }) => (
+          <ListItem key={`${layer}/${warning}`}>Layer {layer}: {warning}</ListItem>
+        ))}
+      </UnorderedList>
+    </InlineNotification>
+  );
+}
+
 /** Section 4 of the approval page: what changes, per layer, from the plan itself. */
 export function Changes({ plans, deferred }: { plans: Plan[]; deferred: string[] }) {
   const current = plans.filter((plan) => !plan.superseded);
@@ -114,6 +132,7 @@ export function Changes({ plans, deferred }: { plans: Plan[]; deferred: string[]
   }
   return (
     <div className="app-stack-tight">
+      <WarningsCallout plans={current} />
       <DestructiveCallout plans={current} />
       <Accordion align="start">
         {current.map((plan) => (

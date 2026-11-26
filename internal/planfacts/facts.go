@@ -30,6 +30,10 @@ type Facts struct {
 	Replace   int              `json:"replace"`
 	Resources []ResourceChange `json:"resources"`
 	Outputs   []string         `json:"outputs"`
+	// Warnings are for the approver. The core writes them from the plan and the code of
+	// the change, for example when the plan lowers the version of the application across
+	// a release that changed the schema of its database.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // HasChanges reports whether the plan changes a resource or an output. A plan that changes
@@ -112,6 +116,28 @@ func Parse(raw []byte) (Facts, error) {
 	}
 	sort.Strings(facts.Outputs)
 	return facts, nil
+}
+
+// OutputChange returns the value of a string output before and after the plan. Both are
+// empty when the plan does not update the output, or when a value is not a string.
+func OutputChange(raw []byte, name string) (before, after string, err error) {
+	var plan struct {
+		OutputChanges map[string]struct {
+			Actions []string `json:"actions"`
+			Before  any      `json:"before"`
+			After   any      `json:"after"`
+		} `json:"output_changes"`
+	}
+	if err := json.Unmarshal(raw, &plan); err != nil {
+		return "", "", fmt.Errorf("decode plan JSON: %w", err)
+	}
+	change := plan.OutputChanges[name]
+	before, beforeOK := change.Before.(string)
+	after, afterOK := change.After.(string)
+	if actionName(change.Actions) != "update" || !beforeOK || !afterOK {
+		return "", "", nil
+	}
+	return before, after, nil
 }
 
 // flatten turns a nested value into leaf paths. List indexes are left out of the path, so

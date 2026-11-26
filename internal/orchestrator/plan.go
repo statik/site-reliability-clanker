@@ -382,6 +382,11 @@ func (o *Orchestrator) runPlan(ctx context.Context, wi WorkItem, layer string,
 	if err != nil {
 		return Plan{}, err
 	}
+	if layer == o.App.Layer {
+		if facts.Warnings, err = o.versionWarnings(wi, result.PlanJSON); err != nil {
+			return Plan{}, fmt.Errorf("plan of %s: %w", layer, err)
+		}
+	}
 	modules, err := o.policyModules()
 	if err != nil {
 		return Plan{}, err

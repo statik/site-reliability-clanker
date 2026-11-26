@@ -255,3 +255,43 @@ func TestThePlatformFilesOfAPackAreBelowItsDirectory(t *testing.T) {
 		t.Errorf("a pack with no records has records in the platform: %v, %v", none, err)
 	}
 }
+
+func TestParseRecordReadsTheFileOfARecordFromTheForge(t *testing.T) {
+	record, err := pack.ParseRecord([]byte(remoteRecord))
+	if err != nil || !*record.SchemaChange || record.ChartName != "coder" {
+		t.Fatalf("record %+v, %v", record, err)
+	}
+	refused := map[string]string{
+		`{"schema_change": true, "hooks": "x"}`: "unknown field",
+		`{"values": {}}`:                        "schema_change is required",
+		`{"schema_change": false}{}`:            "text after the record",
+		`{"values": [], "schema_change": true}`: "values must be an object",
+		`schema_change: true`:                   "not a correct release record",
+	}
+	for raw, want := range refused {
+		if _, err := pack.ParseRecord([]byte(raw)); err == nil ||
+			!strings.Contains(err.Error(), want) {
+			t.Errorf("%s: error %v, want one with %q", raw, err, want)
+		}
+	}
+}
+
+func TestReleaseNamesAndTheirOrder(t *testing.T) {
+	for version, want := range map[string]bool{"3.5.0": true, "1.2.0-bad": true,
+		"v3.5.0": false, "3.5": false, "../3.5.0": false, "3.5.0-rc.1": false} {
+		if got := pack.IsRelease(version); got != want {
+			t.Errorf("IsRelease(%q) = %v, want %v", version, got, want)
+		}
+	}
+	newer := [][2]string{{"3.5.0", "3.4.9"}, {"10.0.0", "9.9.9"}, {"3.4.10", "3.4.9"},
+		{"4.0.0", "3.99.99"}}
+	for _, pair := range newer {
+		if !pack.Newer(pair[0], pair[1]) || pack.Newer(pair[1], pair[0]) {
+			t.Errorf("want %s newer than %s, and not the other way", pair[0], pair[1])
+		}
+	}
+	if pack.Newer("1.2.0-bad", "1.2.0") || pack.Newer("1.2.0", "1.2.0-bad") ||
+		pack.Newer("3.5.0", "3.5.0") {
+		t.Error("a suffix, or the same version, must not be newer")
+	}
+}
