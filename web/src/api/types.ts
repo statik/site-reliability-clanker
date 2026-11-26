@@ -509,3 +509,31 @@ export interface PlanJSON {
   plan_sha256: string;
   plan: Record<string, unknown>;
 }
+
+export interface RunbookField {
+  type: "string" | "integer";
+  description: string;
+  values?: string[];
+}
+
+/** A runbook of the runbooks repository, as `GET /runbooks` lists it. */
+export interface Runbook {
+  name: string;
+  title?: string;
+  description: string;
+  tier: string;
+  incident_mitigation?: boolean;
+  inputs?: Record<string, RunbookField>;
+  outputs?: Record<string, RunbookField>;
+  /** The user who signed the standing approval, or "" when nobody did. */
+  standing_approver: string;
+  /** When the standing approval was signed, or "" when the core did not record it. */
+  standing_signed_at: string;
+}
+
+/** The answer of a signature or a revocation of a standing approval. */
+export interface StandingApproval {
+  runbook: string;
+  signer: string;
+  signed_at: string;
+}

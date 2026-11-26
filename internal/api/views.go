@@ -185,6 +185,7 @@ var markerCategory = map[string]string{
 	"verify.failed": "verify", "sim.release_published": "external",
 	"sim.advisory_published": "external", "sim.manual_change": "external",
 	"sim.fault_injected": "external", "standing_approval.signed": "approval",
+	"standing_approval.revoked": "approval",
 }
 
 func marker(e audit.Event) (map[string]any, bool) {

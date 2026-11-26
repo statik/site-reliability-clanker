@@ -237,6 +237,73 @@ func TestAStandingApprovalNeedsARunbookThatItCanCover(t *testing.T) {
 	}
 }
 
+func TestAnApproverSignsAndRevokesAStandingApproval(t *testing.T) {
+	o, runners := runbookOrchestrator(t, nil)
+	if _, err := o.DB.Exec(`INSERT INTO users (name, display, role, email) VALUES
+		('alice', 'Alice Chen', 'approver', 'alice@example.com')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := o.SignStandingApproval("db-backup", "alice"); err != nil {
+		t.Fatal(err)
+	}
+	signed := StandingApproval{Runbook: "db-backup", Signer: "alice",
+		SignedAt: "2026-11-21T02:00:00.000Z"}
+	if got, err := o.StandingApproval("db-backup"); err != nil || got != signed {
+		t.Errorf("standing approval = %+v, %v; want %+v", got, err, signed)
+	}
+	if err := o.RevokeStandingApproval("db-backup", "carol"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := o.StandingApproval("db-backup"); err != nil ||
+		got != (StandingApproval{Runbook: "db-backup"}) {
+		t.Errorf("standing approval after the revocation = %+v, %v; want none", got, err)
+	}
+	if data := eventData(t, o, "standing_approval.revoked"); data["runbook"] != "db-backup" ||
+		data["signer"] != "alice" {
+		t.Errorf("revocation recorded %v, want the runbook and the signer alice", data)
+	}
+	err := o.RevokeStandingApproval("db-backup", "carol")
+	if !errors.Is(err, ErrConflict) {
+		t.Errorf("a second revocation: error = %v, want ErrConflict", err)
+	}
+	_, err = o.RunRunbook(context.Background(), RunbookRequest{Env: "local", Name: "db-backup",
+		Actor: "carol"})
+	if err == nil || !strings.Contains(err.Error(), "has no standing approval") {
+		t.Errorf("a run after the revocation: error = %v, want a refusal", err)
+	}
+	wantNothingStarted(t, o, runners)
+}
+
+func TestOnlyAnApproverOrAnAdminSignsOrRevokesAStandingApproval(t *testing.T) {
+	o, _ := runbookOrchestrator(t, nil)
+	if _, err := o.DB.Exec(`INSERT INTO users (name, display, role, email) VALUES
+		('dave', 'Dave Okafor', 'viewer', 'dave@example.com')`); err != nil {
+		t.Fatal(err)
+	}
+	sign(t, o, "restart-component")
+	for _, user := range []string{"dave", "mallory"} {
+		if err := o.SignStandingApproval("db-backup", user); !errors.Is(err, ErrForbidden) {
+			t.Errorf("%s signs: error = %v, want ErrForbidden", user, err)
+		}
+		err := o.RevokeStandingApproval("restart-component", user)
+		if !errors.Is(err, ErrForbidden) {
+			t.Errorf("%s revokes: error = %v, want ErrForbidden", user, err)
+		}
+	}
+	if approver, err := o.StandingApprover("db-backup"); approver != "" || err != nil {
+		t.Errorf("db-backup has the standing approval of %q, %v", approver, err)
+	}
+	if approver, err := o.StandingApprover("restart-component"); approver != "carol" ||
+		err != nil {
+		t.Errorf("restart-component has the standing approval of %q, %v; want carol",
+			approver, err)
+	}
+	err := o.RevokeStandingApproval("../kv", "carol")
+	if !errors.Is(err, ErrInvalid) {
+		t.Errorf("a revocation of a name that is not valid: error = %v, want ErrInvalid", err)
+	}
+}
+
 // runBackup runs db-backup with a runner that reports the given outputs.
 func runBackup(t *testing.T, reported map[string]any) (*Orchestrator, *fakeRunners, WorkItem) {
 	t.Helper()
