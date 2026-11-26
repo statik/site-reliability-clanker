@@ -1,0 +1,5 @@
+# Values of the local target, after values.yaml. The default guarantee of a user server is
+# 1G of memory, too much for the one node of kind next to the platform.
+singleuser:
+  memory:
+    guarantee: 256M

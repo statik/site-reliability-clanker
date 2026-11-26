@@ -1,0 +1,72 @@
+# Values of every target, at the paths of the Zero to JupyterHub chart. The chart is a chart
+# of another project: it gets no values of the platform, so these values connect it to the
+# objects that the platform makes for the pack by name (platform/CONTRACT.md section 4):
+# the Secret jupyterhub-db, the Secret jupyterhub-generated and the claim jupyterhub-shared.
+# The names of the objects of the chart stay hub, proxy and proxy-public.
+hub:
+  config:
+    JupyterHub:
+      # One password for every user, from the Secret jupyterhub-generated (see extraConfig).
+      authenticator_class: shared-password
+    Authenticator:
+      # JupyterHub 5 lets nobody in without an allow rule. Any name with the password.
+      allow_all: true
+  db:
+    type: postgres
+    # No host, user or database in the URL: libpq reads the PG* variables below.
+    url: postgresql+psycopg2://
+    # The chart starts the hub with --upgrade-db. Each 5.x release has the same schema.
+    upgrade: true
+  extraEnv:
+    PGHOST:
+      valueFrom: {secretKeyRef: {name: jupyterhub-db, key: PGHOST}}
+    PGPORT:
+      valueFrom: {secretKeyRef: {name: jupyterhub-db, key: PGPORT}}
+    PGDATABASE:
+      valueFrom: {secretKeyRef: {name: jupyterhub-db, key: PGDATABASE}}
+    PGUSER:
+      valueFrom: {secretKeyRef: {name: jupyterhub-db, key: PGUSER}}
+    PGPASSWORD:
+      valueFrom: {secretKeyRef: {name: jupyterhub-db, key: PGPASSWORD}}
+    PGSSLMODE:
+      valueFrom: {secretKeyRef: {name: jupyterhub-db, key: PGSSLMODE}}
+    SHARED_PASSWORD:
+      valueFrom: {secretKeyRef: {name: jupyterhub-generated, key: shared-password}}
+  extraConfig:
+    shared-password: |
+      import os
+      c.SharedPasswordAuthenticator.user_password = os.environ["SHARED_PASSWORD"]
+
+proxy:
+  service:
+    # The route of the platform reaches proxy-public; nothing else needs an address.
+    type: ClusterIP
+
+singleuser:
+  # The user id, not the name, so a list of the pods shows no user names.
+  podNameTemplate: jupyter-{userid}
+  cloudMetadata:
+    # The default adds a privileged init container to each user pod. The egress
+    # NetworkPolicy of the user pods does not admit the metadata server either.
+    blockWithIptables: false
+  storage:
+    # The one ReadWriteMany claim of the pack, with a directory for each user.
+    type: static
+    static:
+      pvcName: jupyterhub-shared
+      subPath: home/{username}
+
+scheduling:
+  # The user scheduler needs a ClusterRole and the pod priority a PriorityClass. The
+  # applier of the layer has rights in the namespace of the application only.
+  userScheduler:
+    enabled: false
+  podPriority:
+    enabled: false
+  userPlaceholder:
+    enabled: false
+
+prePuller:
+  # The hook makes each upgrade wait until every node pulled the user image.
+  hook:
+    enabled: false
