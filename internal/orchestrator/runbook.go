@@ -269,7 +269,7 @@ func (o *Orchestrator) runRunbookJob(ctx context.Context, job *Job, log io.Write
 	writeSorted(log, "param", spec.Params)
 	writeSorted(log, "target", map[string]string{"application": spec.Namespace,
 		"data": spec.DataNamespace})
-	spec.KubeConfig, spec.Log = cred.KubeConfig, log
+	spec.KubeConfig, spec.AWS, spec.Log = cred.KubeConfig, cred.AWS, log
 	result, err := o.run(ctx, job, spec)
 	if err != nil {
 		return nil, err
@@ -430,7 +430,8 @@ func (o *Orchestrator) DebugSession(ctx context.Context, wi WorkItem, actor, rea
 			return fmt.Errorf("the broker refused the debug grant: %w", err)
 		}
 		result, err := o.run(ctx, &job, jobspec.Job{Spec: jobspec.Spec{Kind: jobspec.KindDiagnose,
-			Env: wi.Env, KubeConfig: cred.KubeConfig, Namespace: targets.Namespace, Reads: reads}})
+			Env: wi.Env, KubeConfig: cred.KubeConfig, AWS: cred.AWS, Namespace: targets.Namespace,
+			Reads: reads}})
 		if err != nil {
 			return err
 		}

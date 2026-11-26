@@ -447,3 +447,68 @@ func TestAnApplyGrantAndItsSessionLastTheApplyWindowOfTheTarget(t *testing.T) {
 		}
 	}
 }
+
+// kubeconfigIssuer gives each grant an AWS session and a kubeconfig that name its identity,
+// as the AWS issuer gives a debug or runbook grant.
+type kubeconfigIssuer struct{ sessionIssuer }
+
+func (k *kubeconfigIssuer) Issue(ctx context.Context, g broker.Grant, remaining time.Duration) (
+	broker.Credential, error) {
+	cred, err := k.sessionIssuer.Issue(ctx, g, remaining)
+	cred.KubeConfig = "kubeconfig of " + g.Identity
+	return cred, err
+}
+
+// awsRunbookOrchestrator has an environment on AWS with the targets of the platform and a
+// broker whose issuer gives sessions and kubeconfigs.
+func awsRunbookOrchestrator(t *testing.T) (*Orchestrator, *fakeRunners) {
+	t.Helper()
+	o, runners := runbookOrchestrator(t, nil)
+	key, err := broker.NewKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.Broker, err = broker.New(o.DB, fixedClock{}, key, &kubeconfigIssuer{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	o.Envs[sandbox.Name] = sandbox
+	setTargets(t, o, sandbox.Name, map[string]any{"application": "shop", "data": ""})
+	return o, runners
+}
+
+// On AWS the kubeconfig of a runbook or a debug session gets its tokens with the session
+// of the grant, so the job carries both.
+func TestARunbookOnAWSGivesTheRunnerTheSessionAndTheKubeconfig(t *testing.T) {
+	o, runners := awsRunbookOrchestrator(t)
+	sign(t, o, "restart-component")
+	wi, err := o.RunRunbook(context.Background(), RunbookRequest{Env: sandbox.Name,
+		Name: "restart-component", Params: map[string]string{"component": "api"},
+		Actor: "carol"})
+	if err != nil || wi.State != StateDone {
+		t.Fatalf("state %s, %v; want a finished run", wi.State, err)
+	}
+	job := runners.jobs[0]
+	if job.AWS == nil || job.AWS.AccessKeyID != "ASIAEXAMPLErunbook" ||
+		job.KubeConfig != "kubeconfig of runbook" {
+		t.Errorf("runbook job: session %v, kubeconfig %q", job.AWS, job.KubeConfig)
+	}
+}
+
+func TestADebugSessionOnAWSGivesTheRunnerTheSessionAndTheKubeconfig(t *testing.T) {
+	o, runners := awsRunbookOrchestrator(t)
+	runners.result.Commands = make([]jobspec.CommandOutput, len(debugReads(o.App)))
+	wi, err := o.Create(NewWorkItem{Title: "Debug session: test", Kind: "debug-session",
+		Env: sandbox.Name, Trigger: "test", Actor: "carol"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := o.DebugSession(context.Background(), wi, "carol", "test"); err != nil {
+		t.Fatal(err)
+	}
+	job := runners.jobs[0]
+	if job.Kind != jobspec.KindDiagnose || job.AWS == nil ||
+		job.AWS.AccessKeyID != "ASIAEXAMPLEdebug" || job.KubeConfig != "kubeconfig of debugger" {
+		t.Errorf("diagnose job: kind %s, session %v, kubeconfig %q", job.Kind, job.AWS,
+			job.KubeConfig)
+	}
+}

@@ -15,8 +15,9 @@ import (
 )
 
 // stsForward serves STS AssumeRole. It records the role, the session name, the lifetime and
-// the session tags that the core asks for, and gets a session of MinIO with the same
-// lifetime. MinIO has no roles: each session has the rights of the user of MinIO.
+// the session tags that the core asks for, and the key ID of the session of MinIO with the
+// same lifetime that it gets. MinIO has no roles: each session has the rights of the user
+// of MinIO.
 type stsForward struct {
 	record *recorder
 	minio  *sts.Client
@@ -68,8 +69,6 @@ func (s *stsForward) serve(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "DurationSeconds is not a number", http.StatusBadRequest)
 		return
 	}
-	s.record.add("sts", "AssumeRole", r, map[string]any{"role_arn": role,
-		"session_name": name, "duration_seconds": seconds, "tags": sessionTags(r.PostForm)})
 	out, err := s.minio.AssumeRole(r.Context(), &sts.AssumeRoleInput{
 		RoleArn: aws.String(role), RoleSessionName: aws.String(name),
 		DurationSeconds: aws.Int32(int32(seconds))})
@@ -78,6 +77,10 @@ func (s *stsForward) serve(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "MinIO refused AssumeRole: "+err.Error(), http.StatusBadGateway)
 		return
 	}
+	// The key ID of the session joins it to the tokens that the stand-in cluster records.
+	s.record.add("sts", "AssumeRole", r, map[string]any{"role_arn": role,
+		"session_name": name, "duration_seconds": seconds, "tags": sessionTags(r.PostForm),
+		"access_key_id": aws.ToString(out.Credentials.AccessKeyId)})
 	var answer assumeRoleResponse
 	answer.Credentials.AccessKeyID = aws.ToString(out.Credentials.AccessKeyId)
 	answer.Credentials.SecretAccessKey = aws.ToString(out.Credentials.SecretAccessKey)

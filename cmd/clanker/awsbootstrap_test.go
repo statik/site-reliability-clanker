@@ -109,4 +109,14 @@ func TestTheBootstrapGivesTheEnvironmentItsBackendAndTheBrokerItsRoles(t *testin
 	if !reflect.DeepEqual(outputs, bootstrap.Outputs) {
 		t.Errorf("stored outputs = %v, want %v", outputs, bootstrap.Outputs)
 	}
+	// The kubeconfig of a grant names the cluster from the last apply of 20-cluster, in the
+	// region of the environment.
+	cluster := map[string]any{"cluster_name": "clanker-aws-sandbox"}
+	if err := store.SetLayerOutputs(db, "aws-sandbox", "20-cluster", cluster, "now"); err != nil {
+		t.Fatal(err)
+	}
+	read, err := credentials.ClusterOutputs("aws-sandbox")
+	if err != nil || !reflect.DeepEqual(read, cluster) || credentials.Region != "eu-west-1" {
+		t.Errorf("cluster outputs = %v, %v; region %q", read, err, credentials.Region)
+	}
 }

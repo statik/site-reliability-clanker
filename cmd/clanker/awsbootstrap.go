@@ -23,9 +23,10 @@ const bootstrapEnv = "CLANKER_AWS_BOOTSTRAP"
 // awsEnvironment reads the outputs of layer 00-bootstrap on AWS. With them, the control
 // plane records them as the outputs of that layer, so that the layer above can be planned;
 // the environment gets the state backend and the region of its layers; and the broker gets
-// an issuer of STS sessions for the roles of the identities. Without the setting the
-// control plane starts before layer 00-bootstrap exists: the environment has no backend
-// and the broker no issuer. A setting that is not valid stops the start.
+// an issuer of STS sessions for the roles of the identities, which also gives a debug
+// session or a runbook a kubeconfig for the cluster of layer 20-cluster. Without the
+// setting the control plane starts before layer 00-bootstrap exists: the environment has no
+// backend and the broker no issuer. A setting that is not valid stops the start.
 func awsEnvironment(c *components, env orchestrator.EnvConfig,
 	client func(region string) awstarget.STS) (orchestrator.EnvConfig, broker.Issuer, error) {
 	text := os.Getenv(bootstrapEnv)
@@ -53,6 +54,10 @@ func awsEnvironment(c *components, env orchestrator.EnvConfig,
 	slog.Info("the broker issues STS sessions", "region", region,
 		"identities", slices.Sorted(maps.Keys(bootstrap.Roles)))
 	return env, awstarget.Credentials{STS: client(region), Roles: bootstrap.Roles,
+		Region: bootstrap.Region,
+		ClusterOutputs: func(env string) (map[string]any, error) {
+			return store.LayerOutputs(c.db, env, awstarget.ClusterLayer)
+		},
 		Record: func(e audit.Event) error {
 			_, err := c.log.Append(e)
 			return err

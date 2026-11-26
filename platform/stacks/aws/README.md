@@ -20,11 +20,11 @@ the contract. The next table lists them.
 
 | Layer | Resources |
 |---|---|
-| `00-bootstrap` | S3 state bucket and S3 evidence bucket (versioned, encrypted, no public access, TLS only; with `ttl_hours` above 0 a destroy removes them with their objects). One permission boundary policy. IAM roles `observer`, `planner`, `debugger` and `applier-<layer>` for layers 10 to 50 |
+| `00-bootstrap` | S3 state bucket and S3 evidence bucket (versioned, encrypted, no public access, TLS only; with `ttl_hours` above 0 a destroy removes them with their objects). One permission boundary policy. IAM roles `observer`, `planner`, `debugger`, `runbook` and `applier-<layer>` for layers 10 to 50 |
 | `10-network` | VPC, one public and one private subnet in each of `zone_count` zones, internet gateway, one NAT gateway, route tables. With `existing_network_id`: nothing. The layer reads each subnet and stops the plan if a subnet is not in the VPC |
-| `20-cluster` | EKS control plane, one managed node group (Amazon Linux 2023, arm64 on `t4g.medium` by default) with a launch template that requires IMDSv2 and tags each instance and volume, the EKS Pod Identity agent add-on, the EFS CSI driver add-on with its pod identity role, IAM roles for the cluster and the nodes, EKS access entries for the agent roles and the operator |
+| `20-cluster` | EKS control plane, one managed node group (Amazon Linux 2023, arm64 on `t4g.medium` by default) with a launch template that requires IMDSv2 and tags each instance and volume, the EKS Pod Identity agent add-on, the EFS CSI driver add-on with its pod identity role, IAM roles for the cluster and the nodes, EKS access entries for the agent roles and the operator, a rule that lets the address ranges of the VPC reach the private endpoint of the API server on port 443 (the runners of the control plane run in the VPC) |
 | `30-data` | RDS for PostgreSQL (`db.t4g.micro`, one zone, gp3, encrypted, private, admin password in Secrets Manager), EFS file system with one mount target in each private subnet, `StorageClass` `efs-rwx`, S3 backup bucket (removed with its objects when `00-bootstrap` has a TTL) |
-| `40-platform` | Calls `modules/shared/platform`. That module installs Envoy Gateway and the Gateway of the platform. The annotations from this root make the service controller of EKS create an internal Network Load Balancer for the Envoy `Service` (`clanker-envoy`), in the private subnets of `10-network`. The module reads the DNS name of the load balancer from that `Service` after the apply |
+| `40-platform` | Calls `modules/shared/platform`. That module installs Envoy Gateway and the Gateway of the platform. The annotations from this root make the service controller of EKS create an internal Network Load Balancer for the Envoy `Service` (`clanker-envoy`), in the private subnets of `10-network`. `modules/aws/service-address` waits in the first apply until that `Service` has the DNS name of the load balancer, and reads it. A `Role` gives the group `clanker-runbook` its rights in the application namespace |
 | `50-app` | Calls `modules/shared/app`, which installs the Paperboat chart |
 
 ### The load balancer
@@ -60,7 +60,24 @@ boundary and a maximum session of one hour.
 | `observer` | Yes | None |
 | `planner` | Yes | None |
 | `debugger` | No | Session tags `clanker_grant` (not empty) and `clanker_env` |
+| `runbook` | No | Session tags `clanker_grant` (not empty) and `clanker_env` |
 | `applier-<layer>` | No | Session tags `clanker_grant` (not empty), `clanker_env` and `clanker_layer` = `<layer>` |
+
+`runbook` has no IAM policy. Its session only signs the tokens of the cluster. `20-cluster`
+gives it an access entry with the Kubernetes group `clanker-runbook` and no access policy, and
+`40-platform` binds that group to the rights of the runbook identity of the local target in
+the application namespace: `get`, `list` and `patch` on deployments, `get` and `list` on pods
+and their logs.
+
+### Debug sessions and runbooks
+
+For a debug or a runbook grant the broker gives the STS session of the role and a kubeconfig
+for the cluster. The kubeconfig comes from the outputs `cluster_name`, `cluster_endpoint` and
+`cluster_certificate_authority_data` of `20-cluster`. Its user runs
+`aws eks get-token --cluster-name <name> --region <region>`, which signs with the keys of the
+session. The runner gives the keys only to the environment of kubectl or of the runbook
+script. The plan and apply jobs get no kubeconfig: the `kubernetes` and `helm` providers of
+layers 30 to 50 run `aws eks get-token` with the keys of the job themselves.
 
 The broker passes the session tags in `sts:AssumeRole`. The broker's own IAM policy decides
 when it can do so. The session tags are in CloudTrail for each call. The broker also passes
@@ -168,7 +185,8 @@ Not done:
 - The applier roles have service-level permissions inside the boundary. Make them narrower
   after the first real plan shows the exact actions.
 - `applier-30-data`, `applier-40-platform` and `applier-50-app` are cluster administrators in
-  Kubernetes. `debugger` can edit only the `paperboat` namespace.
+  Kubernetes. `debugger` can edit only the `paperboat` namespace: more than the `view` of the
+  local target (#148 design 1.16).
 - With `existing_network_id`, `10-network` checks that each subnet is in the VPC. It does not
   check that the subnets are private or that each is in a different zone. EFS, RDS and the
   load balancer need one subnet in each zone.
@@ -176,7 +194,10 @@ Not done:
   recommends the AWS Load Balancer Controller for new load balancers.
 - The RDS admin secret rotates. After a rotation, apply `40-platform` again to refresh
   `DATABASE_URL`.
-- The Kubernetes API endpoint is public and private. IAM protects the public endpoint.
+- The Kubernetes API endpoint is public and private. IAM protects the public endpoint. The
+  address ranges of the VPC reach the private endpoint.
+- The wait for the load balancer address runs in the first apply of `40-platform` only. If the
+  `Service` loses its address later, the next plan fails on the empty `public_address`.
 - No pod has an IAM role for the backup bucket yet. The component that writes backups needs
   an EKS Pod Identity association.
 - CloudTrail is the audit source in the plan. These modules do not create a trail.

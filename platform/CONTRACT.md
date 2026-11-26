@@ -114,7 +114,7 @@ Types use OpenTofu syntax. "Local" shows how the local target satisfies the row.
 |---|---|---|---|
 | `state_backend` | `map(string)` | Backend configuration for the other layers | `{ path = <dir> }` |
 | `evidence_bucket` | `string` | Bucket for audit evidence and backups | Directory path |
-| `identities` | `map(string)` | Keys `observer`, `planner`, `debugger`, `applier-10-network` … `applier-50-app`. Values are role ARNs, service account emails or managed identity IDs | Kubernetes service account names |
+| `identities` | `map(string)` | Keys `observer`, `planner`, `debugger`, `applier-10-network` … `applier-50-app`, and on AWS `runbook`. Values are role ARNs, service account emails or managed identity IDs | Kubernetes service account names |
 | `permission_guard` | `string` | ID of the permission boundary, deny policy or assignment condition | Empty |
 
 ### 10-network
