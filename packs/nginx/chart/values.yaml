@@ -1,0 +1,21 @@
+# The image. The release record of each release sets the tag and the digest.
+image:
+  repository: docker.io/nginxinc/nginx-unprivileged
+  tag: ""
+  digest: ""
+
+replicaCount: 1
+
+# Send the version of nginx in the Server header and on the error pages.
+serverTokens: false
+
+# Variables of the container, as in a pod spec: env entries and envFrom sources.
+env: []
+envFrom: []
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    memory: 64Mi

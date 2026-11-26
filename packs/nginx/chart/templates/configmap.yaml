@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-conf
+  labels:
+    {{- include "nginx.labels" . | nindent 4 }}
+data:
+  default.conf: |
+    server {
+        listen 8080;
+        server_tokens {{ if .Values.serverTokens }}on{{ else }}off{{ end }};
+
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+        }
+    }
