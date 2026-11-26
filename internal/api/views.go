@@ -481,8 +481,8 @@ func (s *Server) latestVersions() (map[string]string, error) {
 			return nil, err
 		}
 		for _, e := range entries {
-			v := app.ReleaseOf(e.Name)
-			if withdrawn[v] {
+			v, ok := app.ReleaseOf(e.Name)
+			if !ok || withdrawn[v] {
 				continue
 			}
 			if latest[app.Name] == "" || detect.Newer(v, latest[app.Name]) {

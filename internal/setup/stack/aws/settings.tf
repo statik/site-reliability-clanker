@@ -62,12 +62,16 @@ locals {
     CLANKER_OIDC_CLIENT_ID     = local.client_id
     CLANKER_OIDC_CLIENT_SECRET = random_password.client_secret.result
     CLANKER_ADMIN_EMAIL        = local.admin_email
+    CLANKER_APPROVER_EMAILS    = local.approver_email
     CLANKER_AWS_RUNNER         = local.runner_setting
   }
   # A for_each key cannot come from a map with secret values, so the names are a list.
   core_setting_names = toset(concat(
-    ["CLANKER_DATABASE_URL", "CLANKER_SIGNING_KEY", "CLANKER_PUBLIC_URL", "CLANKER_OIDC_ISSUER",
-    "CLANKER_OIDC_CLIENT_ID", "CLANKER_OIDC_CLIENT_SECRET", "CLANKER_ADMIN_EMAIL"],
+    [
+      "CLANKER_DATABASE_URL", "CLANKER_SIGNING_KEY", "CLANKER_PUBLIC_URL", "CLANKER_OIDC_ISSUER",
+      "CLANKER_OIDC_CLIENT_ID", "CLANKER_OIDC_CLIENT_SECRET", "CLANKER_ADMIN_EMAIL",
+      "CLANKER_APPROVER_EMAILS",
+    ],
     var.runner_image_digest == null ? [] : ["CLANKER_AWS_RUNNER"],
   ))
 
@@ -215,10 +219,9 @@ resource "aws_ssm_parameter" "core" {
   }
 }
 
-# The slot of the outputs of 00-bootstrap. Nothing writes it yet. Its writer must overwrite
-# it as a SecureString with --key-id <this key>, as the role that applies this stack. Until
-# then the value is a placeholder that stops the start of the core, so apply phase 2 after
-# the outputs are written.
+# The slot of the outputs of 00-bootstrap. `clanker bootstrap --cloud aws --kms-key <this
+# key>` overwrites it as a SecureString. Until then the value is a placeholder that stops the
+# start of the core, so apply phase 2 after the outputs are written.
 resource "aws_ssm_parameter" "bootstrap" {
   name   = "${local.parameter_path}/CLANKER_AWS_BOOTSTRAP"
   type   = "SecureString"

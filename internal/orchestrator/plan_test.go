@@ -78,18 +78,23 @@ func TestTemplateExplanationCountsTheChangedOutputs(t *testing.T) {
 	}
 }
 
-func TestAChartOfAnotherPackTouchesItsLayer(t *testing.T) {
+func TestEveryDeployFileOfAPackTouchesItsLayer(t *testing.T) {
 	second := packtest.Second(t)
-	got, err := orchestrator.LayersForPaths("local", second,
-		[]string{"apps/harbor/chart/values.yaml"})
-	if err != nil || len(got) != 1 || got[0] != second.Layer {
-		t.Errorf("layers = %v, %v, want the layer of the pack", got, err)
+	for _, file := range []string{"chart/values.yaml", "values/values-aws.yaml",
+		"extras/templates/job.yaml", "releases/3.5.0.json", "charts/harbor-3.5.0.tgz"} {
+		got, err := orchestrator.LayersForPaths("local", second,
+			[]string{"apps/harbor/" + file})
+		if err != nil || len(got) != 1 || got[0] != second.Layer {
+			t.Errorf("%s: layers = %v, %v, want the layer of the pack", file, got, err)
+		}
 	}
 	example := packtest.Example(t)
-	other, err := orchestrator.LayersForPaths("local", second,
-		[]string{example.ChartMount() + "/values.yaml"})
-	if err != nil || len(other) != 0 {
-		t.Errorf("the chart of another application touched %v, %v", other, err)
+	for _, path := range []string{example.PlatformDir() + "/chart/values.yaml",
+		"apps/harbor-two/chart/values.yaml", "apps/harbor"} {
+		other, err := orchestrator.LayersForPaths("local", second, []string{path})
+		if err != nil || len(other) != 0 {
+			t.Errorf("%s touched %v, %v", path, other, err)
+		}
 	}
 }
 

@@ -12,7 +12,21 @@
     "directory": "releases",
     "first": "1.0.0"
   },
-  "deploy": {"kind": "helm", "chart": "chart", "mount": "apps/paperboat", "build": "build.sh"},
+  "deploy": {
+    "kind": "helm",
+    "chart": "chart",
+    "build": "build.sh",
+    "settings": [
+      {"variable": "api_replicas", "type": "number", "min": 1, "max": 5, "default": 1,
+       "value": "api.replicas"},
+      {"variable": "worker_replicas", "type": "number", "min": 1, "max": 5, "default": 1,
+       "value": "worker.replicas"},
+      {"variable": "web_replicas", "type": "number", "min": 1, "max": 5, "default": 1,
+       "value": "web.replicas"},
+      {"variable": "loadgen_enabled", "type": "bool", "default": true, "value": "loadgen.enabled"}
+    ],
+    "route": {"service": "paperboat-web", "port": 8080}
+  },
   "runbooks": "runbooks",
   "evals": "evals",
   "components": [
