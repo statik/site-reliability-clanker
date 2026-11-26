@@ -4,4 +4,4 @@ description: Paperboat fish rental. web, api, worker, loadgen and a migrate hook
 type: application
 # The chart version changes when the templates change. The release that runs is the value
 # image.tag; this chart sets no appVersion, so nothing can read a stale one.
-version: 0.1.0
+version: 0.2.0

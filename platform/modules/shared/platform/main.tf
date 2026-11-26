@@ -14,11 +14,15 @@ terraform {
 }
 
 locals {
-  use_envoy = var.gateway_class == "envoy"
   labels = {
     clanker_env   = var.env_name
     clanker_layer = "40-platform"
   }
+  application_label  = { "clanker.dev/application" = "true" }
+  gateway_name       = "clanker"
+  gateway_namespace  = "clanker-gateway"
+  envoy_namespace    = "envoy-gateway-system"
+  envoy_service_name = "clanker-envoy"
   database_url = format(
     "postgres://postgres:%s@%s:%d/%s?sslmode=prefer",
     var.postgres_admin_password, var.postgres_host, var.postgres_port, var.postgres_database,
@@ -28,7 +32,7 @@ locals {
 resource "kubernetes_namespace_v1" "app" {
   metadata {
     name   = var.app_namespace
-    labels = local.labels
+    labels = merge(local.labels, local.application_label)
   }
 }
 
@@ -61,94 +65,88 @@ resource "kubernetes_persistent_volume_claim_v1" "shared" {
   }
 }
 
-resource "helm_release" "envoy_gateway" {
-  count = local.use_envoy ? 1 : 0
+# The entry point of the target. Envoy Gateway brings the CRDs of the Gateway API and of
+# Envoy Gateway. The objects of those kinds are in a chart that a second release installs:
+# a kubernetes_manifest needs the CRD at plan time, and on a new cluster the CRD does not
+# exist before the apply of this layer.
+resource "kubernetes_namespace_v1" "gateway" {
+  metadata {
+    name   = local.gateway_namespace
+    labels = local.labels
+  }
+}
 
+resource "helm_release" "envoy_gateway" {
   name             = "envoy-gateway"
-  namespace        = "envoy-gateway-system"
+  namespace        = local.envoy_namespace
   create_namespace = true
   repository       = "oci://docker.io/envoyproxy"
   chart            = "gateway-helm"
   version          = "v1.10.0"
 }
 
-resource "kubernetes_manifest" "envoy_proxy" {
-  count = local.use_envoy ? 1 : 0
+resource "helm_release" "gateway" {
+  name      = local.gateway_name
+  namespace = kubernetes_namespace_v1.gateway.metadata[0].name
+  chart     = "${path.module}/gateway"
 
-  manifest = {
-    apiVersion = "gateway.envoyproxy.io/v1alpha1"
-    kind       = "EnvoyProxy"
-    metadata = {
-      name      = "paperboat"
-      namespace = "envoy-gateway-system"
+  # Through values, not set: a set value with a comma is a list for Helm, and the AWS
+  # annotations hold commas.
+  values = [yamlencode({
+    gateway = {
+      name                 = local.gateway_name
+      className            = "envoy"
+      port                 = var.public_port
+      routeNamespaceLabels = local.application_label
     }
-    spec = {
-      provider = {
-        type = "Kubernetes"
-        kubernetes = {
-          envoyService = {
-            annotations = var.service_annotations
-          }
-        }
-      }
+    envoyProxyName = "clanker"
+    envoyService = {
+      name        = local.envoy_service_name
+      type        = var.node_port > 0 ? "NodePort" : "LoadBalancer"
+      nodePort    = var.node_port
+      annotations = var.service_annotations
     }
-  }
+  })]
 
   depends_on = [helm_release.envoy_gateway]
 }
 
-resource "kubernetes_manifest" "gateway_class" {
-  count = local.use_envoy ? 1 : 0
-
-  manifest = {
-    apiVersion = "gateway.networking.k8s.io/v1"
-    kind       = "GatewayClass"
-    metadata   = { name = "envoy" }
-    spec = {
-      controllerName = "gateway.envoyproxy.io/gatewayclass-controller"
-      parametersRef = {
-        group     = "gateway.envoyproxy.io"
-        kind      = "EnvoyProxy"
-        name      = "paperboat"
-        namespace = "envoy-gateway-system"
-      }
-    }
+# The Gateway admits routes from the application namespaces. The admin ClusterRole has no
+# rights on routes, and the applier of 50-app has only admin in its namespace.
+resource "kubernetes_cluster_role_v1" "route_admin" {
+  metadata {
+    name = "clanker-httproute-admin"
+    labels = merge(local.labels, {
+      "rbac.authorization.k8s.io/aggregate-to-admin" = "true"
+    })
   }
 
-  depends_on = [kubernetes_manifest.envoy_proxy]
+  rule {
+    api_groups = ["gateway.networking.k8s.io"]
+    resources  = ["httproutes"]
+    verbs      = ["create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"]
+  }
 }
 
-resource "kubernetes_manifest" "gateway" {
-  count = local.use_envoy ? 1 : 0
+# A cloud load balancer gets its address after Envoy Gateway makes the Service, so the
+# address is read after the apply of the gateway release.
+data "kubernetes_service_v1" "envoy" {
+  count = var.public_address == "" ? 1 : 0
 
-  manifest = {
-    apiVersion = "gateway.networking.k8s.io/v1"
-    kind       = "Gateway"
-    metadata = {
-      name      = "paperboat"
-      namespace = kubernetes_namespace_v1.app.metadata[0].name
-    }
-    spec = {
-      gatewayClassName = "envoy"
-      listeners = [{
-        name     = "http"
-        protocol = "HTTP"
-        port     = var.public_port
-      }]
-    }
+  metadata {
+    name      = local.envoy_service_name
+    namespace = local.envoy_namespace
   }
 
-  wait {
-    fields = {
-      "status.addresses[0].value" = "*"
-    }
-  }
-
-  depends_on = [kubernetes_manifest.gateway_class]
+  depends_on = [helm_release.gateway]
 }
 
 locals {
-  gateway_address = try(kubernetes_manifest.gateway[0].object.status.addresses[0].value, "")
+  envoy_ingress = try(data.kubernetes_service_v1.envoy[0].status[0].load_balancer[0].ingress[0], {})
+  cloud_address = try(compact([
+    try(local.envoy_ingress.hostname, ""), try(local.envoy_ingress.ip, ""),
+  ])[0], "")
+  public_address = var.public_address != "" ? var.public_address : local.cloud_address
 }
 
 # The collector of the cluster. It reads the state of the workloads in the namespace of the

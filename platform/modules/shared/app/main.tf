@@ -9,10 +9,6 @@ terraform {
   }
 }
 
-locals {
-  use_nodeport = var.gateway_class == "nodeport"
-}
-
 resource "helm_release" "paperboat" {
   name      = "paperboat"
   namespace = var.app_namespace
@@ -37,12 +33,32 @@ resource "helm_release" "paperboat" {
     sharedVolume = {
       claimName = var.shared_volume_claim
     }
-    service = local.use_nodeport ? { type = "NodePort", nodePort = 30080 } : { type = "ClusterIP" }
-    gateway = local.use_nodeport ? {} : { className = var.gateway_class }
   })]
 
   set_sensitive = var.admin_token == "" ? [] : [{
     name  = "adminToken"
     value = var.admin_token
   }]
+}
+
+# The route of the application on the Gateway of 40-platform. A chart, not a
+# kubernetes_manifest, so that this layer needs only the helm provider.
+resource "helm_release" "route" {
+  name      = "paperboat-route"
+  namespace = var.app_namespace
+  chart     = "${path.module}/route"
+
+  values = [yamlencode({
+    name = "paperboat"
+    gateway = {
+      name      = var.gateway_name
+      namespace = var.gateway_namespace
+    }
+    backend = {
+      service = "paperboat-web"
+      port    = 8080
+    }
+  })]
+
+  depends_on = [helm_release.paperboat]
 }

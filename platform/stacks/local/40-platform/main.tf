@@ -31,7 +31,7 @@ module "platform" {
   postgres_admin_password = data.kubernetes_secret_v1.postgres_admin.data["password"]
   rwx_storage_class       = local.data_outputs.rwx_storage_class
   shared_fs_capacity_gb   = var.shared_fs_claim_gb
-  gateway_class           = "nodeport"
+  node_port               = 30080
   public_address          = "localhost:${var.public_port}"
   collector_endpoint      = var.collector_endpoint
   collector_token         = var.collector_token

@@ -74,7 +74,6 @@ module "platform" {
   postgres_admin_password = local.data.postgres_admin_password
   rwx_storage_class       = local.data.rwx_storage_class
   shared_fs_capacity_gb   = local.data.shared_fs_capacity_gb
-  gateway_class           = "envoy"
   public_address          = local.cluster.public_address
   collector_endpoint      = var.collector_endpoint
   collector_token         = var.collector_token

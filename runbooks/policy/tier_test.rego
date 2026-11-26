@@ -60,6 +60,38 @@ test_identity_change_is_t3 if {
 	d.rule == "identity-change"
 }
 
+test_kubernetes_rbac_change_is_t3 if {
+	types := [
+		"kubernetes_role_v1", "kubernetes_cluster_role_v1",
+		"kubernetes_role_binding_v1", "kubernetes_cluster_role_binding_v1",
+		"kubernetes_role", "kubernetes_cluster_role",
+		"kubernetes_role_binding", "kubernetes_cluster_role_binding",
+	]
+	every type in types {
+		every actions in [["create"], ["update"], ["delete"]] {
+			plan := {"resource_changes": [change(type, actions)]}
+			d := tier.decision with input as {"kind": "change", "layer": "40-platform", "plan": plan}
+			d.tier == "T3"
+			d.rule == "identity-change"
+		}
+	}
+}
+
+test_other_kubernetes_objects_are_t2 if {
+	every type in ["kubernetes_service_account_v1", "kubernetes_config_map_v1"] {
+		plan := {"resource_changes": [change(type, ["update"])]}
+		d := tier.decision with input as {"kind": "change", "layer": "40-platform", "plan": plan}
+		d.tier == "T2"
+		d.rule == "normal-change"
+	}
+}
+
+test_unchanged_kubernetes_rbac_is_t0 if {
+	plan := {"resource_changes": [change("kubernetes_cluster_role_v1", ["no-op"]), change("kubernetes_role_binding_v1", ["read"])]}
+	d := tier.decision with input as {"kind": "drift", "layer": "40-platform", "plan": plan}
+	d.tier == "T0"
+}
+
 test_blank_slate_is_t3 if {
 	plan := {"resource_changes": [change("local_file", ["create"])]}
 	d := tier.decision with input as {"kind": "blank-slate", "layer": "50-app", "plan": plan}

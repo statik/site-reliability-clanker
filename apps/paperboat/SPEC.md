@@ -19,7 +19,7 @@ between Paperboat and the rest of the repository.
 
 | Subcommand | Kubernetes object | Port | Role |
 |---|---|---|---|
-| `web` | Deployment + Service | 8080 | Serves the browser UI and proxies `/api/` to `api`. This is the public entry point (NodePort `30080` on the local target) |
+| `web` | Deployment + Service | 8080 | Serves the browser UI and proxies `/api/` to `api`. This is the public entry point: the HTTPRoute of layer `50-app` sends each request on the Gateway of the platform to its `ClusterIP` Service |
 | `api` | Deployment + Service | 8081 | REST API and the live inventory stream |
 | `worker` | Deployment | — | Fish aging, delivery progress, manifest files, support escalation |
 | `migrate` | Job, Helm `pre-install,pre-upgrade` hook | — | Applies schema migrations, then exits |

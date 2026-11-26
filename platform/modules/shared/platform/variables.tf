@@ -46,19 +46,20 @@ variable "shared_fs_capacity_gb" {
   description = "Size of the shared volume claim in GiB."
 }
 
-variable "gateway_class" {
-  type        = string
-  description = "nodeport for targets without the Gateway API, or envoy to install Envoy Gateway."
+variable "node_port" {
+  type        = number
+  description = "Node port of the Envoy Service. 0 makes it a LoadBalancer Service."
+  default     = 0
 
   validation {
-    condition     = contains(["nodeport", "envoy"], var.gateway_class)
-    error_message = "Set gateway_class to nodeport or envoy."
+    condition     = var.node_port == 0 || (var.node_port >= 30000 && var.node_port <= 32767)
+    error_message = "Set node_port to 0 or to a port from 30000 to 32767."
   }
 }
 
 variable "public_address" {
   type        = string
-  description = "Known public address. Empty means: read it from the Gateway status."
+  description = "Known public address. Empty: read it from the load balancer of the Envoy Service."
   default     = ""
 }
 

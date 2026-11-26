@@ -1,0 +1,25 @@
+# Layer 40-platform sets every value. These defaults only make the chart render alone.
+
+gateway:
+  # Name of the Gateway in the release namespace. HTTPRoutes name it in their parentRefs.
+  name: clanker
+  # Name of the GatewayClass. It is cluster-wide.
+  className: envoy
+  # Port of the HTTP listener.
+  port: 80
+  # The Gateway admits routes only from namespaces with all of these labels.
+  routeNamespaceLabels:
+    clanker.dev/application: "true"
+
+# Name of the EnvoyProxy in the release namespace. The GatewayClass refers to it.
+envoyProxyName: clanker
+
+envoyService:
+  # Fixed name of the Service that Envoy Gateway makes for Envoy, in envoy-gateway-system.
+  name: clanker-envoy
+  # LoadBalancer on a cloud. NodePort on the local target.
+  type: LoadBalancer
+  # Node port of the listener. Read only when type is NodePort.
+  nodePort: 30080
+  # Annotations for the cloud load balancer.
+  annotations: {}

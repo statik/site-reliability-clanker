@@ -3,9 +3,14 @@ output "app_namespace" {
   description = "Namespace for Paperboat."
 }
 
-output "gateway_class" {
-  value       = module.platform.gateway_class
-  description = "nodeport on the local target."
+output "gateway_name" {
+  value       = module.platform.gateway_name
+  description = "Name of the Gateway that the routes of the application attach to."
+}
+
+output "gateway_namespace" {
+  value       = module.platform.gateway_namespace
+  description = "Namespace of the Gateway."
 }
 
 output "public_address" {

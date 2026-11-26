@@ -1,0 +1,7 @@
+apiVersion: v2
+name: clanker-gateway
+description: >-
+  The entry point of every target. The EnvoyProxy, GatewayClass and Gateway of the platform,
+  installed after Envoy Gateway so that their kinds exist.
+type: application
+version: 0.1.0

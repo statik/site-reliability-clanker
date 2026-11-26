@@ -62,7 +62,8 @@ module "app" {
   app_namespace       = data.terraform_remote_state.platform.outputs.app_namespace
   app_secret_name     = data.terraform_remote_state.platform.outputs.app_secret_name
   shared_volume_claim = data.terraform_remote_state.platform.outputs.shared_volume_claim
-  gateway_class       = data.terraform_remote_state.platform.outputs.gateway_class
+  gateway_name        = data.terraform_remote_state.platform.outputs.gateway_name
+  gateway_namespace   = data.terraform_remote_state.platform.outputs.gateway_namespace
   public_address      = data.terraform_remote_state.platform.outputs.public_address
 
   chart_path = "${path.root}/../../../../apps/paperboat/chart"

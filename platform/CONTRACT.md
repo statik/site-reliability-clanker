@@ -180,8 +180,9 @@ Types use OpenTofu syntax. "Local" shows how the local target satisfies the row.
 
 | Output | Type | Meaning | Local |
 |---|---|---|---|
-| `app_namespace` | `string` | Namespace for Paperboat | Same |
-| `gateway_class` | `string` | `GatewayClass` name, or `nodeport` when the target has no Gateway API | `nodeport` |
+| `app_namespace` | `string` | Namespace for Paperboat. It has the label `clanker.dev/application=true` | Same |
+| `gateway_name` | `string` | Name of the Gateway that the routes of the application attach to | `clanker` |
+| `gateway_namespace` | `string` | Namespace of the Gateway | `clanker-gateway` |
 | `public_address` | `string` | Host name or IP address that serves the application | `localhost:8088` |
 | `app_secret_name` | `string` | Kubernetes secret in `app_namespace` with keys `DATABASE_URL` | Same |
 | `shared_volume_claim` | `string` | `PersistentVolumeClaim` in `app_namespace`, `ReadWriteMany` | Same |
@@ -190,6 +191,23 @@ Types use OpenTofu syntax. "Local" shows how the local target satisfies the row.
 
 The control plane gives `collector_endpoint` and `collector_token` to the runner as
 `TF_VAR_collector_endpoint` and `TF_VAR_collector_token`; they are not in `terraform.tfvars`.
+
+The entry point is the same on every target, the local target too:
+
+- The layer installs Envoy Gateway with one release. A second release installs the chart
+  `modules/shared/platform/gateway` after it: the EnvoyProxy `clanker`, the GatewayClass
+  `envoy` and the Gateway `gateway_name` in `gateway_namespace`. A `kubernetes_manifest`
+  for these kinds cannot be planned on a new cluster, because their CRDs come with the
+  first release.
+- The Gateway has one HTTP listener on `public_port`. It admits routes only from
+  namespaces with the label `clanker.dev/application=true`.
+- Envoy Gateway makes the Service `clanker-envoy` in `envoy-gateway-system`. On a cloud it
+  is a `LoadBalancer` Service. When the root gives no `public_address` (aws), the shared
+  module reads the address of the load balancer from this Service once, after the release
+  of the Gateway. Nothing waits for the address: the aws root fails the apply when the
+  Service has none yet.
+- The ClusterRole `clanker-httproute-admin` adds the rights on `httproutes` to the
+  ClusterRole `admin`, so the applier of `50-app` can manage the route in its namespace.
 
 ### 50-app
 
@@ -220,13 +238,18 @@ Layer `50-app` installs the chart in `apps/paperboat/chart` with these values:
 | `loadgen.enabled` | `loadgen_enabled` |
 | `database.secretName` | `40-platform.app_secret_name` |
 | `sharedVolume.claimName` | `40-platform.shared_volume_claim` |
-| `service.type`, `service.nodePort` | `NodePort` and `30080` when `gateway_class` is `nodeport`, otherwise `ClusterIP` |
-| `gateway.className` | `40-platform.gateway_class` when it is not `nodeport` |
+
+The chart makes no Gateway, no route and no Service of type `NodePort` or `LoadBalancer`.
+Its Service `paperboat-web` (port `8080`) is a `ClusterIP` Service. Layer `50-app`
+attaches it to the Gateway of `40-platform` with the HTTPRoute `paperboat`, which a second
+release (`paperboat-route`, chart `modules/shared/app/route`) installs.
 
 ## 5. Local target specifics
 
 - The runner sets `KIND_EXPERIMENTAL_DOCKER_NETWORK` to the `network_id` output of `10-network`.
-- Host port `8088` maps to node port `30080`. Host port `5001` is the image registry.
+- Host port `8088` maps to node port `30080`. The Envoy Service is a `NodePort` Service
+  with node port `30080` for the listener port `8088`. Host port `5001` is the image
+  registry.
 - The local target has no cloud identities. The broker issues Kubernetes service account
   tokens for the `identities` in `00-bootstrap`.
 
