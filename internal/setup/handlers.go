@@ -103,15 +103,22 @@ func operatorFor(target, name string) (string, error) {
 	return name, nil
 }
 
-// postModel records which language model the control plane uses: a hosted key or the
-// model on this machine. The model on this machine needs a job, which downloads it when
-// Ollama does not hold it.
+// postModel records which language model the control plane uses: a hosted key, the model
+// on this machine, or Amazon Bedrock in the account of the AWS target. The model on this
+// machine needs a job, which downloads it when Ollama does not hold it. Bedrock needs a
+// job, which calls each model once.
 func (s *Server) postModel(r *http.Request) (any, error) {
-	var body struct{ Choice, Key string }
+	var body struct {
+		Choice, Key string
+		Models      map[string]string
+	}
 	if err := decode(r, &body); err != nil {
 		return nil, err
 	}
 	switch body.Choice {
+	case ModelBedrock:
+		err := s.chooseBedrock(body.Models)
+		return map[string]bool{"started": err == nil}, err
 	case ModelHosted:
 		key := strings.TrimSpace(body.Key)
 		if len(key) < 20 || strings.ContainsAny(key, " \t\r\n\"'") {
@@ -130,8 +137,8 @@ func (s *Server) postModel(r *http.Request) (any, error) {
 		err := s.start("model", s.prepareLocalModel)
 		return map[string]bool{"started": err == nil}, err
 	default:
-		return nil, invalid("the choice %q does not exist: use %s or %s", body.Choice,
-			ModelHosted, ModelLocal)
+		return nil, invalid("the choice %q does not exist: use %s, %s or %s", body.Choice,
+			ModelHosted, ModelLocal, ModelBedrock)
 	}
 }
 
@@ -169,6 +176,7 @@ func (s *Server) postSignIn(r *http.Request) (any, error) {
 	s.state.Account, s.state.Principal = identity.Account, identity.Arn
 	s.review, s.found = nil, nil
 	s.clearPlacement()
+	s.clearBedrock()
 	return s.state, s.save()
 }
 

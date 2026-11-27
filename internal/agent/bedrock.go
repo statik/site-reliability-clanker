@@ -253,6 +253,13 @@ var bedrockPrices = map[string]modelPrices{
 	"global.anthropic.claude-sonnet-5-5": {standard: tokenPrices{2.00, 10.00}},
 }
 
+// HasBedrockPrice reports whether the agent knows the list price of an inference profile.
+// The calls of another profile record no cost, so the daily token limit stops them.
+func HasBedrockPrice(model string) bool {
+	_, found := bedrockPrices[model]
+	return found
+}
+
 // bedrockCost returns the list price of one call, or zero for a model with no price.
 func bedrockCost(model string, promptTokens, completionTokens int) float64 {
 	prices, found := bedrockPrices[model]

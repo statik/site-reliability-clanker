@@ -222,9 +222,8 @@ func (r *installRun) checkInputs(ctx context.Context) error {
 	if err := r.checkTags(ctx); err != nil {
 		return err
 	}
-	if r.vars.ModelKey == "" {
-		r.log("No model key: the control plane answers with recorded responses. Give the key " +
-			"(--model-key-file, or the step Language model of the wizard) to use a hosted model.")
+	if err := r.checkModel(ctx); err != nil {
+		return err
 	}
 	if err := WriteHomeVars(r.home.vars(), r.vars); err != nil {
 		return err

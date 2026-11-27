@@ -85,6 +85,9 @@ func (s *Server) postPlace(r *http.Request) (any, error) {
 		return nil, invalid("the mode %q does not exist: use %s or %s", body.Mode, PlaceExisting,
 			PlaceNew)
 	}
+	if s.state.Region != s.found.Region {
+		s.clearBedrock()
+	}
 	s.state.Region = s.found.Region
 	s.state.PlaceMode, s.state.Network = placed.PlaceMode, placed.Network
 	s.state.Subnets = placed.Subnets

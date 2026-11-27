@@ -14,15 +14,18 @@ import (
 // HomeVars are the inputs of the home stack that home.tfvars holds. The file can hold the
 // required tags and the model key, so no error and no log line has a value of it.
 type HomeVars struct {
-	Env          string
-	Region       string
-	Network      string
-	Subnets      []string
-	RouterGroup  string
-	ZoneID       string
-	Tags         map[string]string
-	ModelKey     string
-	InstanceType string
+	Env         string
+	Region      string
+	Network     string
+	Subnets     []string
+	RouterGroup string
+	ZoneID      string
+	Tags        map[string]string
+	ModelKey    string
+	// BedrockModels is the inference profile of Amazon Bedrock for each role. It takes the
+	// place of ModelKey.
+	BedrockModels map[string]string
+	InstanceType  string
 	// Application is the name of the pack, whose images have a repository in the stack.
 	Application string
 }
@@ -41,6 +44,7 @@ var homeVarNames = map[string]byte{
 	"env_name": 's', "region": 's', "vpc_id": 's', "private_subnet_ids": 'l',
 	"router_security_group_id": 's', "zone_id": 's', "required_tags": 'm',
 	"model_api_key": 's', "core_instance_type": 's', "application_name": 's',
+	"bedrock_models": 'm',
 }
 
 // ReadHomeVars reads home.tfvars. A file that does not exist gives no values.
@@ -92,6 +96,8 @@ func (v *HomeVars) set(name string, kind byte, value tfvarsValue) error {
 		v.Tags = value.table
 	case "model_api_key":
 		v.ModelKey = *value.text
+	case "bedrock_models":
+		v.BedrockModels = value.table
 	case "core_instance_type":
 		v.InstanceType = *value.text
 	case "application_name":
@@ -116,11 +122,7 @@ func WriteHomeVars(path string, v HomeVars) error {
 	line("private_subnet_ids", "["+strings.Join(quoted, ", ")+"]")
 	line("router_security_group_id", hclString(v.RouterGroup))
 	line("zone_id", hclString(v.ZoneID))
-	b.WriteString("required_tags = {\n")
-	for _, key := range slices.Sorted(maps.Keys(v.Tags)) {
-		fmt.Fprintf(&b, "  %s = %s\n", hclString(key), hclString(v.Tags[key]))
-	}
-	b.WriteString("}\n")
+	table(&b, "required_tags", v.Tags)
 	if v.InstanceType != "" {
 		line("core_instance_type", hclString(v.InstanceType))
 	}
@@ -130,6 +132,9 @@ func WriteHomeVars(path string, v HomeVars) error {
 	if v.ModelKey != "" {
 		line("model_api_key", hclString(v.ModelKey))
 	}
+	if len(v.BedrockModels) > 0 {
+		table(&b, "bedrock_models", v.BedrockModels)
+	}
 	if err := os.WriteFile(path, []byte(b.String()), 0o600); err != nil {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
@@ -138,6 +143,15 @@ func WriteHomeVars(path string, v HomeVars) error {
 		return fmt.Errorf("make %s readable only by you: %w", path, err)
 	}
 	return nil
+}
+
+// table writes a map of strings, sorted by key.
+func table(b *strings.Builder, name string, values map[string]string) {
+	b.WriteString(name + " = {\n")
+	for _, key := range slices.Sorted(maps.Keys(values)) {
+		fmt.Fprintf(b, "  %s = %s\n", hclString(key), hclString(values[key]))
+	}
+	b.WriteString("}\n")
 }
 
 // hclString quotes a string for HCL. HCL reads ${ and %{ as the start of a template.

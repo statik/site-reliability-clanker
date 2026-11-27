@@ -149,10 +149,17 @@ func (s *Server) installInput() InstallInput {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	state := s.state
-	return InstallInput{Env: state.Env, Profile: state.Profile, Region: state.Region,
+	in := InstallInput{Env: state.Env, Profile: state.Profile, Region: state.Region,
 		Network: state.Network, Subnets: state.Subnets, RouterGroup: state.RouterGroup,
 		ZoneID: state.ZoneID, Tags: maps.Clone(s.tags), ModelKey: s.key, Nanos: state.Nanos,
 		Source: state.Source}
+	switch state.KeyChoice {
+	case ModelBedrock:
+		in.ModelProvider, in.BedrockModels = ProviderBedrock, maps.Clone(state.BedrockModels)
+	case ModelHosted:
+		in.ModelProvider = ProviderOpenRouter
+	}
+	return in
 }
 
 // deployAWS starts the installer. The person pressed Create on the review.
@@ -167,20 +174,8 @@ func (s *Server) deployAWS(state State, reviewed bool) error {
 	if blocked := plan.Blocked; len(blocked) > 0 {
 		return invalid("%s", strings.Join(blocked, "; "))
 	}
-	if state.KeyChoice != ModelHosted {
-		return invalid("choose a hosted key in the step Language model: a control plane on " +
-			"AWS cannot reach a model on this machine")
-	}
-	saved, _, err := s.installer.Defaults(state.Env)
-	if err != nil {
+	if err := s.checkAWSModel(state); err != nil {
 		return err
-	}
-	s.mu.Lock()
-	keyHeld := s.key != ""
-	s.mu.Unlock()
-	if !keyHeld && saved.ModelKey == "" {
-		return invalid("give the model key again in the step Language model: the wizard " +
-			"keeps it in memory until the installer writes it to home.tfvars")
 	}
 	return s.startJob("install", func(ctx context.Context, current *job) error {
 		result, err := s.installer.Install(ctx, s.installInput(), current.report(InstallSteps))
@@ -193,6 +188,33 @@ func (s *Server) deployAWS(state State, reviewed bool) error {
 		s.key, s.modelChosen = "", false
 		return s.save()
 	})
+}
+
+// checkAWSModel refuses a choice of the step Language model that the installer cannot use.
+func (s *Server) checkAWSModel(state State) error {
+	switch state.KeyChoice {
+	case ModelBedrock:
+		if len(state.BedrockModels) == 0 {
+			return invalid("choose the models of Amazon Bedrock again in the step Language model")
+		}
+		return nil
+	case ModelHosted:
+	default:
+		return invalid("choose Amazon Bedrock or a hosted key in the step Language model: a " +
+			"control plane on AWS cannot reach a model on this machine")
+	}
+	saved, _, err := s.installer.Defaults(state.Env)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	keyHeld := s.key != ""
+	s.mu.Unlock()
+	if !keyHeld && saved.ModelKey == "" {
+		return invalid("give the model key again in the step Language model: the wizard " +
+			"keeps it in memory until the installer writes it to home.tfvars")
+	}
+	return nil
 }
 
 // postRemove starts the removal of the environment on AWS. The person must type the name

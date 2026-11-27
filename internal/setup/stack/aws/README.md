@@ -23,7 +23,7 @@ The stack uses an existing VPC and changes nothing in it.
 | Core (phase 2) | Launch template (the Nanos image, `t4g.small`, IMDSv2 required, no key pair, the instance profile, the required tags on the instance and its volume) and an auto scaling group of one. Its health check is the health check of the load balancer on `/healthz`, port 7070 |
 | Database | RDS for PostgreSQL 18 (the current minor version of RDS), `db.t4g.micro`, 20 GiB gp3, encrypted, private, one zone, one day of automatic backups, no deletion protection, no final snapshot. The URL has `sslmode=require` |
 | Settings | A customer KMS key (deletion window of 7 days) and SecureString parameters below `/src/<env>`. Keycloak's own parameters are below `/src/<env>/idp` |
-| Roles | The role of the core (the broker principal of `00-bootstrap`) with its instance profile. The execution roles of the runner and of Keycloak. No task role |
+| Roles | The role of the core (the broker principal of `00-bootstrap`) with its instance profile. With `bedrock_models` it may invoke the chosen inference profiles of Amazon Bedrock and the foundation models that they route to. The execution roles of the runner and of Keycloak. No task role |
 | Registry | ECR repositories `clanker-<env>/runner` for the runner image and `clanker-<env>/<application_name>` for the images of the application (`image_registry` is `<registry>/clanker-<env>`) |
 | Runners | ECS cluster, log group (7 days) and, in phase 2, the Fargate task definition (ARM64, 1 vCPU, 2 GiB) with the runner image by its digest |
 | Keycloak | Log group (7 days), Fargate task definition (ARM64, 1 vCPU, 2 GiB) and a service of one task behind the load balancer. Keycloak 26.8.2, pinned by digest, in production mode with `--db=dev-file` |
@@ -51,6 +51,8 @@ starts. The image of the core holds only the path and the region (output `core_i
 | `CLANKER_AWS_RUNNER` | Phase 2: cluster, task definition, container, private subnets and the runner security group |
 | `CLANKER_AWS_LAYER_VARIABLES` | The inputs of layers 10 to 50 that belong to this account: `existing_network_id`, `existing_private_subnet_ids`, `image_registry`, `instance_tags` (the required tags) and `operator_principal_arn` (the role of the person who applies this stack) |
 | `OPENROUTER_API_KEY` | Only with the input `model_api_key` |
+| `CLANKER_LLM_PROVIDER` | `bedrock`, only with the input `bedrock_models` |
+| `CLANKER_LLM_MODEL_<ROLE>` | The inference profile of each role of `bedrock_models`. The core calls Bedrock in the region of `AWS_REGION` with the role of its instance |
 | `CLANKER_AWS_BOOTSTRAP` | A placeholder for the outputs of `00-bootstrap` (`tofu output -json`). `clanker bootstrap --cloud aws --parameter-path <parameter_path> --kms-key <parameter_key_arn>` overwrites the parameter as a SecureString with that key, as the person who applies this stack. The stack ignores later changes of the value. With the placeholder the core does not start |
 
 No value holds the address of an instance: people, Keycloak (the redirect URI) and the
@@ -100,6 +102,7 @@ ignores.
 | `keycloak_realm` | The realm, as JSON text |
 | `core_instance_type` | Default `t4g.small`. It must match the architecture of the image |
 | `model_api_key` | Optional. The OpenRouter API key of the core |
+| `bedrock_models` | Optional, instead of `model_api_key`. The inference profile of Amazon Bedrock for each role: `triage`, `explainer`, `author`, `investigator` and `reviewer`. The stack reads the routing of each profile with GetInferenceProfile, so the person who applies it needs `bedrock:GetInferenceProfile` |
 | `application_name` | Default `paperboat`. The name of the application pack, and of the repository of its images |
 | `runner_image_digest` | Phase 2 |
 | `core_image_id` | Phase 2. It needs `runner_image_digest` |

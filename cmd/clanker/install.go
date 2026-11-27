@@ -13,13 +13,33 @@ import (
 // installFlags are the inputs of `clanker install --cloud aws`. An input that is not given
 // takes its value from ~/.clanker/aws/<env>/home.tfvars, when that file exists.
 type installFlags struct {
-	network      string
-	subnets      string
-	routerGroup  string
-	zoneID       string
-	nanos        string
-	modelKeyFile string
-	tags         tagFlags
+	network       string
+	subnets       string
+	routerGroup   string
+	zoneID        string
+	nanos         string
+	modelKeyFile  string
+	modelProvider string
+	bedrockModels roleModels
+	tags          tagFlags
+}
+
+// roleModels collects --bedrock-model ROLE=ID.
+type roleModels map[string]string
+
+func (m *roleModels) String() string { return fmt.Sprintf("%d models", len(*m)) }
+
+func (m *roleModels) Set(text string) error {
+	role, id, found := strings.Cut(text, "=")
+	if !found || strings.TrimSpace(role) == "" || id == "" {
+		return errors.New("give a model as ROLE=ID, for example " +
+			"author=us.anthropic.claude-sonnet-5-5")
+	}
+	if *m == nil {
+		*m = roleModels{}
+	}
+	(*m)[role] = id
+	return nil
 }
 
 // tagFlags collects --tag KEY=VALUE. The values are never printed.
@@ -86,6 +106,9 @@ func installInput(o options) (setup.InstallInput, error) {
 	if o.install.tags != nil {
 		in.Tags = o.install.tags
 	}
+	if err := modelInput(o.install, &in); err != nil {
+		return setup.InstallInput{}, err
+	}
 	if o.install.modelKeyFile != "" {
 		key, err := os.ReadFile(o.install.modelKeyFile)
 		if err != nil {
@@ -98,6 +121,31 @@ func installInput(o options) (setup.InstallInput, error) {
 		}
 	}
 	return in, nil
+}
+
+// modelInput reads the choice of the model. A --bedrock-model alone chooses Bedrock, and a
+// key file alone chooses OpenRouter.
+func modelInput(flags installFlags, in *setup.InstallInput) error {
+	in.ModelProvider = flags.modelProvider
+	if in.ModelProvider == "" && len(flags.bedrockModels) > 0 {
+		in.ModelProvider = setup.ProviderBedrock
+	}
+	switch in.ModelProvider {
+	case "", setup.ProviderOpenRouter:
+		if len(flags.bedrockModels) > 0 {
+			return errors.New("--bedrock-model is for --model-provider bedrock")
+		}
+	case setup.ProviderBedrock:
+		if flags.modelKeyFile != "" {
+			return errors.New("--model-key-file is for OpenRouter: the core calls Amazon " +
+				"Bedrock with the role of its instance and needs no key")
+		}
+		in.BedrockModels = flags.bedrockModels
+	default:
+		return fmt.Errorf("--model-provider %q does not exist: use %s or %s",
+			in.ModelProvider, setup.ProviderBedrock, setup.ProviderOpenRouter)
+	}
+	return nil
 }
 
 // printReport prints the progress of the installer.

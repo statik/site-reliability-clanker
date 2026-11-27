@@ -113,6 +113,18 @@ data "aws_iam_policy_document" "core" {
       values   = [local.ecs_tasks_principal]
     }
   }
+
+  # Converse needs bedrock:InvokeModel; the stream of an answer needs the second action.
+  dynamic "statement" {
+    for_each = var.bedrock_models == null ? [] : ["bedrock"]
+
+    content {
+      sid       = "InvokeTheModels"
+      effect    = "Allow"
+      actions   = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
+      resources = local.bedrock_resources
+    }
+  }
 }
 
 resource "aws_iam_role_policy" "core" {

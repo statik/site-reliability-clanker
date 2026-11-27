@@ -97,6 +97,63 @@ func TestMergeKeepsTheSavedValueOfAnEmptyInput(t *testing.T) {
 	}
 }
 
+func TestMergeChoosesOneModelAndNeverABilledOneByItself(t *testing.T) {
+	withKey := HomeVars{ModelKey: "key"}
+	withBedrock := HomeVars{BedrockModels: bedrockChoice(map[string]string{
+		"author": "global.anthropic.claude-sonnet-5-5"}, nil)}
+	cases := []struct {
+		name     string
+		in       InstallInput
+		saved    HomeVars
+		key      string
+		author   string
+		explains string
+	}{
+		{"no choice and nothing saved", InstallInput{}, HomeVars{}, "", "", ""},
+		{"no choice keeps the key", InstallInput{}, withKey, "key", "", ""},
+		{"no choice keeps Bedrock", InstallInput{}, withBedrock, "",
+			"global.anthropic.claude-sonnet-5-5", "us.anthropic.claude-haiku-5-5"},
+		{"Bedrock replaces the key", InstallInput{ModelProvider: ProviderBedrock}, withKey, "",
+			"us.anthropic.claude-sonnet-5-5", "us.anthropic.claude-haiku-5-5"},
+		{"Bedrock keeps the saved models of the other roles", InstallInput{
+			ModelProvider: ProviderBedrock, BedrockModels: map[string]string{
+				"explainer": "us.anthropic.claude-sonnet-5-5"}}, withBedrock, "",
+			"global.anthropic.claude-sonnet-5-5", "us.anthropic.claude-sonnet-5-5"},
+		{"a key replaces Bedrock", InstallInput{ModelKey: "new"}, withBedrock, "new", "", ""},
+		{"OpenRouter keeps the saved key", InstallInput{ModelProvider: ProviderOpenRouter},
+			HomeVars{ModelKey: "key", BedrockModels: withBedrock.BedrockModels}, "key", "", ""},
+	}
+	for _, tc := range cases {
+		merged := merge(tc.in, tc.saved)
+		if merged.ModelKey != tc.key || merged.BedrockModels["author"] != tc.author ||
+			merged.BedrockModels["explainer"] != tc.explains {
+			t.Errorf("%s: key %q, models %v", tc.name, merged.ModelKey, merged.BedrockModels)
+		}
+		if tc.author == "" && merged.BedrockModels != nil {
+			t.Errorf("%s: models %v, want none", tc.name, merged.BedrockModels)
+		}
+	}
+}
+
+func TestBedrockModelsSurviveAWriteAndARead(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "home.tfvars")
+	vars := HomeVars{Env: "e", Region: "us-west-2", Network: "n", Subnets: []string{"s"},
+		RouterGroup: "g", ZoneID: "z", Tags: map[string]string{},
+		BedrockModels: bedrockChoice(nil, nil)}
+	if err := WriteHomeVars(path, vars); err != nil {
+		t.Fatal(err)
+	}
+	read, _, err := ReadHomeVars(path)
+	if err != nil || !reflect.DeepEqual(read, vars) {
+		t.Errorf("read %+v, %v; want %+v", read, err, vars)
+	}
+	text, err := os.ReadFile(path)
+	if err != nil || !strings.Contains(string(text),
+		"bedrock_models = {\n  \"author\" = \"us.anthropic.claude-sonnet-5-5\"\n") {
+		t.Errorf("home.tfvars = %s, %v", text, err)
+	}
+}
+
 func TestLineWriterHidesPrivateValuesInEachLine(t *testing.T) {
 	lines := []string{}
 	w := &lineWriter{send: func(line string) { lines = append(lines, line) },
