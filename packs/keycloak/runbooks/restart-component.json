@@ -1,6 +1,6 @@
 {
   "title": "Restart a component",
-  "description": "Restart the Keycloak server and wait for the rollout. Every pod stops before the new ones start, so Keycloak does not answer for about a minute. Signed-in users stay signed in: their sessions are in the database. A login that is in progress starts again.",
+  "description": "Restart the Keycloak server and wait for the rollout. Every pod stops before the new ones start, so Keycloak does not answer until the new pods are ready (25 seconds for the whole runbook on the local target). Signed-in users stay signed in: their sessions are in the database. A login that is in progress starts again.",
   "tier": "T1",
   "incident_mitigation": true,
   "inputs": {

@@ -14,7 +14,8 @@ server) deployment="keycloak" ;;
 esac
 
 # The deployment has the strategy Recreate: the old pods stop, then the new ones start and
-# become ready when Keycloak has started. A start that migrates nothing takes about a minute.
+# become ready when Keycloak has started. A start that migrates nothing took 25 s on kind; a
+# start that migrates the database can take much longer.
 kubectl -n "${namespace}" rollout restart "deployment/${deployment}"
 kubectl -n "${namespace}" rollout status "deployment/${deployment}" --timeout=600s
 kubectl -n "${namespace}" get pods -l "app.kubernetes.io/name=keycloak" -o wide
