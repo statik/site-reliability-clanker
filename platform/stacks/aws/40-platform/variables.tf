@@ -18,6 +18,12 @@ variable "app_name" {
   type        = string
 }
 
+variable "workloads_namespace" {
+  type        = bool
+  description = "Make the namespace <name>-workloads for the pods that the application starts. The control plane writes this line from deploy.workloads_namespace of the pack."
+  default     = false
+}
+
 variable "public_port" {
   description = "Port of the public listener."
   type        = number

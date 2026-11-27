@@ -330,8 +330,11 @@ func (p Pack) TopologyNodes() []string {
 	return append(names, p.Topology.Extra...)
 }
 
+// maxNameLength is the longest name that namePattern allows.
+const maxNameLength = 31
+
 var (
-	namePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,30}$`)
+	namePattern = regexp.MustCompile(fmt.Sprintf(`^[a-z][a-z0-9-]{0,%d}$`, maxNameLength-1))
 	// A title is one to three words, with no punctuation that can make a sentence.
 	titlePattern = regexp.MustCompile(
 		`^[A-Za-z][A-Za-z0-9-]{0,19}( [A-Za-z0-9][A-Za-z0-9-]{0,19}){0,2}$`)

@@ -43,8 +43,8 @@ run "the_local_root_names_everything_after_the_pack" {
   }
 
   assert {
-    condition     = output.targets == { application = "paperboat", data = "clanker-data" }
-    error_message = "The targets must be the namespace of the pack and clanker-data."
+    condition     = output.targets == { application = "paperboat", data = "clanker-data", workloads = "" }
+    error_message = "The targets must be the namespace of the pack and clanker-data, and no namespace for workloads."
   }
 }
 

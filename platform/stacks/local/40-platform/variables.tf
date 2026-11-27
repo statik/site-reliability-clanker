@@ -13,6 +13,12 @@ variable "app_name" {
   description = "Name of the application pack. The namespace, the database role, the database, the Secret <name>-db and the claim <name>-shared have this name."
 }
 
+variable "workloads_namespace" {
+  type        = bool
+  description = "Make the namespace <name>-workloads for the pods that the application starts. The control plane writes this line from deploy.workloads_namespace of the pack."
+  default     = false
+}
+
 variable "public_port" {
   type        = number
   description = "Host port that serves Paperboat."

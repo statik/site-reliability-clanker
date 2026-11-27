@@ -18,7 +18,11 @@ const (
 const (
 	targetApplication = "application"
 	targetData        = "data"
+	targetWorkloads   = "workloads"
 )
+
+// targetKeys are the keys that the output can have.
+var targetKeys = []string{targetApplication, targetData, targetWorkloads}
 
 // reservedNamespaces belong to the cluster or to the control plane, as each namespace
 // with the prefix "kube-" does. No application and no data service runs there, so no
@@ -38,6 +42,10 @@ type Targets struct {
 	// DataNamespace is the namespace of the data services of the application. It is empty
 	// on a target whose data services are not in the cluster.
 	DataNamespace string
+	// WorkloadsNamespace is the namespace of the pods that the application starts, or empty
+	// when the pack asks for none. Only the applier of the application layer gets rights
+	// there: no runbook and no debug session reads or changes it.
+	WorkloadsNamespace string
 }
 
 // ParseTargets reads the targets from the outputs of the layer of the platform. The
@@ -63,12 +71,12 @@ func ParseTargets(outputs map[string]any) (Targets, error) {
 	sort.Strings(keys)
 	found := map[string]string{}
 	for _, key := range keys {
-		if key != targetApplication && key != targetData {
-			return Targets{}, fmt.Errorf("the output %s has the key %q; it can have %s and %s",
-				TargetsOutput, key, targetApplication, targetData)
+		if !slices.Contains(targetKeys, key) {
+			return Targets{}, fmt.Errorf("the output %s has the key %q; it can have %s",
+				TargetsOutput, key, strings.Join(targetKeys, ", "))
 		}
 		name, _ := values[key].(string)
-		if key == targetData && name == "" {
+		if key != targetApplication && name == "" {
 			continue
 		}
 		if err := checkNamespace(key, name); err != nil {
@@ -80,11 +88,25 @@ func ParseTargets(outputs map[string]any) (Targets, error) {
 		return Targets{}, fmt.Errorf("the output %s has no namespace for %s", TargetsOutput,
 			targetApplication)
 	}
-	if found[targetApplication] == found[targetData] {
-		return Targets{}, fmt.Errorf("the output %s has the namespace %q two times",
-			TargetsOutput, found[targetData])
+	if err := checkDistinct(found); err != nil {
+		return Targets{}, err
 	}
-	return Targets{Namespace: found[targetApplication], DataNamespace: found[targetData]}, nil
+	return Targets{Namespace: found[targetApplication], DataNamespace: found[targetData],
+		WorkloadsNamespace: found[targetWorkloads]}, nil
+}
+
+// checkDistinct refuses a namespace that the output names for two keys.
+func checkDistinct(found map[string]string) error {
+	seen := map[string]bool{}
+	for _, key := range targetKeys {
+		name := found[key]
+		if name != "" && seen[name] {
+			return fmt.Errorf("the output %s has the namespace %q two times", TargetsOutput,
+				name)
+		}
+		seen[name] = true
+	}
+	return nil
 }
 
 func checkNamespace(key, name string) error {
@@ -92,9 +114,11 @@ func checkNamespace(key, name string) error {
 		return fmt.Errorf("the namespace %q of %s in the output %s must match %s", name, key,
 			TargetsOutput, namePattern)
 	}
-	if key == targetApplication && reservedName(name) {
+	// The data services can be in a namespace of the platform. The application and the
+	// pods that it starts cannot.
+	if key != targetData && reservedName(name) {
 		return fmt.Errorf("the namespace %q of %s in the output %s belongs to the cluster, "+
-			"to the control plane or to the platform; it must be the name of the pack",
+			"to the control plane or to the platform; it must have the name of the pack",
 			name, key, TargetsOutput)
 	}
 	if slices.Contains(reservedNamespaces, name) || strings.HasPrefix(name, clusterPrefix) {

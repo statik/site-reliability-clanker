@@ -147,6 +147,10 @@ type Route struct {
 	Wildcard bool `json:"wildcard,omitempty"`
 }
 
+// WorkloadsSuffix ends the name of the namespace that deploy.workloads_namespace asks for:
+// <name>-workloads.
+const WorkloadsSuffix = "-workloads"
+
 // HelmTimeout returns the Helm timeout of an apply, in seconds.
 func (d Deploy) HelmTimeout() int {
 	if d.TimeoutSeconds == nil {
@@ -167,6 +171,13 @@ func (p Pack) checkDeploy() error {
 	}
 	if err := checkSecrets(deploy.Secrets); err != nil {
 		return err
+	}
+	// The targets of the platform name the namespace, and a target must be a name.
+	if workloads := p.Name + WorkloadsSuffix; deploy.WorkloadsNamespace &&
+		!namePattern.MatchString(workloads) {
+		return fmt.Errorf("deploy.workloads_namespace asks for the namespace %s, which does "+
+			"not match %s; give the pack a name of at most %d characters", workloads,
+			namePattern, maxNameLength-len(WorkloadsSuffix))
 	}
 	if err := checkRoute(deploy.Route); err != nil {
 		return err

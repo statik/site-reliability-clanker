@@ -13,6 +13,12 @@ variable "app_name" {
   }
 }
 
+variable "workloads_namespace" {
+  type        = bool
+  description = "Make a second namespace <name>-workloads for the pods that the application starts, such as the workspaces of Coder. Only the applier of 50-app gets rights there: no runbook, no debug session and not the collector."
+  default     = false
+}
+
 variable "public_port" {
   type        = number
   description = "Port of the public listener."

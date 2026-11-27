@@ -675,9 +675,8 @@ Schema 2 replaces schema 1. The loader reads one schema.
 | `topology.services` | `components`, plus `topology.extra` for nodes that are not components (the load generator, a load balancer) |
 
 The deploy fields of the kind `helm` (issue #148, sections 1.2 to 1.7). The loader checks
-them, and the application layer of the core uses them (`platform/CONTRACT.md`, `50-app`
-and section 4), except `workloads_namespace`, which comes later.
-`apps/paperboat/PACK.md` has the bounds of each field.
+them, and the layers of the core use them (`platform/CONTRACT.md`, `40-platform`, `50-app`
+and section 4). `apps/paperboat/PACK.md` has the bounds of each field.
 
 | Field | Content |
 |---|---|

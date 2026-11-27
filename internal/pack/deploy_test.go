@@ -81,6 +81,8 @@ func TestLoadRefusesADeploymentOutsideItsBounds(t *testing.T) {
 		"a secret key two times": {in("deploy", "secrets", []any{"a", "a"}), `the key "a"`},
 		"a workloads namespace that is not a bool": {in("deploy", "workloads_namespace", "yes"),
 			"workloads_namespace"},
+		"a workloads namespace longer than a name": {set("name", strings.Repeat("h", 22)),
+			"give the pack a name of at most 21 characters"},
 	}
 	for name, tc := range cases {
 		_, err := pack.Load(packFiles(manifest(t, tc.change)), "p")
@@ -180,6 +182,11 @@ func TestADeploymentLoadsAtItsBounds(t *testing.T) {
 		"a route with a wildcard":       route(map[string]any{"hostname": true, "wildcard": true}),
 		"a setting with one value":      setting(number(3, 3, 3)),
 		"a setting from 0 to a million": setting(number(0, 1000000, 1000000)),
+		"the longest workloads name":    set("name", strings.Repeat("h", 21)),
+		"the longest name without a workloads namespace": func(m map[string]any) {
+			m["name"] = strings.Repeat("h", 31)
+			delete(m["deploy"].(map[string]any), "workloads_namespace")
+		},
 		"no settings, secrets, values or extras": func(m map[string]any) {
 			for _, field := range []string{"settings", "secrets", "values", "extras"} {
 				delete(m["deploy"].(map[string]any), field)

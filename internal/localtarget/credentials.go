@@ -26,6 +26,9 @@ var appIdentitiesManifest []byte
 //go:embed identities-data.yaml
 var dataIdentitiesManifest []byte
 
+//go:embed identities-workloads.yaml
+var workloadsIdentitiesManifest []byte
+
 const identityNamespace = "clanker-system"
 
 // clusterLayers are the layers that need a Kubernetes credential on the local target.
@@ -61,13 +64,18 @@ func kubectl(ctx context.Context, kubeconfig string, stdin []byte, args ...strin
 
 // appIdentities returns the bindings of the identities in the namespaces of the
 // application. The names are the targets of the environment, which pack.ParseTargets
-// checked against a pattern. A target with no data namespace gets no binding for one.
+// checked against a pattern. A target with no data namespace or no workloads namespace
+// gets no binding for one.
 func appIdentities(targets pack.Targets) []byte {
 	text := strings.ReplaceAll(string(appIdentitiesManifest), "{{namespace}}",
 		targets.Namespace)
 	if targets.DataNamespace != "" {
 		text += "---\n" + strings.ReplaceAll(string(dataIdentitiesManifest),
 			"{{data_namespace}}", targets.DataNamespace)
+	}
+	if targets.WorkloadsNamespace != "" {
+		text += "---\n" + strings.ReplaceAll(string(workloadsIdentitiesManifest),
+			"{{workloads_namespace}}", targets.WorkloadsNamespace)
 	}
 	return []byte(text)
 }
