@@ -1,0 +1,49 @@
+{
+  "schema": 2,
+  "name": "jupyterhub",
+  "title": "JupyterHub",
+  "version": "0.1.0",
+  "description": "JupyterHub from the Zero to JupyterHub chart: a hub and a proxy that start one JupyterLab server for each user.",
+  "layer": "50-app",
+  "version_variable": "jupyterhub_version",
+  "url_output": "app_url",
+  "releases": {
+    "repository": "jupyterhub",
+    "directory": "releases",
+    "first": "5.5.4"
+  },
+  "deploy": {
+    "kind": "helm",
+    "values": "values",
+    "secrets": ["shared-password"],
+    "route": {"service": "proxy-public", "port": 80, "timeout_seconds": 0},
+    "timeout_seconds": 600
+  },
+  "runbooks": "runbooks",
+  "evals": "evals",
+  "components": [
+    {"name": "hub", "runtime": "kubernetes", "workload": "hub", "required": true},
+    {"name": "proxy", "runtime": "kubernetes", "workload": "proxy", "required": true}
+  ],
+  "incident": {"runbook": "restart-component", "component": "hub"},
+  "diagnostics": [
+    {"read": "events"},
+    {"read": "logs", "component": "hub", "lines": 80},
+    {"read": "logs", "component": "proxy", "lines": 20}
+  ],
+  "checks": [
+    {"name": "proxy", "kind": "http", "path": "/_chp_healthz"},
+    {"name": "login", "kind": "http", "path": "/hub/login"},
+    {"name": "hub", "kind": "http", "path": "/hub/health", "primary": true}
+  ],
+  "app_version": {"source": "http-json", "path": "/hub/api"},
+  "topology": {
+    "extra": ["servers"],
+    "edges": [
+      ["lb", "proxy"], ["proxy", "hub"], ["proxy", "servers"],
+      ["hub", "servers"], ["hub", "cluster"],
+      ["hub", "postgres"], ["hub", "secrets"],
+      ["servers", "sharedfs"]
+    ]
+  }
+}

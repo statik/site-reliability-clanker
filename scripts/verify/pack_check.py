@@ -253,8 +253,36 @@ def check_restarts() -> None:
         expect_state(drive(work_item, RUNBOOK_SECONDS), "Done")
 
 
+def copy_record(clone: Path, name: str, previous: str, version: str) -> Path | None:
+    """Write the release record of a bad version as a copy of the record of previous.
+
+    A pack with release records needs apps/<name>/releases/<version>.json in the platform
+    repository for every version that the layer deploys. The copy names the artifacts of
+    previous, so the running version differs from version and the verification fails. It
+    keeps the schema_change of previous, which decides between Failed and RolledBack.
+
+    Returns:
+        The path of the new record in clone, or None when the pack has no records.
+
+    Raises:
+        CheckError: The version has a record already, so it is a real release.
+    """
+    releases = clone / "apps" / name / "releases"
+    source = releases / f"{previous}.json"
+    if not source.is_file():
+        return None
+    target = releases / f"{version}.json"
+    if target.exists():
+        raise CheckError(f"{target.relative_to(clone)} exists: give --bad a version with no record")
+    target.write_bytes(source.read_bytes())
+    return target
+
+
 def push_version(pack: Pack, version: str, purpose: str) -> tuple[str, str]:
     """Push a branch that sets the version of the application and open its pull request.
+
+    For a bad version of a pack with release records, the branch also adds the record of
+    the version (copy_record).
 
     Returns:
         The work item of the pull request and the version that main held before.
@@ -268,8 +296,11 @@ def push_version(pack: Pack, version: str, purpose: str) -> tuple[str, str]:
         path = clone / pack.tfvars
         text, previous = set_version(path.read_text(encoding="utf-8"), pack.variable, version)
         path.write_text(text, encoding="utf-8")
-        # A pack with release records needs apps/<name>/releases/<version>.json for a bad
-        # version too: write here a record that names the artifacts of `previous`.
+        if purpose == "bad":
+            record = copy_record(clone, pack.name, previous, version)
+            if record is not None:
+                git("add", str(record.relative_to(clone)), cwd=clone)
+                print(f"  record {record.relative_to(clone)} copies {previous}", flush=True)
         git("commit", "-q", "-am", title, cwd=clone)
         git("push", "-q", "origin", branch, cwd=clone)
     body = {"branch": branch, "title": title, "body": "Pack check", "env": ENV}

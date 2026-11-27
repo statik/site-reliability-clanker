@@ -35,6 +35,10 @@ locals {
     local.repository != "" ? local.record.chart_name :
     "${var.pack_dir}/chart"
   )
+  # The chart of a record is a chart of another project. Its values schema can refuse a key
+  # that it does not know, as the schema of Zero to JupyterHub does, so it gets no values of
+  # the platform. The values files of the pack connect it to the objects of the platform.
+  own_chart = local.archive == "" && local.repository == ""
 
   # A route with a host name gets <name>.<app_domain>, and with a wildcard every name below
   # it. Without app_domain the application has no host name, and its URL is the public
@@ -47,8 +51,8 @@ locals {
   )
   generated_secret = length(var.app.secrets) > 0 ? "${local.name}-generated" : ""
 
-  # The values that every chart of the pack gets from the platform (platform/CONTRACT.md
-  # section 4). adminToken comes with set_sensitive.
+  # The values that the main chart of the pack and its extras chart get from the platform
+  # (platform/CONTRACT.md section 4). adminToken comes with set_sensitive.
   platform_values = {
     name              = local.name
     namespace         = var.app_namespace
@@ -65,12 +69,12 @@ locals {
   cloud_value = "${local.values_dir}/values-${var.cloud}.yaml"
 
   # Lowest first: values.yaml, values-<cloud>.yaml, the values of the record, the values
-  # of the platform. The settings come last, with set.
+  # of the platform for a chart of the pack. The settings come last, with set.
   main_values = concat(
     var.app.values ? [file("${local.values_dir}/values.yaml")] : [],
     var.app.values && fileexists(local.cloud_value) ? [file(local.cloud_value)] : [],
     try(local.record.values, null) != null ? [yamlencode(local.record.values)] : [],
-    [yamlencode({ platform = local.platform_values })],
+    local.own_chart ? [yamlencode({ platform = local.platform_values })] : [],
   )
   admin_token = var.admin_token == "" ? [] : [{
     name  = "platform.adminToken"
@@ -138,7 +142,7 @@ resource "helm_release" "app" {
     name  = path
     value = value
   }]
-  set_sensitive = local.admin_token
+  set_sensitive = local.own_chart ? local.admin_token : []
 
   lifecycle {
     precondition {

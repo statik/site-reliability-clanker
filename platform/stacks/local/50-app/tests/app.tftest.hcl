@@ -481,6 +481,7 @@ run "a_record_with_an_archive_installs_the_archive" {
     public_address      = "demo.example.com"
     public_port         = 8088
     app_domain          = ""
+    admin_token         = "test-token"
   }
 
   assert {
@@ -489,6 +490,14 @@ run "a_record_with_an_archive_installs_the_archive" {
       && helm_release.app.repository == null
     )
     error_message = "A record with an archive must install the archive of the pack."
+  }
+
+  assert {
+    condition = (
+      length(helm_release.app.values) == 0
+      && length(helm_release.app.set_sensitive) == 0
+    )
+    error_message = "A chart of another project must get neither the platform values nor the admin token."
   }
 }
 
@@ -532,6 +541,11 @@ run "a_record_with_an_oci_chart_pins_the_digest" {
     )
     error_message = "An OCI chart must be <repository>/<name>@<digest> with the version, so Helm checks both."
   }
+
+  assert {
+    condition     = length(helm_release.app.values) == 0
+    error_message = "An OCI chart of another project must get no platform values."
+  }
 }
 
 run "a_record_with_an_https_chart_names_the_repository" {
@@ -573,6 +587,11 @@ run "a_record_with_an_https_chart_names_the_repository" {
       && helm_release.app.version == "2.3.0"
     )
     error_message = "A chart in an https repository must be the repository, the name and the version."
+  }
+
+  assert {
+    condition     = length(helm_release.app.values) == 0
+    error_message = "A chart of another project in an https repository must get no platform values."
   }
 }
 

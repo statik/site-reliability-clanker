@@ -67,6 +67,51 @@ class SetVersionTest(unittest.TestCase):
             pack_check.set_version('v = "1"\nv = "2"\n', "v", "3")
 
 
+class CopyRecordTest(unittest.TestCase):
+    """A bad version of a pack with records gets the record of the version before it."""
+
+    RECORD = b'{"values": {"image": {"tag": "2.0.0"}}, "schema_change": true}\n'
+
+    def clone_with(self, files: dict[str, bytes]) -> Path:
+        """Return a directory, removed after the test, that holds files at their paths."""
+        work = tempfile.TemporaryDirectory()
+        self.addCleanup(work.cleanup)
+        clone = Path(work.name)
+        for name, content in files.items():
+            path = clone / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+        return clone
+
+    def test_copy_of_the_previous_record(self) -> None:
+        """The new record has the bytes of the previous one, schema_change included."""
+        clone = self.clone_with({"apps/kc/releases/2.0.0.json": self.RECORD})
+        record = pack_check.copy_record(clone, "kc", "2.0.0", "2.0.1")
+        self.assertEqual(record, clone / "apps/kc/releases/2.0.1.json")
+        self.assertEqual(record.read_bytes(), self.RECORD)
+
+    def test_pack_without_records(self) -> None:
+        """A pack with no record of the previous version gets no record."""
+        clone = self.clone_with({"apps/kc/chart/Chart.yaml": b"name: kc\n"})
+        self.assertIsNone(pack_check.copy_record(clone, "kc", "2.0.0", "2.0.1"))
+        self.assertFalse((clone / "apps/kc/releases/2.0.1.json").exists())
+
+    def test_record_of_another_pack(self) -> None:
+        """Only the records of the pack itself count."""
+        clone = self.clone_with({"apps/other/releases/2.0.0.json": self.RECORD})
+        self.assertIsNone(pack_check.copy_record(clone, "kc", "2.0.0", "2.0.1"))
+
+    def test_existing_record_is_kept(self) -> None:
+        """A version with a record is a real release: the check stops and changes nothing."""
+        real = b'{"schema_change": false}\n'
+        clone = self.clone_with(
+            {"apps/kc/releases/2.0.0.json": self.RECORD, "apps/kc/releases/2.0.1.json": real}
+        )
+        with self.assertRaises(pack_check.CheckError):
+            pack_check.copy_record(clone, "kc", "2.0.0", "2.0.1")
+        self.assertEqual((clone / "apps/kc/releases/2.0.1.json").read_bytes(), real)
+
+
 class RunningVersionsTest(unittest.TestCase):
     """Only a passed verification reports a running version."""
 
