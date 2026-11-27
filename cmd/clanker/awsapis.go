@@ -10,10 +10,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
+	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
+	"github.com/statik/site-reliability-clanker/internal/agent"
 	"github.com/statik/site-reliability-clanker/internal/awsparams"
 	"github.com/statik/site-reliability-clanker/internal/awsrunner"
 	"github.com/statik/site-reliability-clanker/internal/awstarget"
@@ -21,7 +23,7 @@ import (
 )
 
 // testEndpointEnv is for scripts/verify/aws-core-check.sh only. It sends every call of
-// the core to Parameter Store, STS and ECS to a stand-in for AWS on this machine, with
+// the core to Parameter Store, STS, ECS and Bedrock to a stand-in for AWS on this machine, with
 // fixed keys instead of the role of the instance. The core uses it only when it starts
 // with the flag --fake-aws, and only an address on the loopback interface. Parameter Store
 // cannot give it.
@@ -33,11 +35,12 @@ type awsAPIs struct {
 	sts        func(region string) awstarget.STS
 	ecs        func(region string) awsrunner.ECS
 	metadata   func() awsrunner.Metadata
+	bedrock    func(region string) agent.ConverseAPI
 }
 
 // realAWS are the clients of AWS, with the credentials of the role of the instance.
 var realAWS = awsAPIs{parameters: awsparams.NewStore, sts: awstarget.NewSTS,
-	ecs: awsrunner.NewECS, metadata: awsrunner.NewMetadata}
+	ecs: awsrunner.NewECS, metadata: awsrunner.NewMetadata, bedrock: agent.NewBedrockRuntime}
 
 // chooseAWSAPIs returns the clients of AWS, or with --fake-aws the clients of the
 // stand-in at the address of CLANKER_TEST_AWS_ENDPOINT. Each of the two without the
@@ -94,6 +97,10 @@ func fakeAWSAPIs(endpoint string) awsAPIs {
 				Credentials: keys})
 		},
 		metadata: func() awsrunner.Metadata { return noMetadata{} },
+		bedrock: func(region string) agent.ConverseAPI {
+			return bedrockruntime.New(bedrockruntime.Options{Region: region,
+				BaseEndpoint: aws.String(endpoint), Credentials: keys})
+		},
 	}
 }
 

@@ -7,7 +7,8 @@
 //   - ECS RunTask, DescribeTasks and StopTask: RunTask runs the runner image with Docker,
 //     with the environment of the container override, as Fargate runs a runner task.
 //     StopTask stops the container as Fargate stops a task: SIGTERM, and SIGKILL after the
-//     stop timeout of the runner task definition.
+//     stop timeout of the runner task definition;
+//   - Bedrock Converse, with a fixed answer for the Explainer and the Reviewer (bedrock.go).
 //
 // It also takes the webhook of a chat platform at /hooks/<name>, and serves a stand-in for the
 // API server of an EKS cluster over TLS at --kube-addr (kube.go). `fakeaws cert DIR` writes
@@ -139,6 +140,9 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	target := r.Header.Get("X-Amz-Target")
 	service, action, _ := strings.Cut(target, ".")
 	switch {
+	case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/model/") &&
+		strings.HasSuffix(r.URL.Path, "/converse"):
+		s.converse(w, r)
 	case service == "AmazonSSM" && action == "GetParametersByPath":
 		s.getParametersByPath(w, r)
 	case service == "AmazonEC2ContainerServiceV20141113":

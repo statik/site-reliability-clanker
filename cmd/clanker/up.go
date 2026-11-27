@@ -468,7 +468,7 @@ func build(ctx context.Context, o options) (*components, error) {
 			}
 			return notify.ParseRules([]byte(raw))
 		})
-	llm, models, err := chooseLLM(os.Getenv)
+	llm, models, err := chooseLLM(os.Getenv, bedrockFor(ctx, o))
 	if err != nil {
 		return nil, err
 	}

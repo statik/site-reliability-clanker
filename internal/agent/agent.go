@@ -65,6 +65,18 @@ func DefaultModels() map[string]string {
 	}
 }
 
+// DefaultBedrockModels are the inference profiles of Amazon Bedrock for each role, with
+// the split of DefaultModels. The us. profiles serve a region in the United States.
+func DefaultBedrockModels() map[string]string {
+	return map[string]string{
+		RoleTriage:       "us.anthropic.claude-haiku-5-5",
+		RoleExplainer:    "us.anthropic.claude-haiku-5-5",
+		RoleAuthor:       "us.anthropic.claude-sonnet-5-5",
+		RoleInvestigator: "us.anthropic.claude-sonnet-5-5",
+		RoleReviewer:     "us.anthropic.claude-sonnet-5-5",
+	}
+}
+
 func (a *Agent) now() string { return store.FormatTime(a.Clock.Now()) }
 
 func (a *Agent) spentToday() (float64, error) {

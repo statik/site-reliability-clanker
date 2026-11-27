@@ -100,6 +100,37 @@ A call to such an endpoint reports no cost, so the limit of 5 USD does not stop 
 runtime also stops model calls for the day after 5 million tokens in calls that report no
 cost.
 
+The agent can also use Amazon Bedrock in an AWS account, through the Converse API. It needs
+no API key: AWS credentials sign each call.
+
+| Setting | Meaning |
+|---|---|
+| `CLANKER_LLM_PROVIDER` | `bedrock` uses Amazon Bedrock. Without this setting the agent uses `CLANKER_LLM_BASE_URL` or OpenRouter as above. Another value stops `clanker up` at the start. |
+| `CLANKER_LLM_REGION` | The region of Bedrock. Without it the agent uses `AWS_REGION`. One of the two is necessary. |
+| `CLANKER_LLM_MODEL` | The ID of an inference profile for every role, for example `us.anthropic.claude-sonnet-5-5`. |
+| `CLANKER_LLM_MODEL_<ROLE>` | The ID of an inference profile for one role. |
+
+Without a model setting, the Triage and Explainer roles use `us.anthropic.claude-haiku-5-5`,
+and the Author, Investigator and Reviewer roles use `us.anthropic.claude-sonnet-5-5`. The
+`us.` profiles serve a region in the United States. In another region, set the models to the
+profiles of that region, for example `eu.` or `global.`.
+
+The credentials depend on where the control plane runs:
+
+- On AWS, the control plane uses the role of its instance. The home stack gives that role
+  `bedrock:InvokeModel` on the chosen inference profiles and on the foundation models that
+  they route to. The installer writes the settings to Parameter Store.
+- On this machine, `clanker up` uses the AWS credentials of the environment: the keys in
+  `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, or the AWS CLI profile in `AWS_PROFILE`.
+  It reads them once at the start, and stops with an error when it finds none or the
+  session of the profile has expired.
+
+The dashboard and the audit log show this mode as `bedrock`. The agent asks for an answer of
+at most 16000 tokens, because the thinking of the model counts against the same limit, and
+waits 5 minutes for one answer. The cost of each call comes from the on-demand list prices
+of the default profiles and of their `global.` profiles. A call to another model records no
+cost, so the limit of 5 million tokens applies to it.
+
 Stop a running control plane before you start `make demo` again: `pkill -f "clanker up"`.
 
 ## What is in the repository

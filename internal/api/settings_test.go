@@ -69,6 +69,7 @@ type settingsAnswer struct {
 	Provider string            `json:"provider"`
 	Models   map[string]string `json:"models"`
 	BaseURL  string            `json:"base_url"`
+	Region   string            `json:"region"`
 	KeySet   *bool             `json:"key_set"`
 	Local    ollama.State      `json:"local"`
 	Done     string            `json:"done"`
@@ -105,14 +106,17 @@ func TestTheModelSettingsNameTheProviderOfEachMode(t *testing.T) {
 		provider string
 		keySet   bool
 		baseURL  string
+		region   string
 		models   int
 	}{
-		{agent.NewOpenRouter(canaryKey), "openrouter", "OpenRouter", true, "", 2},
+		{agent.NewOpenRouter(canaryKey), "openrouter", "OpenRouter", true, "", "", 2},
 		{agent.NewLocal("http://u:"+canaryKey+"@127.0.0.1:11434/v1?key="+canaryKey, canaryKey),
-			"local", "Ollama on this machine", true, "http://127.0.0.1:11434/v1", 2},
+			"local", "Ollama on this machine", true, "http://127.0.0.1:11434/v1", "", 2},
 		{agent.NewLocal("http://127.0.0.1:11434/v1", ""), "local", "Ollama on this machine",
-			false, "http://127.0.0.1:11434/v1", 2},
-		{agent.Replay{}, "replay", "Recorded answers", false, "", 0},
+			false, "http://127.0.0.1:11434/v1", "", 2},
+		{&agent.Bedrock{Region: "us-west-2"}, "bedrock", "Amazon Bedrock", false, "",
+			"us-west-2", 2},
+		{agent.Replay{}, "replay", "Recorded answers", false, "", "", 0},
 	}
 	for _, tc := range cases {
 		server := withSettings(t, tc.llm, theModel)
@@ -122,7 +126,7 @@ func TestTheModelSettingsNameTheProviderOfEachMode(t *testing.T) {
 			t.Fatalf("%s: status %d: %s", tc.mode, code, body)
 		}
 		if got.Mode != tc.mode || got.Provider != tc.provider || got.BaseURL != tc.baseURL ||
-			got.KeySet == nil || *got.KeySet != tc.keySet || len(got.Models) != tc.models {
+			got.Region != tc.region || got.KeySet == nil || *got.KeySet != tc.keySet || len(got.Models) != tc.models {
 			t.Errorf("%s: %s", tc.mode, body)
 		}
 		if strings.Contains(body, "canary") || strings.Contains(body, canaryKey[10:]) {

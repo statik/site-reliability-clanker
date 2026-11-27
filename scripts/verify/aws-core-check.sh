@@ -2,21 +2,23 @@
 # Run the core in AWS mode against stand-ins for AWS on this machine, and let it deploy the
 # first environment. No call goes to AWS.
 #
-# - scripts/verify/fakeaws serves Parameter Store, STS and ECS. Its RunTask runs the runner
-#   image with Docker, as Fargate runs a runner task. Its AssumeRole gets a session of
-#   MinIO, so each job gets a session with a session token, as from STS.
+# - scripts/verify/fakeaws serves Parameter Store, STS, ECS and Bedrock Converse. Its RunTask
+#   runs the runner image with Docker, as Fargate runs a runner task. Its AssumeRole gets a
+#   session of MinIO, so each job gets a session with a session token, as from STS. Its
+#   Converse gives a fixed answer to the Explainer and to the Reviewer.
 # - MinIO holds the state of the layers, with server-side encryption.
 # - The stacks of layers 10 to 50 are the stand-in stacks of scripts/verify/fakeaws/fixture.
 #   They use no provider. 10-network has no resource, like the real layer in its
 #   existing-network mode. The cluster of 20-cluster is a stand-in for the API server of EKS
 #   that fakeaws serves over TLS. It refuses every request and records its token.
-# - The core gets every setting from the stand-in for Parameter Store. Its environment
-#   holds only the path, the region and the address of the stand-in, and it starts with
-#   --fake-aws.
+# - The core gets every setting from the stand-in for Parameter Store, also the provider of
+#   the model (Bedrock) and a model for each role. Its environment holds only the path, the
+#   region and the address of the stand-in, and it starts with --fake-aws.
 #
 # The check starts the core once without the runner setting, which must stand by, and then
 # with every setting. The first deployment must plan 10-network in a runner task and wait
-# for approval. The admin and a second approver approve it through the API, and every layer
+# for approval, with the approval summary of the Explainer from Bedrock and the review of the
+# Reviewer. The admin and a second approver approve it through the API, and every layer
 # must be applied in runner tasks with STS sessions and state in the bucket. The variables of
 # the collector must reach 40-platform. Then a debug session must reach the stand-in cluster
 # with the kubeconfig of the broker and the keys of the session of the debugger role.
@@ -232,7 +234,9 @@ jq -n --arg db "postgres://postgres:check@${db_address}/clanker?sslmode=disable"
   CLANKER_OIDC_CLIENT_ID: "clanker", CLANKER_OIDC_CLIENT_SECRET: "check",
   CLANKER_PUBLIC_URL: $base, CLANKER_ADMIN_EMAIL: "admin@example.com",
   CLANKER_APPROVER_EMAILS: "approver2@example.com", CLANKER_CORE_URL: $core, CLANKER_AWS_BOOTSTRAP: $bootstrap, CLANKER_AWS_RUNNER: $runner,
-  CLANKER_AWS_LAYER_VARIABLES: $variables, CLANKER_SLACK_WEBHOOK: $slack} |
+  CLANKER_AWS_LAYER_VARIABLES: $variables, CLANKER_SLACK_WEBHOOK: $slack,
+  CLANKER_LLM_PROVIDER: "bedrock", CLANKER_LLM_MODEL: "global.anthropic.claude-sonnet-5-5",
+  CLANKER_LLM_MODEL_EXPLAINER: "us.anthropic.claude-haiku-5-5"} |
   {"/src/check": ., "/src/standby": del(.CLANKER_AWS_RUNNER)}' >"${work}/parameters.json"
 
 echo "== start the stand-ins"
@@ -303,6 +307,24 @@ http://host.docker.internal:${port} ${env_name} CLANKER_CORE_URL,CLANKER_JOB_TOK
 plan_log="$(sql "SELECT log FROM jobs WHERE work_item = '${item}' AND layer = '10-network' AND kind = 'plan'")"
 grep -q -- "-backend-config=key=${env_name}/10-network.tfstate" <<<"${plan_log}" ||
   fail "the plan job did not use the state key of its layer"
+
+echo "== the Explainer and the Reviewer called Bedrock with the role of the core"
+converse="$(jq -rs '[.[] | select(.service == "bedrock") | .detail.role + ": " +
+  .detail.model] | unique | join(", ")' "${record}")"
+[ "${converse}" = "Explainer role: us.anthropic.claude-haiku-5-5, Reviewer role: \
+global.anthropic.claude-sonnet-5-5" ] ||
+  fail "the Explainer and the Reviewer did not call Bedrock with their models: ${converse}"
+[ "$(jq -cs '[.[] | select(.service == "bedrock") | .detail.max_tokens] | unique' \
+  "${record}")" = "[16000]" ] || fail "a Converse call did not ask for 16000 tokens"
+calls="$(sql "SELECT DISTINCT role || ' ' || model || ' ' || mode || ' ' || prompt_tokens || ' ' ||
+  completion_tokens || ' ' || round(cost_usd::numeric, 6) FROM agent_calls ORDER BY 1")"
+want_calls="explainer us.anthropic.claude-haiku-5-5 bedrock 1000 100 0.000165
+reviewer global.anthropic.claude-sonnet-5-5 bedrock 1000 100 0.003000"
+[ "${calls}" = "${want_calls}" ] ||
+  fail "the records of the model calls do not name Bedrock, the models and the cost: ${calls}"
+[ "$(sql "SELECT data FROM events WHERE type = 'agent.explained' AND work_item = '${item}'
+  LIMIT 1" | jq -r '.mode + " " + .model')" = "bedrock us.anthropic.claude-haiku-5-5" ] ||
+  fail "the approval summary of ${item} is not from the Explainer on Bedrock"
 
 echo "== the admin and a second approver approve; every layer is applied"
 [ "$(sign_in approver2@example.com "${work}/approver.jar")" = approver ] ||
@@ -428,7 +450,8 @@ if [ "${failures}" -ne 0 ]; then
   echo "RESULT: ${failures} checks failed. The files are in ${work}"
   exit 1
 fi
-echo "RESULT: the core on AWS read its settings from Parameter Store, planned 10-network in" \
+echo "RESULT: the core on AWS read its settings from Parameter Store, explained and" \
+  "reviewed the first deployment with Bedrock, planned 10-network in" \
   "a runner task with an STS session and S3 state, applied layers 10 to 50 after two" \
   "approvals with the variables of the collector, and ran a debug session against the" \
   "stand-in cluster with the kubeconfig of the broker and the session of the debugger"
