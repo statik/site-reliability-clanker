@@ -290,7 +290,10 @@ control plane writes.
    `<repository>/<chart_name>@<chart_digest>` with `version = chart_version`, so Helm
    checks that the digest is the digest of that version. Helm does not check the digest
    of a chart in an `https://` repository. When the pack has records and the version has
-   none, a precondition stops the plan and names the record to add.
+   none, a precondition stops the plan and names the record to add. The runner fetches
+   such a chart without a credential: each job gets a registry configuration of its own
+   (`HELM_CONFIG_HOME`, `HELM_REGISTRY_CONFIG` and `DOCKER_CONFIG`), so Helm asks no
+   credential helper of the machine.
 3. `<name>-extras`, the chart `apps/<name>/extras`, when the pack has `deploy.extras`.
 
 Each release has `timeout = deploy.timeout_seconds` (default 300), `wait = true` and

@@ -52,8 +52,20 @@ type Runner struct {
 	digestOnce sync.Once
 	digest     string
 	dockerHost string
+	helmHome   string
 	unpack     sync.Mutex
 }
+
+// registryConfigText is the registry configuration of every OpenTofu job, for Helm and Docker.
+// Helm's registry client reads a Helm file (HELM_REGISTRY_CONFIG, or registry/config.json
+// below HELM_CONFIG_HOME, depending on the code path of the Helm provider) and then the
+// Docker configuration (DOCKER_CONFIG). A file that configures no credential makes the
+// client ask the native credential store of the platform, and the Docker configuration of
+// the user can name the helper of Docker Desktop. On a Mac such a helper can wait for the
+// keychain, so a pull from ghcr.io hangs until the Helm timeout. One entry for a name that
+// never resolves configures a credential, so the client asks no helper and pulls public
+// charts and images anonymously.
+const registryConfigText = `{"auths": {"registry.invalid": {}}}` + "\n"
 
 // New returns a runner that keeps its files below dir.
 func New(dir string) (*Runner, error) {
@@ -67,12 +79,25 @@ func New(dir string) (*Runner, error) {
 			return nil, fmt.Errorf("create runner directory %s: %w", sub, err)
 		}
 	}
+	r.helmHome = filepath.Join(r.WorkRoot, "helm")
+	if err := os.MkdirAll(filepath.Dir(r.registryConfig()), 0o755); err != nil {
+		return nil, fmt.Errorf("create registry directory of %s: %w", r.helmHome, err)
+	}
+	if err := os.WriteFile(r.registryConfig(), []byte(registryConfigText), 0o644); err != nil {
+		return nil, fmt.Errorf("write registry configuration %s: %w", r.registryConfig(), err)
+	}
 	out, err := exec.Command("docker", "context", "inspect", "--format",
 		"{{.Endpoints.docker.Host}}").Output()
 	if err == nil {
 		r.dockerHost = strings.TrimSpace(string(out))
 	}
 	return r, nil
+}
+
+// registryConfig returns the file with the registry configuration of the jobs. It is where
+// Helm looks below its configuration directory, and its name is the one that Docker reads.
+func (r *Runner) registryConfig() string {
+	return filepath.Join(r.helmHome, "registry", "config.json")
 }
 
 // Checkout is the tree of one commit that a job works on.
@@ -257,6 +282,9 @@ func (r *Runner) prepare(j Job) (run, func(), error) {
 		"TF_IN_AUTOMATION=1",
 		"TF_INPUT=0",
 		"TF_PLUGIN_CACHE_DIR="+r.PluginCache,
+		"HELM_CONFIG_HOME="+r.helmHome,
+		"HELM_REGISTRY_CONFIG="+r.registryConfig(),
+		"DOCKER_CONFIG="+filepath.Dir(r.registryConfig()),
 	)
 	if stateLocation != "" {
 		env = append(env, "TF_VAR_state_location="+stateLocation)
