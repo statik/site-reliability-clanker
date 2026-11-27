@@ -1,0 +1,12 @@
+# A drain of a node stops one Keycloak pod at a time, so the others keep the cache entries.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      {{- include "keycloak.selector" . | nindent 6 }}
