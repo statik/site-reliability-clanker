@@ -35,4 +35,9 @@ module "platform" {
   public_address          = "localhost:${var.public_port}"
   collector_endpoint      = var.collector_endpoint
   collector_token         = var.collector_token
+
+  # Public DNS answers every name under this domain with 127.0.0.1, where the host port
+  # serves the gateway. CoreDNS answers them in the cluster with the Service of Envoy.
+  app_domain          = "127-0-0-1.sslip.io"
+  rewrite_cluster_dns = true
 }

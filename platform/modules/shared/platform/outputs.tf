@@ -18,6 +18,16 @@ output "public_address" {
   description = "Address that serves the application. Empty while the load balancer has none."
 }
 
+output "public_port" {
+  value       = var.public_port
+  description = "Port of the public listener."
+}
+
+output "app_domain" {
+  value       = var.app_domain
+  description = "Domain of the host names of the applications. Empty: no application has a host name."
+}
+
 output "envoy_service" {
   value       = "${local.envoy_namespace}/${local.envoy_service_name}"
   description = "Namespace and name of the Service of Envoy."

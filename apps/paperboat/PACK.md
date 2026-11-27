@@ -107,10 +107,11 @@ platform (the route, `<name>-platform`, `<name>-generated`), then the chart of t
 release record or of `deploy.chart` with the values files, the values of the record, the
 values of the platform and the settings, then the extras chart. A chart that a record
 names is a chart of another project, so it does not get the values of the platform
-(`platform.*`); its values files read the objects of the platform by name. It does not read
-`deploy.route.hostname`, `deploy.route.wildcard` or `deploy.workloads_namespace` yet:
-steps S10 and S11 of #148 add them. `packs/nginx` is the smallest pack that uses each
-of the other fields.
+(`platform.*`); its values files read the objects of the platform by name. With
+`deploy.route.hostname` the application gets the host name `<name>.<app_domain>` of the
+target, and its URL is on that name (`platform/CONTRACT.md` section 4). The layer does not
+read `deploy.workloads_namespace` yet: step S11 of #148 adds it. `packs/nginx` is the
+smallest pack that uses each of the other fields.
 
 **Release records.** A pack can have a record `<version>.json` beside the note of each
 release. When a pack has records, every release must have one, and each record must have

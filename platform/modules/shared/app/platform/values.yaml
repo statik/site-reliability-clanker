@@ -18,6 +18,9 @@ route:
   # Request timeout, for example "30s". "0s" is no timeout. Empty: the default of the
   # gateway.
   timeout: ""
+  # Host names of the route, for example example.127-0-0-1.sslip.io and
+  # *.example.127-0-0-1.sslip.io. Empty: every host name.
+  hostnames: []
 
 # The data of the ConfigMap <name>-platform.
 platform:

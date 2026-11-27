@@ -189,6 +189,8 @@ application. `40-platform` makes that database.
 | `gateway_name` | `string` | Name of the Gateway that the routes of the application attach to | `clanker` |
 | `gateway_namespace` | `string` | Namespace of the Gateway | `clanker-gateway` |
 | `public_address` | `string` | Host name or IP address that serves the application | `localhost:8088` |
+| `public_port` | `number` | Port of the public listener: the input `public_port` | `8088` |
+| `app_domain` | `string` | Domain of the host names of the applications. A route with `hostname` gets `<name>.<app_domain>`. Empty: no application has a host name. The clouds have none yet: a private DNS zone and a certificate for each cloud come later, after the owner approves the cost | `127-0-0-1.sslip.io` |
 | `app_secret_name` | `string` | Kubernetes secret `<name>-db` in `app_namespace` with the credential of the database role of the application. See below | Same |
 | `shared_volume_claim` | `string` | `PersistentVolumeClaim` `<name>-shared` in `app_namespace`, `ReadWriteMany` | Same |
 | `targets` | `map(string)` | Where the application runs. The key `application` has the namespace of its components. The key `data` has the namespace of its data services, or it is empty when they are not in the cluster. The control plane reads the namespaces of a debug session and of the rights of its identities from this output, not from the application pack | `data` is the output `data_namespace` of `30-data` |
@@ -213,6 +215,15 @@ The entry point is the same on every target, the local target too:
   Service has none yet.
 - The ClusterRole `clanker-httproute-admin` adds the rights on `httproutes` to the
   ClusterRole `admin`, so the applier of `50-app` can manage the route in its namespace.
+- On the local target the public DNS answers every name under `app_domain` with
+  `127.0.0.1`. That is the host port of the gateway for the browser and the control plane,
+  but not for a pod. So the layer writes the key `Corefile` of the ConfigMap
+  `kube-system/coredns` (the module input `rewrite_cluster_dns`): the Corefile of kubeadm
+  with one rewrite, which answers each name under `app_domain`, and no other name, with the
+  Service of Envoy, under the name of the question. The Service has the port `public_port`
+  too, so one URL works from the host and from a pod. CoreDNS reloads the file about a
+  minute after the apply. The destroy of the layer takes the key out; the destroy of
+  `20-cluster` then deletes the cluster.
 
 The database of the application is the same on every target:
 
@@ -299,8 +310,8 @@ JupyterHub does.
 | `platform.name` | The name of the pack |
 | `platform.namespace` | `40-platform.app_namespace` |
 | `platform.version` | The version variable |
-| `platform.url` | The URL output: `http://<public_address>` |
-| `platform.hostname` | Empty. Step S10 of issue #148 adds host names |
+| `platform.url` | The URL output: `http://<name>.<app_domain>:<public_port>` for a route with `hostname` when the target has an `app_domain`, else `http://<public_address>` |
+| `platform.hostname` | `<name>.<app_domain>` for a route with `hostname` when the target has an `app_domain`, else empty |
 | `platform.imageRegistry` | `10-network.image_registry` |
 | `platform.databaseSecret` | `40-platform.app_secret_name`: the Secret `<name>-db` |
 | `platform.sharedVolumeClaim` | `40-platform.shared_volume_claim`: the claim `<name>-shared` |
@@ -313,7 +324,7 @@ it to these objects in `app_namespace`, by name, with `env` and `envFrom`:
 | Object | Content |
 |---|---|
 | Secret `<name>-db` | `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, `PGSSLMODE`, `DATABASE_URL` (see `40-platform`) |
-| ConfigMap `<name>-platform` | `APP_URL`, `APP_HOSTNAME`, `APP_WILDCARD_HOST` (empty until S10), `APP_VERSION` |
+| ConfigMap `<name>-platform` | `APP_URL` (`platform.url`), `APP_HOSTNAME` (`platform.hostname`), `APP_WILDCARD_HOST` (`*.<name>.<app_domain>` for a route with `wildcard`, else empty), `APP_VERSION`. The host names have no port |
 | Secret `<name>-generated` | One key for each entry of `deploy.secrets`, each with a random value of 32 letters and digits that the state of the layer keeps |
 | PersistentVolumeClaim `<name>-shared` | `ReadWriteMany` |
 
@@ -322,6 +333,9 @@ The HTTPRoute `<name>` of the core attaches the `ClusterIP` Service `deploy.rout
 on `deploy.route.port` to the Gateway of `40-platform`, with the path prefixes of
 `deploy.route.paths` (every path when it has none) and the request timeout
 `deploy.route.timeout_seconds` (`0` is no timeout; with none, the default of the gateway).
+With `deploy.route.hostname` and an `app_domain`, the route has the host name
+`<name>.<app_domain>`, and with `deploy.route.wildcard` also `*.<name>.<app_domain>`;
+it then gets only requests for those names. Without them it gets every host name.
 
 Paperboat reads `platform.imageRegistry` and `platform.version` for its image,
 `platform.databaseSecret`, `platform.sharedVolumeClaim` and `platform.adminToken`. Its
@@ -333,6 +347,10 @@ Service `paperboat-web` (port `8080`) is the route service.
 - Host port `8088` maps to node port `30080`. The Envoy Service is a `NodePort` Service
   with node port `30080` for the listener port `8088`. Host port `5001` is the image
   registry.
+- `app_domain` is `127-0-0-1.sslip.io`: the public DNS of sslip.io answers every name
+  under it with `127.0.0.1`, and CoreDNS answers them in the cluster with the Envoy Service
+  (see `40-platform`). A router or resolver that drops DNS answers with a private address
+  also drops these; then a line in the hosts file of the machine is the fallback.
 - The local target has no cloud identities. The broker issues Kubernetes service account
   tokens for the `identities` in `00-bootstrap`.
 

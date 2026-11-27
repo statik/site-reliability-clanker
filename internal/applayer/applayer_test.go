@@ -116,7 +116,7 @@ func TestTheLayerOfASecondPackHasItsNames(t *testing.T) {
 		`"gateway.replicaCount" = tostring(var.gateway_replicas)`,
 		`"jobservice.enabled"   = tostring(var.jobs_enabled)`,
 		`service         = "harbor-ui"`, `paths           = ["/api", "/v2"]`,
-		`timeout_seconds = 0`,
+		`timeout_seconds = 0`, `hostname        = true`, `wildcard        = false`,
 		`output "harbor_url" {`, `output "harbor_release" {`,
 	} {
 		if !strings.Contains(app, want) {

@@ -19,6 +19,23 @@ variable "public_port" {
   default     = 80
 }
 
+variable "app_domain" {
+  type        = string
+  description = "Domain of the host names of the applications. A route with a host name gets <name>.<app_domain>. Empty: no application has a host name."
+  default     = ""
+
+  validation {
+    condition     = var.app_domain == "" || can(regex("^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.])+[a-z]{2,63}$", var.app_domain))
+    error_message = "Set app_domain to a DNS domain in lowercase, such as 127-0-0-1.sslip.io, or to \"\"."
+  }
+}
+
+variable "rewrite_cluster_dns" {
+  type        = bool
+  description = "Make the DNS of the cluster answer each name under app_domain with the Service of Envoy, so that a pod reaches the URL of an application through the gateway. For a domain whose public DNS answer does not reach the gateway from a pod, such as 127-0-0-1.sslip.io on the local target. It writes the Corefile of the ConfigMap kube-system/coredns."
+  default     = false
+}
+
 variable "postgres_host" {
   type        = string
   description = "Private host name of Postgres."

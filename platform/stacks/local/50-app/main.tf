@@ -28,5 +28,7 @@ module "app" {
   gateway_name        = local.platform.gateway_name
   gateway_namespace   = local.platform.gateway_namespace
   public_address      = local.platform.public_address
+  public_port         = local.platform.public_port
+  app_domain          = local.platform.app_domain
   admin_token         = var.admin_token
 }

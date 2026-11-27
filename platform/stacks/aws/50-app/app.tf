@@ -66,6 +66,8 @@ locals {
       port            = 8080
       paths           = []
       timeout_seconds = null
+      hostname        = false
+      wildcard        = false
     }
   }
 }

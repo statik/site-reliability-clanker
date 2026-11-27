@@ -54,4 +54,6 @@ module "app" {
   gateway_name        = data.terraform_remote_state.platform.outputs.gateway_name
   gateway_namespace   = data.terraform_remote_state.platform.outputs.gateway_namespace
   public_address      = data.terraform_remote_state.platform.outputs.public_address
+  public_port         = data.terraform_remote_state.platform.outputs.public_port
+  app_domain          = data.terraform_remote_state.platform.outputs.app_domain
 }

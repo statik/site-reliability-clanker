@@ -208,6 +208,9 @@ type route struct {
 	Paths   []string
 	// Timeout is the HCL value of the request timeout: a number of seconds, or null.
 	Timeout string
+	// Hostname and Wildcard ask for the host names <name>.<app_domain> and
+	// *.<name>.<app_domain>.
+	Hostname, Wildcard bool
 }
 
 // AppTF returns app.tf of the stacks of the layer of the pack.
@@ -221,7 +224,8 @@ func AppTF(app pack.Pack) ([]byte, error) {
 		Extras: deploy.Extras != "", Records: app.HasRecords(),
 		TimeoutSeconds: deploy.HelmTimeout(), Secrets: deploy.Secrets,
 		Route: route{Service: deploy.Route.Service, Port: deploy.Route.Port,
-			Paths: deploy.Route.Paths, Timeout: "null"}}
+			Paths: deploy.Route.Paths, Timeout: "null", Hostname: deploy.Route.Hostname,
+			Wildcard: deploy.Route.Wildcard}}
 	if deploy.Route.TimeoutSeconds != nil {
 		values.Route.Timeout = strconv.Itoa(*deploy.Route.TimeoutSeconds)
 	}

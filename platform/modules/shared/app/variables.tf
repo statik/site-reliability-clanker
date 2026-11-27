@@ -21,6 +21,9 @@ variable "app" {
       paths = list(string)
       # Request timeout. 0 is no timeout; null is the default of the gateway.
       timeout_seconds = number
+      # A host name <name>.<app_domain> for the route, and every name below it.
+      hostname = bool
+      wildcard = bool
     })
   })
   description = "The application of the pack. The file app.tf of the stack writes it from the manifest."
@@ -79,6 +82,16 @@ variable "gateway_namespace" {
 variable "public_address" {
   type        = string
   description = "Host name or IP address that serves the application."
+}
+
+variable "public_port" {
+  type        = number
+  description = "Port of the public listener of 40-platform."
+}
+
+variable "app_domain" {
+  type        = string
+  description = "Domain of the host names of 40-platform. Empty: the route has no host name."
 }
 
 variable "admin_token" {
