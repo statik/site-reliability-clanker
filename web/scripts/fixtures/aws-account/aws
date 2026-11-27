@@ -98,6 +98,27 @@ reads() {
   "iam get-role")
     echo '"arn:aws:iam::111122223333:role/Operator"'
     ;;
+  "bedrock list-inference-profiles")
+    echo '[{"id":"global.anthropic.claude-sonnet-5-5","name":"Global Anthropic Claude Sonnet 5.5","status":"ACTIVE"},
+      {"id":"us.anthropic.claude-haiku-5-5","name":"US Anthropic Claude Haiku 5.5","status":"ACTIVE"},
+      {"id":"us.anthropic.claude-sonnet-5-5","name":"US Anthropic Claude Sonnet 5.5","status":"ACTIVE"},
+      {"id":"us.moonshotai.kimi-k3.1","name":"US Moonshot AI Kimi K3.1","status":"ACTIVE"}]'
+    ;;
+  "bedrock get-inference-profile")
+    case "$(arg --inference-profile-identifier "$@")" in
+    global.anthropic.claude-sonnet-5-5 | us.anthropic.claude-haiku-5-5 | \
+      us.anthropic.claude-sonnet-5-5 | us.moonshotai.kimi-k3.1)
+      echo '"ACTIVE"'
+      ;;
+    *)
+      refuse "An error occurred (ResourceNotFoundException) when calling the GetInferenceProfile operation: The inference profile was not found."
+      ;;
+    esac
+    ;;
+  "bedrock-runtime converse")
+    echo '{"stopReason":"end_turn","usage":{"inputTokens":12,"outputTokens":3,"totalTokens":15},
+      "output":{"message":{"role":"assistant","content":[{"text":"ready"}]}}}'
+    ;;
   "iam simulate-principal-policy")
     echo '[{"action":"iam:CreateRole","decision":"allowed"},{"action":"ec2:RunInstances","decision":"allowed"}]'
     ;;

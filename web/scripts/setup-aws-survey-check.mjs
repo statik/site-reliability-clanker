@@ -1,5 +1,5 @@
-// Walk through the setup wizard for AWS in a real browser: the survey, the names and tags,
-// the review, a Create that fails at the image of the core, Create again, a reload, and
+// Walk through the setup wizard for AWS in a real browser: the survey, Amazon Bedrock as the
+// language model, the names and tags, the review, a Create that fails at the image of the core, Create again, a reload, and
 // Remove. The walk runs against the stand-ins of scripts/fixtures/aws-account for aws, tofu,
 // docker, ops, make and pnpm, never against an account. It serves /healthz for the stand-in
 // of the load balancer.
@@ -83,16 +83,10 @@ if (steps.includes("Hand over")) problems.push('the steps for AWS include "Hand 
 for (const want of ["Names and tags", "Review", "Create", "Done"]) {
   if (!steps.includes(want)) problems.push(`the steps for AWS lack "${want}"`);
 }
-await press("Continue");
-
-await heading("Choose the language model of S.R.C.");
-if (!(await page.getByRole("radio", { name: /^A model on this machine/ }).isDisabled())) {
-  problems.push("the model on this machine is offered for AWS");
+if (steps.indexOf("Language model") !== steps.indexOf("Network") + 1) {
+  problems.push(`the language model does not follow the network on AWS: ${steps.join(", ")}`);
 }
-await page.getByRole("radio", { name: /^A hosted key/ }).check({ force: true });
-await page.getByLabel("OpenRouter API key").fill(modelKey);
-await shoot("model");
-await press("Save the key and continue");
+await press("Continue");
 
 await heading("Sign in to your AWS account.");
 await page.getByLabel("Profile").selectOption("fixture-operator");
@@ -111,7 +105,37 @@ const regions = await page.getByLabel("Region").locator("option").count();
 if (regions !== 2) problems.push(`the page lists ${regions} regions, want the 2 of the fixture`);
 await press("Use this network");
 
+await heading("Choose the language model of S.R.C.");
+if (!(await page.getByRole("radio", { name: /^A model on this machine/ }).isDisabled())) {
+  problems.push("the model on this machine is offered for AWS");
+}
+if (!(await page.getByRole("radio", { name: /^Amazon Bedrock in this account/ }).isChecked())) {
+  problems.push("Amazon Bedrock is not the default on AWS");
+}
+const heavy = page.getByLabel("Model of the Author, the Investigator and the Reviewer");
+await heavy.waitFor({ timeout: 30000 });
+const offered = await heavy.locator("option").allTextContents();
+if (offered.length !== 4 || !offered[0].includes("anthropic") || !offered[3].includes("kimi")) {
+  problems.push(`the profiles are ${offered.join(", ")}, want the 4 of the fixture, Anthropic first`);
+}
+if (await heavy.inputValue() !== "us.anthropic.claude-sonnet-5-5" ||
+  await page.getByLabel("Model of Triage and the Explainer").inputValue() !== "us.anthropic.claude-haiku-5-5") {
+  problems.push("the defaults are not Sonnet 5.5 and Haiku 5.5");
+}
+await heavy.selectOption("us.moonshotai.kimi-k3.1");
+if (!(await page.locator("main").textContent()).includes("no price for us.moonshotai.kimi-k3.1")) {
+  problems.push("the step does not say that a model with no price stops at the token limit");
+}
+await heavy.selectOption("global.anthropic.claude-sonnet-5-5");
+await shoot("model");
+await press("Check the models and continue");
+
 await heading("Choose the names and the tags.", 60000);
+const chosen = (await api("/api/state")).state;
+if (chosen.key_choice !== "bedrock" || chosen.bedrock_models.reviewer !== "global.anthropic.claude-sonnet-5-5" ||
+  chosen.bedrock_models.explainer !== "us.anthropic.claude-haiku-5-5") {
+  problems.push(`the choice of the model is ${JSON.stringify([chosen.key_choice, chosen.bedrock_models])}`);
+}
 await shoot("names-and-tags");
 const zones = page.getByRole("radiogroup", { name: "Zone" }).getByRole("radio");
 if ((await zones.count()) !== 2) problems.push(`the page lists ${await zones.count()} zones, want the 2 of the fixture`);
@@ -131,7 +155,11 @@ const review = await page.locator("main").textContent();
 for (const want of ["t4g.small", "auto scaling group of one", "db.t4g.micro", "machine image and its snapshot",
   "Two names in example.com", "src-clanker.example.com", "Layer 00-bootstrap", "Images", "Log groups",
   "example:owner (values not shown)", "admits only the router of your private network", "clanker_env=clanker",
-  weekly, "US West (Oregon)", "What Create does", "Build and push the images of the application", "111122223333"]) {
+  weekly, "US West (Oregon)", "What Create does", "Build and push the images of the application", "111122223333",
+  "Amazon Bedrock in this account, us-west-2: global.anthropic.claude-sonnet-5-5 for the Author",
+  "us.anthropic.claude-haiku-5-5 for Triage and the Explainer", "Bedrock bills each token to this account",
+  "Access to Amazon Bedrock", "Amazon Bedrock bills to this account for each token",
+  "S.R.C. stops the model calls of a day at 5 USD at list price."]) {
   if (!review.includes(want)) problems.push(`the review lacks "${want}"`);
 }
 checkPrivate("the review", review);
@@ -139,7 +167,10 @@ await shoot("review");
 
 // Until Create, every call reads, or makes a dry run.
 const beforeCreate = (await readFile(fixtureLog, "utf8")).trim().split("\n");
-const reads = /^(configure list-profiles|sts (get-caller-identity|decode-authorization-message)|(ec2|ecs) (describe|list)-[a-z-]+|iam (get-role|simulate-principal-policy)|route53 (list-hosted-zones|get-hosted-zone)|ssm get-parameter|ec2 run-instances .*--dry-run) /;
+// The one small call of each Bedrock model changes nothing either.
+const reads = /^(configure list-profiles|sts (get-caller-identity|decode-authorization-message)|(ec2|ecs) (describe|list)-[a-z-]+|iam (get-role|simulate-principal-policy)|route53 (list-hosted-zones|get-hosted-zone)|ssm get-parameter|ec2 run-instances .*--dry-run|bedrock (list|get)-inference-profiles?|bedrock-runtime converse) /;
+const converse = beforeCreate.filter((call) => call.startsWith("bedrock-runtime converse")).length;
+if (converse !== 2) problems.push(`the wizard called Converse ${converse} times, want once for each of the 2 models`);
 for (const call of beforeCreate) {
   if (!reads.test(`${call} `)) problems.push(`the wizard made a call that is not a read before Create: aws ${call}`);
 }
@@ -171,6 +202,9 @@ for (const want of ["http://127.0.0.1:7182", "admin@src-clanker-idp.example.com"
 }
 checkPrivate("the page after Create", done);
 const installed = await api("/api/state");
+if (!installed.job.lines.some((line) => line.startsWith("Amazon Bedrock in us-west-2 answered with"))) {
+  problems.push("Create did not check the Bedrock models");
+}
 if (!installed.job.lines.includes("The image of the core is ami-0f1c7e00000001, with the snapshot snap-0f1c7e00000001.") ||
   installed.job.lines.some((line) => line.startsWith("$ make bundle"))) {
   problems.push("Create again did not go on from the image of the core");
@@ -215,6 +249,7 @@ if (problems.length > 0) {
   console.error(`FAILED:\n${problems.join("\n")}`);
   process.exit(1);
 }
-console.log(`RESULT: the wizard surveyed the fixture account with ${beforeCreate.length} calls that read, stopped ` +
+console.log(`RESULT: the wizard surveyed the fixture account with ${beforeCreate.length} calls that read, chose ` +
+  "Amazon Bedrock after one call of each model, stopped " +
   "Create at the image of the core, went on from there, created the control plane with the stand-ins in 9 steps, " +
   "kept Done after a reload, removed it in 7 steps, and showed no private value");

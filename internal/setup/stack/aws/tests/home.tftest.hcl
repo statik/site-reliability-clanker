@@ -429,6 +429,147 @@ run "a_model_key_becomes_a_setting_of_the_core" {
   }
 }
 
+# A mock gives every profile the same routing: here that of a us. profile from us-west-2.
+run "bedrock_models_become_settings_and_a_statement_of_the_core" {
+  command = apply
+
+  variables {
+    bedrock_models = {
+      triage       = "us.anthropic.claude-haiku-5-5"
+      explainer    = "us.anthropic.claude-haiku-5-5"
+      author       = "us.anthropic.claude-sonnet-5-5"
+      investigator = "us.anthropic.claude-sonnet-5-5"
+      reviewer     = "us.anthropic.claude-sonnet-5-5"
+    }
+  }
+
+  override_data {
+    target = data.aws_bedrock_inference_profile.model
+    values = {
+      models = [
+        { model_arn = "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-test" },
+        { model_arn = "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-test" },
+        { model_arn = "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-test" },
+      ]
+    }
+  }
+
+  assert {
+    condition = [
+      for statement in data.aws_iam_policy_document.core.statement : {
+        actions   = toset(statement.actions)
+        resources = toset(statement.resources)
+      } if statement.sid == "InvokeTheModels"
+      ] == [{
+        actions = toset(["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"])
+        resources = toset([
+          "arn:aws:bedrock:us-west-2:123456789012:inference-profile/us.anthropic.claude-haiku-5-5",
+          "arn:aws:bedrock:us-west-2:123456789012:inference-profile/us.anthropic.claude-sonnet-5-5",
+          "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-test",
+          "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-test",
+          "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-test",
+        ])
+    }]
+    error_message = "The core may invoke the chosen profiles and the models in each region they route to."
+  }
+
+  assert {
+    condition     = length(data.aws_iam_policy_document.core.statement) == 7
+    error_message = "With Bedrock the role of the core has its six statements and the one for the models."
+  }
+
+  assert {
+    condition = {
+      for name in [
+        "CLANKER_LLM_PROVIDER", "CLANKER_LLM_MODEL_TRIAGE", "CLANKER_LLM_MODEL_EXPLAINER",
+        "CLANKER_LLM_MODEL_AUTHOR", "CLANKER_LLM_MODEL_INVESTIGATOR", "CLANKER_LLM_MODEL_REVIEWER",
+      ] : name => nonsensitive(aws_ssm_parameter.core[name].value)
+      } == {
+      CLANKER_LLM_PROVIDER           = "bedrock"
+      CLANKER_LLM_MODEL_TRIAGE       = "us.anthropic.claude-haiku-5-5"
+      CLANKER_LLM_MODEL_EXPLAINER    = "us.anthropic.claude-haiku-5-5"
+      CLANKER_LLM_MODEL_AUTHOR       = "us.anthropic.claude-sonnet-5-5"
+      CLANKER_LLM_MODEL_INVESTIGATOR = "us.anthropic.claude-sonnet-5-5"
+      CLANKER_LLM_MODEL_REVIEWER     = "us.anthropic.claude-sonnet-5-5"
+    }
+    error_message = "The provider and the model of each role must be settings of the core."
+  }
+
+  assert {
+    condition = (
+      length(aws_ssm_parameter.core) == 15 &&
+      !contains(keys(aws_ssm_parameter.core), "OPENROUTER_API_KEY") &&
+      aws_ssm_parameter.core["CLANKER_LLM_PROVIDER"].name == "/src/test/CLANKER_LLM_PROVIDER"
+    )
+    error_message = "Bedrock adds six settings below /src/test and no model key."
+  }
+}
+
+# GetInferenceProfile gives a global. profile the model without a region and the model of
+# the region of the stack.
+run "a_global_profile_lets_the_core_invoke_the_model_without_a_region" {
+  command = apply
+
+  variables {
+    bedrock_models = {
+      triage       = "global.anthropic.claude-sonnet-5-5"
+      explainer    = "global.anthropic.claude-sonnet-5-5"
+      author       = "global.anthropic.claude-sonnet-5-5"
+      investigator = "global.anthropic.claude-sonnet-5-5"
+      reviewer     = "global.anthropic.claude-sonnet-5-5"
+    }
+  }
+
+  override_data {
+    target = data.aws_bedrock_inference_profile.model
+    values = {
+      models = [
+        { model_arn = "arn:aws:bedrock:::foundation-model/anthropic.claude-sonnet-5-5" },
+        { model_arn = "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-5-5" },
+      ]
+    }
+  }
+
+  assert {
+    condition = [
+      for statement in data.aws_iam_policy_document.core.statement :
+      toset(statement.resources) if statement.sid == "InvokeTheModels"
+      ] == [toset([
+        "arn:aws:bedrock:us-west-2:123456789012:inference-profile/global.anthropic.claude-sonnet-5-5",
+        "arn:aws:bedrock:::foundation-model/anthropic.claude-sonnet-5-5",
+        "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-5-5",
+    ])]
+    error_message = "A global profile needs the profile, the model without a region and the model here."
+  }
+}
+
+run "bedrock_models_and_a_model_key_fail_the_plan" {
+  command = plan
+
+  variables {
+    model_api_key = "sk-or-v1-test-key-of-the-stack"
+    bedrock_models = {
+      triage       = "us.anthropic.claude-haiku-5-5"
+      explainer    = "us.anthropic.claude-haiku-5-5"
+      author       = "us.anthropic.claude-sonnet-5-5"
+      investigator = "us.anthropic.claude-sonnet-5-5"
+      reviewer     = "us.anthropic.claude-sonnet-5-5"
+    }
+  }
+
+  expect_failures = [var.bedrock_models]
+}
+
+run "bedrock_models_name_every_role" {
+  command = plan
+
+  variables {
+    bedrock_models = { author = "us.anthropic.claude-sonnet-5-5" }
+  }
+
+  expect_failures = [var.bedrock_models]
+}
+
 run "only_the_core_and_keycloak_decrypt_the_settings" {
   command = apply
 

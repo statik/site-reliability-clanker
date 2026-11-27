@@ -119,7 +119,11 @@ The credentials depend on where the control plane runs:
 
 - On AWS, the control plane uses the role of its instance. The home stack gives that role
   `bedrock:InvokeModel` on the chosen inference profiles and on the foundation models that
-  they route to. The installer writes the settings to Parameter Store.
+  they route to. The installer writes the settings to Parameter Store. In the wizard, the
+  step Language model of the AWS target offers Amazon Bedrock first: it lists the inference
+  profiles of the region and calls each chosen model once with your profile. The command
+  line has the same choice: `clanker install --cloud aws --model-provider bedrock`, with
+  `--bedrock-model ROLE=ID` for a role that needs another profile.
 - On this machine, `clanker up` uses the AWS credentials of the environment: the keys in
   `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, or the AWS CLI profile in `AWS_PROFILE`.
   It reads them once at the start, and stops with an error when it finds none or the

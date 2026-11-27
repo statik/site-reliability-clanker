@@ -14,9 +14,11 @@ const stepList = document.getElementById("steps");
 const STEPS = [
   { id: "target", title: "Where to run" },
   { id: "checks", title: "Check this machine" },
-  { id: "key", title: "Language model" },
+  { id: "key", title: "Language model", except: "aws" },
   { id: "signin", title: "Sign in", only: "aws" },
   { id: "where", title: "Network", only: "aws" },
+  // On AWS the model comes after the network: Amazon Bedrock answers in the region of it.
+  { id: "key", title: "Language model", only: "aws" },
   { id: "details", title: "Names and tags", only: "aws" },
   { id: "review", title: "Review" },
   { id: "create", title: "Create" },
@@ -28,7 +30,8 @@ let view = null;
 let step = "target";
 let message = null;
 let timer = null;
-const form = { target: "", env: "clanker", operator: "", key: "", model: "", local: null, profile: "", profiles: null,
+const form = { target: "", env: "clanker", operator: "", key: "", model: "", local: null, bedrock: null, heavy: "",
+  light: "", profile: "", profiles: null,
   checks: null, found: null, surveying: false, place: "", details: null, zone: "", tags: [], newTag: "",
   checkout: "", nanos: "", confirm: "" };
 
@@ -62,7 +65,8 @@ function el(tag, attributes = {}, ...children) {
   return node;
 }
 
-const visibleSteps = () => STEPS.filter((item) => !item.only || item.only === targetOf());
+const visibleSteps = () => STEPS.filter((item) => (!item.only || item.only === targetOf()) &&
+  item.except !== targetOf());
 const targetOf = () => form.target || view?.state.target || "";
 const jobRunning = () => view?.job?.status === "running";
 
@@ -219,13 +223,14 @@ function drawChecks() {
     buttons(
       button("Back", "secondary", () => go("target")),
       ready ? null : button("Check again", "secondary", () => { form.checks = null; draw(); }),
-      button("Continue", "primary", () => go("key"), !ready)),
+      button("Continue", "primary", () => go(targetOf() === "aws" ? "signin" : "key"), !ready)),
   ];
 }
 
 // ---------------------------------------------------------------- 3. language model
 
 const MODELS = {
+  bedrock: "Amazon Bedrock in this account",
   live: "A hosted key",
   local: "A model on this machine",
 };
@@ -270,6 +275,71 @@ function localModelBlock() {
   ];
 }
 
+// The roles that draft and review get the first model; Triage and the Explainer the second.
+const HEAVY_ROLES = ["author", "investigator", "reviewer"];
+const LIGHT_ROLES = ["triage", "explainer"];
+
+async function loadBedrock() {
+  try {
+    const found = await call("GET", "/api/aws/bedrock");
+    const ids = found.profiles.map((profile) => profile.id);
+    const pick = (role) => [view.state.bedrock_models?.[role], found.defaults[role]]
+      .find((id) => ids.includes(id)) ?? "";
+    form.heavy = pick("author");
+    form.light = pick("explainer");
+    form.bedrock = found;
+  } catch (error) { form.bedrock = { failed: true }; fail(error); return; }
+  draw();
+}
+
+function profileField(label, value, onchange) {
+  return el("label", { class: "field" }, label,
+    el("select", { onchange: (event) => { onchange(event.target.value); draw(); } },
+      value === "" ? el("option", { value: "", selected: true }, "Choose a model") : null,
+      form.bedrock.profiles.map((profile) => el("option", { value: profile.id, selected: profile.id === value },
+        `${profile.name} (${profile.id})`))));
+}
+
+// budgetNote says which daily limit stops the calls of the chosen models.
+function budgetNote() {
+  const unpriced = [...new Set([form.heavy, form.light])]
+    .filter((id) => id !== "" && !form.bedrock.priced.includes(id));
+  if (unpriced.length === 0) return el("p", { class: "help" }, "S.R.C. stops the model calls of a day at 5 USD at list price.");
+  return el("div", { class: "notice notice-warning" }, `S.R.C. has no price for ${unpriced.join(" and ")}, so the ` +
+    "model calls of a day stop at 5 million tokens of it, not at 5 USD.");
+}
+
+function bedrockBlock() {
+  if (form.bedrock === null) {
+    loadBedrock();
+    return el("p", { class: "block" }, el("span", { class: "spinner" }),
+      `Reading the inference profiles of Amazon Bedrock in ${view.state.region}…`);
+  }
+  if (form.bedrock.failed) {
+    return buttons(button("Read the profiles again", "secondary", () => { form.bedrock = null; message = null; draw(); }));
+  }
+  if (form.bedrock.profiles.length === 0) {
+    return el("div", { class: "notice notice-warning" },
+      `Amazon Bedrock has no active inference profile in ${form.bedrock.region} for this account.`);
+  }
+  return [
+    profileField("Model of the Author, the Investigator and the Reviewer", form.heavy, (id) => { form.heavy = id; }),
+    profileField("Model of Triage and the Explainer", form.light, (id) => { form.light = id; }),
+    budgetNote(),
+    el("p", { class: "help" }, `The inference profiles of Amazon Bedrock in ${form.bedrock.region}, those of ` +
+      "Anthropic first. Continue calls each chosen model once with your sign-in, with a few tokens, to check " +
+      "that this account has access. It changes nothing."),
+    view.job?.name === "model" ? jobBlock() : null,
+  ];
+}
+
+function bedrockModels() {
+  const models = {};
+  for (const role of HEAVY_ROLES) models[role] = form.heavy;
+  for (const role of LIGHT_ROLES) models[role] = form.light;
+  return models;
+}
+
 function hostedKeyBlock() {
   const where = targetOf() === "aws"
     ? "The wizard holds it in memory. Create writes it to home.tfvars on this machine, readable " +
@@ -285,6 +355,10 @@ function hostedKeyBlock() {
 function modelButton() {
   const busy = jobRunning();
   if (form.model === "live") return button("Save the key and continue", "primary", saveModel, busy);
+  if (form.model === "bedrock") {
+    return button("Check the models and continue", "primary", saveModel,
+      busy || form.bedrock?.profiles === undefined || form.heavy === "" || form.light === "");
+  }
   if (form.model !== "local") return button("Continue", "primary", saveModel, true);
   if (form.local === null || !form.local.ready) {
     return button("Check again", "secondary", () => { form.local = null; draw(); }, form.local === null);
@@ -295,30 +369,37 @@ function modelButton() {
 
 function drawKey() {
   const aws = targetOf() === "aws";
-  if (form.model === "") form.model = view.state.key_choice;
+  if (form.model === "") form.model = view.state.key_choice || (aws ? "bedrock" : "");
   if (aws && form.model === "local") form.model = "";
+  if (!aws && form.model === "bedrock") form.model = "";
   return [
     el("h1", {}, "Choose the language model of S.R.C."),
     el("p", { class: "lead" }, "The model drafts changes and writes the summaries. It gets no cloud " +
       "credential."),
     el("div", { class: "choices choices-list", role: "radiogroup", "aria-label": "Language model" },
+      aws ? modelChoice("bedrock", `The control plane calls Amazon Bedrock in ${view.state.region} with the role of ` +
+        "its instance, and needs no key. Bedrock bills each token to this account. S.R.C. stops the calls of a day " +
+        "at 5 USD for a model whose price it knows, and at 5 million tokens for another model.") : null,
       modelChoice("live", "An OpenRouter key. S.R.C. chooses a hosted model for each role, and stops " +
         "at 5 USD each day."),
       modelChoice("local", ["Ollama runs qwen3.8:27b on this machine. It needs no key, and no text " +
         "leaves the machine. It needs 32 GB of memory and about 18 GB of disk.", LOCAL_LIMITS],
         aws ? "A control plane on AWS cannot reach a model on this machine." : null)),
+    form.model === "bedrock" ? bedrockBlock() : null,
     form.model === "live" ? hostedKeyBlock() : null,
     form.model === "local" ? localModelBlock() : null,
     notice(),
-    buttons(button("Back", "secondary", () => go("checks"), jobRunning()), modelButton()),
+    buttons(button("Back", "secondary", () => go(aws ? "where" : "checks"), jobRunning()), modelButton()),
   ];
 }
 
-const afterModel = () => go(targetOf() === "aws" ? "signin" : "review");
+const afterModel = () => go(targetOf() === "aws" ? "details" : "review");
 
 async function saveModel() {
   try {
-    const { started } = await call("POST", "/api/model", { choice: form.model, key: form.key });
+    const body = form.model === "bedrock" ? { choice: form.model, models: bedrockModels() }
+      : { choice: form.model, key: form.key };
+    const { started } = await call("POST", "/api/model", body);
     form.key = "";
     await refresh();
     if (!started) { afterModel(); return; }
@@ -385,7 +466,7 @@ function drawSignIn() {
     view.job?.name === "login" ? jobBlock() : null,
     notice(),
     buttons(
-      button("Back", "secondary", () => go("key")),
+      button("Back", "secondary", () => go("checks")),
       button(signedIn ? "Sign in again" : "Sign in", signedIn ? "secondary" : "primary", signIn,
         jobRunning() || form.profile === ""),
       button("Continue", "primary", () => go("where"), !signedIn || jobRunning())),
@@ -418,7 +499,9 @@ async function savePlace() {
     await call("POST", "/api/aws/place", body);
     await refresh();
     form.details = null;
-    go("details");
+    form.bedrock = null;
+    form.model = "";
+    go("key");
   } catch (error) { fail(error); }
 }
 
@@ -583,7 +666,7 @@ function drawDetails() {
   const details = form.details;
   if (details.failed) {
     return [el("h1", {}, "The wizard could not read your zones."), notice(),
-      buttons(button("Back", "secondary", () => go("where")),
+      buttons(button("Back", "secondary", () => go("key")),
         button("Try again", "primary", () => { form.details = null; draw(); }))];
   }
   return [
@@ -623,7 +706,7 @@ function drawDetails() {
     el("p", { class: "help" }, `The inputs go to ${details.directory}/home.tfvars, readable only by you.`),
     notice(),
     buttons(
-      button("Back", "secondary", () => go("where")),
+      button("Back", "secondary", () => go("key")),
       button("Continue", "primary", saveDetails, form.zone === "")),
   ];
 }
@@ -707,6 +790,7 @@ function drawAwsReview() {
       el("div", {}, el("dt", {}, "Required tags"), el("dd", {}, tags)),
       el("div", {}, el("dt", {}, "Language model"), el("dd", {}, MODELS[state.key_choice] ?? "Not chosen")),
       el("div", {}, el("dt", {}, "Nanos kernel"), el("dd", {}, state.nanos || "Not chosen"))),
+    el("p", { class: "block" }, el("strong", {}, "Language model. "), plan.model),
     el("table", {},
       el("thead", {}, el("tr", {}, el("th", {}, "Resource"), el("th", {}, "What it is"))),
       el("tbody", {}, plan.creates.map((item) => el("tr", {},

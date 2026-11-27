@@ -1,5 +1,11 @@
 package setup
 
+import (
+	"maps"
+	"slices"
+	"strings"
+)
+
 // hoursEachWeek turns a price for each hour into a price for one week.
 const hoursEachWeek = 168
 
@@ -45,8 +51,10 @@ type PlanItem struct {
 // AWSPlan is what the review shows for AWS: what the installer creates, where, with which
 // tag and at which price, and what stops it from starting.
 type AWSPlan struct {
-	Network  string     `json:"network"`
-	Access   string     `json:"access"`
+	Network string `json:"network"`
+	Access  string `json:"access"`
+	// Model names the language model of the control plane, and who bills it.
+	Model    string     `json:"model"`
 	Creates  []PlanItem `json:"creates"`
 	TagKey   string     `json:"tag_key"`
 	TagValue string     `json:"tag_value"`
@@ -114,15 +122,46 @@ func awsPlan(state State) *AWSPlan {
 		PlanItem{"Parameters", "the settings of the control plane, in Parameter Store " +
 			"below " + parameterPath(state.Env) + ", with a key that only the control " +
 			"plane and Keycloak can use: the database URL, the signing key, the sign-in, " +
-			"the inputs of the layers with the required tags, and the model key"},
+			"the inputs of the layers with the required tags, and " + modelParameters(state)},
 		PlanItem{"Security groups", "the load balancer admits only " + router +
 			" and the addresses of the network; each other part admits only its callers"})
+	plan.addModel(state)
 	for _, line := range awsPrices.Lines {
 		line.Weekly = line.Hourly * hoursEachWeek
 		plan.Prices.Lines = append(plan.Prices.Lines, line)
 		plan.Weekly += line.Weekly
 	}
 	return &plan
+}
+
+// modelParameters names the parameters of the language model.
+func modelParameters(state State) string {
+	if state.KeyChoice == ModelBedrock {
+		return "the provider and the models of the language model"
+	}
+	return "the model key"
+}
+
+// addModel says which language model the control plane uses. Amazon Bedrock gets a line
+// for the access of the role, and its tokens are not in the estimate.
+func (plan *AWSPlan) addModel(state State) {
+	switch state.KeyChoice {
+	case ModelBedrock:
+		plan.Model = "Amazon Bedrock in this account, " + state.Region + ": " +
+			modelSummary(state.BedrockModels) + ". Bedrock bills each token to this account. " +
+			budgetText(state.BedrockModels)
+		profiles := slices.Sorted(maps.Keys(distinct(state.BedrockModels)))
+		plan.Creates = append(plan.Creates, PlanItem{"Access to Amazon Bedrock", "the role " +
+			"of the virtual machine may call the inference profiles " +
+			strings.Join(profiles, ", ") + " in " + state.Region + " and the foundation " +
+			"models that they route to. The control plane needs no model key."})
+		plan.NotPriced = append(plan.NotPriced, "the tokens of the language model, which "+
+			"Amazon Bedrock bills to this account for each token")
+	case ModelHosted:
+		plan.Model = "OpenRouter, with the key that you gave. OpenRouter bills each token."
+	default:
+		plan.Model = "Not chosen"
+	}
 }
 
 // blockers says why the installer cannot start with the choices of the state.

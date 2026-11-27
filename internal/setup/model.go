@@ -16,16 +16,18 @@ import (
 )
 
 // The choices of the step "Language model". They are the values of State.KeyChoice.
+// ModelBedrock is Amazon Bedrock in the account of the AWS target.
 const (
-	ModelHosted = "live"
-	ModelLocal  = "local"
+	ModelHosted  = "live"
+	ModelLocal   = "local"
+	ModelBedrock = "bedrock"
 )
 
 // knownChoice returns the choice when this version has it, and no choice when it does
 // not. An earlier version had a third choice, the recorded answers; a saved state with
 // that value makes the person choose again.
 func knownChoice(choice string) string {
-	if choice == ModelHosted || choice == ModelLocal {
+	if choice == ModelHosted || choice == ModelLocal || choice == ModelBedrock {
 		return choice
 	}
 	return ""
@@ -163,7 +165,7 @@ func (s *Server) chooseModel(choice, key string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.key, s.modelChosen = key, true
-	s.state.KeyChoice = choice
+	s.state.KeyChoice, s.state.BedrockModels = choice, nil
 	return s.save()
 }
 

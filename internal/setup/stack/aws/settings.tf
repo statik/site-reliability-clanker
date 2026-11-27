@@ -54,7 +54,13 @@ locals {
   admin_email    = "admin@${local.idp_host}"
   approver_email = "approver@${local.idp_host}"
 
-  core_settings = {
+  # The settings of the model on Bedrock. The region of Bedrock is AWS_REGION of the image.
+  model_settings = var.bedrock_models == null ? {} : merge(
+    { CLANKER_LLM_PROVIDER = "bedrock" },
+    { for role, model in var.bedrock_models : "CLANKER_LLM_MODEL_${upper(role)}" => model },
+  )
+
+  core_settings = merge(local.model_settings, {
     CLANKER_DATABASE_URL        = local.database_url
     CLANKER_SIGNING_KEY         = local.signing_key
     CLANKER_PUBLIC_URL          = local.core_url
@@ -66,9 +72,10 @@ locals {
     CLANKER_AWS_RUNNER          = local.runner_setting
     CLANKER_AWS_LAYER_VARIABLES = local.layer_variables
     OPENROUTER_API_KEY          = var.model_api_key
-  }
+  })
   # A for_each key cannot come from a map with secret values, so the names are a list.
   core_setting_names = toset(concat(
+    keys(local.model_settings),
     [
       "CLANKER_DATABASE_URL", "CLANKER_SIGNING_KEY", "CLANKER_PUBLIC_URL", "CLANKER_OIDC_ISSUER",
       "CLANKER_OIDC_CLIENT_ID", "CLANKER_OIDC_CLIENT_SECRET", "CLANKER_ADMIN_EMAIL",

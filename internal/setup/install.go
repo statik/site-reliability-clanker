@@ -90,9 +90,15 @@ type InstallInput struct {
 	// Tags are the tags that the organization requires. A key with an empty value keeps
 	// the value of home.tfvars. No log, error or record holds a value.
 	Tags map[string]string
+	// ModelProvider is ProviderBedrock or ProviderOpenRouter. Empty keeps the choice of
+	// home.tfvars; a ModelKey alone chooses OpenRouter.
+	ModelProvider string
 	// ModelKey is the OpenRouter key of the core. Empty keeps the key of home.tfvars.
 	ModelKey string
-	Nanos    string
+	// BedrockModels is the inference profile of Amazon Bedrock for some roles. A role
+	// without one keeps the profile of home.tfvars, or gets its default.
+	BedrockModels map[string]string
+	Nanos         string
 	// Source is a checkout of this repository. The runner image, the binary of the core
 	// and the images of the application are built from it.
 	Source string
@@ -239,7 +245,7 @@ func merge(in InstallInput, saved HomeVars) HomeVars {
 	vars.Network = pick(in.Network, saved.Network)
 	vars.RouterGroup = pick(in.RouterGroup, saved.RouterGroup)
 	vars.ZoneID = pick(in.ZoneID, saved.ZoneID)
-	vars.ModelKey = pick(in.ModelKey, saved.ModelKey)
+	mergeModel(in, saved, &vars)
 	if len(in.Subnets) > 0 {
 		vars.Subnets = in.Subnets
 	}
@@ -253,6 +259,26 @@ func merge(in InstallInput, saved HomeVars) HomeVars {
 		vars.Tags = map[string]string{}
 	}
 	return vars
+}
+
+// mergeModel chooses the model of the core: Amazon Bedrock with a profile for each role, or
+// OpenRouter with its key. One choice removes the other. Without a choice the saved one
+// stays, so a run never moves an environment to a model that bills by itself.
+func mergeModel(in InstallInput, saved HomeVars, vars *HomeVars) {
+	provider := in.ModelProvider
+	if provider == "" && in.ModelKey != "" {
+		provider = ProviderOpenRouter
+	}
+	switch provider {
+	case ProviderBedrock:
+		vars.ModelKey = ""
+		vars.BedrockModels = bedrockChoice(in.BedrockModels, saved.BedrockModels)
+	case ProviderOpenRouter:
+		vars.BedrockModels = nil
+		if in.ModelKey != "" {
+			vars.ModelKey = in.ModelKey
+		}
+	}
 }
 
 // secretsOf returns the values that no output may show.

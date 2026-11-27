@@ -65,7 +65,9 @@ type State struct {
 	Account   string `json:"account"`
 	Principal string `json:"principal"`
 	KeyChoice string `json:"key_choice"`
-	Deployed  bool   `json:"deployed"`
+	// BedrockModels is the inference profile of each role when KeyChoice is ModelBedrock.
+	BedrockModels map[string]string `json:"bedrock_models,omitempty"`
+	Deployed      bool              `json:"deployed"`
 	// PlaceMode says whether the control plane goes into a network that exists or into a
 	// new one. Network and Subnets name the network that exists; NetworkCIDR is the
 	// address range of the new one. Access says how a person reaches the control plane.
@@ -198,6 +200,7 @@ func (s *Server) Handler(listenHost string) (http.Handler, error) {
 	api("POST /api/model", s.postModel)
 	api("GET /api/model/local", s.getLocalModel)
 	api("GET /api/aws/profiles", s.getProfiles)
+	api("GET /api/aws/bedrock", s.getBedrockProfiles)
 	api("POST /api/aws/signin", s.postSignIn)
 	api("POST /api/aws/discover", s.postDiscover)
 	api("POST /api/aws/place", s.postPlace)

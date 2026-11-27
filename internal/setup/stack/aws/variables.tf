@@ -141,3 +141,35 @@ variable "model_api_key" {
   default     = null
   sensitive   = true
 }
+
+variable "bedrock_models" {
+  description = <<-EOT
+    The inference profile of Amazon Bedrock for each role of the agent: triage, explainer,
+    author, investigator and reviewer, for example us.anthropic.claude-sonnet-5-5. The core
+    calls Bedrock in this account and region with the role of its instance, and needs no
+    model_api_key. null: the core does not use Bedrock.
+  EOT
+  type        = map(string)
+  default     = null
+
+  validation {
+    condition = var.bedrock_models == null || (
+      try(toset(keys(var.bedrock_models)), null) ==
+      toset(["triage", "explainer", "author", "investigator", "reviewer"])
+    )
+    error_message = "bedrock_models must name a model for triage, explainer, author, investigator and reviewer."
+  }
+
+  validation {
+    condition = var.bedrock_models == null || alltrue([
+      for model in values(var.bedrock_models) :
+      can(regex("^[a-z]+\\.[a-z0-9-]+\\.[A-Za-z0-9.:-]+$", model))
+    ])
+    error_message = "Each model of bedrock_models must be the ID of a system inference profile, for example us.anthropic.claude-sonnet-5-5."
+  }
+
+  validation {
+    condition     = var.bedrock_models == null || nonsensitive(var.model_api_key == null)
+    error_message = "Give bedrock_models or model_api_key, not both."
+  }
+}

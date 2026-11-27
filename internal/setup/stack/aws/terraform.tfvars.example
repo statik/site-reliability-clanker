@@ -25,8 +25,19 @@ required_tags = {
   "example:owner"   = "owner@example.com"
 }
 
-# Optional: the OpenRouter API key of the core. Without it the core uses recorded answers.
+# Optional: the OpenRouter API key of the core. Without it, and without bedrock_models, the
+# core uses recorded answers.
 # model_api_key = "sk-or-..."
+
+# Optional, instead of model_api_key: Amazon Bedrock in this account, an inference profile
+# for each role. The role of the core may invoke these profiles and their models.
+# bedrock_models = {
+#   triage       = "us.anthropic.claude-haiku-5-5"
+#   explainer    = "us.anthropic.claude-haiku-5-5"
+#   author       = "us.anthropic.claude-sonnet-5-5"
+#   investigator = "us.anthropic.claude-sonnet-5-5"
+#   reviewer     = "us.anthropic.claude-sonnet-5-5"
+# }
 
 # Phase 2. Leave both unset for phase 1. The installer gives them. See README.md.
 # runner_image_digest = "sha256:<64 hexadecimal digits>"

@@ -3,6 +3,7 @@ package setup
 import (
 	"context"
 	"errors"
+	"maps"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -375,6 +376,67 @@ func TestInstallTakesTheValuesOfHomeTfvars(t *testing.T) {
 	if err != nil || vars.Tags["example:owner"] != fixtureTagValue || vars.Region != "us-west-2" ||
 		vars.ModelKey != fixtureModelKey {
 		t.Errorf("home.tfvars after the run = %+v, %v", vars, err)
+	}
+}
+
+func TestInstallWithBedrockChecksEachModelAndKeepsNoKey(t *testing.T) {
+	s := newInstallStage(t)
+	if _, err := s.install(s.input()); err != nil {
+		t.Fatal(err)
+	}
+	in := s.input()
+	in.ModelKey, in.ModelProvider = "", ProviderBedrock
+	in.BedrockModels = map[string]string{"reviewer": "global.anthropic.claude-sonnet-5-5"}
+	if _, err := s.install(in); err != nil {
+		t.Fatalf("%v\n%s", err, strings.Join(s.lines, "\n"))
+	}
+	vars, _, err := ReadHomeVars(filepath.Join(s.dir(), "home.tfvars"))
+	want := map[string]string{"triage": "us.anthropic.claude-haiku-5-5",
+		"explainer": "us.anthropic.claude-haiku-5-5", "author": "us.anthropic.claude-sonnet-5-5",
+		"investigator": "us.anthropic.claude-sonnet-5-5",
+		"reviewer":     "global.anthropic.claude-sonnet-5-5"}
+	if err != nil || vars.ModelKey != "" || !maps.Equal(vars.BedrockModels, want) {
+		t.Errorf("home.tfvars = key %q, models %v, %v", vars.ModelKey, vars.BedrockModels, err)
+	}
+	log := s.file(s.awsLog)
+	for _, id := range []string{"global.anthropic.claude-sonnet-5-5",
+		"us.anthropic.claude-haiku-5-5", "us.anthropic.claude-sonnet-5-5"} {
+		for _, call := range []string{"bedrock get-inference-profile " +
+			"--inference-profile-identifier " + id, "bedrock-runtime converse --model-id " + id} {
+			if strings.Count(log, call+" ") != 1 {
+				t.Errorf("the installer did not call aws %s once: %s", call, log)
+			}
+		}
+		if !slices.Contains(s.lines, "Amazon Bedrock in us-west-2 answered with "+id+
+			": 3 tokens.") {
+			t.Errorf("the log does not say that %s answered", id)
+		}
+	}
+	if !slices.ContainsFunc(s.lines, func(line string) bool {
+		return strings.Contains(line, "Bedrock bills each token to this account")
+	}) {
+		t.Error("the log does not say who bills the tokens")
+	}
+	s.checkPrivate(nil)
+}
+
+func TestInstallRefusesABedrockModelThatTheRegionDoesNotHave(t *testing.T) {
+	s := newInstallStage(t)
+	in := s.input()
+	in.ModelKey, in.ModelProvider = "", ProviderBedrock
+	in.BedrockModels = map[string]string{"author": "us.anthropic.claude-absent-1"}
+	_, err := s.install(in)
+	if err == nil || !strings.Contains(err.Error(), "step 2 of 9") ||
+		!strings.Contains(err.Error(), "us.anthropic.claude-absent-1") ||
+		!strings.Contains(err.Error(), "bedrock:GetInferenceProfile") {
+		t.Fatalf("err = %v, want the profile at step 2", err)
+	}
+	if applies := s.calls("tofu stack apply"); len(applies) != 0 {
+		t.Errorf("the home stack was applied: %q", applies)
+	}
+	in.BedrockModels = map[string]string{"writer": "us.anthropic.claude-sonnet-5-5"}
+	if _, err := s.install(in); err == nil || !strings.Contains(err.Error(), `no role "writer"`) {
+		t.Errorf("err = %v, want the unknown role", err)
 	}
 }
 

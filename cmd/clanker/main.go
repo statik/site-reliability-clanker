@@ -98,6 +98,15 @@ Flags of install on AWS (each one replaces the value of home.tfvars):
   --tag KEY=VALUE         a tag that the organization requires; repeat it. The values are
                           never printed
   --nanos VERSION         Nanos release of the kernel of the core (default 0.1.56)
+  --model-provider NAME   bedrock: the core calls Amazon Bedrock in the account with the
+                          role of its instance, and needs no key. openrouter: the core
+                          uses the key of --model-key-file. The installer calls each Bedrock
+                          model once with the profile before it creates anything. Without a
+                          choice, the choice of home.tfvars stays
+  --bedrock-model ROLE=ID the inference profile of one role (triage, explainer, author,
+                          investigator, reviewer); repeat it. A role without one keeps its
+                          profile of home.tfvars, or us.anthropic.claude-haiku-5-5 for triage
+                          and explainer and us.anthropic.claude-sonnet-5-5 for the others
   --model-key-file PATH   file with the OpenRouter API key of the core
 `
 
@@ -180,6 +189,10 @@ func parse(command string, args []string) (options, error) {
 		"(default "+setup.DefaultNanos+")")
 	flags.StringVar(&o.install.modelKeyFile, "model-key-file", "", "install: file that "+
 		"holds the OpenRouter API key")
+	flags.StringVar(&o.install.modelProvider, "model-provider", "", "install: bedrock or "+
+		"openrouter")
+	flags.Var(&o.install.bedrockModels, "bedrock-model", "install: the inference profile "+
+		"of a role, ROLE=ID; repeat it")
 	flags.BoolVar(&o.fakeAWS, "fake-aws", false, "for the checks only: send the AWS calls of "+
 		"the core to the stand-in at "+testEndpointEnv)
 	if err := flags.Parse(args); err != nil {
