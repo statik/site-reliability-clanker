@@ -94,6 +94,13 @@ describe("the section Language model", () => {
     show(settings({ mode: "openrouter", provider: "OpenRouter", key_set: true }), "admin");
     expect(host.textContent).toContain("through OpenRouter");
     expect(host.textContent).toContain("A key is set. The dashboard never shows it.");
+    show(settings({ mode: "bedrock", provider: "Amazon Bedrock", region: "us-west-2",
+      base_url: "", models: { author: "us.anthropic.claude-sonnet-5-5" } }), "admin");
+    expect(host.textContent).toContain("inference profile of Amazon Bedrock");
+    expect(host.textContent).toContain("Region us-west-2");
+    expect(host.textContent).not.toContain("Endpoint");
+    expect(host.textContent).toContain("the role of its instance");
+    expect(host.textContent).toContain("us.anthropic.claude-sonnet-5-5");
   });
 
   it("sends a person to the wizard to change the provider", () => {

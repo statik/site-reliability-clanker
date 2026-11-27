@@ -15,6 +15,8 @@ const MODE_MEANING: Record<string, string> = {
   local: "Each role calls a model on an endpoint that the operator runs, and no prompt goes " +
     "to a hosted provider.",
   replay: "Answers are recorded, and no model is called.",
+  bedrock: "Each role calls an inference profile of Amazon Bedrock in the AWS account of " +
+    "this control plane. Bedrock bills each token.",
 };
 
 interface RoleModel {
@@ -117,6 +119,14 @@ function LocalTile({ local, user, reload }: {
   );
 }
 
+function keyText(data: ModelSettings): string {
+  if (data.mode === "bedrock") {
+    return "No key. The AWS credentials of the control plane sign each call: on AWS, the " +
+      "role of its instance.";
+  }
+  return data.key_set ? "A key is set. The dashboard never shows it." : "No key is set.";
+}
+
 /** The section "Language model": what answers, and the control of the local inference. */
 export function ModelSection({ data, user, reload }: {
   data: ModelSettings;
@@ -141,9 +151,15 @@ export function ModelSection({ data, user, reload }: {
               <span className="app-mono">{data.base_url}</span>
             </p>
           )}
+          {data.region !== undefined && data.region !== "" && (
+            <p>
+              <span className="app-label">Region</span>{" "}
+              <span className="app-mono">{data.region}</span>
+            </p>
+          )}
           <p>
             <span className="app-label">Key</span>{" "}
-            {data.key_set ? "A key is set. The dashboard never shows it." : "No key is set."}
+            {keyText(data)}
           </p>
           <p className="app-secondary">
             This page does not change the provider. To change it, run the setup wizard

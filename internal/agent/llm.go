@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
 )
 
 // ChatMessage is one message of an OpenAI-compatible chat completion.
@@ -20,6 +22,9 @@ type ChatMessage struct {
 	Content    string     `json:"content"`
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string     `json:"tool_call_id,omitempty"`
+	// converse is the turn as Amazon Bedrock wrote it, with its thinking blocks. The next
+	// request of the loop sends it back unchanged. No record holds it.
+	converse []types.ContentBlock
 }
 
 // ToolCall is a request of the model to run a typed tool.

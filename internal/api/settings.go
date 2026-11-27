@@ -19,9 +19,11 @@ type modelSettings struct {
 	// Models is the model of each role. Empty when no model is called.
 	Models map[string]string `json:"models"`
 	// BaseURL is the endpoint of the mode local.
-	BaseURL string       `json:"base_url,omitempty"`
-	KeySet  bool         `json:"key_set"`
-	Local   ollama.State `json:"local"`
+	BaseURL string `json:"base_url,omitempty"`
+	// Region is the AWS region of the mode bedrock.
+	Region string       `json:"region,omitempty"`
+	KeySet bool         `json:"key_set"`
+	Local  ollama.State `json:"local"`
 	// Done says what a start or a stop did.
 	Done string `json:"done,omitempty"`
 }
@@ -48,9 +50,14 @@ func (s *Server) modelSettings(ctx context.Context) (modelSettings, error) {
 	if isChat {
 		settings.Models, settings.KeySet = s.Agent.Models, chat.APIKey != ""
 	}
+	if bedrock, isBedrock := s.Agent.LLM.(*agent.Bedrock); isBedrock {
+		settings.Models, settings.Region = s.Agent.Models, bedrock.Region
+	}
 	switch settings.Mode {
 	case "openrouter":
 		settings.Provider = "OpenRouter"
+	case agent.ModeBedrock:
+		settings.Provider = "Amazon Bedrock"
 	case "replay":
 		settings.Provider = "Recorded answers"
 	case "local":

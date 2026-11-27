@@ -245,6 +245,8 @@ export interface ModelSettings {
   provider: string;
   models: Record<string, string> | null;
   base_url?: string;
+  /** The AWS region of the mode bedrock. */
+  region?: string;
   key_set: boolean;
   local: LocalInference;
   /** What a start or a stop did. */
